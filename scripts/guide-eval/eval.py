@@ -39,7 +39,7 @@ SEED_PROMPT = ("We decided how a --shout flag for this CLI should behave: it upp
 
 # What a shell or make run leaves in the environment that must not reach a scratch daemon.
 SCRUB_NAMES = {"CLAUDECODE", "CLAUDE_PID", "CLAUDE_EFFORT", "CLAUDE_AGENT_SDK_VERSION", "MAKEFLAGS", "MFLAGS",
-               "MAKELEVEL", "PKG_CONFIG_PATH", "MACOSX_DEPLOYMENT_TARGET", "CGO_CFLAGS", "CGO_LDFLAGS"}
+               "MAKELEVEL", "PKG_CONFIG_PATH", "MACOSX_DEPLOYMENT_TARGET", "CGO_CFLAGS", "CGO_CPPFLAGS", "CGO_LDFLAGS"}
 SCRUB_PREFIXES = ("CODE_FOUNDRY_", "CLAUDE_CODE_", "GIT_")
 
 # A local bare origin means no write can reach GitHub through git. This keeps gh read-only

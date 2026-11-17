@@ -95,11 +95,10 @@ make gui-build   # "gui/bin/Code Foundry", a bare executable (no .app bundle)
 `./bin/code-foundry gui` starts `gui/bin/Code Foundry` and points it at that CLI. Dev
 builds never check for updates.
 
-`make build` also builds libghostty-vt from a pinned ghostty commit with a pinned zig on
-first use (about a minute; needs network access to ziglang.org, github.com and
-codeberg.org). The result lives in `~/Library/Caches/code-foundry/ghostty-vt/` and is
-shared by every checkout and worktree; the downloads are deleted after the build. It
-builds whisper.cpp, which `code-foundry-dictate` links, the same way from a pinned release
+`make build` also downloads the official prebuilt libghostty-vt (sha256-pinned, one
+download from release.files.ghostty.org) on first use. It lives in
+`~/Library/Caches/code-foundry/ghostty-vt/` and is shared by every checkout and worktree.
+It builds whisper.cpp, which `code-foundry-dictate` links, from a pinned release with cmake
 into `~/Library/Caches/code-foundry/whisper-cpp/`, and downloads ripgrep's official release
 binary (sha256-pinned) into `~/Library/Caches/code-foundry/ripgrep/` for `code-foundry-rg`.
 

@@ -1,5 +1,5 @@
 name: setup-go-ghostty
-description: Go toolchain from go.mod plus cached libghostty-vt and whisper.cpp builds and the ripgrep binary (shared by ci and release).
+description: Go toolchain from go.mod plus the cached prebuilt libghostty-vt, the whisper.cpp build and the ripgrep binary (shared by ci and release).
 runs:
   using: composite
   steps:
@@ -8,17 +8,18 @@ runs:
       with:
         go-version-file: go.mod
         # Go bakes the pkg-config link paths of libghostty-vt and whisper.cpp into compiled
-        # cgo packages without keying on them, so key the build cache on the library pins
-        # as well.
+        # cgo packages without keying on them. The Makefile names the libghostty-vt pin in
+        # CGO_CPPFLAGS, which Go does key on; whisper.cpp has no such guard, and keying the
+        # cache on the pins also drops entries no pin uses any more.
         cache-dependency-path: |
           go.sum
           scripts/ghostty-vt.sh
           scripts/whisper-cpp.sh
 
-    # libghostty-vt (static) from the pinned ghostty commit with zig 0.16.0, cached on
-    # both pins. The script installs into a per-user cache dir outside the checkout; the
-    # .pc files hardcode that absolute prefix, which is stable on runners. A cold build
-    # downloads zig and the ghostty source and takes about a minute.
+    # libghostty-vt (static), the official prebuilt release, cached on its version and
+    # sha256 (the key). The script installs into a per-user cache dir outside the
+    # checkout; the .pc it writes hardcodes that absolute prefix, which is stable on
+    # runners. A cold fetch is one download of about 16 MB.
     - name: libghostty-vt cache key
       id: ghostty-vt
       shell: bash

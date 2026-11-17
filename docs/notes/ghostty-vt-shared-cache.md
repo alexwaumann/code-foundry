@@ -1,5 +1,11 @@
 # ghostty-vt shared cache
 
+> Since 2026-11-17 the cache holds the official prebuilt library, not a zig build: the
+> entry is `<cache>/libghostty-vt-<version>-<sha8>/` with `lib/pkgconfig`, installed under
+> a per-key lock and renamed into place. The per-user cache, `GHOSTTY_VT_CACHE` and
+> `--print-prefix` below still hold; the zig, source and `<key>/ghostty-vt` parts are
+> history. See `libghostty-vt-prebuilt.md`.
+
 `scripts/ghostty-vt.sh` used to build libghostty-vt into `third_party/` of whichever
 checkout ran it, and left zig (403 MB) and the ghostty source (381 MB) there forever. With
 90+ worktrees that was ~70 GB of identical, gitignored bytes, for a 13 MB library.
@@ -27,3 +33,6 @@ action already works around this by keying the Go cache on the script). After sw
 the prefix, `make build` reused a cgo object compiled against another worktree's old
 `third_party` path and failed at link time. `go clean -cache` once fixes it. With one
 shared prefix the hazard is gone for good: every worktree now links the same path.
+(Not quite: two pins sharing one Go cache still collide when the bindings do not change
+with the library. The Makefile now names the pin in `CGO_CPPFLAGS`;
+`libghostty-vt-prebuilt.md` has the demonstration.)

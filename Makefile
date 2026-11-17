@@ -12,28 +12,31 @@ BUF    ?= $(shell command -v buf 2>/dev/null || echo $(GOBIN_DIR)/buf)
 WAILS3 ?= $(shell command -v wails3 2>/dev/null || echo $(GOBIN_DIR)/wails3)
 
 # One macOS deployment target for every cgo object we link, so the linker does not warn
-# "built for newer macOS version". libghostty-vt is built by zig for ghostty's minimum,
-# macOS 13.0, so Go builds target 13.0. (The Wails Taskfile still builds the GUI binary
-# for 12.0; it does not link libghostty-vt.)
+# "built for newer macOS version". The prebuilt libghostty-vt targets macOS 13.0, so Go
+# builds target 13.0. (The Wails Taskfile still builds the GUI binary for 12.0; it does
+# not link libghostty-vt.)
 export MACOSX_DEPLOYMENT_TARGET := 13.0
 export CGO_CFLAGS  := -mmacosx-version-min=13.0
 export CGO_LDFLAGS := -mmacosx-version-min=13.0
 
-# libghostty-vt (static) is built from a pinned ghostty commit into a per-user cache
-# shared by all worktrees (scripts/ghostty-vt.sh holds the pins and the cache layout;
-# override the root with GHOSTTY_VT_CACHE). The Go bindings find it via
-# pkg-config. The generated .pc hardcodes this absolute prefix, so the directory cannot
-# be moved after building.
+# libghostty-vt (static) is the official prebuilt release, fetched into a per-user cache
+# shared by all worktrees (scripts/ghostty-vt.sh holds the pin and the cache layout;
+# override the root with GHOSTTY_VT_CACHE). The Go bindings find it via pkg-config. The
+# .pc hardcodes this absolute prefix, so the directory cannot be moved.
 GHOSTTY_VT_PREFIX := $(shell ./scripts/ghostty-vt.sh --print-prefix)
-GHOSTTY_VT_PC     := $(GHOSTTY_VT_PREFIX)/share/pkgconfig/libghostty-vt-static.pc
-# whisper.cpp (static, Metal embedded) for code-foundry-dictate, built the same way into
-# its own per-user cache (scripts/whisper-cpp.sh; override the root with WHISPER_CPP_CACHE).
+# Go's build cache keys a cgo package on its CGO_* flags but not on pkg-config's output, so
+# a package compiled against one library pin would be reused, link path and all, by a
+# worktree on another pin sharing the cache. Naming the pin in CGO_CPPFLAGS (a define no
+# code reads) gives every pin its own cache entries (docs/notes/libghostty-vt-prebuilt.md).
+export CGO_CPPFLAGS := -DCODE_FOUNDRY_GHOSTTY_VT=$(shell ./scripts/ghostty-vt.sh --print-key)
+# whisper.cpp (static, Metal embedded) for code-foundry-dictate, built from source with
+# cmake into its own per-user cache (scripts/whisper-cpp.sh; override the root with WHISPER_CPP_CACHE).
 WHISPER_CPP_PREFIX := $(shell ./scripts/whisper-cpp.sh --print-prefix)
 # ripgrep (the official release binary, sha256-pinned) for text search, fetched into its own
 # per-user cache (scripts/ripgrep.sh; override the root with RIPGREP_CACHE) and shipped as
 # code-foundry-rg.
 RIPGREP_BIN := $(shell ./scripts/ripgrep.sh --print-bin)
-export PKG_CONFIG_PATH := $(GHOSTTY_VT_PREFIX)/share/pkgconfig:$(WHISPER_CPP_PREFIX)/share/pkgconfig$(if $(PKG_CONFIG_PATH),:$(PKG_CONFIG_PATH))
+export PKG_CONFIG_PATH := $(GHOSTTY_VT_PREFIX)/lib/pkgconfig:$(WHISPER_CPP_PREFIX)/share/pkgconfig$(if $(PKG_CONFIG_PATH),:$(PKG_CONFIG_PATH))
 
 VERSION  ?= dev
 # GitHub repository the in-app updater and install.sh download releases from.
@@ -277,9 +280,9 @@ promote:
 	@sleep 5
 	@gh run list --workflow release.yml --event workflow_dispatch --limit 1 --json url --jq '.[0].url'
 
-## ghostty-vt: build libghostty-vt from the pinned ghostty commit with zig 0.16.0 into the
+## ghostty-vt: fetch the pinned official prebuilt libghostty-vt (sha256-checked) into the
 ## shared per-user cache (~/Library/Caches/code-foundry/ghostty-vt/<key>/, override with
-## GHOSTTY_VT_CACHE). zig and the source are deleted after the build. No-op once the
+## GHOSTTY_VT_CACHE): one download per machine, installed atomically. No-op once the
 ## pkg-config file exists.
 ghostty-vt:
 	@./scripts/ghostty-vt.sh

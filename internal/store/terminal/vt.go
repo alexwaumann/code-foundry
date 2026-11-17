@@ -107,14 +107,16 @@ func formatActivePlain(t *ghostty.Terminal, cols, rows uint16) (string, error) {
 		return "", fmt.Errorf("screen text end: %w", err)
 	}
 	sel := ghostty.Selection{Start: *start, End: *end}
-	text, err := t.SelectionFormatString(
-		ghostty.WithSelection(&sel),
-		ghostty.WithSelectionFormat(ghostty.FormatterFormatPlain),
-		ghostty.WithSelectionTrim(true),
+	var b strings.Builder
+	err = formatTo(&b, t,
+		ghostty.WithFormatterSelection(&sel),
+		ghostty.WithFormatterFormat(ghostty.FormatterFormatPlain),
+		ghostty.WithFormatterTrim(true),
 	)
 	if err != nil {
 		return "", fmt.Errorf("screen text: %w", err)
 	}
+	text := b.String()
 	return text, nil
 }
 

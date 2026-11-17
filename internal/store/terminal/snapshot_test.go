@@ -25,12 +25,12 @@ type vtState struct {
 }
 
 var checkedModes = map[string]ghostty.Mode{
-	"DECCKM":          ghostty.ModeDECCKM,
+	"DECCKM":          ghostty.ModeCursorKeys,
 	"cursorVisible":   ghostty.ModeCursorVisible,
 	"bracketedPaste":  ghostty.ModeBracketedPaste,
-	"altScreenSave":   ghostty.ModeAltScreenSave,
-	"anyMouse":        ghostty.ModeAnyMouse,
-	"sgrMouse":        ghostty.ModeSGRMouse,
+	"altScreenSave":   ghostty.ModeAltScreenSaveCursorClearEnter,
+	"anyMouse":        ghostty.ModeMouseEventAny,
+	"sgrMouse":        ghostty.ModeMouseFormatSGR,
 	"wraparound":      ghostty.ModeWraparound,
 	"focusEvent":      ghostty.ModeFocusEvent,
 	"keypadKeys":      ghostty.ModeKeypadKeys,
@@ -266,6 +266,56 @@ func TestSnapshotDoesNotMutate(t *testing.T) {
 	term.VTWrite([]byte("\x1b[?1049l"))
 	if x, _ := term.CursorX(); x != 5 {
 		t.Fatalf("cursor x after 1049l = %d, want 5", x)
+	}
+}
+
+// The palette extra is 256 OSC 4 entries (~8 KiB), so a snapshot carries it only after a
+// program changed the palette, on either screen.
+func TestSnapshotPaletteOnlyWhenChanged(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  bool
+	}{
+		{"default palette", "\x1b[31mred\x1b[0m plain", false},
+		{"default palette on the alternate screen", "under\x1b[?1049h\x1b[Halt", false},
+		{"changed palette", "\x1b]4;1;rgb:12/34/56\x1b\\\x1b[31mred", true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			term := newTestVT(t, 40, 8)
+			term.VTWrite([]byte(tt.input))
+			snap, err := buildSnapshot(term)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := bytes.Contains(snap, []byte("\x1b]4;")); got != tt.want {
+				t.Errorf("snapshot has OSC 4 = %v, want %v: %q", got, tt.want, snap)
+			}
+		})
+	}
+}
+
+// formatTo starts every pass from no extras and no trimming, which libghostty 1.0 no
+// longer defaults to (it adds the palette, cursor style and hyperlink, and trims). The
+// row-counting pass relies on it: a VT pass without trimming ends every row, blank ones
+// included, with CRLF.
+func TestFormatToStartsFromNothing(t *testing.T) {
+	term := newTestVT(t, 20, 6)
+	term.VTWrite([]byte("\x1b[31mred\x1b[0m   \r\nsecond"))
+	var rows rowCounter
+	if err := formatTo(&rows, term, ghostty.WithFormatterFormat(ghostty.FormatterFormatVT)); err != nil {
+		t.Fatal(err)
+	}
+	if rows.crlfs != 5 {
+		t.Errorf("VT pass ends %d rows with CRLF, want 5 (all 6 rows, blank ones kept)", rows.crlfs)
+	}
+	vt, err := format(term, ghostty.WithFormatterFormat(ghostty.FormatterFormatVT))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := "\x1b[0m\x1b[38;5;1mred\x1b[0m   \r\nsecond"; !bytes.HasPrefix(vt, []byte(want)) {
+		t.Errorf("VT pass = %q, want it to start with %q (no palette, trailing spaces kept)", vt, want)
 	}
 }
 
