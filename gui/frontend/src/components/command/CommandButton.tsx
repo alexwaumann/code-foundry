@@ -2,8 +2,9 @@ import type { ComponentProps, ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tip } from "@/components/ui/tooltip";
-import { isStartable, startCommandNamed } from "@/keys/bindings";
-import { useCommandsStore } from "@/stores/commands";
+import { isStartable, startCommandNamed, viewActionChord } from "@/keys/bindings";
+import { formatChord } from "@/keys/chord";
+import { useCommandChord, useCommandsStore } from "@/stores/commands";
 
 type ButtonProps = ComponentProps<typeof Button>;
 
@@ -12,8 +13,16 @@ interface CommandButtonProps {
   command: string;
   /** The button's icon; omit it when `children` draws the whole content. */
   icon?: LucideIcon;
-  /** Tooltip of an icon-only button; defaults to the command's title. A button with content has none. Never a chord: those live in the palette and help. */
+  /** Tooltip of an icon-only button; defaults to the command's title. A button with content has none. */
   tooltip?: string;
+  /**
+   * The tooltip names the command's key after its name, as plain text ("Command Palette ⌘K"),
+   * so a user learns it: the first chord bound to the command (a rebind follows), else the
+   * view action standing in for it (viewActionChord); with neither, just the name. Opt-in, for
+   * the few always-there controls whose key is worth learning (the sidebar footer's palette and
+   * settings); every other tooltip is the name alone, and chords live in the palette and help.
+   */
+  withKey?: boolean;
   /** Which side an icon-only button's tooltip floats to; defaults to Tip's. */
   tooltipSide?: ComponentProps<typeof Tip>["side"];
   /** Dim the button although the command is listed: running it here would do nothing. */
@@ -47,6 +56,7 @@ export function CommandButton({
   icon: Icon,
   children,
   tooltip,
+  withKey = false,
   tooltipSide,
   disabled = false,
   whenUnavailable = "hide",
@@ -58,8 +68,10 @@ export function CommandButton({
   "data-testid": testId,
 }: CommandButtonProps) {
   const commandTitle = useCommandsStore((s) => s.commands.find((c) => c.name === command && isStartable(c))?.title ?? null);
+  const bound = useCommandChord(command);
   if (commandTitle === null && whenUnavailable === "hide") return null;
   const name = tooltip ?? commandTitle ?? command;
+  const chord = withKey ? bound || viewActionChord(command) : "";
   const dimmed = disabled || commandTitle === null;
   // Visible content names the button itself: no tooltip.
   const visible = children !== undefined;
@@ -91,7 +103,7 @@ export function CommandButton({
   // An icon-only button names itself in a tooltip (and aria-label). A disabled button gets
   // no pointer events, so a disabled one is hovered through a span around it.
   return (
-    <Tip label={name} side={tooltipSide}>
+    <Tip label={chord ? `${name} ${formatChord(chord)}` : name} side={tooltipSide}>
       {dimmed ? <span className="inline-flex">{button}</span> : button}
     </Tip>
   );

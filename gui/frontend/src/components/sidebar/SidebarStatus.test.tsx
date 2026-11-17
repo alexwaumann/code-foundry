@@ -3,6 +3,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CommandView } from "@/api/command";
 
 vi.mock("@/api/command", async (orig) => ({ ...(await orig<typeof import("@/api/command")>()), ...(await import("@/test/daemonFakes")).commandFakes }));
+// The real view actions' chords, unless a test takes cmd+k away.
+const unboundViewActions = vi.hoisted(() => ({ on: false }));
+vi.mock("@/keys/bindings", async (orig) => {
+  const real = await orig<typeof import("@/keys/bindings")>();
+  return { ...real, viewActionChord: (of: string | (() => void)) => (unboundViewActions.on ? "" : real.viewActionChord(of)) };
+});
 
 const { invocationsOf, resetDaemon } = await import("@/test/daemonFakes");
 const { TooltipProvider } = await import("@/components/ui/tooltip");
@@ -10,6 +16,7 @@ const { useCommandsStore } = await import("@/stores/commands");
 const { useUiStore } = await import("@/stores/ui");
 const { useViewsStore } = await import("@/stores/views");
 const { SidebarStatus } = await import("./SidebarStatus");
+const { tooltipText } = await import("@/test/tooltip");
 
 /**
  * The sidebar's status row: the palette, Usage, Help and Settings buttons, started like the
@@ -19,11 +26,11 @@ const { SidebarStatus } = await import("./SidebarStatus");
  * an open sheet's backdrop is e2e (settings-sheet.spec.ts, usage-page.spec.ts).
  */
 
-const cmd = (name: string, title: string): CommandView => ({ name, title, description: "", category: "View", args: [], keybindings: [], available: true });
+const cmd = (name: string, title: string, keybindings: string[] = []): CommandView => ({ name, title, description: "", category: "View", args: [], keybindings, available: true });
 
 beforeEach(() => {
   resetDaemon();
-  useCommandsStore.setState({ commands: [cmd("ui.palette.open", "Command Palette"), cmd("view.usage", "Usage"), cmd("view.help", "Help"), cmd("view.settings", "Settings")] });
+  useCommandsStore.setState({ commands: [cmd("ui.palette.open", "Command Palette"), cmd("view.usage", "Usage"), cmd("view.help", "Help", ["cmd+/"]), cmd("view.settings", "Settings", ["cmd+,"])] });
   useViewsStore.setState({ settingsOpen: false, usageOpen: false, themesOpen: false, helpOpen: false });
   useUiStore.setState({ selection: { kind: "thread", id: "a" } });
   act(() => {
@@ -33,6 +40,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  unboundViewActions.on = false;
 });
 
 function show() {
@@ -101,5 +109,31 @@ describe("SidebarStatus", () => {
       expect(useUiStore.getState().palette.open).toBe(true);
     });
     expect(invocationsOf("ui.palette.open")).toEqual([]);
+  });
+
+  // The palette's key is cmd+k, a view action (ui.palette.open has no keybinding of its own);
+  // Settings' is the registry's, which a user may rebind or unbind.
+  it("the palette and Settings tooltips name their key after the name; Usage and Help name none", () => {
+    show();
+    expect(tooltipText(screen.getByTestId("status-palette"))).toBe("Command Palette ⌘K");
+    expect(tooltipText(screen.getByTestId("status-settings"))).toBe("Settings ⌘,");
+    expect(tooltipText(screen.getByTestId("status-usage"))).toBe("Usage");
+    expect(tooltipText(screen.getByTestId("status-help"))).toBe("Keyboard Shortcuts and Help");
+    expect(screen.getByTestId("status-settings").getAttribute("aria-label")).toBe("Settings");
+  });
+
+  it.each([
+    ["rebound", ["cmd+alt+s"], "Settings ⌥⌘S"],
+    ["unbound", [], "Settings"],
+  ])("Settings' tooltip follows its binding: %s", (_case, keybindings, want) => {
+    useCommandsStore.setState((s) => ({ commands: s.commands.map((c) => (c.name === "view.settings" ? { ...c, keybindings } : c)) }));
+    show();
+    expect(tooltipText(screen.getByTestId("status-settings"))).toBe(want);
+  });
+
+  it("the palette's tooltip is the name alone with no key to open it", () => {
+    unboundViewActions.on = true;
+    show();
+    expect(tooltipText(screen.getByTestId("status-palette"))).toBe("Command Palette");
   });
 });

@@ -12,9 +12,15 @@ const runCommandForResult = vi.hoisted(() => vi.fn());
 const invokeConfirmed = vi.hoisted(() => vi.fn());
 vi.mock("@/stores/commands", async (orig) => ({ ...(await orig<typeof import("@/stores/commands")>()), runCommandForResult, invokeConfirmed }));
 const startCommandNamed = vi.hoisted(() => vi.fn(() => true));
-vi.mock("@/keys/bindings", async (orig) => ({ ...(await orig<typeof import("@/keys/bindings")>()), startCommandNamed }));
+// The real view actions' chords, unless a test takes cmd+b away.
+const unboundViewActions = vi.hoisted(() => ({ on: false }));
+vi.mock("@/keys/bindings", async (orig) => {
+  const real = await orig<typeof import("@/keys/bindings")>();
+  return { ...real, startCommandNamed, viewActionChord: (of: string | (() => void)) => (unboundViewActions.on ? "" : real.viewActionChord(of)) };
+});
 
 const { TopBar } = await import("./TopBar");
+const { tooltipText } = await import("@/test/tooltip");
 const { RemoveSpaceDialog } = await import("./RemoveSpaceDialog");
 const { resetLayout } = await import("@/stores/layout");
 const { useCommandsStore } = await import("@/stores/commands");
@@ -105,6 +111,7 @@ beforeEach(async () => {
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
+  unboundViewActions.on = false;
   resetLayout();
 });
 
@@ -123,6 +130,16 @@ describe("the top bar", () => {
     expect(tabs().map((t) => t.textContent)).toEqual(["Main1", "Release 0.222", "Reviews"]);
     expect(tabOf("sp-a").getAttribute("aria-selected")).toBe("true");
     expect(screen.getByTestId("top-bar-new-space")).toBeTruthy();
+  });
+
+  it("names the sidebar toggle's key (cmd+b) after its name, and only the name with no key", () => {
+    render(<TopBar />);
+    expect(tooltipText(screen.getByTestId("top-bar-sidebar-toggle"))).toBe("Toggle sidebar ⌘B");
+    cleanup();
+    unboundViewActions.on = true;
+    render(<TopBar />);
+    expect(tooltipText(screen.getByTestId("top-bar-sidebar-toggle"))).toBe("Toggle sidebar");
+    expect(screen.getByTestId("top-bar-sidebar-toggle").getAttribute("aria-label")).toBe("Toggle sidebar");
   });
 
   it("puts the Needs you control after back and forward, so they do not move when the sidebar collapses", async () => {

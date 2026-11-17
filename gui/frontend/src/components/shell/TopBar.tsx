@@ -4,7 +4,8 @@ import { CommandButton } from "@/components/command/CommandButton";
 import { Button } from "@/components/ui/button";
 import { Tip } from "@/components/ui/tooltip";
 import { APP_NAME_WIDTH, TITLE_BAND_HEIGHT, trafficLightGutter } from "@/components/window/titleBand";
-import { toggleSidebar } from "@/keys/bindings";
+import { toggleSidebar, viewActionChord } from "@/keys/bindings";
+import { formatChord } from "@/keys/chord";
 import { newSpace } from "@/shell/spaceActions";
 import { useCanStepFocus } from "@/stores/focusHistory";
 import { useLayoutStore } from "@/stores/layout";
@@ -53,7 +54,7 @@ export function TopBar() {
           Code Foundry
         </span>
         <span className="ml-2 flex shrink-0 items-center [--wails-draggable:no-drag]">
-          <Tip label="Toggle sidebar" side="bottom">
+          <Tip label={`Toggle sidebar ${formatChord(viewActionChord(toggleSidebar))}`.trim()} side="bottom">
             <Button variant="ghost" size="icon-xs" className="size-7" aria-label="Toggle sidebar" onClick={toggleSidebar} data-testid="top-bar-sidebar-toggle">
               <PanelLeft className="size-4" />
             </Button>
