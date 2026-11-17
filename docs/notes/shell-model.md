@@ -153,8 +153,11 @@ when the first working version is whole. Nothing partial is released.
   - **What a fold looks like.** A pane folded in a row is a rail 36px wide and as tall as its place;
     a pane folded in a column is a strip 36px tall and as wide as its place. Both show the tabs'
     icons, mark the selected one and carry the attention dot; a click on an icon unfolds the pane on
-    that tab. A column is narrower only when every pane in it folds, and a row is shorter only when
-    every pane in it folds.
+    that tab, and a click anywhere else on it that is not one of its buttons unfolds it on its
+    selected tab, as a click on that icon does (another pane may fold). The whole rail takes a light
+    hover tint to say it is clickable, the selected icon a step stronger on it; no animation, and
+    the rail adds no tab stop (the keyboard keeps to its icons and buttons). A column is narrower
+    only when every pane in it folds, and a row is shorter only when every pane in it folds.
   - **Which fold, in what order.** A pane the user collapsed is always folded and is not in this
     order (see "Collapsing a pane"). The others: panes without a thread tab first, then panes with
     one; within each, the least recently focused first (never focused before any that was, and
@@ -219,10 +222,11 @@ when the first working version is whole. Nothing partial is released.
     recently focused pane that is open. The focus may still rest on a collapsed pane: the direction
     keys reach it as they reach a rail (as drawn), and focus it without opening it, so the next key
     goes on from it; with shift they swap it with its neighbour, still collapsed. While it has the
-    focus its border is the focused one and the keyboard is on its selected icon; cmd+shift+m or a
-    click on an icon opens it.
-  - **Opening it.** A click on one of its icons opens it on that tab; cmd+shift+m while it has the
-    focus; its expand button; `pane.collapse --off` from the CLI. Opening from the user takes the
+    focus its border is the focused one and the keyboard is on its selected icon; cmd+shift+m, Enter
+    on that icon, or a click on the rail opens it.
+  - **Opening it.** A click on one of its icons opens it on that tab; a click anywhere else on the
+    rail that is not one of its buttons opens it on its selected tab, as its expand button does;
+    cmd+shift+m while it has the focus; its expand button; `pane.collapse --off` from the CLI. Opening from the user takes the
     focus; from a thread's model it does not.
   - **What opens it by itself.** An action that gives one of its tabs the user's focus opens it:
     a sidebar click on a thread whose tab it holds, an "already open" surface focused there,
