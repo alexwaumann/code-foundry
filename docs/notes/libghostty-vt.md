@@ -1,5 +1,10 @@
 # libghostty-vt Go bindings — verified findings (2026-10-08)
 
+> Since 2026-11-17 the library is the official prebuilt libghostty-vt 1.0.1 and the
+> bindings are at `v0.0.0-20261107144202-b13f277ddcb2` (libghostty 1.0 compat); zig is
+> gone. See `libghostty-vt-prebuilt.md`. The versions, build recipe and some API names
+> below are the original 0.x findings, kept as the record.
+
 Verified by actually building and running on macOS 27 arm64 with Command Line Tools only.
 
 ## Versions
@@ -39,7 +44,8 @@ PKG_CONFIG_PATH=<abs prefix>/share/pkgconfig go build ./...
 - `GridRef`, `Selection`, iterators are invalidated by the next mutating call or `Update`. Copy first.
 - CUP sequences are 1-based; API coordinates 0-based.
 - `NextDirty` also reports the row the cursor left.
-- No API stability promise. Expect renames when bumping the pseudo-version.
+- No API stability promise. Expect renames when bumping the pseudo-version. (The C ABI is
+  stable from 1.0; the Go bindings still have no tags.)
 
 Working demo: `libghostty-vt-demo.go.txt` next to this file.
 
@@ -53,9 +59,9 @@ need to build on that machine. Two things learned there still apply:
 * **Go's build cache does not key on pkg-config output.** The `.pc` link path is baked
   into the compiled cgo package. Moving or rebuilding the library under a different path
   with a warm cache links the old file, silently while it exists and with
-  `no such file or directory` once it is gone. CI keys setup-go's cache on
-  `scripts/ghostty-vt.sh` (the pins) as well as `go.sum`; locally, `go clean -cache` after
-  a pin bump or a path change.
+  `no such file or directory` once it is gone. Since 2026-11-17 the Makefile names the
+  pin in `CGO_CPPFLAGS`, which Go does key on, so a pin bump needs no `go clean -cache`
+  (`libghostty-vt-prebuilt.md`).
 * `strip -S` takes the archive from 11 MB to 2.6 MB with every exported symbol intact and
   the tests passing, and `ZERO_AR_DATE=1` makes the result byte-reproducible. Useful if
   the library is ever shipped separately again.

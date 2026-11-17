@@ -1,35 +1,43 @@
 #!/usr/bin/env bash
-# Builds libghostty-vt (static) from a pinned ghostty commit with a pinned zig into a
-# per-user cache shared by every checkout and worktree:
-#   $GHOSTTY_VT_CACHE/<key>/ghostty-vt   (default ~/Library/Caches/code-foundry/ghostty-vt)
-# where <key> is `--print-key` (ghostty commit + zig version + arch). Idempotent: exits
-# early when the pkg-config file exists. zig and the ghostty source are build
-# intermediates and are deleted after a successful build. Called by `make ghostty-vt`;
-# the Makefile reads the prefix with `--print-prefix`. See docs/notes/phase1a-terminal.md
-# and docs/notes/ghostty-vt-shared-cache.md.
+# Fetches the official prebuilt libghostty-vt (static, universal arm64 + x86_64, macOS
+# 13.0) into a per-user cache shared by every checkout and worktree:
+#   $GHOSTTY_VT_CACHE/<key>/   (default ~/Library/Caches/code-foundry/ghostty-vt)
+# where <key> is `--print-key` (version + the first 8 hex of the archive's sha256). The
+# prefix holds include/ghostty/, lib/libghostty-vt.a and lib/pkgconfig/
+# libghostty-vt-static.pc, which this script writes: the release ships no pkg-config
+# file, and the Go bindings link through one. Idempotent: exits early when the .pc is
+# there. Called by `make ghostty-vt`; the Makefile reads the prefix with `--print-prefix`
+# and the key with `--print-key`. See docs/notes/libghostty-vt-prebuilt.md.
 #
-# The Go bindings (go.mitchellh.com/libghostty, pinned in go.mod) track a specific
-# ghostty commit; bump GHOSTTY_COMMIT only together with that module version.
+# Many worktrees build at once, so the install is shared and atomic: one download per
+# machine under a per-key lock, unpacked into a temporary directory inside the cache and
+# renamed into place, so nobody ever sees a half-written prefix. Only this key's prefix,
+# lock and temporary directories are ever written or removed; entries for other pins
+# (older worktrees still on them, including the zig-built ones) are left alone.
+#
+# The Go bindings (go.mitchellh.com/libghostty, pinned in go.mod) target a libghostty-vt
+# 1.x; a later 1.x library works with earlier 1.x headers (lib.ghostty.org/vt/stability).
 set -euo pipefail
 
 # ---- pins ------------------------------------------------------------------------------
-GHOSTTY_REPO="https://github.com/ghostty-org/ghostty.git"
-GHOSTTY_COMMIT="34f39002c6e3974b54e6a6d400bd83777c5ea558"
-ZIG_VERSION="0.16.0"
-# sha256 values from https://ziglang.org/download/index.json (cross-checked at download).
-ZIG_SHA256_aarch64="b23d70deaa879b5c2d486ed3316f7eaa53e84acf6fc9cc747de152450d401489"
-ZIG_SHA256_x86_64="0387557ed1877bc6a2e1802c8391953baddba76081876301c522f52977b52ba7"
+VT_VERSION="1.0.1"
+# sha256 of ghostty-vt-<version>.xcframework.zip, as in the release's SHA256SUMS.
+VT_SHA256="c0f9631277f726154c8f521954d17cdc41aac4626fc0df8cf925a19ee58e829b"
 # ----------------------------------------------------------------------------------------
 
-KEY="ghostty-vt-${GHOSTTY_COMMIT}-zig-${ZIG_VERSION}-$(uname -m)"
+NAME="ghostty-vt-${VT_VERSION}.xcframework.zip"
+URL="https://release.files.ghostty.org/libghostty-vt/${VT_VERSION}/${NAME}"
+# The slice of the xcframework that is macOS; the others are iOS.
+SLICE="ghostty-vt.xcframework/macos-arm64_x86_64"
+KEY="libghostty-vt-${VT_VERSION}-${VT_SHA256:0:8}"
 CACHE="${GHOSTTY_VT_CACHE:-${HOME}/Library/Caches/code-foundry/ghostty-vt}"
-PREFIX="${CACHE}/${KEY}/ghostty-vt"
-BUILD="${CACHE}/${KEY}/build"
-SRC="${BUILD}/ghostty-src"
-ZIG_DIR="${BUILD}/zig"
-PC="${PREFIX}/share/pkgconfig/libghostty-vt-static.pc"
+PREFIX="${CACHE}/${KEY}"
+PC_REL="lib/pkgconfig/libghostty-vt-static.pc"
+PC="${PREFIX}/${PC_REL}"
+LOCK="${CACHE}/${KEY}.lock"
 
-# `--print-key` prints the cache key (CI uses it); `--print-prefix` the install prefix.
+# `--print-key` prints the cache key (CI and the Makefile use it); `--print-prefix` the
+# install prefix.
 case "${1:-}" in
 --print-key)
 	printf '%s\n' "${KEY}"
@@ -51,76 +59,69 @@ if [[ "$(uname -s)" != "Darwin" ]]; then
 	log "only macOS is supported"
 	exit 1
 fi
-case "$(uname -m)" in
-arm64 | aarch64) ARCH=aarch64 ZIG_SHA256="${ZIG_SHA256_aarch64}" ;;
-x86_64) ARCH=x86_64 ZIG_SHA256="${ZIG_SHA256_x86_64}" ;;
-*)
-	log "unsupported arch $(uname -m)"
-	exit 1
-	;;
-esac
 
-mkdir -p "${BUILD}"
-
-# ---- zig -------------------------------------------------------------------------------
-ZIG_NAME="zig-${ARCH}-macos-${ZIG_VERSION}"
-ZIG="${ZIG_DIR}/${ZIG_NAME}/zig"
-if [[ ! -x "${ZIG}" ]]; then
-	log "downloading ${ZIG_NAME}"
-	tmp="$(mktemp -d)"
-	trap 'rm -rf "${tmp}"' EXIT
-	curl -fsSL --retry 3 -o "${tmp}/index.json" https://ziglang.org/download/index.json
-	# Cross-check the pin against the published index (no jq dependency).
-	if ! grep -A4 "\"${ARCH}-macos\"" "${tmp}/index.json" | grep -q "${ZIG_SHA256}"; then
-		log "pinned sha256 for ${ZIG_NAME} not found in ziglang.org index.json"
-		exit 1
-	fi
-	curl -fsSL --retry 3 -o "${tmp}/zig.tar.xz" \
-		"https://ziglang.org/download/${ZIG_VERSION}/${ZIG_NAME}.tar.xz"
-	got="$(shasum -a 256 "${tmp}/zig.tar.xz" | cut -d' ' -f1)"
-	if [[ "${got}" != "${ZIG_SHA256}" ]]; then
-		log "sha256 mismatch for ${ZIG_NAME}: got ${got}, want ${ZIG_SHA256}"
-		exit 1
-	fi
-	rm -rf "${ZIG_DIR}"
-	mkdir -p "${ZIG_DIR}"
-	tar -xJf "${tmp}/zig.tar.xz" -C "${ZIG_DIR}"
-	rm -rf "${tmp}"
-	trap - EXIT
+# Everything below runs once per machine at a time: re-run this script under the kernel
+# lock on this key (lockf frees it if the holder dies). A waiter finds the .pc on its
+# second look and exits.
+if [[ "${1:-}" != "--locked" ]]; then
+	mkdir -p "${CACHE}"
+	exec lockf -k "${LOCK}" "$0" --locked
 fi
-got_version="$("${ZIG}" version)"
-if [[ "${got_version}" != "${ZIG_VERSION}" ]]; then
-	log "zig version ${got_version}, want ${ZIG_VERSION}"
+if [[ -f "${PC}" ]]; then
+	exit 0
+fi
+
+# Left behind only by a killed install of this key; nothing else can be using them while
+# the lock is held. A prefix without a .pc is the same: an install that never finished.
+rm -rf "${CACHE}/.${KEY}".tmp.*
+if [[ -e "${PREFIX}" ]]; then
+	log "removing incomplete ${PREFIX}"
+	rm -rf "${PREFIX}"
+fi
+
+WORK="$(mktemp -d "${CACHE}/.${KEY}.tmp.XXXXXX")"
+trap 'rm -rf "${WORK}"' EXIT
+
+log "downloading ${NAME}"
+curl --fail --silent --show-error --location --retry 3 --proto '=https' --tlsv1.2 \
+	-o "${WORK}/vt.zip" "${URL}"
+got="$(shasum -a 256 "${WORK}/vt.zip" | cut -d' ' -f1)"
+if [[ "${got}" != "${VT_SHA256}" ]]; then
+	log "checksum mismatch for ${NAME}: got ${got}, want ${VT_SHA256}"
 	exit 1
 fi
 
-# ---- ghostty source --------------------------------------------------------------------
-if [[ "$(git -C "${SRC}" rev-parse HEAD 2>/dev/null || true)" != "${GHOSTTY_COMMIT}" ]]; then
-	log "fetching ghostty ${GHOSTTY_COMMIT} (shallow)"
-	rm -rf "${SRC}"
-	git init -q "${SRC}"
-	git -C "${SRC}" remote add origin "${GHOSTTY_REPO}"
-	git -C "${SRC}" fetch -q --depth 1 origin "${GHOSTTY_COMMIT}"
-	git -C "${SRC}" checkout -q --detach FETCH_HEAD
-fi
-
-# ---- build -----------------------------------------------------------------------------
-# -Demit-xcframework=false: the xcframework step needs full Xcode, not just the CLT.
-# The generated .pc files hardcode PREFIX, so the output cannot be moved afterwards.
-log "building libghostty-vt into ${PREFIX}"
-rm -rf "${PREFIX}"
-(
-	cd "${SRC}"
-	"${ZIG}" build \
-		-Demit-lib-vt \
-		-Demit-xcframework=false \
-		-Doptimize=ReleaseFast \
-		--prefix "${PREFIX}"
-)
-if [[ ! -f "${PC}" ]]; then
-	log "build finished but ${PC} is missing"
+mkdir "${WORK}/x" "${WORK}/prefix"
+unzip -q "${WORK}/vt.zip" "${SLICE}/*" -d "${WORK}/x"
+lib="${WORK}/x/${SLICE}/libghostty-vt.a"
+hdr="${WORK}/x/${SLICE}/Headers/ghostty"
+if [[ ! -f "${lib}" || -L "${lib}" || ! -f "${hdr}/vt.h" ]]; then
+	log "the archive has no ${SLICE}/libghostty-vt.a or Headers/ghostty/vt.h"
 	exit 1
 fi
-# zig and the ghostty source (~800 MB) are only needed to produce the ~13 MB prefix.
-rm -rf "${BUILD}"
+if ! grep -q "#define GHOSTTY_VT_VERSION \"${VT_VERSION}\"" "${hdr}/vt/version.h"; then
+	log "the headers are not libghostty-vt ${VT_VERSION}"
+	exit 1
+fi
+mkdir -p "${WORK}/prefix/include" "${WORK}/prefix/lib/pkgconfig"
+mv "${hdr}" "${WORK}/prefix/include/ghostty"
+mv "${lib}" "${WORK}/prefix/lib/libghostty-vt.a"
+
+# The prefix is absolute and final: the .pc is written for where the directory is about
+# to be renamed to, so the directory cannot be moved afterwards.
+cat >"${WORK}/prefix/${PC_REL}" <<EOF
+prefix=${PREFIX}
+includedir=\${prefix}/include
+libdir=\${prefix}/lib
+
+Name: libghostty-vt-static
+URL: https://lib.ghostty.org/vt/
+Description: Ghostty VT library (static, official prebuilt ${VT_VERSION})
+Version: ${VT_VERSION}
+Cflags: -I\${includedir}
+Libs: \${libdir}/libghostty-vt.a
+EOF
+
+# One rename on the cache's filesystem: the prefix appears complete or not at all.
+mv "${WORK}/prefix" "${PREFIX}"
 log "done: ${PREFIX}"

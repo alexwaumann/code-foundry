@@ -69,24 +69,19 @@ func buildSnapshot(t *ghostty.Terminal) ([]byte, error) {
 		}
 	}
 
-	prefix := []ghostty.FormatterOption{
-		ghostty.WithFormatterExtraModes(true),
-		ghostty.WithFormatterExtraTabstops(true),
-	}
+	prefix := ghostty.FormatterExtraModes | ghostty.FormatterExtraTabstops
 	if paletteChanged(t) {
-		prefix = append(prefix, ghostty.WithFormatterExtraPalette(true))
+		prefix |= ghostty.FormatterExtraPalette
 	}
-	suffix := []ghostty.FormatterOption{
-		ghostty.WithFormatterExtraScrollingRegion(true),
-		ghostty.WithFormatterExtraKeyboard(true),
-		ghostty.WithFormatterExtraPwd(true),
-		ghostty.WithFormatterExtraCursor(true),
-		ghostty.WithFormatterExtraStyle(true),
-		ghostty.WithFormatterExtraHyperlink(true),
-		ghostty.WithFormatterExtraProtection(true),
-		ghostty.WithFormatterExtraKittyKeyboard(true),
-		ghostty.WithFormatterExtraCharsets(true),
-	}
+	suffix := ghostty.FormatterExtraScrollingRegion |
+		ghostty.FormatterExtraKeyboard |
+		ghostty.FormatterExtraPwd |
+		ghostty.FormatterExtraCursor |
+		ghostty.FormatterExtraStyle |
+		ghostty.FormatterExtraHyperlink |
+		ghostty.FormatterExtraProtection |
+		ghostty.FormatterExtraKittyKeyboard |
+		ghostty.FormatterExtraCharsets
 	if err := writeScreen(&out, t, prefix, suffix); err != nil {
 		return nil, err
 	}
@@ -125,11 +120,11 @@ func writePrimaryUnderAlt(out *bytes.Buffer, t *ghostty.Terminal) error {
 	}
 	defer clone.Close()
 
-	clone.VTWrite([]byte(altScreenExit(modeOf(t, ghostty.ModeAltScreenSave), modeOf(t, ghostty.ModeAltScreen))))
+	clone.VTWrite([]byte(altScreenExit(modeOf(t, ghostty.ModeAltScreenSaveCursorClearEnter), modeOf(t, ghostty.ModeAltScreen))))
 	if s, err := clone.ActiveScreen(); err != nil || s != ghostty.ScreenPrimary {
 		return fmt.Errorf("clone did not return to the primary screen (screen=%v err=%v)", s, err)
 	}
-	return writeScreen(out, clone, nil, []ghostty.FormatterOption{ghostty.WithFormatterExtraCursor(true)})
+	return writeScreen(out, clone, ghostty.FormatterExtrasNone, ghostty.FormatterExtraCursor)
 }
 
 // writeScreen formats the active screen of t as prefix extras + content + padding +
@@ -141,7 +136,7 @@ func writePrimaryUnderAlt(out *bytes.Buffer, t *ghostty.Terminal) error {
 // used for padding comes from a separate wrapped pass, where every row ends in CRLF. That
 // pass is only measured, the prefix pass goes straight into out, and of the full pass only
 // what follows the prefix pass is kept, so out holds the one copy of the content.
-func writeScreen(out *bytes.Buffer, t *ghostty.Terminal, prefix, suffix []ghostty.FormatterOption) error {
+func writeScreen(out *bytes.Buffer, t *ghostty.Terminal, prefix, suffix ghostty.FormatterExtras) error {
 	vt := ghostty.WithFormatterFormat(ghostty.FormatterFormatVT)
 	unwrap := ghostty.WithFormatterUnwrap(true)
 	var rows rowCounter
@@ -150,11 +145,11 @@ func writeScreen(out *bytes.Buffer, t *ghostty.Terminal, prefix, suffix []ghostt
 	}
 	out.Grow(rows.size + snapshotSlack)
 	start := out.Len()
-	if err := formatTo(out, t, append([]ghostty.FormatterOption{vt, unwrap}, prefix...)...); err != nil {
+	if err := formatTo(out, t, vt, unwrap, ghostty.WithFormatterExtras(prefix)); err != nil {
 		return err
 	}
 	tail := tailWriter{head: out.Bytes()[start:]}
-	if err := formatTo(&tail, t, append(append([]ghostty.FormatterOption{vt, unwrap}, prefix...), suffix...)...); err != nil {
+	if err := formatTo(&tail, t, vt, unwrap, ghostty.WithFormatterExtras(prefix|suffix)); err != nil {
 		return err
 	}
 	if len(tail.head) > 0 {
@@ -169,9 +164,16 @@ func writeScreen(out *bytes.Buffer, t *ghostty.Terminal, prefix, suffix []ghostt
 	return nil
 }
 
-// formatTo streams a formatter pass into w.
+// formatTo streams a formatter pass into w. A pass starts from no trimming and no extras,
+// so it emits only what opts ask for: libghostty's own defaults (trim on; palette, cursor
+// style and hyperlink extras on) would put up to 8 KiB of palette into every snapshot pass
+// and trim the trailing blank rows that padRows counts.
 func formatTo(w io.Writer, t *ghostty.Terminal, opts ...ghostty.FormatterOption) error {
-	f, err := ghostty.NewFormatter(t, opts...)
+	base := []ghostty.FormatterOption{
+		ghostty.WithFormatterTrim(false),
+		ghostty.WithFormatterExtras(ghostty.FormatterExtrasNone),
+	}
+	f, err := ghostty.NewFormatter(t, append(base, opts...)...)
 	if err != nil {
 		return fmt.Errorf("new formatter: %w", err)
 	}

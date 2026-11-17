@@ -11,7 +11,7 @@ require (
 	github.com/fsnotify/fsevents v0.2.0
 	github.com/fsnotify/fsnotify v1.10.1
 	github.com/wailsapp/wails/v3 v3.1.0
-	go.mitchellh.com/libghostty v0.0.0-20261007030428-8812ad0e0f79
+	go.mitchellh.com/libghostty v0.0.0-20261107144202-b13f277ddcb2
 	golang.org/x/sys v0.48.0
 	golang.org/x/text v0.42.0
 	google.golang.org/protobuf v1.36.12
