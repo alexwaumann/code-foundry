@@ -1,14 +1,15 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type MouseEvent } from "react";
 import { Maximize2 } from "lucide-react";
 import { Tip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { openPane } from "@/shell/collapse";
 import { focusTabNow } from "@/shell/commands";
 import { usePaneDragged } from "@/shell/drag/state";
 import { useTabDrag } from "@/shell/drag/draggable";
 import { enterFullscreen } from "@/shell/fullscreen";
 import type { PaneRect } from "@/shell/geometry/types";
 import { shellSurfaceOf } from "@/shell/surfaces/registry";
-import { usePane, useTab, type TabEntry } from "@/stores/layout";
+import { useLayoutStore, usePane, useTab, type TabEntry } from "@/stores/layout";
 import { requestPaneFocus, takeFocusRequest, useShellViewStore } from "@/stores/shellView";
 import { keepPreviewTab } from "@/shell/preview";
 import { AttentionDot, LinkedTip, PREVIEW_DASHES, TabContentIcon, TabContextMenu } from "./PaneTabStrip";
@@ -56,10 +57,12 @@ function RailTabOf({ tab, paneId, selected, vertical }: { tab: TabEntry; paneId:
         data-preview={tab.preview || undefined}
         className={cn(
           "relative flex size-7 shrink-0 cursor-default items-center justify-center rounded-md outline-none focus-visible:ring-1 focus-visible:ring-cf-focus",
-          // The selected tab: the strip's active tint, its icon at full contrast, and an accent bar on the rail's inner side.
+          // The selected tab: the strip's active tint (a step stronger while the whole rail is
+          // hovered, so it stays apart from the rail's tint), its icon at full contrast, and an accent
+          // bar on the rail's inner side.
           selected
             ? cn(
-                "bg-cf-control-hover text-cf-text before:absolute before:rounded-full before:bg-cf-accent",
+                "bg-cf-control-hover text-cf-text group-hover/rail:bg-cf-control-active before:absolute before:rounded-full before:bg-cf-accent",
                 vertical ? "before:inset-y-1.5 before:left-0 before:w-0.5" : "before:inset-x-1.5 before:bottom-0 before:h-0.5",
               )
             : "text-cf-text-muted hover:bg-cf-control-hover/40 hover:text-cf-text",
@@ -93,7 +96,9 @@ function RailTabOf({ tab, paneId, selected, vertical }: { tab: TabEntry; paneId:
  * every pane at its minimum, or the user collapsed it ("Collapsing a pane"), so this one shows
  * only its tabs' icons, the selected one marked, with their attention dots. It mounts no tab body
  * and holds no stream. A click on an icon focuses that tab, which unfolds the pane (another may
- * fold) and opens a collapsed one; a tab drags out like any tab, and the rail as a whole takes a
+ * fold) and opens a collapsed one; a click anywhere else on the rail that is not one of its
+ * buttons opens it on its selected tab (openRail), and the whole rail tints under the pointer to
+ * say so; a tab drags out like any tab, and the rail as a whole takes a
  * dropped tab (shell/drag/targets.ts). Its last buttons open it again when the user collapsed it,
  * and show the pane full screen; a horizontal rail has them at its right end, where the open
  * pane's strip has collapse and full screen. A collapsed pane may have the focus (a direction key reached
@@ -101,6 +106,28 @@ function RailTabOf({ tab, paneId, selected, vertical }: { tab: TabEntry; paneId:
  * row of panes, horizontal in a column. See docs/notes/shell-19-rails-fullscreen.md and
  * docs/notes/shell-25d-collapse.md.
  */
+/**
+ * A click on the rail's empty area (anywhere but an icon or a button): the pane opens on its
+ * selected tab, with the focus. A pane the user collapsed opens as its Open pane button does; a
+ * pane folded for lack of room as a click on its selected icon does (that tab takes the focus, so
+ * the pane unfolds and another may fold). A click that bubbles here through React from a portal
+ * (a tab's context menu) is not on the rail and does nothing; after a tab drag dnd-kit swallows
+ * the click, so a drag never reads as one.
+ */
+function openRail(e: MouseEvent<HTMLElement>, paneId: string): void {
+  const target = e.target as Element;
+  if (!e.currentTarget.contains(target) || target.closest("button")) return;
+  const pane = useLayoutStore.getState().panes[paneId];
+  if (!pane) return;
+  if (pane.collapsed) {
+    void openPane(paneId);
+    return;
+  }
+  if (!pane.active) return;
+  void focusTabNow(pane.active);
+  requestPaneFocus(paneId);
+}
+
 export function PaneRail({ paneId, rect, focused = false }: { paneId: string; rect: PaneRect; focused?: boolean }) {
   const pane = usePane(paneId);
   const dragged = usePaneDragged(paneId);
@@ -116,9 +143,11 @@ export function PaneRail({ paneId, rect, focused = false }: { paneId: string; re
     listRef.current.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]')?.focus();
   }, [request]);
   return (
+    // The whole rail is the pointer's target (openRail); the keyboard keeps to the tablist's icons
+    // and buttons, so the rail adds no tab stop and no role.
     <section
       className={cn(
-        "absolute flex overflow-hidden rounded-pane border bg-cf-surface shadow-xs",
+        "group/rail absolute flex overflow-hidden rounded-pane border bg-cf-surface shadow-xs",
         focused ? "border-cf-accent/60" : "border-cf-divider",
         dragged && "opacity-60",
       )}
@@ -129,13 +158,21 @@ export function PaneRail({ paneId, rect, focused = false }: { paneId: string; re
       data-collapsed={collapsed || undefined}
       data-focused={focused || undefined}
       data-orientation={vertical ? "vertical" : "horizontal"}
+      onClick={(e) => {
+        openRail(e, paneId);
+      }}
     >
       <div
         ref={listRef}
         role="tablist"
         aria-label="Tabs"
         aria-orientation={vertical ? "vertical" : "horizontal"}
-        className={cn("flex min-h-0 min-w-0 items-center gap-1 overflow-hidden", vertical ? "flex-col p-0.5" : "w-full flex-row py-0.5 pr-1.5 pl-0.5")}
+        // It fills the rail, so its tint (the control hover at low strength) covers the whole rail
+        // while the pointer is anywhere on it.
+        className={cn(
+          "flex min-h-0 min-w-0 w-full items-center gap-1 overflow-hidden group-hover/rail:bg-cf-control-hover/40",
+          vertical ? "flex-col p-0.5" : "flex-row py-0.5 pr-1.5 pl-0.5",
+        )}
       >
         {tabIds.map((id) => (
           <RailTab key={id} tabId={id} paneId={paneId} selected={id === pane?.active} vertical={vertical} />
