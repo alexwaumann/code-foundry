@@ -132,7 +132,7 @@ func (h *Thread) Rename(ctx context.Context, req *connect.Request[v1.RenameThrea
 	return connect.NewResponse(&v1.RenameThreadResponse{Thread: threadToProto(s)}), nil
 }
 
-// RegenerateName names the thread again from its recent turns and returns it renamed.
+// RegenerateName names the thread again by its overall task and returns it renamed.
 func (h *Thread) RegenerateName(ctx context.Context, req *connect.Request[v1.RegenerateNameRequest]) (*connect.Response[v1.RegenerateNameResponse], error) {
 	s, err := h.store.RegenerateName(ctx, req.Msg.GetId())
 	if err != nil {

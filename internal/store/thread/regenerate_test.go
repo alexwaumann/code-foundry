@@ -3,33 +3,66 @@ package thread
 import (
 	"context"
 	"errors"
+	"fmt"
 	"path/filepath"
 	"strings"
 	"testing"
+	"unicode/utf8"
 )
 
-func TestRecentTurnsContext(t *testing.T) {
+func TestThreadNamingContext(t *testing.T) {
 	user := func(s string) Item { return Item{Kind: KindUserMessage, Text: s} }
 	asst := func(s string) Item { return Item{Kind: KindAssistantText, Text: s} }
-	long := strings.Repeat("a", 3000) + "END"
+	turns := func(from, to int) []Item {
+		var items []Item
+		for i := from; i <= to; i++ {
+			items = append(items, user(fmt.Sprintf("u%d", i)), asst(fmt.Sprintf("r%d", i)))
+		}
+		return items
+	}
+	longReply := "Done. " + strings.Repeat("Here is what changed. ", 200) + "All tests pass."
 	tests := []struct {
-		name  string
-		items []Item
-		want  string
+		name        string
+		cur         string
+		provisional bool
+		items       []Item
+		want        string
 	}{
-		{"nothing", nil, ""},
-		{"no user message", []Item{asst("hello"), {Kind: KindNote, Text: "Forked from x"}}, ""},
-		{"only a wake", []Item{{Kind: KindUserMessage, Text: "PR merged", WakeTitle: "PR merged"}, asst("ok")}, ""},
-		{"one turn", []Item{user("fix the login"), asst("Looking."), asst("Fixed it.")},
+		{"nothing", "", false, nil, ""},
+		{"no user message, even with a name", "Fix it", false, []Item{asst("hello"), {Kind: KindNote, Text: "Forked from x"}}, ""},
+		{"only a wake", "", false, []Item{{Kind: KindUserMessage, Text: "PR merged", WakeTitle: "PR merged"}, asst("ok")}, ""},
+		{"one turn", "", false, []Item{user("fix the login"), asst("Looking."), asst("Fixed it.")},
 			"User: fix the login\n\nAssistant: Looking.\n\nFixed it."},
-		{"the last three user messages, oldest first", []Item{
-			user("one"), asst("r1"), user("two"), asst("r2"), user("three"), asst("r3"), user("four"), asst("r4"),
-		}, "User: two\n\nAssistant: r2\n\nUser: three\n\nAssistant: r3\n\nUser: four\n\nAssistant: r4"},
-		{"other kinds, wakes, subagents and API errors are left out", []Item{
+		{"the current name line", "Fix the login redirect", false, []Item{user("fix the login"), asst("ok")},
+			"Current name: Fix the login redirect\n\nUser: fix the login\n\nAssistant: ok"},
+		{"no line for a provisional name", "fix the login", true, []Item{user("fix the login")}, "User: fix the login"},
+		{"no line for a blank name", "  ", false, []Item{user("fix the login")}, "User: fix the login"},
+		{"the first message is there once when it is a recent one", "", false, turns(1, recentTurns),
+			"User: u1\n\nAssistant: r1\n\nUser: u2\n\nAssistant: r2\n\nUser: u3\n\nAssistant: r3\n\n" +
+				"User: u4\n\nAssistant: r4\n\nUser: u5\n\nAssistant: r5\n\nUser: u6\n\nAssistant: r6"},
+		{"the first message right before the recent turns", "", false, turns(1, recentTurns+1),
+			"User: u1\n\nUser: u2\n\nAssistant: r2\n\nUser: u3\n\nAssistant: r3\n\nUser: u4\n\nAssistant: r4\n\n" +
+				"User: u5\n\nAssistant: r5\n\nUser: u6\n\nAssistant: r6\n\nUser: u7\n\nAssistant: r7"},
+		{"the first message, the gap, then the recent turns", "Add dark mode", false, turns(1, 10),
+			"Current name: Add dark mode\n\nUser: u1\n\n(3 user messages left out)\n\n" +
+				"User: u5\n\nAssistant: r5\n\nUser: u6\n\nAssistant: r6\n\nUser: u7\n\nAssistant: r7\n\n" +
+				"User: u8\n\nAssistant: r8\n\nUser: u9\n\nAssistant: r9\n\nUser: u10\n\nAssistant: r10"},
+		// The reported case: a long last reply after a small follow-up crowded out
+		// everything but its own tail.
+		{"a long last reply after a small follow-up keeps the task", "Add a release channel switcher", false, []Item{
+			user("add a release channel switcher to the settings page"), asst("I'll add it."),
+			user("also persist the choice"), asst("Persisted."),
+			user("thanks, also fix the typo"), asst(longReply),
+		}, "Current name: Add a release channel switcher\n\n" +
+			"User: add a release channel switcher to the settings page\n\nAssistant: I'll add it.\n\n" +
+			"User: also persist the choice\n\nAssistant: Persisted.\n\n" +
+			"User: thanks, also fix the typo\n\nAssistant: " + clip(longReply, maxAssistantBlock)},
+		{"other kinds, wakes, subagents and API errors are left out", "", false, []Item{
 			user("go"),
 			{Kind: KindThinking, Text: "hmm"},
 			{Kind: KindToolCall, Text: "ls"},
 			{Kind: KindAssistantText, Text: "subagent says", ParentToolUseID: "t1"},
+			{Kind: KindUserMessage, Text: "subagent prompt", ParentToolUseID: "t1"},
 			{Kind: KindAssistantText, Text: "Invalid API key", APIError: true},
 			{Kind: KindCommandOutput, Text: "Compacted"},
 			{Kind: KindCompaction, Text: "summary"},
@@ -38,31 +71,90 @@ func TestRecentTurnsContext(t *testing.T) {
 			{Kind: KindUserMessage, Text: "timer fired", WakeTitle: "timer"},
 			asst("woke up"),
 		}, "User: go\n\nAssistant: done\n\nwoke up"},
-		{"a reply before any user message is left out", []Item{asst("parent reply"), user("next"), asst("ok")},
+		{"a reply before any user message is left out", "", false, []Item{asst("parent reply"), user("next"), asst("ok")},
 			"User: next\n\nAssistant: ok"},
-		{"blank text is skipped", []Item{user("  "), user("real"), asst(" ")}, "User: real"},
-		{"over the cap the oldest block loses its start", []Item{user(long), asst(long)},
-			"User: …" + long[len(long)-(maxRecentTurnsContext-len("Assistant: ")-len(long)-2-len("User: ")-len("…")):] + "\n\nAssistant: " + long},
-		{"a block that does not fit at all goes", []Item{user("old"), asst(strings.Repeat("b", maxRecentTurnsContext-len("Assistant: ")))},
-			"Assistant: " + strings.Repeat("b", maxRecentTurnsContext-len("Assistant: "))},
+		{"blank text is skipped", "", false, []Item{user("  "), user("real"), asst(" ")}, "User: real"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := recentTurnsContext(tt.items)
+			got := threadNamingContext(tt.cur, tt.provisional, tt.items)
 			if got != tt.want {
-				t.Errorf("recentTurnsContext =\n%q\nwant\n%q", got, tt.want)
-			}
-			if len(got) > maxRecentTurnsContext {
-				t.Errorf("len = %d, over the cap", len(got))
+				t.Errorf("threadNamingContext =\n%q\nwant\n%q", got, tt.want)
 			}
 		})
 	}
 }
 
-func TestRecentTurnsContextCutsAtARune(t *testing.T) {
-	got := recentTurnsContext([]Item{{Kind: KindUserMessage, Text: strings.Repeat("é", 3000)}})
-	if !strings.HasPrefix(got, "User: …é") || len(got) > maxRecentTurnsContext {
-		t.Errorf("got %q… (len %d)", got[:20], len(got))
+// Each block is cut on its own: the first message, a later user message and an
+// assistant block each to their cap, head and end kept.
+func TestThreadNamingContextPerBlockCaps(t *testing.T) {
+	body := func(tag string) string { return tag + "-start " + strings.Repeat("x", 3000) + " " + tag + "-end" }
+	items := []Item{
+		{Kind: KindUserMessage, Text: body("first")},
+		{Kind: KindAssistantText, Text: body("reply0")},
+	}
+	for i := 1; i <= recentTurns; i++ {
+		items = append(items,
+			Item{Kind: KindUserMessage, Text: body(fmt.Sprintf("user%d", i))},
+			Item{Kind: KindAssistantText, Text: body(fmt.Sprintf("part%da", i))},
+			Item{Kind: KindAssistantText, Text: body(fmt.Sprintf("part%db", i))})
+	}
+	blocks := strings.Split(threadNamingContext("", false, items), "\n\n")
+	// The first message, then the recent turns (no gap line: none is left out between).
+	if len(blocks) != 1+2*recentTurns {
+		t.Fatalf("%d blocks, want %d: %q", len(blocks), 1+2*recentTurns, blocks)
+	}
+	check := func(b, label string, max int, start, end string) {
+		t.Helper()
+		text, ok := strings.CutPrefix(b, label+": ")
+		if !ok || len(text) > max || !strings.HasPrefix(text, start) || !strings.HasSuffix(text, end) || !strings.Contains(text, "…") {
+			t.Errorf("block %.40q… (len %d): want %s, at most %d bytes, %q…%q", b, len(text), label, max, start, end)
+		}
+	}
+	check(blocks[0], "User", maxFirstMessage, "first-start", "first-end")
+	for i := 1; i <= recentTurns; i++ {
+		check(blocks[2*i-1], "User", maxUserBlock, fmt.Sprintf("user%d-start", i), fmt.Sprintf("user%d-end", i))
+		// An assistant's blocks in a row are one block, cut as one.
+		check(blocks[2*i], "Assistant", maxAssistantBlock, fmt.Sprintf("part%da-start", i), fmt.Sprintf("part%db-end", i))
+	}
+}
+
+// No context is over maxNamingContext: every block at its cap, a long name, a big gap.
+func TestThreadNamingContextBound(t *testing.T) {
+	long := strings.Repeat("é", 5000)
+	var items []Item
+	for i := 0; i < 1000; i++ {
+		items = append(items, Item{Kind: KindUserMessage, Text: long}, Item{Kind: KindAssistantText, Text: long})
+	}
+	got := threadNamingContext(strings.Repeat("n", 500), false, items)
+	if len(got) > maxNamingContext {
+		t.Errorf("len = %d, over %d", len(got), maxNamingContext)
+	}
+	if !strings.Contains(got, "(993 user messages left out)") {
+		t.Errorf("no gap line in %.200q", got)
+	}
+}
+
+func TestClip(t *testing.T) {
+	tests := []struct {
+		name string
+		s    string
+		n    int
+		want string
+	}{
+		{"fits", "short", 5, "short"},
+		{"head and end", "abcdefghijklmnopqrstuvwxyz", 13, "abcdef…wxyz"},
+		{"spaces at the cut go", "one two three four five six seven", 16, "one two…seven"},
+		// "é" is two bytes: neither side starts or ends inside one.
+		{"rune boundaries", strings.Repeat("é", 20), 11, "éé…éé"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := clip(tt.s, tt.n)
+			if got != tt.want || len(got) > tt.n || !utf8.ValidString(got) {
+				t.Errorf("clip(%q, %d) = %q (len %d), want %q", tt.s, tt.n, got, len(got), tt.want)
+			}
+		})
 	}
 }
 
@@ -74,18 +166,18 @@ func TestBuildNamingPromptConversation(t *testing.T) {
 		absent []string
 	}{
 		{"conversation", NamingRequest{Conversation: "User: fix it\n\nAssistant: done"},
-			[]string{"currently working on", "most recent turns", "sentence case", "Reply with only the title.", "Recent conversation:\nUser: fix it\n\nAssistant: done"},
+			[]string{"overall task", "small follow-ups", "keep its subject", "sentence case", "Reply with only the title.", "Thread:\nUser: fix it\n\nAssistant: done"},
 			[]string{"Request:", "Branch"}},
 		{"the conversation wins over a message", NamingRequest{Message: "first ask", Conversation: "User: now"},
-			[]string{"Recent conversation:\nUser: now"}, []string{"first ask"}},
+			[]string{"Thread:\nUser: now"}, []string{"first ask"}},
 		{"a blank conversation is the first-message prompt", NamingRequest{Message: "fix it", Conversation: " \n"},
-			[]string{namingPrompt + "fix it"}, []string{"Recent conversation"}},
+			[]string{namingPrompt + "fix it"}, []string{"Thread:"}},
 		// A move into a new worktree (move.go): the title and the branch from the conversation.
 		{"conversation and a semantic branch", NamingRequest{Conversation: "User: fix it", Branch: &BranchRequest{Mode: BranchModeSemantic}},
-			[]string{"currently working on", "twice: a title and a git branch", "Branch: <type>/<slug>", "Title: <title>\nBranch: <branch>", "Recent conversation:\nUser: fix it"},
+			[]string{"overall task", "small follow-ups", "twice: a title and a git branch", "Branch: <type>/<slug>", "Title: <title>\nBranch: <branch>", "Thread:\nUser: fix it"},
 			[]string{"Request:", "Reply with only the title."}},
 		{"conversation and a prefix branch", NamingRequest{Conversation: "User: fix it", Branch: &BranchRequest{Mode: BranchModePrefix}},
-			[]string{"Branch: a slug of", "Recent conversation:\nUser: fix it"}, []string{"Request:"}},
+			[]string{"Branch: a slug of", "Thread:\nUser: fix it"}, []string{"Request:"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -104,7 +196,7 @@ func TestBuildNamingPromptConversation(t *testing.T) {
 	}
 }
 
-// RegenerateName names from the recent turns, replaces a hand-typed name, marks the call
+// RegenerateName names from the thread (current name, first message, latest turns), replaces a hand-typed name, marks the call
 // explicit, shows Naming while it runs and refuses a second call meanwhile; a failure
 // keeps the name.
 func TestRegenerateName(t *testing.T) {
@@ -158,7 +250,7 @@ func TestRegenerateName(t *testing.T) {
 	req := e.namingReqs[len(e.namingReqs)-1]
 	calls := append([]bool(nil), explicit...)
 	e.mu.Unlock()
-	if !strings.HasPrefix(req.Conversation, "User: fix the login redirect\n\nAssistant: ") || req.Message != "" || req.Branch != nil {
+	if !strings.HasPrefix(req.Conversation, "Current name: Mine\n\nUser: fix the login redirect\n\nAssistant: ") || req.Message != "" || req.Branch != nil {
 		t.Errorf("naming request = %+v", req)
 	}
 	if len(calls) == 0 || !calls[len(calls)-1] {
