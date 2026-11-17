@@ -44,6 +44,8 @@ export interface LayoutVerbsWorld {
   isArchived?(id: string): boolean;
   /** Whether a thread is snoozed or saved for later: thread.open --preview opens it as a preview. */
   isSnoozed?(id: string): boolean;
+  /** Whether another thread created it and that creator exists: thread.open --preview opens it as a preview. */
+  isChild?(id: string): boolean;
   /** Archives a thread (space.remove --archive). */
   archiveThread?(id: string): void;
   /** Whether a thread exists. */
@@ -181,7 +183,7 @@ function verbs(world: LayoutVerbsWorld): Entry[] {
           edgeArg("edge", "With --split: the edge"),
           edgeArg("outer", "In a new pane on this edge of the whole area"),
           focusArg,
-          bool("preview", "As the space's preview tab when the thread is archived or snoozed (otherwise a kept tab)"),
+          bool("preview", "As the space's preview tab when the thread is archived, snoozed or a child (otherwise a kept tab)"),
         ],
       },
       when: always,
@@ -203,6 +205,7 @@ function verbs(world: LayoutVerbsWorld): Entry[] {
           if (a.pane || a.split || a.outer) refuse("invalid argument: a preview opens where a thread's tab opens: no --pane, --split or --outer");
           op.preview = true;
           if (world.isSnoozed?.(id)) op.snoozed = true;
+          if (world.isChild?.(id)) op.child = true;
         }
         return run(op, (r) => `opened thread ${id} as tab ${r.result.tab ?? ""}`);
       },

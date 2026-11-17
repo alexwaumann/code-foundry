@@ -9,6 +9,7 @@ import { handoffQuery, type SearchRow } from "@/lib/threadSearch";
 import { setSearchTarget } from "./searchDialog";
 import { openThreadFind } from "./threadFind";
 import { useUiStore } from "./ui";
+import { openThread } from "./openThread";
 
 /**
  * search.open in this window: the palette's Find dialog. Deferred, so that picked in the
@@ -48,14 +49,14 @@ export function closeQuietly(): void {
  */
 export function openSearchHit(hit: { threadId: string; itemId: string }, query: string): void {
   closeQuietly();
-  useUiStore.getState().select({ kind: "thread", id: hit.threadId });
+  openThread(hit.threadId, { focusPrompt: false });
   openThreadFind(hit.threadId, handoffQuery(query), { itemId: hit.itemId });
 }
 
 /** Enter on a thread name: the thread in the content pane, its prompt focused. */
 export function openSearchThread(threadId: string): void {
   closeQuietly();
-  useUiStore.getState().select({ kind: "thread", id: threadId }, { focusPrompt: true });
+  openThread(threadId);
 }
 
 /**
@@ -64,7 +65,7 @@ export function openSearchThread(threadId: string): void {
  */
 export function openSearchThreadFind(threadId: string, query: string): void {
   closeQuietly();
-  useUiStore.getState().select({ kind: "thread", id: threadId });
+  openThread(threadId, { focusPrompt: false });
   openThreadFind(threadId, handoffQuery(query));
 }
 

@@ -10,8 +10,8 @@ import { statusToneText, type StatusTone } from "@/lib/statusLine";
 import { cn } from "@/lib/utils";
 import { runCommandForResult } from "@/stores/commands";
 import { holdEmberBoard, useBoardCounts, useEmberStore, useEmberTasks, useEmberTimers } from "@/stores/ember";
-import { useUiStore } from "@/stores/ui";
 import { Flame } from "./Flame";
+import { openThread } from "@/stores/openThread";
 
 /** Done today shows this many cards until "+N more" is clicked. */
 const DONE_CAP = 10;
@@ -28,11 +28,6 @@ const toneText = (tone: StatusTone): string => (tone === "muted" ? "text-cf-text
 
 function Dot({ dot, className }: { dot: TaskDot; className?: string }) {
   return <span className={cn("block size-2 shrink-0 rounded-full", DOT[dot], className)} data-dot={dot} aria-hidden />;
-}
-
-/** Opens a worker thread, as a lineage row of the thread info card does (it is a hidden child of Ember's). */
-function openThread(id: string): void {
-  useUiStore.getState().select({ kind: "thread", id }, { focusPrompt: true });
 }
 
 /** A lead's team member's indent by its depth below the lead (lib/ember teamRows). */

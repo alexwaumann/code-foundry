@@ -16,6 +16,7 @@ import { setRowExpanded, useThreadStore } from "./thread";
 import { useThreadsStore } from "./threads";
 import { closeQuietly } from "./threadSearch";
 import { useUiStore } from "./ui";
+import { openThread } from "./openThread";
 
 /** How long Enter waits for a hit's thread to load (its log) or a promoted thread to be listed. */
 export const ARRIVAL_MS = 10_000;
@@ -102,7 +103,7 @@ export async function revealHit(hit: AgentHitView, ms = ARRIVAL_MS): Promise<boo
 export function openAgentHit(entryId: string, hit: AgentHitView): void {
   void runCommandForResult("search.open-hit", { id: entryId, hit: String(hit.n) }, BOOKKEEPING);
   closeQuietly();
-  useUiStore.getState().select({ kind: "thread", id: hit.threadId });
+  openThread(hit.threadId, { focusPrompt: false });
   void revealHit(hit);
 }
 

@@ -190,15 +190,8 @@ describe("a card", () => {
     const link = within(cardOf("n-1")).getByTestId("notification-thread");
     expect(link.textContent).toBe("Investigate flaky e2e");
     fireEvent.click(link);
-    expect(openThread).toHaveBeenCalledWith("s-4", { preview: false });
+    // openThread decides whether it opens as a preview (stores/openThread.test.ts).
+    expect(openThread).toHaveBeenCalledWith("s-4");
     expect(useNotificationsStore.getState().open).toBe(false);
-  });
-
-  it("an archived thread's link opens it as a preview, as the sidebar does", async () => {
-    show(note("n-2", { threadId: "s-7" }));
-    render(<NotificationBell />);
-    await openBell();
-    fireEvent.click(within(cardOf("n-2")).getByTestId("notification-thread"));
-    expect(openThread).toHaveBeenCalledWith("s-7", { preview: true });
   });
 });

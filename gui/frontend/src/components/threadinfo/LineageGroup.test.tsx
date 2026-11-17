@@ -1,8 +1,9 @@
-import { act, cleanup, render, screen } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ThreadView } from "@/api/threads";
 import { useThreadStore } from "@/stores/thread";
 import { useThreadsStore } from "@/stores/threads";
+import { useUiStore } from "@/stores/ui";
 import { LineageGroup } from "./LineageGroup";
 
 /**
@@ -74,5 +75,19 @@ describe("LineageGroup's label", () => {
     expect(label()).toBe("Lineage · 2 running");
     set("cookie", { status: "attention", statusReason: "finished" });
     expect(label()).toBe("Lineage · 1 running");
+  });
+});
+
+describe("LineageGroup's links", () => {
+  it("a child row opens the child as the space's preview tab; the parent row opens a kept tab", () => {
+    put([thread("lead"), thread("mid", { createdBy: "lead" }), thread("leaf", { createdBy: "mid", status: "busy" })]);
+    const select = vi.fn();
+    useUiStore.setState({ select } as never);
+    render(<LineageGroup threadId="mid" />);
+    fireEvent.click(row("leaf") as HTMLElement);
+    expect(select).toHaveBeenLastCalledWith({ kind: "thread", id: "leaf" }, { focusPrompt: true, preview: true });
+    // "mid" is itself a child, but its lead opens as a kept tab from it.
+    fireEvent.click(screen.getByTestId("ti-parent"));
+    expect(select).toHaveBeenLastCalledWith({ kind: "thread", id: "lead" }, { focusPrompt: true });
   });
 });

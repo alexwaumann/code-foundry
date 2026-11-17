@@ -1,0 +1,73 @@
+{
+  "doc": "A child's preview shows only its conversation: its remembered set stays put away (a surface placed beside it would keep it).",
+  "state": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Main",
+        "root": {"t":"pane","id":"p-a","tabs":[{"id":"t-p","kind":"prs"}],"active":"t-p"},
+        "focus": "p-a",
+        "mru": ["t-p"]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a",
+    "threads": {
+      "th-c": {
+        "space": "sp-a",
+        "remembered": {
+          "pane": "p-a",
+          "tabs": [
+            {
+              "tab": {"id":"t-f","kind":"file","thread":"th-c","params":{"path":"/a"}},
+              "pane": "p-b",
+              "index": 0,
+              "active": true
+            }
+          ]
+        }
+      }
+    }
+  },
+  "op": {"op":"open_thread","thread":"th-c","child":true,"preview":true,"focus":true},
+  "want": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Main",
+        "root": {
+          "t": "pane",
+          "id": "p-a",
+          "tabs": [
+            {"id":"t-p","kind":"prs"},
+            {"id":"t-n1","kind":"thread","thread":"th-c","preview":true}
+          ],
+          "active": "t-n1"
+        },
+        "focus": "p-a",
+        "mru": ["t-n1","t-p"]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a",
+    "threads": {
+      "th-c": {
+        "space": "sp-a",
+        "remembered": {
+          "pane": "p-a",
+          "tabs": [
+            {
+              "tab": {"id":"t-f","kind":"file","thread":"th-c","params":{"path":"/a"}},
+              "pane": "p-b",
+              "index": 0,
+              "active": true
+            }
+          ]
+        }
+      }
+    }
+  },
+  "result": {"space":"sp-a","pane":"p-a","tab":"t-n1","rule":"focused"}
+}

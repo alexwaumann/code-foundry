@@ -16,8 +16,8 @@ when the first working version is whole. Nothing partial is released.
   Requests page, the Projects page, and later a plugin's.
 - **Linked surface**: a surface that belongs to a thread (its diff, its files, its pull requests,
   its terminal tabs).
-- **Preview tab**: a temporary tab of an archived or snoozed thread, opened by a click on its
-  sidebar row, which the next preview in its space replaces ("Preview tabs").
+- **Preview tab**: a temporary tab of an archived, snoozed or child thread, opened by the user's
+  click on it in the window, which the next preview in its space replaces ("Preview tabs").
 
 ## Structure
 
@@ -393,14 +393,22 @@ when the first working version is whole. Nothing partial is released.
 ## Preview tabs
 
 - **What a preview is.** A thread tab can be a preview: temporary. Only a tab of an archived or
-  snoozed thread can be one; an active thread never previews. The daemon keeps the flag on the
+  snoozed thread, or of a child (a thread another thread created, while that creator exists: the
+  sidebar's rule, `lib/inSidebar.ts`), can be one; any other active thread never previews. A
+  child is its lead's to manage, so the window does not pull it out as a kept tab on a look. The daemon keeps the flag on the
   tab, so the CLI's `tab.list` and `layout show` mark it.
 - **Opening one.** A click on an Archived or Snoozed sidebar row opens the thread as a preview tab
-  where a thread's own tab opens (by the same rule). Every other open is a kept
-  tab: a drop from the sidebar (an open at a place), the CLI without `--preview`, a thread's model,
+  where a thread's own tab opens (by the same rule). So does every other click in the window that
+  opens an archived, snoozed or child thread: a lineage row of the thread info card, a wake note's
+  link, a thread or agent search hit, a Needs you card, a notification's link, a prompt in prompt
+  history, an Ember board worker, a memory's "by" link, a Projects page thread row. One function
+  decides (`stores/openThread.ts`, `previewOnOpen`). A thread's lead opened from it (the parent
+  row, the creator link, a wake note from it) is a kept tab even when the lead is a child itself.
+  A child whose creator was removed is in the sidebar and opens as any thread of it. Every other
+  open is a kept tab: a drop from the sidebar (an open at a place), the CLI without `--preview`, a thread's model,
   a restore, cmd+shift+t. A preview is asked for explicitly (`thread.open --preview`, the user
-  only, without a place), and the daemon honours it only for a thread that is archived or snoozed;
-  for any other it opens a kept tab. A thread or a page cannot ask for one.
+  only, without a place), and the daemon honours it only for a thread that is archived, snoozed or
+  a child; for any other it opens a kept tab. A thread or a page cannot ask for one.
 - **One per space.** Opening a preview closes the space's previous preview wherever it is in the
   space. When the previous one is in the pane the new one opens in, the new one takes its place in
   the strip; otherwise the old one closes and the new one opens by the usual rule. A replaced
@@ -418,6 +426,9 @@ when the first working version is whole. Nothing partial is released.
   terminal, a plugin's surface); an explicit keep (`tab.keep`, which the window sends for typing in
   its composer, a double click on the tab or its rail icon, and "Keep open" in the thread's
   three-dot menu, since a thread's tab has no menu of its own).
+  A message sent to an archived or snoozed thread keeps it by unarchiving or waking it; a child's
+  preview is kept by the user's message (typing it in the composer keeps it first), and not by
+  one its lead sends.
 - **What does not.** Reading: focus, scroll, find, the thread info toggle.
 - **How it looks.** A 1px dashed outline in a quiet neutral around the tab, in every state, over
   the tab's usual fills; the name upright and the ordinary thread icon. In a rail, a dashed square
@@ -427,6 +438,8 @@ when the first working version is whole. Nothing partial is released.
   closed).
 - **Snoozed threads.** Its tab opened while the thread is still snoozed shows only the
   conversation: the remembered set comes back when the thread wakes ("Moving a thread" above).
+  A child's preview shows only its conversation too: its remembered set (a surface placed beside
+  it would keep it) waits for the child's next kept open.
   Archived threads keep no set. An open archived thread's tab moved to another space is an
   ordinary move, and keeps it.
 

@@ -27,6 +27,7 @@ import { interruptThread } from "@/stores/threadActions";
 import { useThreadsStore } from "@/stores/threads";
 import { useUiStore } from "@/stores/ui";
 import { Group, HOVER_CARD, Row } from "./Row";
+import { openThread } from "@/stores/openThread";
 
 const DOT: Record<LineageRowState, string> = {
   working: "text-cf-link",
@@ -116,7 +117,8 @@ function LineageItem({ threadId, row, sub = false, inert = false }: { threadId: 
   const model = modelId ? canonicalModelName(choices, modelId) : "";
   const open = () => {
     if (row.kind === "agent") void openAgentRun(threadId, row.id);
-    else useUiStore.getState().select({ kind: "thread", id: row.id }, { focusPrompt: true });
+    // A child opens as the space's preview tab: its lead manages it (stores/openThread.ts).
+    else openThread(row.id, { from: threadId });
   };
   const card = (
     <div className={cn(HOVER_CARD, "flex flex-col gap-0.5")}>

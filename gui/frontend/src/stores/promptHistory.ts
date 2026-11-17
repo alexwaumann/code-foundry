@@ -17,6 +17,7 @@ import { threadDraftKey } from "./threadActions";
 import { useThreadsStore } from "./threads";
 import { historyComposer as composerOf, type PromptSource } from "./historyComposers";
 import { useUiStore, type Selection } from "./ui";
+import { openThread } from "./openThread";
 
 /**
  * Puts a prompt in a draft, replacing its text (the picker's filter): the composer text
@@ -51,7 +52,7 @@ const REVEAL_FRAMES = 180;
 export function revealPrompt(p: SentPromptView): void {
   const ui = useUiStore.getState();
   const sel = ui.selection;
-  if (sel.kind !== "thread" || sel.id !== p.threadId) ui.select({ kind: "thread", id: p.threadId });
+  if (sel.kind !== "thread" || sel.id !== p.threadId) openThread(p.threadId, { focusPrompt: false });
   let tries = 0;
   const step = () => {
     if (getTimeline(p.threadId)?.showRow(p.itemId, "start")) return;

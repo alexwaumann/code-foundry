@@ -100,6 +100,25 @@ describe("the mock's layout verbs", () => {
     expect(tabOf(third.tab ?? "")).toBeUndefined();
   });
 
+  it("open a child thread as the space's one preview, replacing an archived one's", async () => {
+    const layout = new MockLayout({ publish: () => undefined, ids: seqIds() });
+    layout.seed("grid");
+    const cmds = layoutCommands({ layout, hasThread: () => true, isArchived: (id) => id === "s-8", isChild: (id) => id === "s-c" });
+    const run = async (name: string, args: Record<string, string> = {}) => {
+      const out = await cmds.find((x) => x.cmd.name === name)?.run(undefined, args);
+      return JSON.parse(out?.resultJson || "{}") as { tab?: string; closed?: { id: string }[] };
+    };
+    const tabOf = (id: string) => panes(layout.state().spaces[0]?.root).flatMap((p) => p.tabs ?? []).find((t) => t.id === id);
+    const archived = await run("thread.open", { id: "s-8", preview: "true", focus: "true" });
+    const child = await run("thread.open", { id: "s-c", preview: "true", focus: "true" });
+    expect(child.closed?.map((t) => t.id)).toEqual([archived.tab]);
+    expect(tabOf(child.tab ?? "")?.preview).toBe(true);
+    // Without --preview (the CLI, a model) a child's tab is kept.
+    await run("tab.close", { tab: child.tab ?? "" });
+    const kept = await run("thread.open", { id: "s-c", focus: "true" });
+    expect(tabOf(kept.tab ?? "")?.preview).toBeUndefined();
+  });
+
   it("default to the stored focus, as the user's call does", async () => {
     const w = world();
     expect(w.focus()).toBe("p-1");
