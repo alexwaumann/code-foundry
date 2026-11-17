@@ -8,7 +8,7 @@ import { useMemo } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { needsBySpace, needsList, needsScopeOf, shellThreadOrder, type ShellDraft, type ShellListOptions, type ShellListThread } from "@/lib/shellSections";
 import { decodeThreadListKeys, getListOptions, getListThreads, useThreadListKeys } from "./context";
-import { spaceOfThread, useCurrentSpaceId, useLayoutStore } from "./layout";
+import { spaceOfThread, useLayoutStore } from "./layout";
 import { useSettingsStore, useSettingValue } from "./settings";
 import { useShellSidebarStore } from "./shellSidebar";
 import { useThreadsStore } from "./threads";
@@ -61,19 +61,6 @@ export function getShellListOptions(): ShellListOptions {
 /** Thread ids in the sidebar's order as drawn. */
 export function sidebarThreadOrder(): string[] {
   return shellThreadOrder(getShellListThreads(), getShellListOptions());
-}
-
-/**
- * The Needs you list as the sidebar's section draws it, collapsed or not: its ids in order in
- * the scope in force, and whether any thread in any space waits on the user (the top bar's
- * control for a collapsed sidebar; docs/notes/shell-17-needs-you.md).
- */
-export function useNeedsList(): { ids: readonly string[]; any: boolean } {
-  const keys = useThreadListKeys();
-  const spaces = useThreadSpaces();
-  const currentSpaceId = useCurrentSpaceId();
-  const needsScope = useNeedsScope();
-  return useMemo(() => needsList(decodeThreadListKeys(keys).map((t, i) => ({ ...t, spaceId: spaces[i] ?? "" })), { currentSpaceId, needsScope }), [keys, spaces, currentSpaceId, needsScope]);
 }
 
 /** The Needs you list's ids read imperatively (cmd+shift+a). */

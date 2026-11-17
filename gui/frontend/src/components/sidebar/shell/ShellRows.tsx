@@ -262,10 +262,9 @@ function RequestLines({ id, anchor }: { id: string; anchor: string }) {
  * A Needs you row's lines: the place and the kind of ask, then the title, then one line per open
  * request when it has several. No controls: a click on the title opens the thread's popup
  * (`anchor` names the hover card it shuts until the next hover), a click on a request's line opens
- * it on that request, a click elsewhere goes to the thread (the row's own click). Also the top
- * bar's popover rows.
+ * it on that request, a click elsewhere goes to the thread (the row's own click).
  */
-export function NeedsLines({ id, anchor }: { id: string; anchor: string }) {
+function NeedsLines({ id, anchor }: { id: string; anchor: string }) {
   return (
     <span className="flex min-w-0 flex-col" data-testid="thread-body" data-needs>
       <span className="flex h-4 min-w-0 items-center text-caption-sm" data-testid="row-line-1">

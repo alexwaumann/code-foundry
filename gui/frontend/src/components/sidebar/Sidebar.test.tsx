@@ -52,7 +52,7 @@ beforeEach(() => {
     byId: Object.fromEntries(Object.entries(st.byId).map(([id, t]) => [id, Object.assign({ linkedPullRequests: [] }, t, id === "s-6" ? { lastActivityAtMs: Date.now() - 60_000 } : {})])),
   }));
   setEmberEnabled(false);
-  useUiStore.setState({ selection: HOME, cursorKey: null, sidebarVisible: true, workingCollapsed: false, snoozedCollapsed: true, archivedCollapsed: true });
+  useUiStore.setState({ selection: HOME, cursorKey: null, sidebarExpanded: true, workingCollapsed: false, snoozedCollapsed: true, archivedCollapsed: true });
   useCommandsStore.setState({ commands: [cmd("thread.new", "New Thread"), cmd("thread.pin", "Pin Thread")] });
   daemon.commands = [...useCommandsStore.getState().commands];
 });

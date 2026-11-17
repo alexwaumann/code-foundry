@@ -7,20 +7,23 @@ import { useSidebarDashboard } from "./useLinkedPrs";
 import { SidebarStatus } from "./SidebarStatus";
 import { SidebarMenu } from "./SidebarMenu";
 import { ShellSidebarList } from "./shell/ShellSidebarList";
+import { SidebarRail } from "./rail/SidebarRail";
 
 /**
  * The sidebar under the top bar (components/shell/TopBar.tsx holds the app name and back and
  * forward): the menu pane (New thread, search), Ember's row, the thread list's sections and rows
  * (sidebar/shell; docs/notes/shell-16-sidebar.md) and the daemon status, beside its resize handle.
+ * Collapsed (cmd+B, the top bar's toggle) it is the icon rail (sidebar/rail;
+ * docs/notes/sidebar-rail.md); it is never hidden.
  */
 export function Sidebar() {
-  const visible = useUiStore((s) => s.sidebarVisible);
+  const expanded = useUiStore((s) => s.sidebarExpanded);
   const width = useUiStore((s) => sidebarWidthAt(s.sidebarWidth, s.zoom));
-  if (!visible) return null;
-  return <SidebarShown width={width} />;
+  if (!expanded) return <SidebarRail />;
+  return <SidebarExpanded width={width} />;
 }
 
-function SidebarShown({ width }: { width: number }) {
+function SidebarExpanded({ width }: { width: number }) {
   const bodyRef = useRef<HTMLDivElement>(null);
   const bodyHeight = useHeight(bodyRef, 0);
   useSidebarDashboard();

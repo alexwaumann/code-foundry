@@ -233,6 +233,7 @@ test("the top bar drags the window, and its controls still take clicks", async (
   await expect(page.getByTestId("shell-grid")).toHaveAttribute("data-space-id", "sp-rel");
   await page.getByTestId("top-bar-sidebar-toggle").click();
   await expect(page.getByTestId("sidebar")).toHaveCount(0);
+  await expect(page.getByTestId("sidebar-rail")).toBeVisible();
   await page.getByTestId("top-bar-sidebar-toggle").click();
   await expect(page.getByTestId("sidebar")).toBeVisible();
   await page.getByTestId("top-bar-new-space").click();

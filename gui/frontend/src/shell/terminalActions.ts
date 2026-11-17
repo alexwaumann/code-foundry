@@ -18,7 +18,7 @@ import { useTerminalsStore } from "@/stores/terminals";
 import { applyLayout, useLayoutStore, type TabEntry } from "@/stores/layout";
 import { focusedTab } from "@/stores/selectionBridge";
 import { requestPaneFocus, requestPaneFocusOverSheets } from "@/stores/shellView";
-import { useUiStore } from "@/stores/ui";
+import { renameInSidebar } from "@/stores/ui";
 import { afterRev, layoutResultOf, runLayoutCommand } from "./commands";
 import { focusQuick, quickHasFocus, quickKeyAction, quickTerminalOf } from "./quickTerminal";
 
@@ -288,11 +288,7 @@ export async function cycleTerminals(): Promise<void> {
 export function renameFocusedTab(): void {
   const tab = focusedTab(useLayoutStore.getState());
   if (tab?.kind === "terminal") beginTabRename(tab.id);
-  else if (tab?.kind === "thread") {
-    const ui = useUiStore.getState();
-    if (!ui.sidebarVisible) ui.toggleSidebar();
-    ui.setRenaming(tab.thread);
-  }
+  else if (tab?.kind === "thread") renameInSidebar(tab.thread);
 }
 
 /** cmd+shift+r: the automatic name again (a thread's is generated again; a terminal goes back to what runs in it). */

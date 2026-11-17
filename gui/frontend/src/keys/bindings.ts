@@ -29,7 +29,7 @@ import { jumpToNeighbour } from "@/stores/threadNeighbours";
 import { toggleThreadInfo, useCardRoom } from "@/stores/threadInfoOverlay";
 import { useThreadsStore } from "@/stores/threads";
 import { zoomUi } from "@/stores/settings";
-import { useUiStore } from "@/stores/ui";
+import { renameInSidebar, useUiStore } from "@/stores/ui";
 import { openUpdateDialog, runUpdateAction } from "@/stores/update";
 import { historyCommand, openThemes, showView, toggleHelp, toggleView } from "@/stores/views";
 import { presentShellCommand, SHELL_PRESENTERS } from "@/shell/keyPresenters";
@@ -78,10 +78,13 @@ function focusThreadPrompt(): void {
   if (useUiStore.getState().selection.kind === "thread") useUiStore.setState((s) => ({ promptFocusSeq: s.promptFocusSeq + 1 }));
 }
 
-/** cmd+b (a GUI view action), and the top bar's sidebar toggle. */
+/**
+ * cmd+b (a GUI view action), and the top bar's sidebar toggle: the full list collapses to the
+ * icon rail (the thread's prompt takes the keyboard), the rail opens to the full list (which takes it).
+ */
 export function toggleSidebar(): void {
   const ui = useUiStore.getState();
-  if (ui.sidebarVisible) {
+  if (ui.sidebarExpanded) {
     ui.toggleSidebar();
     focusThreadPrompt();
   } else {
@@ -382,9 +385,7 @@ export function openRunInPicker(threadId: string): boolean {
 /** Starts inline rename of the active thread's sidebar row. */
 export function beginRename(threadId: string | null = getUiContext().activeThreadId || null): boolean {
   if (!threadId || !useThreadsStore.getState().byId[threadId]) return false;
-  const ui = useUiStore.getState();
-  if (!ui.sidebarVisible) ui.toggleSidebar();
-  ui.setRenaming(threadId);
+  renameInSidebar(threadId);
   return true;
 }
 

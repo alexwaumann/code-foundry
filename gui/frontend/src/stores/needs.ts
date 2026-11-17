@@ -28,7 +28,7 @@ interface NeedsState {
   popup: string | null;
   /** The request the popup opened on (a Needs you line's); null for the oldest. The popup's stepper moves from there. */
   popupRequest: string | null;
-  /** The hover card anchor ("sidebar:<id>", "popover:<id>", "strip:<pane>") the popup dismissed until it is hovered again. */
+  /** The hover card anchor ("sidebar:<id>", "strip:<pane>") the popup dismissed until it is hovered again. */
   dismissed: string | null;
   /** Asks read for a card, by request id; absent until read. */
   details: Readonly<Record<string, AskDetail>>;
@@ -36,11 +36,9 @@ interface NeedsState {
   misses: Readonly<Record<string, AskMiss>>;
   /** The sidebar list has the keyboard and its cursor moved by key: a Needs you row under it shows its card. */
   keyCursor: boolean;
-  /** The top bar's Needs you popover is open (the sidebar collapsed); the popup closes it. */
-  popover: boolean;
 }
 
-export const useNeedsStore = create<NeedsState>()(() => ({ popup: null, popupRequest: null, dismissed: null, details: {}, misses: {}, keyCursor: false, popover: false }));
+export const useNeedsStore = create<NeedsState>()(() => ({ popup: null, popupRequest: null, dismissed: null, details: {}, misses: {}, keyCursor: false }));
 
 /** The sidebar list's cursor moved by key: the row under it shows its card, even one the popup shut. */
 export function needsKeyMove(): void {
@@ -58,11 +56,7 @@ export function needsKeyLeave(): void {
  * request; the hover card of `anchor` stays shut until that anchor is hovered again.
  */
 export function openNeedsPopup(threadId: string, anchor: string | null = null, requestId: string | null = null): void {
-  useNeedsStore.setState({ popup: threadId, popupRequest: requestId, dismissed: anchor, popover: false });
-}
-
-export function setNeedsPopover(open: boolean): void {
-  useNeedsStore.setState({ popover: open });
+  useNeedsStore.setState({ popup: threadId, popupRequest: requestId, dismissed: anchor });
 }
 
 export function closeNeedsPopup(): void {
@@ -103,7 +97,6 @@ export function openNextNeedsPopup(): boolean {
  */
 export function goToNeedsThread(threadId: string): void {
   closeNeedsPopup();
-  setNeedsPopover(false);
   openThread(threadId);
 }
 
@@ -147,7 +140,7 @@ function readDetail(threadId: string, p: ThreadPendingView): void {
 /** Forgets every read detail (tests). */
 export function resetNeeds(): void {
   reading.clear();
-  useNeedsStore.setState({ popup: null, popupRequest: null, dismissed: null, details: {}, misses: {}, keyCursor: false, popover: false });
+  useNeedsStore.setState({ popup: null, popupRequest: null, dismissed: null, details: {}, misses: {}, keyCursor: false });
 }
 
 /**

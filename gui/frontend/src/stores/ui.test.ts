@@ -53,8 +53,18 @@ describe("ui persistence", () => {
   });
 
   it("loading keeps the other saved fields", () => {
-    const merged = useUiStore.persist.getOptions().merge?.({ sidebarVisible: false, sidebarWidth: 180, fontSize: 15 }, useUiStore.getState());
-    expect(merged).toMatchObject({ sidebarVisible: false, sidebarWidth: SIDEBAR_MIN, fontSize: 15 });
+    const merged = useUiStore.persist.getOptions().merge?.({ sidebarExpanded: false, sidebarWidth: 180, fontSize: 15 }, useUiStore.getState());
+    expect(merged).toMatchObject({ sidebarExpanded: false, sidebarWidth: SIDEBAR_MIN, fontSize: 15 });
+  });
+
+  it.each([
+    [{ sidebarVisible: false }, false],
+    [{ sidebarVisible: true }, true],
+    [{ sidebarExpanded: false, sidebarVisible: true }, false],
+    [{}, true],
+  ])("a store from before the rail (sidebarVisible) loads its sidebar as the rail or expanded: %j", (saved, expanded) => {
+    const merged = useUiStore.persist.getOptions().merge?.(saved, { ...useUiStore.getState(), sidebarExpanded: true });
+    expect(merged?.sidebarExpanded).toBe(expanded);
   });
 
   it("does not save the selection: the window always starts on HOME, the No project composer", () => {
