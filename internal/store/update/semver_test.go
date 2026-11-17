@@ -69,3 +69,37 @@ func TestNewer(t *testing.T) {
 		}
 	}
 }
+
+func TestAtLeast(t *testing.T) {
+	for _, tt := range []struct {
+		running, minimum string
+		want             bool
+	}{
+		{"v0.31.0", "", true},
+		{"v0.31.0", "0.31.0", true},
+		{"v0.31.1", "0.31.0", true},
+		{"v1.0.0", "0.31.0", true},
+		{"v0.29.2", "0.31.0", false},
+		{"v0.30.9", "0.31.0", false},
+		{"0.31.0", "0.31.0", true}, // no leading v
+		// A tip is its base version.
+		{"v0.31.0-tip.4", "0.31.0", true},
+		{"v0.31.0-tip.4", "0.31.1", false},
+		{"v0.30.0-tip.9", "0.31.0", false},
+		{"v0.31.0-tip.1", "0.31.0-rc.1", true},
+		// Other pre-releases compare by semver.
+		{"v0.31.0-rc.1", "0.31.0", false},
+		{"v0.31.0-rc.2", "0.31.0-rc.1", true},
+		{"v0.31.0", "0.31.0-rc.1", true},
+		// A dev build satisfies any minimum.
+		{"dev", "99.0.0", true},
+		{"", "99.0.0", true},
+		{"v1.2", "99.0.0", true},
+		// A malformed minimum is none.
+		{"v0.1.0", "v1", true},
+	} {
+		if got := AtLeast(tt.running, tt.minimum); got != tt.want {
+			t.Errorf("AtLeast(%q, %q) = %v, want %v", tt.running, tt.minimum, got, tt.want)
+		}
+	}
+}

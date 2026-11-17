@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { PluginView } from "@/api/plugin";
 import type { OverflowItem } from "@/components/projects/OverflowMenu";
-import { entryNames, groupedIds, hasUpdate, matchesEntry, NOT_AVAILABLE, pluginGroup, pluginMain, pluginMenu, registriesSummary, rowPill, searchedIds, updatablePlugins } from "./model";
+import { entryNames, groupedIds, hasUpdate, hostNeedSentence, matchesEntry, NOT_AVAILABLE, pluginGroup, pluginMain, pluginMenu, registriesSummary, rowPill, searchedIds, updatablePlugins } from "./model";
 
 const none = { commands: [], events: [], threadStatus: false, sessionEnv: false, secrets: false, threads: false, terminals: false, api: false };
 
@@ -34,6 +34,7 @@ function plugin(o: Partial<PluginView> & { name: string }): PluginView {
     updateAvailable: false,
     updateVersion: "",
     updateRegistry: "",
+    heldUpdate: null,
     ...o,
   };
 }
@@ -95,6 +96,7 @@ describe("a row", () => {
   });
 
   const offered = { updateAvailable: true, updateVersion: "2.0.0" };
+  const held = { version: "1.4.0", minHostVersion: "0.31.0", hostVersion: "0.29.2" };
   it.each([
     ["nothing", {}, null, null, undefined, null],
     ["an update", offered, null, null, undefined, { kind: "update", version: "2.0.0", retry: false }],
@@ -106,8 +108,21 @@ describe("a row", () => {
     ["reloading", {}, "reload", null, undefined, { kind: "working", words: "Reloading…" }],
     ["uninstalling", offered, "uninstall", null, undefined, { kind: "working", words: "Uninstalling…" }],
     ["a flip shows on the switch alone", {}, "disable", null, undefined, null],
+    ["a held update", { heldUpdate: held }, null, null, undefined, { kind: "held", version: "1.4.0", minHostVersion: "0.31.0" }],
+    ["a held update on a dev link", { heldUpdate: held, dev: true }, null, null, undefined, null],
+    ["a held update while restarting", { heldUpdate: held }, "restart", null, undefined, { kind: "working", words: "Restarting…" }],
+    ["a held update after Update all finished", { heldUpdate: held }, null, null, "1.3.0", { kind: "updated", version: "1.3.0" }],
   ] as const)("main: %s", (_name, o, busy, failure, updated, want) => {
     expect(pluginMain(plugin({ name: "x", ...o }), busy, failure, updated)).toEqual(want);
+  });
+
+  it("a held update says what it needs and what this is", () => {
+    expect(hostNeedSentence(held)).toBe("Version 1.4.0 needs Code Foundry 0.31.0 or newer. You have 0.29.2.");
+    // It is no update: not in Needs you, not in Update all.
+    const p = plugin({ name: "x", heldUpdate: held });
+    expect(hasUpdate(p)).toBe(false);
+    expect(updatablePlugins([p])).toEqual([]);
+    expect(pluginGroup(p, {})).toBe("running");
   });
 
   it("updatablePlugins and hasUpdate leave a dev link out", () => {

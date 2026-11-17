@@ -59,6 +59,7 @@ show in `code-foundry plugin list`'s NOTE column.
 | `version` | Required. Strict semantic version without a leading `v`: `0.1.0`, `1.0.0-rc.1`. The release tag is `v<version>`. |
 | `description` | Up to 300 characters; shown in the consent dialog and the registry. |
 | `protocol` | Required: `1`. |
+| `minHostVersion` | Optional. The oldest Code Foundry this version runs on, strict semver without a `v`: `"0.31.0"`. Set it when the version uses something a Code Foundry release added (a host command, a view node, an SDK call). An older Code Foundry does not install it, does not offer it as an update (the plugin's row says what it needs) and does not start it. A development build of Code Foundry runs anything; a tip build (`v0.31.0-tip.4`) counts as the release it is built towards (`0.31.0`). Absent: any. `code-foundry version` prints the running one. |
 | `exec` | Required: the argv the host starts. `exec[0]` with a slash is relative to the package folder and must stay inside it (`bin/gh-actions`, `./run.sh`); a bare word (`python3`, `node`) is looked up on PATH. Use `bin/<name>`: the example's Makefile builds it there. |
 | `permissions` | What the plugin may do through the host (below). `{}` asks for nothing; the user still consents once to running the plugin at all. |
 | `commands` | Up to 100 (below). |

@@ -51,6 +51,28 @@ func TestRegistryEntryScript(t *testing.T) {
 	if arm.SHA256 != a || arm.URL != "https://github.com/octo/code-foundry-plugin-minimal/releases/download/v0.1.0/minimal-0.1.0-darwin-arm64.tar.gz" || e.Artifacts["darwin/amd64"].SHA256 != b {
 		t.Errorf("artifacts %+v", e.Artifacts)
 	}
+	if strings.Contains(string(raw), "minHostVersion") {
+		t.Errorf("an entry without a minimum names one:\n%s", raw)
+	}
+
+	// A manifest's minHostVersion goes into the entry.
+	mf, err := os.ReadFile("examples/minimal/plugin.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	needs := filepath.Join(dir, "plugin.json")
+	if err := os.WriteFile(needs, []byte(strings.Replace(string(mf), `"protocol": 1,`, `"protocol": 1, "minHostVersion": "0.31.0",`, 1)), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cmd = exec.Command("go", "run", "scripts/registry-entry.go", "-manifest", needs, "-repo", "octo/code-foundry-plugin-minimal", "-sums", sums)
+	cmd.Dir = "examples/minimal"
+	got, err := cmd.Output()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(got), `"minHostVersion": "0.31.0"`) {
+		t.Errorf("entry without the manifest's minHostVersion:\n%s", got)
+	}
 }
 
 // Every action the example's workflows use is pinned to a full commit SHA with its

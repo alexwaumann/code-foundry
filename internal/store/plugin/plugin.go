@@ -146,6 +146,10 @@ type Plugin struct {
 	Installed *InstallRecord
 	// Update is a newer version a registry lists (updates.go); nil when there is none.
 	Update *UpdateOffer
+	// HeldUpdate is a newer version its source lists that needs a newer Code Foundry than
+	// this one (HeldUpdate.MinHost, minhost.go): no update, so Update is nil. nil when
+	// there is none.
+	HeldUpdate *HeldUpdate
 }
 
 // DisplayName is the manifest's display name, else the name.

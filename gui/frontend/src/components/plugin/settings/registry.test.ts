@@ -25,11 +25,20 @@ describe("registry words", () => {
   });
 
   it("offers Install only when nothing is installed and Update only from the install source", () => {
-    expect(entryAction({ relation: "not-installed" })).toBe("install");
-    expect(entryAction({ relation: "update" })).toBe("update");
-    expect(entryAction({ relation: "installed" })).toBeNull();
-    expect(entryAction({ relation: "dev" })).toBeNull();
-    expect(entryAction({ relation: "other-source" })).toBeNull();
+    expect(entryAction({ relation: "not-installed", needsHost: null })).toBe("install");
+    expect(entryAction({ relation: "update", needsHost: null })).toBe("update");
+    expect(entryAction({ relation: "installed", needsHost: null })).toBeNull();
+    expect(entryAction({ relation: "dev", needsHost: null })).toBeNull();
+    expect(entryAction({ relation: "other-source", needsHost: null })).toBeNull();
+  });
+
+  it("an entry needing a newer Code Foundry says so where Install or Update would be, and nowhere else", () => {
+    const needsHost = { version: "1.4.0", minHostVersion: "0.31.0", hostVersion: "0.29.2" };
+    expect(entryAction({ relation: "not-installed", needsHost })).toBe("needs-host");
+    expect(entryAction({ relation: "update", needsHost })).toBe("needs-host");
+    expect(entryAction({ relation: "installed", needsHost })).toBeNull();
+    expect(entryAction({ relation: "dev", needsHost })).toBeNull();
+    expect(entryAction({ relation: "other-source", needsHost })).toBeNull();
   });
 
   it("describes registries and their failures", () => {

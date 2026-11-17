@@ -81,6 +81,7 @@ function plugin(o: Partial<PluginView> & { name: string }): PluginView {
     updateAvailable: false,
     updateVersion: "",
     updateRegistry: "",
+    heldUpdate: null,
     ...o,
   };
 }
@@ -141,6 +142,7 @@ const entry = (o: Partial<IndexEntryView>): IndexEntryView => ({
   installedVersion: null,
   relation: "not-installed",
   installedFrom: "",
+  needsHost: null,
   ...o,
 });
 const FIXTURE = "https://github.com/alexwaumann/code-foundry-plugins";
@@ -257,6 +259,21 @@ describe("Settings → Plugins: the default list", () => {
     const d = details("x").getByText("It asks for more than you allowed.");
     expect(d).toBeTruthy();
     expect(screen.getByText("bad manifest field")).toBeTruthy();
+  });
+
+  it("a newer version needing a newer Code Foundry: said where Update would be, why in the details, with the app's update check", () => {
+    const need = { version: "1.4.0", minHostVersion: "0.31.0", hostVersion: "0.29.2" };
+    setPlugins([plugin({ name: "linear", displayName: "Linear sync", version: "1.2.0", heldUpdate: need })]);
+    show();
+    // No update: it stays in its group, with no Update button.
+    expect(groups()).toEqual(["running"]);
+    const row = within(installed("linear"));
+    expect(row.queryByTestId("plugin-update")).toBeNull();
+    expect(row.getByTestId("plugin-held-update").textContent).toBe("1.4.0 needs Code Foundry 0.31.0");
+    const d = details("linear");
+    expect(d.getByTestId("plugin-host-need").textContent).toBe("Version 1.4.0 needs Code Foundry 0.31.0 or newer. You have 0.29.2. Update Code Foundry");
+    fireEvent.click(d.getByTestId("plugin-host-need-update"));
+    expect(m.startCommandNamed).toHaveBeenCalledWith("app.update.check");
   });
 
   it("an update offered: Update to X, which goes once updated", () => {
@@ -446,6 +463,29 @@ describe("Settings → Plugins: searching and Browse all", () => {
     expect(entryRow("hello").textContent).toContain("Dev 0.1.0");
     expect(entryRow("linear-board").textContent).toContain("No build for this Mac");
     expect(within(entryRow("linear-board")).getByTestId<HTMLButtonElement>("registry-install").disabled).toBe(true);
+  });
+
+  it("an entry needing a newer Code Foundry offers neither Install nor Update, and says why", () => {
+    const needsHost = { version: "1.0.0", minHostVersion: "0.31.0", hostVersion: "0.29.2" };
+    setBrowse({
+      entries: [
+        entry({ name: "deploy-board", displayName: "Deploy board", needsHost }),
+        entry({ name: "test-watcher", displayName: "Test Watcher", version: "1.0.0", installedVersion: "0.0.9", relation: "update", needsHost }),
+      ],
+    });
+    show();
+    fireEvent.click(screen.getByTestId("plugin-browse-all"));
+    for (const name of ["deploy-board", "test-watcher"]) {
+      const r = within(entryRow(name));
+      expect(r.queryByTestId("registry-install")).toBeNull();
+      expect(r.queryByTestId("registry-update")).toBeNull();
+      expect(r.getByTestId("registry-needs-host").textContent).toBe("Needs Code Foundry 0.31.0");
+    }
+    const r = within(entryRow("deploy-board"));
+    fireEvent.click(r.getByTestId("catalog-chevron"));
+    expect(r.getByTestId("plugin-host-need").textContent).toBe("Version 1.0.0 needs Code Foundry 0.31.0 or newer. You have 0.29.2. Update Code Foundry");
+    fireEvent.click(r.getByTestId("plugin-host-need-update"));
+    expect(m.startCommandNamed).toHaveBeenCalledWith("app.update.check");
   });
 
   it("an installed entry with nothing to do says so", () => {

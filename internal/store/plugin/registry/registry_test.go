@@ -49,6 +49,9 @@ func TestParse(t *testing.T) {
 			wantIssues: []string{"plain http only for localhost"}},
 		{name: "loopback http artifact", body: `{"plugins":[{"name":"x","version":"1.0.0","artifacts":{"darwin/arm64":{"url":"http://127.0.0.1:9/x.tgz","sha256":"` + strings.ToUpper(sha) + `"}}}]}`,
 			wantNames: []string{"x"}},
+		{name: "minHostVersion", body: `{"plugins":[{"name":"x","version":"1.0.0","minHostVersion":"0.31.0","artifacts":{"darwin/arm64":{"url":"https://example.com/x.tgz","sha256":"` + sha + `"}}},` +
+			`{"name":"y","version":"1.0.0","minHostVersion":"v0.31.0","artifacts":{"darwin/arm64":{"url":"https://example.com/y.tgz","sha256":"` + sha + `"}}}]}`,
+			wantNames: []string{"x"}, wantIssues: []string{"plugins[1] (y): minHostVersion"}},
 		{name: "not json", body: `<html>`, wantErr: "index.json"},
 		{name: "no plugins list", body: `{"schema":1}`, wantErr: "no plugins list"},
 	}
@@ -523,6 +526,41 @@ func TestFingerprint(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if same := tt.a.Fingerprint() == tt.b.Fingerprint(); same != tt.same {
 				t.Errorf("same = %v, want %v", same, tt.same)
+			}
+		})
+	}
+}
+
+func TestReadManifest(t *testing.T) {
+	reg := func(name string) tar.Header { return tar.Header{Name: name, Typeflag: tar.TypeReg, Mode: 0o644} }
+	const mf = `{"name":"x","version":"1.4.0","minHostVersion":"0.31.0"}`
+	for _, tt := range []struct {
+		name    string
+		entries []tar.Header
+		bodies  map[string]string
+		want    string
+		wantErr string
+	}{
+		{name: "at root", entries: []tar.Header{reg("bin/x"), reg("plugin.json")}, bodies: map[string]string{"plugin.json": mf, "bin/x": "bin"}, want: mf},
+		{name: "under ./", entries: []tar.Header{reg("./plugin.json")}, bodies: map[string]string{"./plugin.json": mf}, want: mf},
+		{name: "nested is not it", entries: []tar.Header{reg("pkg/plugin.json")}, bodies: map[string]string{"pkg/plugin.json": mf}, wantErr: "has no plugin.json"},
+		{name: "a link is not it", entries: []tar.Header{{Name: "plugin.json", Typeflag: tar.TypeSymlink, Linkname: "/etc/passwd"}}, wantErr: "has no plugin.json"},
+		{name: "outside the root is not it", entries: []tar.Header{reg("../plugin.json")}, bodies: map[string]string{"../plugin.json": mf}, wantErr: "has no plugin.json"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			file := filepath.Join(t.TempDir(), "x.tar.gz")
+			if err := os.WriteFile(file, targz(t, tt.entries, tt.bodies), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			got, err := registry.ReadManifest(file)
+			if tt.wantErr != "" {
+				if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
+					t.Fatalf("err = %v, want %q", err, tt.wantErr)
+				}
+				return
+			}
+			if err != nil || string(got) != tt.want {
+				t.Errorf("ReadManifest = %q, %v; want %q", got, err, tt.want)
 			}
 		})
 	}

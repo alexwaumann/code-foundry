@@ -348,6 +348,9 @@ func formatPlugins(ps []*v1.Plugin) string {
 			note = fmt.Sprintf("%s (restart %d)", note, p.GetRestarts())
 		case p.GetUpdateAvailable() && note == "":
 			note = p.GetUpdateVersion() + " available: code-foundry plugin update " + p.GetName()
+		case p.GetHeldUpdate() != nil && note == "":
+			h := p.GetHeldUpdate()
+			note = h.GetVersion() + " needs Code Foundry " + h.GetMinHostVersion() + " (this is " + h.GetHostVersion() + ")"
 		}
 		_, _ = fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%d\t%s\t%s\t%s\n", p.GetName(), p.GetVersion(), state,
 			permissionSummary(p.GetPermissions()), len(p.GetCommands()), surfaceSummary(p.GetSurfaces()), wakeSummary(p.GetWakes()), note)

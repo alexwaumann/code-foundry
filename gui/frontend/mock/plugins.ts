@@ -928,7 +928,8 @@ function seedPlugins(): MockPlugin[] {
       permissions: { commands: [], events: [], threadStatus: false, sessionEnv: false, secrets: false },
       commands: [],
       surfaces: [],
-      install: { kind: "registry", source: "https://plugins.acme.dev/index.json" },
+      // linear-sync came from the fixture registry, which lists a 1.4.0 that needs a newer Code Foundry (held).
+      install: { kind: "registry", source: name === "linear-sync" ? "https://github.com/alexwaumann/code-foundry-plugins" : "https://plugins.acme.dev/index.json" },
     })),
   ];
 }
@@ -948,6 +949,8 @@ export interface PluginDeps {
   sendToThread: (id: string, text: string) => void;
   /** The plugins.registries setting (mock/pluginRegistry.ts). */
   registries: () => string;
+  /** This Code Foundry's version (the mock updater's), for plugins needing a newer one. */
+  hostVersion?: () => string;
   /**
    * Opens a tab in the layout by the placement rules, or in `pane` (the daemon's plugin.TabOpener):
    * a thread surface's show command opens its tab linked to the thread, and any surface's given
@@ -985,6 +988,7 @@ export class MockPlugins {
   /** The registries, Browse and plugin.install / update / uninstall (mock/pluginRegistry.ts). */
   readonly registry: MockRegistry = new MockRegistry({
     registries: () => this.deps.registries(),
+    hostVersion: () => this.deps.hostVersion?.() ?? "v0.1.0",
     installed: (name) => {
       const p = this.plugins.get(name);
       return p ? { version: p.version, dev: p.dev, install: p.install } : null;

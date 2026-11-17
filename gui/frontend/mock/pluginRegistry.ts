@@ -9,14 +9,16 @@
  * apart, like a real download.
  */
 import type { MessageInitShape } from "@bufbuild/protobuf";
+import { Code, ConnectError } from "@connectrpc/connect";
 import { timestampFromDate } from "@bufbuild/protobuf/wkt";
 import { ArgType, type UiContext } from "../src/gen/codefoundry/v1/command_pb";
-import { PluginIndexRelation, PluginInstallPhase, type BrowsePluginsResponseSchema, type PluginIndexEntrySchema } from "../src/gen/codefoundry/v1/plugin_pb";
+import { PluginIndexRelation, PluginInstallPhase, type BrowsePluginsResponseSchema, type PluginHostNeedSchema, type PluginIndexEntrySchema } from "../src/gen/codefoundry/v1/plugin_pb";
 import { CommandError } from "./errors";
 import type { PluginCommand, PluginEventInit } from "./plugins";
 
 type EntryInit = MessageInitShape<typeof PluginIndexEntrySchema>;
 type BrowseInit = MessageInitShape<typeof BrowsePluginsResponseSchema>;
+type HostNeedInit = MessageInitShape<typeof PluginHostNeedSchema>;
 
 /** The registry the fixture lists, configured in the mock's settings (not a default). */
 export const FIXTURE_REGISTRY = "https://github.com/alexwaumann/code-foundry-plugins";
@@ -58,6 +60,8 @@ export interface InstallSpec {
 
 interface Entry extends InstallSpec {
   repo: string;
+  /** The oldest Code Foundry the version runs on (docs/notes/plugin-min-host-version.md); absent: any. */
+  minHostVersion?: string;
 }
 
 /** An installed plugin as the registry half sees it: its version, dev link, and where `plugin install` got it. */
@@ -76,6 +80,8 @@ export interface RegistryDeps {
   publish: (ev: PluginEventInit) => void;
   /** The registries changed: publish every plugin again, as the daemon does for those whose offer changed. */
   republish: () => void;
+  /** This Code Foundry's version ("v0.1.0", the mock updater's). */
+  hostVersion: () => string;
 }
 
 function seedEntries(): Entry[] {
@@ -114,6 +120,28 @@ function seedEntries(): Entry[] {
       description: "Shows your Linear cycle in a tab.",
       repo: "alexwaumann/code-foundry-plugin-linear-board",
       permissions: { commands: [], events: [], threadStatus: false, sessionEnv: false, secrets: true },
+      registry: FIXTURE_REGISTRY,
+    },
+    {
+      // Installed 1.2.0 from here (mock/plugins.ts); 1.4.0 needs a newer Code Foundry than the mock's, so it is held.
+      name: "linear-sync",
+      displayName: "Linear Sync",
+      version: "1.4.0",
+      minHostVersion: "0.31.0",
+      description: "Mirrors a thread's linked issues and posts when a pull request merges.",
+      repo: "alexwaumann/code-foundry-plugin-linear-sync",
+      permissions: { commands: [], events: [], threadStatus: false, sessionEnv: false, secrets: false },
+      registry: FIXTURE_REGISTRY,
+    },
+    {
+      // Needs a newer Code Foundry than the mock's: Browse says so instead of Install.
+      name: "deploy-board",
+      displayName: "Deploy Board",
+      version: "1.0.0",
+      minHostVersion: "0.31.0",
+      description: "Watch deploys from a pane: each environment, what is on it and who shipped it.",
+      repo: "alexwaumann/code-foundry-plugin-deploy-board",
+      permissions: { commands: [], events: ["project"], threadStatus: false, sessionEnv: false, secrets: false },
       registry: FIXTURE_REGISTRY,
     },
     {
@@ -274,10 +302,26 @@ export class MockRegistry {
     return e;
   }
 
-  /** The update fields of a Plugin message: an offer only from the source it was installed from (the daemon's offerFor). */
-  offer(name: string): { updateAvailable?: boolean; updateVersion?: string; updateRegistry?: string } {
+  /** This Code Foundry's version without its v. */
+  private host(): string {
+    return this.deps.hostVersion().replace(/^v/, "");
+  }
+
+  /** Why this Code Foundry cannot run e (update.AtLeast, the fixtures being releases); undefined when it can. */
+  private needsHost(e: Entry): HostNeedInit | undefined {
+    if (!e.minHostVersion || !newer(e.minHostVersion, this.host())) return undefined;
+    return { version: e.version, minHostVersion: e.minHostVersion, hostVersion: this.host() };
+  }
+
+  /**
+   * The update fields of a Plugin message: an offer only from the source it was installed from (the daemon's offerFor),
+   * held when it needs a newer Code Foundry.
+   */
+  offer(name: string): { updateAvailable?: boolean; updateVersion?: string; updateRegistry?: string; heldUpdate?: HostNeedInit } {
     const e = this.listed().find((x) => x.name === name);
     if (!e || relate(this.deps.installed(name), e) !== "update") return {};
+    const held = this.needsHost(e);
+    if (held) return { heldUpdate: held };
     return { updateAvailable: true, updateVersion: e.version, updateRegistry: e.registry };
   }
 
@@ -285,6 +329,7 @@ export class MockRegistry {
     if (refresh) this.fetchedAt = new Date();
     const entries: EntryInit[] = this.listed().map((e) => {
       const inst = this.deps.installed(e.name);
+      const needsHost = this.needsHost(e);
       return {
         name: e.name,
         displayName: e.displayName,
@@ -303,8 +348,10 @@ export class MockRegistry {
         available: true,
         ...(inst ? { installed: { name: e.name, version: inst.version, dev: inst.dev } } : {}),
         relation: relations[relate(inst, e)],
-        updateAvailable: relate(inst, e) === "update",
+        updateAvailable: relate(inst, e) === "update" && !needsHost,
         installedFrom: inst && relate(inst, e) === "other_source" ? sourceLabel(inst) : "",
+        minHostVersion: e.minHostVersion ?? "",
+        ...(needsHost ? { needsHost } : {}),
       };
     });
     return {
@@ -377,6 +424,8 @@ export class MockRegistry {
         run: async (_c, a) => {
           const ref = a.ref ?? "";
           const e = this.entry(ref.split("@")[0] ?? "");
+          const need = this.needsHost(e);
+          if (need) throw new ConnectError(`${e.name} ${e.version} needs Code Foundry ${need.minHostVersion ?? ""} or newer; this is ${this.host()}`, Code.FailedPrecondition);
           const had = this.deps.installed(e.name);
           if (had && had.version === e.version && a.force !== "true") {
             return { message: `${e.name} ${e.version} is installed already (--force reinstalls it)`, resultJson: JSON.stringify({ plugin: { name: e.name, version: e.version, enabled: true }, version: e.version }) };
@@ -422,6 +471,10 @@ export class MockRegistry {
               continue;
             }
             if (relate(had, e) !== "update") continue;
+            if (this.needsHost(e)) {
+              lines.push(`not offered: ${n} ${e.version} needs Code Foundry ${e.minHostVersion ?? ""} or newer; this is ${this.host()} (update Code Foundry first: code-foundry update)`);
+              continue;
+            }
             if (a.check === "true") {
               lines.push(`${n} ${had.version} → ${e.version}`);
               continue;

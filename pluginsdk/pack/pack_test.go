@@ -156,6 +156,25 @@ func TestChecksumsAndEntry(t *testing.T) {
 	if _, err := pack.MakeEntry("o/demo", []pack.Result{rs[0], rs[0]}, func(pack.Result) string { return "" }); err == nil {
 		t.Error("two tarballs for one platform should fail")
 	}
+	// minHostVersion is written only when the manifest has one, and every tarball agrees.
+	if _, ok := back["minHostVersion"]; ok {
+		t.Errorf("entry without a minimum has minHostVersion: %s", b)
+	}
+	needs := slices.Clone(rs)
+	for i := range needs {
+		needs[i].Manifest.MinHostVersion = "0.31.0"
+	}
+	e, err = pack.MakeEntry("o/demo", needs, func(r pack.Result) string { return pack.ReleaseURL("o/demo", r.Version, r.Base) })
+	if err != nil {
+		t.Fatal(err)
+	}
+	if b, _ := pack.MarshalEntry(e); !strings.Contains(string(b), `"minHostVersion": "0.31.0"`) {
+		t.Errorf("entry = %s", b)
+	}
+	needs[1].Manifest.MinHostVersion = "0.30.0"
+	if _, err := pack.MakeEntry("o/demo", needs, func(pack.Result) string { return "" }); err == nil || !strings.Contains(err.Error(), "minHostVersion") {
+		t.Errorf("tarballs needing different versions: err = %v", err)
+	}
 }
 
 func toStrings(v any) []string {

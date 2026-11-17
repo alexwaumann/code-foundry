@@ -207,6 +207,23 @@ message Plugin {
   bool dev_watch = 32;
   // A dev plugin's build command and, while watched, its last build.
   PluginDevBuild dev_build = 33;
+  // The manifest's minHostVersion: the oldest Code Foundry this version runs on (empty
+  // for any). One this Code Foundry is too old for does not start (last_error says so).
+  string min_host_version = 34;
+  // A newer version its source lists that needs a newer Code Foundry than this one: no
+  // update (update_available stays false), shown with why instead. Unset when none.
+  PluginHostNeed held_update = 35;
+}
+
+// PluginHostNeed is a plugin version this Code Foundry is too old for
+// (docs/notes/plugin-min-host-version.md).
+message PluginHostNeed {
+  // The plugin's version on offer.
+  string version = 1;
+  // The oldest Code Foundry it runs on (its minHostVersion, no leading v).
+  string min_host_version = 2;
+  // This Code Foundry's version, no leading v.
+  string host_version = 3;
 }
 
 enum PluginDevBuildState {
@@ -727,6 +744,11 @@ message PluginIndexEntry {
   // Where the installed plugin came from, short (a registry URL without its scheme,
   // owner/repo, "the plugins folder"); set only when relation is OTHER_SOURCE.
   string installed_from = 15;
+  // The oldest Code Foundry version runs on (empty for any).
+  string min_host_version = 16;
+  // Set when this Code Foundry is older than min_host_version: neither Install nor
+  // Update is offered, whatever relation says (update_available is false).
+  PluginHostNeed needs_host = 17;
 }
 
 message BrowsePluginsRequest {
@@ -803,6 +825,10 @@ message PluginUpdate {
   // installed from installed_from (short, as PluginIndexEntry.installed_from), so it is
   // not offered and not installed (`plugin install <name> --force` switches source).
   string installed_from = 8;
+  // Set when this is no update either: version needs Code Foundry needs_host or newer,
+  // and this one is host_version (no leading v). Not offered, not installed.
+  string needs_host = 9;
+  string host_version = 10;
 }
 
 message UpdatePluginsResponse {

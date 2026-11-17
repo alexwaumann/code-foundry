@@ -262,6 +262,19 @@ func relationNote(e *v1.PluginIndexEntry) string {
 	return ""
 }
 
+// needsHostWords is why a plugin version is not offered: "linear 1.4.0 needs Code
+// Foundry 0.31.0 or newer; this is 0.29.2" (the daemon's install refusal, word for word).
+func needsHostWords(name, version, minHost, host string) string {
+	return fmt.Sprintf("%s %s needs Code Foundry %s or newer; this is %s", name, version, minHost, host)
+}
+
+// heldOffer is the line for an update that needs a newer Code Foundry
+// (PluginUpdate.needs_host): no offer, and how to get it.
+func heldOffer(u *v1.PluginUpdate) string {
+	return "not offered: " + needsHostWords(u.GetName(), u.GetVersion(), u.GetNeedsHost(), u.GetHostVersion()) +
+		" (update Code Foundry first: code-foundry update)"
+}
+
 // notOffered is the line for an update a registry lists of a plugin installed from
 // another source (PluginUpdate.installed_from): no offer, and how to switch.
 func notOffered(u *v1.PluginUpdate) string {
@@ -270,11 +283,14 @@ func notOffered(u *v1.PluginUpdate) string {
 }
 
 func formatUpdates(ups []*v1.PluginUpdate, check bool) string {
-	var offers, others []*v1.PluginUpdate
+	var offers, held, others []*v1.PluginUpdate
 	for _, u := range ups {
-		if u.GetInstalledFrom() != "" {
+		switch {
+		case u.GetNeedsHost() != "":
+			held = append(held, u)
+		case u.GetInstalledFrom() != "":
 			others = append(others, u)
-		} else {
+		default:
 			offers = append(offers, u)
 		}
 	}
@@ -294,6 +310,9 @@ func formatUpdates(ups []*v1.PluginUpdate, check bool) string {
 		lines = append(lines, sb.String())
 	default:
 		lines = append(lines, updatedLines(offers)...)
+	}
+	for _, u := range held {
+		lines = append(lines, heldOffer(u))
 	}
 	for _, u := range others {
 		lines = append(lines, notOffered(u))
@@ -342,6 +361,9 @@ func formatBrowse(r *v1.BrowsePluginsResponse) string {
 			version := e.GetVersion()
 			if !e.GetAvailable() {
 				version += " (no " + r.GetPlatform() + " build)"
+			}
+			if n := e.GetNeedsHost(); n != nil {
+				version += " (needs Code Foundry " + n.GetMinHostVersion() + ")"
 			}
 			desc := truncateRunes(e.GetDescription(), 60)
 			_, _ = fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n", e.GetName(), version, inst, permissionSummary(e.GetPermissions()), desc)

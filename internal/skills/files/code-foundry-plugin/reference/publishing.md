@@ -81,6 +81,11 @@ actions run may need `actions/checkout` and `actions/setup-go` allowed.
   minor for features, major when commands, args or settings break.
 - A version that asks for more permissions than the user granted disables the plugin on
   update until they consent again: say why in the release notes.
+- A version that needs a newer Code Foundry than the one it was first written for (a host
+  command, view node or SDK call a Code Foundry release added) sets `minHostVersion` in
+  `plugin.json` to that release (`"0.31.0"`, no `v`; `manifest.md`). Users on an older
+  Code Foundry keep the version they have: the update is not offered until they update
+  the app.
 
 ## The release
 
@@ -151,8 +156,10 @@ downloads the release's `SHA256SUMS` and writes `dist/<name>.json`:
 }
 ```
 
-`name`, `version` and `permissions` (all eight keys) come from `plugin.json`, which the
-registry's CI compares with the `plugin.json` inside each tarball.
+`name`, `version`, `minHostVersion` (only when `plugin.json` has one) and `permissions`
+(all eight keys) come from `plugin.json`, which the registry's CI compares with the
+`plugin.json` inside each tarball. Code Foundry reads the entry's `minHostVersion` before
+it downloads anything, so an entry whose `plugin.json` says one must say it too.
 
 ### Which registry
 

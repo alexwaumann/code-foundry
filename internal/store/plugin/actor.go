@@ -219,6 +219,9 @@ func (a *actor) once(info spawnInfo) (err error) {
 	if mf.Protocol != pluginsdk.ProtocolVersion {
 		return fmt.Errorf("%w: it speaks protocol %d, this Code Foundry speaks %d", errPermanent, mf.Protocol, pluginsdk.ProtocolVersion)
 	}
+	if err := a.m.needsHost(mf.Name, mf.Version, mf.MinHostVersion); err != nil {
+		return fmt.Errorf("%w: %w", errPermanent, err)
+	}
 	argv, err := resolveExec(info.dir, mf.Exec)
 	if err != nil {
 		return fmt.Errorf("%w: %v", errPermanent, err)

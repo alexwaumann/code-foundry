@@ -29,6 +29,10 @@ type UpdateOffer struct {
 	// repository's latest, or the version a registry entry of that repository lists);
 	// "" installs the name from the registries.
 	Ref string
+	// MinHost is the version's minHostVersion: the oldest Code Foundry it runs on ("" for
+	// any). An offer this Code Foundry is too old for is held (Plugin.HeldUpdate), not an
+	// update (minhost.go).
+	MinHost string
 }
 
 // RegistryChanged is published when the merged index changes (an entry added, removed,
@@ -132,7 +136,7 @@ func offerFor(p Plugin, merged registry.Merged, releases map[string]UpdateOffer)
 		if relate(&p, e) != RelationUpdate {
 			return UpdateOffer{}, false
 		}
-		o := UpdateOffer{Version: e.Version, Registry: e.Registry}
+		o := UpdateOffer{Version: e.Version, Registry: e.Registry, MinHost: e.MinHostVersion}
 		if p.Installed.Kind == KindGitHub {
 			o.Ref = p.Installed.Source + "@v" + e.Version
 		}
@@ -160,7 +164,9 @@ func fromRepo(p Plugin, merged registry.Merged) bool {
 
 // checkReleases asks, once per update check, each plugin installed from a GitHub
 // repository that no registry lists for its latest release, and records the offers.
-// A failure keeps the last answer (logged at debug: gh may be offline).
+// A newer release's minHostVersion is read from its tarball (releaseMinHost) the first
+// time that version is seen. A failure keeps the last answer (logged at debug: gh may be
+// offline).
 func (m *Manager) checkReleases(ctx context.Context) {
 	m.inst.mu.Lock()
 	merged := m.inst.merged
@@ -178,6 +184,19 @@ func (m *Manager) checkReleases(ctx context.Context) {
 		o := UpdateOffer{Version: version, Registry: "https://github.com/" + repo, Ref: repo + "@" + tag}
 		m.inst.mu.Lock()
 		old, had := m.inst.releases[p.Name]
+		m.inst.mu.Unlock()
+		if had && old.Version == o.Version && old.Ref == o.Ref {
+			o.MinHost = old.MinHost
+		} else if registry.Newer(version, p.Manifest.Version) {
+			minHost, err := m.releaseMinHost(ctx, repo, tag)
+			if err != nil {
+				m.log.Debug("plugin update check: release manifest", "plugin", p.Name, "repo", repo, "tag", tag, "err", err)
+				continue
+			}
+			o.MinHost = minHost
+		}
+		m.inst.mu.Lock()
+		old, had = m.inst.releases[p.Name]
 		next := maps.Clone(m.inst.releases)
 		if next == nil {
 			next = map[string]UpdateOffer{}
@@ -208,7 +227,11 @@ func (m *Manager) setMerged(merged registry.Merged) {
 	for _, p := range m.Snapshot().Plugins {
 		// The record matters for offerFor; the snapshot's is current.
 		o, ok := offerFor(p, merged, releases)
-		if (p.Update == nil) == !ok && (p.Update == nil || *p.Update == o) {
+		cur := p.Update
+		if p.HeldUpdate != nil {
+			cur = &p.HeldUpdate.UpdateOffer
+		}
+		if (cur == nil) == !ok && (cur == nil || *cur == o) {
 			continue
 		}
 		m.update(p.Name, nil, func(*entry) {})
@@ -247,14 +270,18 @@ type PluginUpdate struct {
 	// plugin was installed from another source (SourceLabel), so it is not offered and
 	// Update skips it (RelationOtherSource; `plugin install --force` switches).
 	InstalledFrom string
+	// NeedsHost, when set, makes this no offer either: Version needs Code Foundry
+	// NeedsHost or newer, and this one is Host (Plugin.HeldUpdate). Update skips it.
+	NeedsHost, Host string
 }
 
 // CheckUpdates reads the registries (the cached indexes within their TTL unless
 // refresh) and returns the installed plugins their own source lists a newer version of
 // (offerFor), and those installed from a GitHub repository no registry lists whose
 // latest release is newer (one `gh release view` per such plugin per call). After the
-// offers come the entries that are no offer because the plugin came from elsewhere
-// (InstalledFrom set) but list a newer version. It installs nothing; the snapshot's
+// offers come the versions that need a newer Code Foundry (NeedsHost set), then the
+// entries that are no offer because the plugin came from elsewhere (InstalledFrom set)
+// but list a newer version. It installs nothing; the snapshot's
 // Plugin.Update carries the same offers.
 func (m *Manager) CheckUpdates(ctx context.Context, refresh bool) ([]PluginUpdate, error) {
 	if m.opts.Registry == nil {
@@ -270,6 +297,12 @@ func (m *Manager) CheckUpdates(ctx context.Context, refresh bool) ([]PluginUpdat
 				Registry: p.Update.Registry, Ref: p.Update.Ref})
 		}
 	}
+	for _, p := range snap.Plugins {
+		if h := p.HeldUpdate; h != nil {
+			out = append(out, PluginUpdate{Name: p.Name, Current: p.Manifest.Version, Version: h.Version,
+				Registry: h.Registry, Ref: h.Ref, NeedsHost: h.MinHost, Host: h.Host})
+		}
+	}
 	m.inst.mu.Lock()
 	merged := m.inst.merged
 	m.inst.mu.Unlock()
@@ -280,6 +313,9 @@ func (m *Manager) CheckUpdates(ctx context.Context, refresh bool) ([]PluginUpdat
 		}
 		if p.Update != nil && !registry.Newer(e.Version, p.Update.Version) {
 			continue // its own source offers as much
+		}
+		if p.HeldUpdate != nil && !registry.Newer(e.Version, p.HeldUpdate.Version) {
+			continue // its own source lists as much (needing a newer Code Foundry)
 		}
 		out = append(out, PluginUpdate{Name: p.Name, Current: p.Manifest.Version, Version: e.Version, Registry: e.Registry,
 			InstalledFrom: SourceLabel(p)})
@@ -312,8 +348,8 @@ func (m *Manager) Update(ctx context.Context, name string, check, refresh bool) 
 	}
 	for i := range offers {
 		u := &offers[i]
-		if u.InstalledFrom != "" {
-			continue // not an offer (another source lists it)
+		if u.InstalledFrom != "" || u.NeedsHost != "" {
+			continue // not an offer (another source lists it, or it needs a newer Code Foundry)
 		}
 		wasEnabled := false
 		if p, ok := m.Snapshot().Plugin(u.Name); ok {
@@ -347,6 +383,11 @@ type BrowseEntry struct {
 	// InstalledFrom is where Installed came from (SourceLabel) when Relation is
 	// RelationOtherSource; else empty.
 	InstalledFrom string
+	// NeedsHost: the entry's version needs a newer Code Foundry than this one
+	// (Entry.MinHostVersion; Host is this one's version). Neither Install nor Update is
+	// offered, whatever Relation says.
+	NeedsHost bool
+	Host      string
 }
 
 // BrowseResult is Browse's answer.
@@ -376,6 +417,7 @@ func (m *Manager) Browse(ctx context.Context, refresh bool) (BrowseResult, error
 		if be.Relation == RelationOtherSource {
 			be.InstalledFrom = SourceLabel(*be.Installed)
 		}
+		be.NeedsHost, be.Host = !m.hostRuns(e.MinHostVersion), m.HostVersion()
 		out.Entries = append(out.Entries, be)
 	}
 	return out, nil

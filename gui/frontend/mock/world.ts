@@ -915,6 +915,7 @@ export class World {
       this.logs.send(id, text, []);
     },
     registries: () => this.settings.value("plugins.registries"),
+    hostVersion: () => this.update.status.currentVersion,
     openTab: (tab, focus, pane) => this.layout.apply({ op: "open_surface", tab, focus, ...(pane ? { pane } : {}) }, "", { keep_focus: !focus }).result,
   });
   /** The Skills marketplace (mock/skills.ts); the EventService skill source. */
