@@ -8,9 +8,9 @@ runs:
       with:
         go-version-file: go.mod
         # Go bakes the pkg-config link paths of libghostty-vt and whisper.cpp into compiled
-        # cgo packages without keying on them. The Makefile names the libghostty-vt pin in
-        # CGO_CPPFLAGS, which Go does key on; whisper.cpp has no such guard, and keying the
-        # cache on the pins also drops entries no pin uses any more.
+        # cgo packages without keying on them. The Makefile names both pins in
+        # CGO_CPPFLAGS, which Go does key on; keying the cache on the pins as well drops
+        # entries no pin uses any more.
         cache-dependency-path: |
           go.sum
           scripts/ghostty-vt.sh
