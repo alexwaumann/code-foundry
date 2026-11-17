@@ -2,13 +2,13 @@ import { useMemo } from "react";
 import { workspaceThreads, workspaceThreadsCaption } from "@/lib/workspacePage";
 import { useProjectsStore } from "@/stores/projects";
 import { useThreadsStore } from "@/stores/threads";
-import { useUiStore } from "@/stores/ui";
 import { workspaceTerminalPlace } from "@/stores/workspaceActions";
 import { useWorkspacesStore } from "@/stores/workspaces";
+import { openThread as openWindowThread } from "@/stores/openThread";
 
-/** Opens the thread (its own pane). */
+/** Opens the thread (its own pane); a child or a snoozed one as the space's preview tab (stores/openThread.ts). */
 export function openThread(id: string): void {
-  useUiStore.getState().select({ kind: "thread", id });
+  openWindowThread(id, { focusPrompt: false });
 }
 
 /** The workspace's threads, in the page's order (lib/workspacePage.ts workspaceThreads): ids only, so a status change re-sorts but a name change does not rebuild the list. */

@@ -48,8 +48,8 @@ func init() {
 // (Snoozed, or ThreadState.Snoozed): then it waits for the thread to wake (preview.go). W and
 // H are the pane area for placement (default DefaultW x DefaultH).
 //
-// Preview opens it as a preview tab (preview.go) when the thread is archived or snoozed, and
-// as a kept tab otherwise; it takes no place in a pane and no composer. The space's previous
+// Preview opens it as a preview tab (preview.go) when the thread is archived, snoozed or a
+// child, and as a kept tab otherwise; it takes no place in a pane and no composer. The space's previous
 // preview goes: in the pane the new one opens in, the new one takes its place in the strip;
 // elsewhere it closes (Result.Closed; its linked tabs are remembered, Result.Kept). It is not
 // recorded for reopen_closed. An open thread is focused where it is: a preview stays one
@@ -57,6 +57,10 @@ func init() {
 //
 // Snoozed says the thread is snoozed, as Archived says it is archived; the layout remembers
 // it (ThreadState.Snoozed) until set_snoozed wakes it.
+//
+// Child says another thread created the thread and that creator still exists (the sidebar
+// rule; its lead manages it). Only a preview reads it: a child's preview shows only its
+// conversation, as a snoozed thread's does; its remembered set waits for a kept open.
 type OpenThread struct {
 	Thread   string  `json:"thread"`
 	Pane     string  `json:"pane,omitempty"`
@@ -65,6 +69,7 @@ type OpenThread struct {
 	Compose  string  `json:"compose,omitempty"`
 	Archived bool    `json:"archived,omitempty"`
 	Snoozed  bool    `json:"snoozed,omitempty"`
+	Child    bool    `json:"child,omitempty"`
 	Preview  bool    `json:"preview,omitempty"`
 	Focus    bool    `json:"focus,omitempty"`
 	W        float64 `json:"w,omitempty"`
@@ -85,7 +90,7 @@ func (o *OpenThread) apply(t *tx) (Result, error) {
 		threadState(t.st, o.Thread).Snoozed = true
 	}
 	snoozed := t.snoozed(o.Thread)
-	preview := o.Preview && (o.Archived || snoozed)
+	preview := o.Preview && (o.Archived || snoozed || o.Child)
 	if id := threadTabID(t.st, o.Thread); id != "" {
 		if o.Compose != "" {
 			return Result{}, fmt.Errorf("thread %s is already open as %s: %w", o.Thread, id, ErrFailedPrecondition)
@@ -237,7 +242,8 @@ func (o *OpenThread) apply(t *tx) (Result, error) {
 		pane = &Node{T: NodePane, ID: id, Tabs: []*Tab{tb}, Active: tb.ID}
 		sp.Root = pane
 	}
-	if !snoozed {
+	// A child's preview leaves its set put away: a surface placed beside it would keep it.
+	if !snoozed && !(preview && o.Child) {
 		if err := t.restore(sp, o.Thread, w, h, &res); err != nil {
 			return Result{}, err
 		}

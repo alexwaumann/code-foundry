@@ -5336,6 +5336,10 @@ export class World {
           const t = this.threads.get(id);
           return !!t && (t.snoozedUntil !== null || t.savedAt !== null);
         },
+        isChild: (id) => {
+          const by = this.threads.get(id)?.createdBy ?? "";
+          return by !== "" && this.threads.has(by);
+        },
         archiveThread: (id) => {
           this.archiveThread(id, true);
         },

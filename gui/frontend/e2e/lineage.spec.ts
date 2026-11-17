@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { mockPost, openApp, resetMock, row } from "./fixtures";
+import { mockPost, mockUrl, openApp, resetMock, row } from "./fixtures";
 
 /**
  * Thread lineage in the GUI (docs/notes/agents-3-lineage-gui.md) over the mock's
@@ -26,6 +26,22 @@ const card = (page: Page) => page.getByTestId("thread-info-card");
 /** A thread's row in the thread info card's lineage group (finished ones under Previous). */
 const lineageRow = (page: Page, id: string) => card(page).locator(`[data-testid="ti-lineage-row"][data-id="${id}"]`);
 const sidebarKeys = (page: Page) => page.getByTestId("thread-list").locator('[data-row-key^="s:"]').evaluateAll((els) => els.map((e) => e.getAttribute("data-row-key")));
+
+/** The threads whose stored tab is a preview (the mock daemon's layout). */
+async function storedPreviews(): Promise<string[]> {
+  type Node = { t: "pane"; tabs: { thread?: string; preview?: boolean }[] } | { t: "split"; kids: Node[] };
+  const res = await fetch(`${mockUrl}/__mock/layout`);
+  const spaces = ((await res.json()) as { state: { spaces: { root: Node | null }[] } }).state.spaces;
+  const out: string[] = [];
+  const walk = (n: Node | null): void => {
+    if (n?.t === "pane") for (const t of n.tabs) if (t.preview === true) out.push(String(t.thread));
+    if (n?.t === "split") n.kids.forEach(walk);
+  };
+  spaces.forEach((sp) => {
+    walk(sp.root);
+  });
+  return out;
+}
 
 async function open(page: Page, id: string): Promise<void> {
   await row(page, `s:${id}`).click();
@@ -130,6 +146,18 @@ test.describe("child threads", () => {
     await expect(list).toHaveAttribute("aria-activedescendant", `row-${String(next)}`);
   });
 
+  // Which clicks ask for a preview: src/stores/openThread.test.ts, LineageGroup.test.tsx; the
+  // daemon's answer: internal/command (TestThreadOpenPreview) and internal/layout's cases.
+  test("a child opened from its creator's card is the space's one preview tab; the next child replaces it", async ({ page }) => {
+    await openApp(page);
+    await open(page, P);
+    await openFromCard(page, C, "Add retry to login redirect");
+    await expect.poll(storedPreviews).toEqual([C]);
+    await page.locator(`[data-testid="shell-tab"][data-kind="thread"]`).filter({ hasText: "Fix login redirect" }).first().click();
+    await openFromCard(page, "s-l-e2e", "Update redirect e2e tests");
+    await expect.poll(storedPreviews).toEqual(["s-l-e2e"]);
+  });
+
   // A thread an agent creates not taking the view: src/lib/inSidebar.test.ts (threadFocus "a new created thread") and src/stores/intents.test.ts ("a new child (its creator exists)").
 
   // Archiving the creator asking (its working children counted) and archiving them with it: the daemon's (internal/command/commands_thread_cascade_test.go); only the creator under Archived: src/lib/inSidebar.test.ts.
@@ -148,6 +176,23 @@ for (const scheme of ["dark", "light"] as const) {
     await openCard(page);
     await page.mouse.move(0, 0);
     await page.screenshot({ path: `${String(shots)}/lineage-mock-${scheme}.png` });
+  });
+}
+
+/** SHOTS=<dir>: a child opened from its creator's card, its tab a preview (the strip and the card), dark and light. */
+for (const scheme of ["dark", "light"] as const) {
+  test(`child preview tab screenshot (${scheme})`, async ({ page }, info) => {
+    const shots = process.env.SHOTS;
+    test.skip(!shots || info.project.name !== "webkit", "SHOTS=<dir> with WebKit only");
+    await page.emulateMedia({ colorScheme: scheme });
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await openApp(page);
+    await open(page, P);
+    await openCard(page);
+    await openFromCard(page, C, "Add retry to login redirect");
+    await page.mouse.move(0, 0);
+    await page.waitForTimeout(150);
+    await page.screenshot({ path: `${String(shots)}/child-preview-${scheme}.png` });
   });
 }
 

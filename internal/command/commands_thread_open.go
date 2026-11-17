@@ -58,6 +58,26 @@ func (l layout) namedThread(ctx context.Context, uctx Context, a Args) (string, 
 	return id, nil, nil
 }
 
+// isChild reports whether another thread created th and that creator still exists (an archived
+// one does): the sidebar rule's hidden child, which its lead manages, so the user's open of it
+// may be a preview (docs/notes/shell-model.md, "Preview tabs"). A creator that is gone makes it
+// a thread of the sidebar again.
+func (l layout) isChild(ctx context.Context, th *v1.Thread) (bool, error) {
+	by := th.GetCreatedBy()
+	if by == "" || l.thread == nil {
+		return false, nil
+	}
+	_, err := l.thread.Get(ctx, connect.NewRequest(&v1.GetThreadRequest{Id: by}))
+	switch {
+	case err == nil:
+		return true, nil
+	case connect.CodeOf(err) == connect.CodeNotFound:
+		return false, nil
+	default:
+		return false, err
+	}
+}
+
 func (l layout) threadCommands() []Command {
 	return []Command{
 		{
@@ -68,8 +88,8 @@ func (l layout) threadCommands() []Command {
 				"that edge of the whole pane area), in place of the space's composer when that is all the space shows. An " +
 				"archived thread lives in no space: it opens in the current space (or --pane's). The linked tabs it had open " +
 				"when it closed come back (a snoozed thread's when it wakes). From inside a thread it opens without taking the " +
-				"user's focus unless --focus. --preview (the user only, without a place) opens an archived or snoozed thread " +
-				"as the space's preview tab, replacing the last one, until tab.keep or a move, a send or its surfaces keep it.",
+				"user's focus unless --focus. --preview (the user only, without a place) opens an archived or snoozed thread, " +
+				"or a child (a thread another thread created, while that creator exists), as the space's preview tab, replacing the last one, until tab.keep or a move, a send or its surfaces keep it.",
 			Args: []ArgSpec{
 				layoutThreadArg(true),
 				paneIDArg("pane", "The pane its tab opens in (a pane of the thread's space)"),
@@ -78,7 +98,7 @@ func (l layout) threadCommands() []Command {
 				edgeArg("edge", "With --split: the edge of that pane"),
 				edgeArg("outer", "In a new pane on this edge of the whole pane area of the thread's space"),
 				focusArg,
-				{Name: "preview", Type: Bool, Description: "As the space's preview tab when the thread is archived or snoozed (otherwise a kept tab)"},
+				{Name: "preview", Type: Bool, Description: "As the space's preview tab when the thread is archived, snoozed or a child (otherwise a kept tab)"},
 			},
 			NoPalette: true, NoKeybinding: true,
 			Run: func(ctx context.Context, uctx Context, a Args) (Result, error) {
@@ -89,6 +109,11 @@ func (l layout) threadCommands() []Command {
 				op := &core.OpenThread{
 					Thread: id, Pane: a.String("pane"), Archived: th.GetArchivedAt() != nil,
 					Snoozed: th.GetSnoozedUntil() != nil || th.GetSavedAt() != nil, Preview: a.Bool("preview"),
+				}
+				if op.Preview {
+					if op.Child, err = l.isChild(ctx, th); err != nil {
+						return Result{}, err
+					}
 				}
 				switch {
 				case op.Preview && !uctx.FromUser():

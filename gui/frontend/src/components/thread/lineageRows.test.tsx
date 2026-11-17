@@ -1,5 +1,5 @@
 import { act, cleanup, fireEvent, render } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ThreadItemView } from "@/api/thread";
 import type { ThreadView } from "@/api/threads";
 import { buildRows, buildTurns, decodeTimelineKey, timelineKey } from "@/lib/threadTimeline";
@@ -133,6 +133,20 @@ describe("Created by note", () => {
     expect(q(row, "thread-wake-note-body")).not.toBeNull();
     fireEvent.click(q(row, "thread-wake-note-line") as HTMLElement);
     expect(q(row, "thread-wake-note-body")).toBeNull();
+  });
+
+  it("the waker's link opens a child of this thread as a preview, this thread's creator as a kept tab", () => {
+    const live = { archivedAtMs: null, snoozedUntilMs: null, savedAtMs: null };
+    setThreads([t("p", live), t("s", { ...live, createdBy: "p" }), t("c", { ...live, createdBy: "s" })]);
+    const select = vi.fn();
+    useUiStore.setState({ select } as never);
+    const wake = (id: string, from: string): ThreadItemView => ({ ...user, id, text: "x", wake: { title: `Thread ${from} is idle: finished.`, json: JSON.stringify({ kind: "thread", thread: { id: from, name: from, status: "needs_attention", status_reason: "finished" } }) } });
+    const el = show([wake("w1", "c"), wake("w2", "p")]);
+    const [child, lead] = el.querySelectorAll<HTMLElement>('[data-testid="thread-wake-note-link"]');
+    fireEvent.click(child as HTMLElement);
+    expect(select).toHaveBeenLastCalledWith({ kind: "thread", id: "c" }, { focusPrompt: true, preview: true });
+    fireEvent.click(lead as HTMLElement);
+    expect(select).toHaveBeenLastCalledWith({ kind: "thread", id: "p" }, { focusPrompt: true });
   });
 
   it("a wake for an action run: a red cross, the action's name as plain text", () => {

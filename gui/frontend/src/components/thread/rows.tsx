@@ -59,6 +59,7 @@ import { ThemeCardRow } from "./ThemeCard";
 import { ToolPathChip } from "./PathChip";
 import { AgentReport, ToolDetail } from "./ToolDetail";
 import { UserBubble } from "./UserBubble";
+import { openThread } from "@/stores/openThread";
 
 /** A ticking or whole-second time: "12s", "1m 4s", "1h 5m". */
 const ELAPSED: DurationUnits = { hours: true, minutes: true, seconds: true };
@@ -783,6 +784,7 @@ function WakeNotes({ wake, atMs, queued }: { wake: WakeView; atMs: number | null
  * Claude has not read the wake yet (QueuedTag), on a batch's first line only.
  */
 function WakeNoteRow({ line, atMs, queued }: { line: WakeLine; atMs: number | null; queued: boolean }) {
+  const { threadId } = useThreadCtx();
   const exists = useThreadsStore((s) => line.threadId !== "" && line.threadId in s.byId);
   const current = useThreadsStore((s) => (line.threadId ? (s.byId[line.threadId]?.name ?? "") : ""));
   const name = current || line.name;
@@ -801,7 +803,8 @@ function WakeNoteRow({ line, atMs, queued }: { line: WakeLine; atMs: number | nu
               data-thread={line.threadId}
               onClick={(e) => {
                 e.stopPropagation();
-                useUiStore.getState().select({ kind: "thread", id: line.threadId }, { focusPrompt: true });
+                // A child that woke its lead opens as a preview; the lead from its child, kept (stores/openThread.ts).
+                openThread(line.threadId, { from: threadId });
               }}
             >
               {name}

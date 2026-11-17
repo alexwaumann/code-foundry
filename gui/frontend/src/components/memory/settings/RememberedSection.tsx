@@ -10,12 +10,12 @@ import { leftOutReason, rememberedWhen, type MemoryBy } from "@/lib/memory";
 import { cn } from "@/lib/utils";
 import { runCommand, runCommandForResult } from "@/stores/commands";
 import { loadMemory, useMemoryBy, useMemoryCaps, useMemoryCount, useMemoryEntry, useMemoryFiles, useMemoryStatus, useMemoryStore } from "@/stores/memory";
-import { useUiStore } from "@/stores/ui";
 import { closeSettings, useViewsStore } from "@/stores/views";
+import { openThread } from "@/stores/openThread";
 
 /** Opens a thread from the page: it becomes the selection, which leaves Settings. */
-function openThread(id: string): void {
-  useUiStore.getState().select({ kind: "thread", id }, { focusPrompt: true });
+function openRememberedBy(id: string): void {
+  openThread(id);
   if (useViewsStore.getState().settingsOpen) closeSettings();
 }
 
@@ -37,7 +37,7 @@ function ByThread({ by }: { by: Extract<MemoryBy, { kind: "thread" }> }) {
           type="button"
           className={cn("rounded-sm underline underline-offset-2 outline-none hover:text-cf-text focus-visible:ring-1 focus-visible:ring-cf-focus", gone && "line-through")}
           onClick={() => {
-            openThread(by.id);
+            openRememberedBy(by.id);
           }}
           data-testid="memory-by"
           data-state={by.state}

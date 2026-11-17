@@ -29,7 +29,7 @@ export interface Tab {
   params?: Record<string, string>;
   title?: string;
   name?: string;
-  /** A preview: the space's one tab of an archived or snoozed thread that the next preview replaces (internal/layout preview.go). */
+  /** A preview: the space's one tab of an archived, snoozed or child thread that the next preview replaces (internal/layout preview.go). */
   preview?: boolean;
 }
 
@@ -1233,7 +1233,7 @@ const ops = {
           }
     // A preview (Go's preview.go, simplified): the space's last preview goes; in the pane the new
     // one opens in, the new one takes its place.
-    const preview = asked && (o.archived === true || t.st.threads?.[thread]?.snoozed === true);
+    const preview = asked && (o.archived === true || o.child === true || t.st.threads?.[thread]?.snoozed === true);
     if (preview) {
       if (o.archived === true && t.spaceOf(thread) !== t.st.current_space) ((t.st.threads ??= {})[thread] ??= { space: t.st.current_space }).space = t.st.current_space;
       const sp = t.space(t.spaceOf(thread));

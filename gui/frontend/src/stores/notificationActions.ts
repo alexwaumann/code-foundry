@@ -4,11 +4,9 @@
  * list empties), so no success toasts; a failure toasts at level error.
  */
 import { notify } from "@/lib/notify";
-import { isSnoozed } from "@/lib/snooze";
 import { runCommandForResult } from "./commands";
 import { setBellOpen } from "./notifications";
 import { openThread } from "./openThread";
-import { useThreadsStore } from "./threads";
 
 export const NOTIFICATION_COMMANDS = {
   dismiss: "notification.dismiss",
@@ -59,7 +57,6 @@ export async function actOnNotification(id: string, index: number, label: string
  * them. The bell shuts behind it.
  */
 export function goToNotificationThread(threadId: string): void {
-  const t = useThreadsStore.getState().byId[threadId];
   setBellOpen(false);
-  openThread(threadId, { preview: t !== undefined && (t.archivedAtMs !== null || isSnoozed(t)) });
+  openThread(threadId);
 }

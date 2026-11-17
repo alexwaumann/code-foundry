@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"connectrpc.com/connect"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
@@ -13,12 +14,14 @@ import (
 )
 
 // thread.open --preview (docs/notes/preview-tabs-1-daemon.md): the user's open of an archived
-// or snoozed thread is a preview, any other thread's a kept tab; a thread or a page cannot ask
+// or snoozed thread, or of a child whose creator exists, is a preview, any other thread's a kept tab; a thread or a page cannot ask
 // for one, nor can an open with a place. tab.keep keeps one, and the read verbs mark it.
 func TestThreadOpenPreview(t *testing.T) {
 	archived := &v1.Thread{Id: "s-arch00000001", ArchivedAt: timestamppb.Now()}
 	snoozed := &v1.Thread{Id: "s-snoz00000001", SnoozedUntil: timestamppb.Now()}
 	saved := &v1.Thread{Id: "s-save00000001", SavedAt: timestamppb.Now()}
+	child := &v1.Thread{Id: "s-chld00000001", CreatedBy: "s-lead00000001"}
+	orphan := &v1.Thread{Id: "s-orph00000001", CreatedBy: "s-gone00000001"}
 	tests := []struct {
 		name    string
 		uctx    command.Context
@@ -29,6 +32,10 @@ func TestThreadOpenPreview(t *testing.T) {
 		{"an archived thread", fromApp, map[string]string{"id": archived.Id, "preview": "true"}, true, false},
 		{"a snoozed thread", fromCLI, map[string]string{"id": snoozed.Id, "preview": "true"}, true, false},
 		{"a thread saved for later", fromApp, map[string]string{"id": saved.Id, "preview": "true"}, true, false},
+		{"a child of a thread that exists", fromApp, map[string]string{"id": child.Id, "preview": "true"}, true, false},
+		{"a child whose creator was removed is kept", fromApp, map[string]string{"id": orphan.Id, "preview": "true"}, false, false},
+		{"a child without --preview, kept", fromCLI, map[string]string{"id": child.Id}, false, false},
+		{"a child from a thread, refused", fromThread, map[string]string{"id": child.Id, "preview": "true"}, false, true},
 		{"an active thread is kept", fromApp, map[string]string{"id": "s-live00000001", "preview": "true"}, false, false},
 		{"without --preview, kept", fromApp, map[string]string{"id": archived.Id}, false, false},
 		{"from a thread, refused", fromThread, map[string]string{"id": archived.Id, "preview": "true"}, false, true},
@@ -38,7 +45,8 @@ func TestThreadOpenPreview(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			f := newLayoutFixture(t)
-			f.thread.Others = []*v1.Thread{archived, snoozed, saved}
+			f.thread.Others = []*v1.Thread{archived, snoozed, saved, child, orphan}
+			f.thread.GetErrs = map[string]error{"s-gone00000001": connect.NewError(connect.CodeNotFound, errors.New("no such thread"))}
 			res, err := f.run(t, tt.uctx, "thread.open", tt.args)
 			if tt.err {
 				if !errors.Is(err, command.ErrInvalidArgs) {
