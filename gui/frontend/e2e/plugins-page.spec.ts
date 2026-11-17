@@ -57,5 +57,20 @@ for (const scheme of ["dark", "light"] as const) {
       await page.waitForTimeout(350);
       await shot("menu");
     });
+
+    test("a plugin version needing a newer Code Foundry: installed and in Browse", async ({ page }, info) => {
+      const shots = process.env.SHOTS;
+      test.skip(!shots || info.project.name !== "webkit", "SHOTS=<dir> with WebKit only");
+      await openPlugins(page);
+      const shot = (name: string) => page.screenshot({ path: `${shots ?? ""}/plugins-${name}-${scheme}.png` });
+      const row = page.getByTestId("plugin-row-settings").and(page.locator('[data-plugin="linear-sync"]'));
+      await row.scrollIntoViewIfNeeded();
+      await row.getByTestId("catalog-chevron").click();
+      await shot("min-host-installed");
+      await page.getByTestId("plugin-browse-all").click();
+      const entry = page.getByTestId("registry-entry").and(page.locator('[data-plugin="deploy-board"]'));
+      await entry.getByTestId("catalog-chevron").click();
+      await shot("min-host-browse");
+    });
   });
 }

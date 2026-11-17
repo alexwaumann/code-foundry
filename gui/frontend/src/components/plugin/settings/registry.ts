@@ -54,11 +54,14 @@ export function entryPill(e: Pick<IndexEntryView, "installedVersion" | "relation
   }
 }
 
-/** The row's one action: Install when nothing of the name is installed, Update when its own source lists a newer version, else none. */
-export function entryAction(e: Pick<IndexEntryView, "relation">): "install" | "update" | null {
-  if (e.relation === "not-installed") return "install";
-  if (e.relation === "update") return "update";
-  return null;
+/**
+ * The row's one action: Install when nothing of the name is installed, Update when its own source lists a newer version,
+ * else none. Where either would be, an entry this Code Foundry is too old for says what it needs instead ("needs-host").
+ */
+export function entryAction(e: Pick<IndexEntryView, "relation" | "needsHost">): "install" | "update" | "needs-host" | null {
+  if (e.relation !== "not-installed" && e.relation !== "update") return null;
+  if (e.needsHost) return "needs-host";
+  return e.relation === "not-installed" ? "install" : "update";
 }
 
 /** "3 plugins · read 5m ago" ("3 plugins" before a first read); a failure shows on its own. */

@@ -1321,7 +1321,11 @@ built: `docs/notes/plugins-1-core.md` through `plugins-14-flag-guidance.md`.
   plugin found on disk is disabled until the user consents to its permissions
   (`commands` globs, `events` sources, `threadStatus`, `sessionEnv`, `secrets`,
   `threads`, `terminals`, `api`: the registry entry's keys); more permissions on an
-  update disable it again until they consent.
+  update disable it again until they consent. An optional `minHostVersion` names the
+  oldest Code Foundry a version runs on (`update.AtLeast`: a dev build runs anything, a
+  tip counts as its base version); an older one neither installs, offers as an update
+  (`Plugin.HeldUpdate`) nor starts it (`minhost.go`,
+  `docs/notes/plugin-min-host-version.md`).
 * **Store** (`internal/store/plugin`): discovery and the `plugins` table, one actor per
   enabled plugin (start with cwd = package folder and a minimal env, `initialize`
   within 5 s, ping every 30 s, backoff 1 s to 60 s, failed after 5 crashes in 10 min,

@@ -3,7 +3,7 @@
  * the groups, what a row shows and offers, the search, and the page menu's words. Kept apart
  * from the components so the table tests read them directly.
  */
-import type { IndexEntryView, PluginView, RegistryView, Tone } from "@/api/plugin";
+import type { HostNeedView, IndexEntryView, PluginView, RegistryView, Tone } from "@/api/plugin";
 import type { OverflowItem } from "@/components/projects/OverflowMenu";
 import { countWords, flatIds, matchesWords } from "@/components/settings/catalog/model";
 import type { PluginFailure, RegistryAction } from "@/stores/pluginRegistry";
@@ -79,19 +79,31 @@ export function rowPill(p: Pick<PluginView, "state" | "enabled" | "needsConsent"
   return p.state === "running" || pill.label === "Disabled" ? null : pill;
 }
 
-/** What a row shows before its switch: the one thing it wants, or what it is doing. */
-export type PluginMain = { kind: "working"; words: string } | { kind: "updated"; version: string } | { kind: "updating" } | { kind: "update"; version: string; retry: boolean } | null;
+/** What a row shows before its switch: the one thing it wants, or what it is doing. "held": its newer version needs a newer Code Foundry, said where Update would be. */
+export type PluginMain =
+  | { kind: "working"; words: string }
+  | { kind: "updated"; version: string }
+  | { kind: "updating" }
+  | { kind: "update"; version: string; retry: boolean }
+  | { kind: "held"; version: string; minHostVersion: string }
+  | null;
 
 const WORKING: Readonly<Partial<Record<RegistryAction, string>>> = { restart: "Restarting…", reload: "Reloading…", uninstall: "Uninstalling…" };
 
-/** A row's main action. A run's finished row says so; a failed update offers its retry (the failure is under the row). */
-export function pluginMain(p: Pick<PluginView, "updateAvailable" | "dev" | "updateVersion">, busy: RegistryAction | null, failure: PluginFailure | null, updatedTo: string | undefined): PluginMain {
+/** A row's main action. A run's finished row says so; a failed update offers its retry (the failure is under the row); a held update says what it needs. */
+export function pluginMain(p: Pick<PluginView, "updateAvailable" | "dev" | "updateVersion" | "heldUpdate">, busy: RegistryAction | null, failure: PluginFailure | null, updatedTo: string | undefined): PluginMain {
   const working = busy ? WORKING[busy] : undefined;
   if (working) return { kind: "working", words: working };
   if (busy === "update") return { kind: "updating" };
   if (hasUpdate(p)) return { kind: "update", version: p.updateVersion, retry: failure?.action === "update" };
   if (updatedTo !== undefined) return { kind: "updated", version: updatedTo };
+  if (p.heldUpdate && !p.dev) return { kind: "held", version: p.heldUpdate.version, minHostVersion: p.heldUpdate.minHostVersion };
   return null;
+}
+
+/** The details' sentence for a version this Code Foundry is too old for: "Version 1.4.0 needs Code Foundry 0.31.0 or newer. You have 0.29.2." */
+export function hostNeedSentence(n: Pick<HostNeedView, "version" | "minHostVersion" | "hostVersion">): string {
+  return `Version ${n.version} needs Code Foundry ${n.minHostVersion} or newer. You have ${n.hostVersion}.`;
 }
 
 /** The surface's menu item when it cannot open: why. */

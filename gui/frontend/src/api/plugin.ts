@@ -19,6 +19,7 @@ import {
   InstallPluginResponseSchema,
   type BrowsePluginsResponse,
   type Plugin,
+  type PluginHostNeed,
   type PluginIndexEntry,
   type PluginInstallProgress,
   type PluginRegistry,
@@ -733,6 +734,22 @@ export interface PluginView {
   updateAvailable: boolean;
   updateVersion: string;
   updateRegistry: string;
+  /** A newer version its source lists that needs a newer Code Foundry: no update (updateAvailable stays false). */
+  heldUpdate: HostNeedView | null;
+}
+
+/** A plugin version this Code Foundry is too old for (PluginHostNeed): versions without a leading v. */
+export interface HostNeedView {
+  /** The plugin's version on offer. */
+  version: string;
+  /** The oldest Code Foundry it runs on. */
+  minHostVersion: string;
+  /** This Code Foundry's version. */
+  hostVersion: string;
+}
+
+function toHostNeed(n: PluginHostNeed | undefined): HostNeedView | null {
+  return n ? { version: n.version, minHostVersion: n.minHostVersion, hostVersion: n.hostVersion } : null;
 }
 
 function toPermissions(p: PluginPermissions | undefined): PluginPermissionsView {
@@ -780,6 +797,7 @@ export function toPluginView(p: Plugin): PluginView {
     updateAvailable: p.updateAvailable,
     updateVersion: p.updateVersion,
     updateRegistry: p.updateRegistry,
+    heldUpdate: toHostNeed(p.heldUpdate),
   };
 }
 
@@ -1109,6 +1127,8 @@ export interface IndexEntryView {
   relation: EntryRelation;
   /** Where the installed plugin came from, short ("127.0.0.1:8765/index.json", "o/repo"); set only for other-source. */
   installedFrom: string;
+  /** This Code Foundry is too old for version: neither Install nor Update is offered, whatever relation says. */
+  needsHost: HostNeedView | null;
 }
 
 /**
@@ -1141,6 +1161,7 @@ export function toIndexEntry(e: PluginIndexEntry): IndexEntryView {
     installedVersion: e.installed ? e.installed.version : null,
     relation: entryRelations[e.relation],
     installedFrom: e.installedFrom,
+    needsHost: toHostNeed(e.needsHost),
   };
 }
 

@@ -11,6 +11,7 @@ import { usePlugin } from "@/stores/plugins";
 import { useProjectsStore } from "@/stores/projects";
 import { useUpdateRunStore } from "@/stores/updateRun";
 import { PillView } from "../parts";
+import { HostNeedLine, HostNeedMark } from "./HostNeed";
 import { hasUpdate, pluginMain, pluginMenu, rowPill, type PluginMain } from "./model";
 import { entryAction, entryPill, progressWords, shortSource } from "./registry";
 import { SecretsList } from "./SecretsSection";
@@ -99,6 +100,8 @@ function MainCell({ name, main, busy }: { name: string; main: PluginMain; busy: 
           {main.retry ? "Retry update" : `Update to ${main.version}`}
         </RowButton>
       );
+    case "held":
+      return <HostNeedMark words={`${main.version} needs Code Foundry ${main.minHostVersion}`} testId="plugin-held-update" />;
   }
 }
 
@@ -146,6 +149,7 @@ function PluginDetails({ p, env, secrets }: { p: PluginView; env: PluginEnvironm
         )}
       </p>
       {p.dev && p.devPath && <p className="truncate font-mono text-caption-sm">{p.devPath}</p>}
+      {p.heldUpdate && !p.dev && <HostNeedLine need={p.heldUpdate} />}
       {p.disabledReason && <p className="text-caption-sm text-cf-warning-text">{p.disabledReason}</p>}
       {p.lastError && p.state !== "running" && (
         <p className="font-mono text-caption-sm break-words text-cf-error-text" data-testid="plugin-last-error">
@@ -319,6 +323,7 @@ export function EntryRow({ name, first, open, onToggle }: { name: string; first:
               Install
             </RowButton>
           )}
+          {action === "needs-host" && e.needsHost && <HostNeedMark words={`Needs Code Foundry ${e.needsHost.minHostVersion}`} testId="registry-needs-host" />}
           {action === "update" && (
             <RowButton
               icon={failure?.action === "update" ? RotateCw : ArrowUpCircle}
@@ -340,6 +345,7 @@ export function EntryRow({ name, first, open, onToggle }: { name: string; first:
       details={
         <>
           {e.description && <p className="text-caption break-words">{e.description}</p>}
+          {action === "needs-host" && e.needsHost && <HostNeedLine need={e.needsHost} />}
           <p className="text-caption-sm break-words" data-testid="registry-permissions">
             {e.permissionLines.length === 0 ? "Asks for no permissions." : `May ${e.permissionLines.join("; ")}.`}
           </p>
