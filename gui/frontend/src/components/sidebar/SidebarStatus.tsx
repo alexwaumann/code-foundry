@@ -27,7 +27,7 @@ export function SidebarStatus() {
       <div className="flex h-6 min-w-0 items-center gap-2">
         <DaemonStatus />
         <span className="ml-auto flex shrink-0 items-center">
-          <CommandButton command="ui.palette.open" icon={Command} tooltip="Command Palette" data-testid="status-palette" />
+          <CommandButton command="ui.palette.open" icon={Command} tooltip="Command Palette" withKey data-testid="status-palette" />
           {/* A toggle (stores/views.ts toggleView "usage"): pressed while the Usage sheet shows; under its backdrop, a click here closes it. */}
           <CommandButton
             command="view.usage"
@@ -43,6 +43,7 @@ export function SidebarStatus() {
             command="view.settings"
             icon={Settings}
             tooltip="Settings"
+            withKey
             pressed={settingsOpen}
             className={cn("-mr-1.25", settingsOpen && "bg-cf-sidebar-row-selected text-cf-sidebar-foreground hover:bg-cf-sidebar-row-selected dark:hover:bg-cf-sidebar-row-selected")}
             data-testid="status-settings"

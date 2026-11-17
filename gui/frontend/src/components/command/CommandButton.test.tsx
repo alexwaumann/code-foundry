@@ -72,4 +72,16 @@ describe("CommandButton", () => {
     expect(wrap.dataset.state).toBe("closed");
     expect(b.dataset.state).toBeUndefined();
   });
+
+  it.each([
+    ["its first keybinding", "terminal.new", ["cmd+shift+t", "cmd+t"], "New Terminal ⇧⌘T"],
+    ["the view action standing in for it", "ui.palette.open", [], "New Terminal ⌘K"],
+    ["no key when it has neither", "terminal.new", [], "New Terminal"],
+  ])("withKey names %s after the name", (_case, name, keybindings, want) => {
+    useCommandsStore.setState({ commands: [cmd({ name, keybindings })] });
+    render(<CommandButton command={name} icon={Plus} withKey data-testid="b" />);
+    const b = screen.getByTestId("b");
+    expect(tooltipText(b)).toBe(want);
+    expect(b.getAttribute("aria-label")).toBe("New Terminal");
+  });
 });

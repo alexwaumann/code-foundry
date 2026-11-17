@@ -47,6 +47,8 @@ import { chordFromEvent, normalizeChord, terminalYieldable } from "./chord";
 export interface ViewAction {
   chord: string;
   title: string;
+  /** The registry command this chord stands in for, when that command has no keybinding of its own (ui.palette.open: cmd+k opens the palette here), so its button can name the key. */
+  command?: string;
   run: () => void;
 }
 
@@ -93,7 +95,7 @@ function zoom(direction: 1 | -1 | null): void {
 }
 
 export const viewActions: readonly ViewAction[] = [
-  { chord: "cmd+k", title: "Command palette", run: togglePalette },
+  { chord: "cmd+k", title: "Command palette", command: "ui.palette.open", run: togglePalette },
   { chord: "cmd+b", title: "Toggle sidebar", run: toggleSidebar },
   { chord: "cmd+shift+a", title: "Next thread needing attention", run: () => void nextAttention() },
   ...Array.from({ length: 9 }, (_, i) => ({
@@ -115,6 +117,15 @@ export const viewActions: readonly ViewAction[] = [
   { chord: "cmd+-", title: "Zoom out", run: () => { zoom(-1); } },
   { chord: "cmd+0", title: "Reset zoom", run: () => { zoom(null); } },
 ];
+
+/**
+ * A view action's chord, for a tooltip that names it: the one that runs `run`, or (a command's
+ * name) the one that stands in for that command; "" when none. Reserved chords
+ * (internal/command/chord.go), so no rebind moves them.
+ */
+export function viewActionChord(of: string | (() => void)): string {
+  return viewActions.find((a) => (typeof of === "string" ? a.command === of : a.run === of))?.chord ?? "";
+}
 
 const viewActionMap = new Map(viewActions.map((a) => [normalizeChord(a.chord) ?? a.chord, a]));
 
