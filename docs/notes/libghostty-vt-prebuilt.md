@@ -118,8 +118,5 @@ showed the red line and the whole `seq` in scrollback.
 
 ## Open
 
-* `scripts/THIRD-PARTY-NOTICES.txt` has no libghostty-vt section, and never had one (the
-  zig build's checkout was never a source for it). The archive bundles ghostty (MIT),
-  simdutf, Google Highway, wuffs, uucode's Unicode tables and zig's compiler_rt, several
-  of them dual-licensed. The texts are in the release's `libghostty-vt-1.0.1.tar.gz` and
-  `-deps.tar.gz`. Left for its own change.
+* Done since: `scripts/THIRD-PARTY-NOTICES.txt` had no libghostty-vt section, and never
+  had one. It has one now, see `libghostty-vt-notices.md`.

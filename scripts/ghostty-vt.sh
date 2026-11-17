@@ -20,6 +20,9 @@
 set -euo pipefail
 
 # ---- pins ------------------------------------------------------------------------------
+# A new version changes what is linked into code-foundry: redo its section of
+# scripts/THIRD-PARTY-NOTICES.txt from the release's deps/libghostty-vt-third-party.json
+# (docs/notes/libghostty-vt-notices.md).
 VT_VERSION="1.0.1"
 # sha256 of ghostty-vt-<version>.xcframework.zip, as in the release's SHA256SUMS.
 VT_SHA256="c0f9631277f726154c8f521954d17cdc41aac4626fc0df8cf925a19ee58e829b"
