@@ -7,7 +7,9 @@
  * the item in the tab's params; from the app it takes the focus, from a caller without a view
  * only with --focus. The tab is the whole effect: no intent goes out
  * (docs/notes/shell-22-retire-verbs.md). The mock checks only what it knows: the thread, a path in
- * one of its checkouts for a diff, and a GitHub repository for a pull request. It does not
+ * one of its checkouts for a diff, and a GitHub repository for a pull request (view.open.pr
+ * --repo-slug with no thread, a tab of no thread as the Pull Requests page opens: the slug's
+ * shape only; the daemon asks the gh store). It does not
  * read files, and of a diff only which files changed (to tell a file from a directory); of
  * view.panel.file --edit's refusals only --note without --edit: they are Go's to test, as is
  * cleaning the note. A page's or diff's --title is cleaned and capped as there, and a diff's
@@ -167,6 +169,22 @@ function itemTitle(kind: string, p: Record<string, string>): { title?: string } 
   return title ? { title } : {};
 }
 
+/** view.open.pr's --repo-slug, trimmed ("" when not given), refused unless "owner/name" (internal/command repoSlugArg). */
+function repoSlug(args: Record<string, string>): string {
+  if (args["repo-slug"] === undefined) return "";
+  const slug = args["repo-slug"].trim();
+  const [owner = "", name = "", ...rest] = slug.split("/");
+  if (!owner || !name || rest.length > 0 || /\s/.test(slug)) throw new CommandError("invalid", `want a GitHub repository, "owner/name", got ${JSON.stringify(slug)}`);
+  return slug;
+}
+
+/** view.open.pr's number, from 1 (internal/command prNumber). */
+function prNumber(args: Record<string, string>): string {
+  const n = Number(args.number);
+  if (!Number.isInteger(n) || n <= 0) throw new CommandError("invalid", `want a pull request number from 1, got ${args.number ?? ""}`);
+  return String(n);
+}
+
 /** Applies a layout op; keepFocus runs it without moving the user's focus (a thread's call). */
 export type PlaceTab = (op: Op, keepFocus: boolean) => void;
 
@@ -320,16 +338,35 @@ export function panelItemCommands(lookup: (id: string) => ItemThread | undefined
         name: "view.open.pr", noPalette: true,
         title: "Open Pull Request Tab",
         category: "View",
-        description: `Open a pull request ${lead}its summary, checks, reviews, timeline and changed files, with Merge and Review.`,
+        description: `Open a pull request ${lead}its summary, checks, reviews, timeline and changed files, with Merge and Review. With --repo-slug and no thread, any pull request GitHub shows you, in a tab of no thread in the user's current space, as the Pull Requests page opens one.`,
         keybindings: [],
-        args: [{ name: "number", type: ArgType.INT, required: true, description: "Pull request number: one the thread links, else one in its project's GitHub repository" }, ...itemThreadArgs, paneArg],
+        args: [
+          { name: "number", type: ArgType.INT, required: true, description: "Pull request number: one the thread links, else one in its project's GitHub repository (with --repo-slug: one there)" },
+          { name: "repo-slug", type: ArgType.STRING, required: false, description: 'GitHub repository, "owner/name", of the pull request: with no thread, its tab is one of no thread; with one, it names the repository instead of the thread\'s links and project' },
+          ...itemThreadArgs,
+          paneArg,
+        ],
       },
-      when,
-      run: (ctx, args) =>
-        show(ctx, args, "pullrequest", (t, id) => {
-          if (!t.githubSlug) throw new CommandError("unavailable", `thread ${id} links no pull request #${args.number ?? ""} and its project has no GitHub repository`);
-          return { slug: t.githubSlug, number: args.number ?? "" };
-        }),
+      // Like the daemon: any caller; with no thread, --repo-slug names the pull request.
+      when: () => true,
+      run: (ctx, args) => {
+        const slug = repoSlug(args);
+        if (!args.thread && !ctx?.activeThreadId) {
+          if (!slug) throw new CommandError("invalid", "needs a thread whose tab to open (--thread, or run it inside a thread), or --repo-slug for a pull request's tab of no thread");
+          const p = { slug, number: prNumber(args) };
+          // Like the daemon's wantsFocus: a caller with no thread is the user's (the app, the CLI outside a thread).
+          const focus = args.focus === undefined || args.focus === "true";
+          // A tab of no thread, in the current space's focused pane: what the Pull Requests page's rows open.
+          place?.({ op: "open_surface", tab: { id: "", kind: "pullrequest", params: p, ...itemTitle("pullrequest", p) }, focus, ...(args.pane ? { pane: args.pane } : {}) }, !focus);
+          return ctx?.activeView ? "" : `opened a pullrequest tab of no thread`;
+        }
+        return show(ctx, args, "pullrequest", (t, id) => {
+          const number = prNumber(args);
+          if (slug) return { slug, number };
+          if (!t.githubSlug) throw new CommandError("unavailable", `thread ${id} links no pull request #${number} and its project has no GitHub repository`);
+          return { slug: t.githubSlug, number };
+        });
+      },
     },
   ];
   return verbs.flatMap((c) => [c, alias(c)]);

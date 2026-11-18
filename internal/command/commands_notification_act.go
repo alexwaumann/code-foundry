@@ -45,10 +45,11 @@ var notificationActionCalls = map[notification.ActionKind]notificationActionCall
 
 // verbSources are the host sources whose command actions name a registry verb themselves
 // rather than a plugin's manifest command: the daemon's plugin health notifications
-// (Restart is plugin.restart, Open plugins is view.settings --page plugins). No plugin can
-// post as one (the daemon refuses a plugin by that name), and notification.post posts as
-// SourceCommand, which may not carry command actions at all.
-var verbSources = []string{notification.SourcePlugins}
+// (Restart is plugin.restart, Open plugins is view.settings --page plugins) and its GitHub
+// ones (Open PR is view.open.pr --repo-slug --number --focus, the pull request's tab of no
+// thread). No plugin can post as one (the daemon refuses a plugin by that name), and
+// notification.post posts as SourceCommand, which may not carry command actions at all.
+var verbSources = []string{notification.SourcePlugins, notification.SourceGitHub}
 
 // notificationAct is notification.act: run one of a notification's actions through the
 // command its kind maps to (notificationActionCalls), then resolve the notification when

@@ -191,3 +191,35 @@ describe("pr.create in the mock", () => {
     }
   });
 });
+
+describe("a GitHub card's Open PR in the mock (internal/command verbSources)", () => {
+  const prTabs = (w: World) => w.layout.state().spaces.flatMap((sp) => panes(sp.root)).flatMap((p) => p.tabs ?? []).filter((t) => t.kind === "pullrequest");
+  const cardOf = (w: World, key: string) => w.notifications.json().notifications.find((n) => n.key === key && n.status === "shown");
+
+  it("runs view.open.pr --repo-slug: one tab of no thread, focused, however often it is pressed; the card stays", async () => {
+    const w = new World();
+    w.notifications.control("github", new URLSearchParams("quiet=1"));
+    const card = cardOf(w, "pr/alexwaumann/code-foundry#139/review-requested");
+    expect(card?.actions[0]).toMatchObject({ label: "Open PR", kind: "command", arg: "view.open.pr", args: { "repo-slug": "alexwaumann/code-foundry", number: "139", focus: "true" }, resolves: false });
+    for (let i = 0; i < 2; i++) await run(w, "notification.act", { activeView: "thread", activeThreadId: "s-1" }, { id: card?.id ?? "" });
+    const tabs = prTabs(w);
+    expect(tabs).toHaveLength(1);
+    expect(tabs[0]).toMatchObject({ params: { slug: "alexwaumann/code-foundry", number: "139" } });
+    expect(tabs[0]?.thread).toBeUndefined();
+    const st = w.layout.state();
+    const focused = panes(st.spaces.find((sp) => sp.id === st.current_space)?.root).find((p) => p.tabs?.some((t) => t.id === tabs[0]?.id));
+    expect(focused?.active).toBe(tabs[0]?.id);
+    expect(cardOf(w, "pr/alexwaumann/code-foundry#139/review-requested")).toBeDefined();
+    // The verb ran with the caller's view only, as the daemon's act runs it.
+    expect(w.invocations.filter((i) => i.name === "view.open.pr").map((i) => i.context?.activeThreadId ?? "")).toEqual(["", ""]);
+  });
+
+  it("a refused verb fails the act and leaves the card", async () => {
+    const w = new World();
+    w.notifications.post({ source: "github", key: "pr/acme/web#1/conflict", title: "Merge conflict on your PR", actions: [{ label: "Open PR", kind: "command", arg: "view.open.pr", args: { "repo-slug": "not-a-slug", number: "1" }, resolves: false }] });
+    const card = cardOf(w, "pr/acme/web#1/conflict");
+    await expect(run(w, "notification.act", { activeView: "thread" }, { id: card?.id ?? "" })).rejects.toThrow(/owner\/name/);
+    expect(prTabs(w)).toHaveLength(0);
+    expect(cardOf(w, "pr/acme/web#1/conflict")).toBeDefined();
+  });
+});

@@ -194,6 +194,9 @@ var rulePhrases = map[string]string{
 // user it is beside the thread.
 func (r PanelResult) tabMessage() string {
 	msg := fmt.Sprintf("opened tab %s in pane %s for thread %s", r.Tab, r.Pane, r.Thread)
+	if r.Thread == "" {
+		msg = fmt.Sprintf("opened tab %s (of no thread) in pane %s of space %s", r.Tab, r.Pane, r.Space)
+	}
 	if p := rulePhrases[r.Rule]; p != "" {
 		msg += " (" + p + ")"
 	}

@@ -39,6 +39,11 @@ const SourceCommand = "command"
 // plugin's manifest command.
 const SourcePlugins = "plugins"
 
+// SourceGitHub is the source of the daemon's own notifications from the GitHub poll (one
+// per pull request and kind; docs/notes/notifications-github.md). Like SourcePlugins, its
+// command actions name a registry verb itself (Open PR is view.open.pr).
+const SourceGitHub = "github"
+
 // Level is how serious a notification is. There is no success level.
 type Level string
 
@@ -86,7 +91,7 @@ type ActionKind string
 
 const (
 	// KindCommand runs one of the source plugin's manifest commands with args
-	// (plugin.<source>.<command>); from SourcePlugins, the registry verb it names. Not for
+	// (plugin.<source>.<command>); from SourcePlugins and SourceGitHub, the registry verb it names. Not for
 	// SourceCommand.
 	KindCommand ActionKind = "command"
 	// KindSend sends text to a thread.

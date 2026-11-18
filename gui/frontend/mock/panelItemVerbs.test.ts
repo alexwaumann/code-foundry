@@ -176,3 +176,34 @@ describe("intoUsersDiff, like the daemon's (commands_view_diff_pick.go)", () => 
     expect(intoUsersDiff(state(mine), o, "t1")).toBe(o);
   });
 });
+
+describe("view.open.pr --repo-slug, like the daemon's (runPanelPR)", () => {
+  type Placed = { op: Record<string, unknown>; keepFocus: boolean };
+  const pr = (args: Record<string, string>, from: unknown): Placed[] => {
+    const placed: Placed[] = [];
+    const cmd = panelItemCommands((id) => (id === "t1" ? thread : undefined), (op, keepFocus) => placed.push({ op, keepFocus })).find((c) => c.cmd.name === "view.open.pr");
+    void cmd?.run(from as never, args);
+    return placed;
+  };
+
+  it("with no thread, a tab of no thread in the focused pane, focused unless --focus=false", () => {
+    for (const from of [undefined, { activeView: "thread" }]) {
+      const [placed] = pr({ "repo-slug": "Acme/Web", number: "7" }, from);
+      expect(placed).toEqual({ op: { op: "open_surface", tab: { id: "", kind: "pullrequest", params: { slug: "Acme/Web", number: "7" }, title: "#7" }, focus: true }, keepFocus: false });
+    }
+    expect(pr({ "repo-slug": "a/b", number: "7", focus: "false" }, undefined)[0]).toMatchObject({ op: { focus: false }, keepFocus: true });
+    expect(pr({ "repo-slug": "a/b", number: "7", pane: "p-2" }, undefined)[0]?.op.pane).toBe("p-2");
+  });
+
+  it("with a thread, it names the repository instead of the thread's project", () => {
+    expect(pr({ "repo-slug": "a/b", number: "7" }, ctx)[0]?.op).toMatchObject({ tab: { thread: "t1", params: { slug: "a/b", number: "7" } } });
+  });
+
+  it("refuses, opening nothing, with no thread and no repository, a slug that is not owner/name, or number 0", () => {
+    const cmd = panelItemCommands(() => undefined, () => { throw new Error("placed"); }).find((c) => c.cmd.name === "view.open.pr");
+    expect(cmd?.when(undefined)).toBe(true);
+    expect(() => cmd?.run(undefined, { number: "7" })).toThrow("or --repo-slug");
+    expect(() => cmd?.run(undefined, { "repo-slug": "a/b/c", number: "7" })).toThrow('"owner/name"');
+    expect(() => cmd?.run(undefined, { "repo-slug": "a/b", number: "0" })).toThrow("from 1");
+  });
+});

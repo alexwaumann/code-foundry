@@ -935,6 +935,7 @@ export class World {
     send: (id, text) => {
       this.logs.send(id, text, []);
     },
+    invoke: (name, args, ctx) => this.invoke(name, ctx, args, true),
   });
   /** The window shell's layout (mock/layout.ts); LayoutService and the EventService layout source. */
   readonly layout = new MockLayout({

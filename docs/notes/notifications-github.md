@@ -3,7 +3,8 @@
 The daemon posts to the bell from the GitHub data the gh store already polls, and withdraws each
 card as soon as its condition is known to be gone. Built on the notification store
 (`notifications-1-store.md`) and the PRs inbox's dashboard (`prs-inbox-1-daemon.md`,
-`prs-inbox-2-gui.md`). No new request to GitHub, no migration, no new command.
+`prs-inbox-2-gui.md`). No new request to GitHub, no migration, no new command (Open PR runs
+`view.open.pr`).
 
 ## What landed
 
@@ -91,14 +92,24 @@ dismissed card comes back only when its content changes, so the content is chose
   new conflict after a fix (which takes a push), comes back; the base moving does not.
 - Comment counts are left out of every card (the sketch had "3 comments"): each comment would be
   new content and bring a dismissed card back.
+- Actions count as content (the store's rule, unchanged). So the upgrade that made Open PR a
+  `command` action changed every card's content once: a card dismissed before that upgrade comes
+  back once, if its condition still holds, and stays dismissed after that.
 
 ## Buttons
 
 Up to two, "Open PR" first (the primary):
 
-- **Open PR**: an `open` action with the PR's URL (the browser). The in-app PR tab
-  (`view.open.pr`) needs a thread to open in and the PRs page's side panel is GUI state, not a
-  command; a notification action cannot name either, so it opens GitHub as a toast's buttons do.
+- **Open PR**: a `command` action, `view.open.pr --repo-slug <owner/name> --number <n> --focus`
+  (source `github` is in `verbSources`, `internal/command/commands_notification_act.go`, so the
+  action names the registry verb itself). It opens the pull request's tab in the app, a tab of no
+  thread in the user's current space, focused, as the Pull Requests page's rows open one; pressed
+  again it focuses the same tab. It never resolves the card (`Resolves` false): the card goes when
+  its condition does. The repository is spelled as GitHub spells it (the PR's URL). The tab links
+  out to GitHub (its header's open-in-browser button), so the way to the browser stays one click
+  further. A PR the gh store cannot read at press time fails the act with the "Open PR failed"
+  toast. Until 2026-11-17 this was an `open` action with the PR's URL, because `view.open.pr`
+  needed a thread (`view-open-pr-without-thread.md`).
 - **Review in a thread** (both review kinds): a `start` action, read-only review prompt ("do not
   submit a review or post comments on GitHub"), in the project whose origin is the repository
   (the first registered), else no project.

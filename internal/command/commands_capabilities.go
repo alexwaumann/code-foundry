@@ -331,7 +331,7 @@ func capPages(_ context.Context, env capEnv) (capDetail, error) {
 
 // panelItems is how the item verbs (commands_view_items.go) and replies open one file or
 // pull request.
-const panelItems = "view.open.file (--path, --line), view.open.diff (--path, --base, --head, --title, --note, --hide) and view.open.pr (--number) open one item " +
+const panelItems = "view.open.file (--path, --line), view.open.diff (--path, --base, --head, --title, --note, --hide) and view.open.pr (--number, --repo-slug: any repository's, in a tab of no thread when run outside one) open one item " +
 	"(view.open.page (--path, --title) an .html page as your own, with its bridge and no card) and refuse one that does not exist or has nothing to show. " +
 	"Their old view.panel.<item> names still work. view.open.file --edit (--line, --note) asks the user to edit the file, a new one included, for a secret or a file you cannot read: end your turn, a message says when it is saved. " +
 	"A file path written in a reply (prose or inline code) also renders as " +
