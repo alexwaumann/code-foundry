@@ -17,15 +17,31 @@ import { useThreadsStore } from "./threads";
 const NO_WAKES: readonly WakeSubscriptionView[] = [];
 
 /**
- * Whether what the strip would show is current: this Watch delivered its snapshot, and it
- * is not failing. A closed Watch leaves its log behind for the next visit, so without this
- * a thread shows the rows it had when it was left, and Stop waiting acts on them. Connecting
- * with a snapshot in hand is a resync: the rows stand until the new snapshot replaces them.
+ * Whether what the strip shows is current, so its actions can be pressed: this Watch
+ * delivered its snapshot, and it is not failing. A closed Watch leaves its log behind for
+ * the next visit, so without this Stop waiting and a row's × would act on the rows the
+ * thread had when it was left. Connecting with a snapshot in hand is a resync: the rows
+ * stand until the new snapshot replaces them.
  */
 export function useWaitListCurrent(threadId: string): boolean {
   return useThreadStore((s) => {
     const status = s.watches[threadId]?.status;
     return threadId in s.synced && status !== "retrying" && status !== "stopped";
+  });
+}
+
+/**
+ * Whether the strip shows at all: not while the Watch is failing (`retrying`, `stopped`), when
+ * nobody knows what is current. Before this Watch's snapshot (a return to a thread whose log
+ * was kept) it shows what the log had when the thread was left, with nothing to press
+ * (useWaitListCurrent): the snapshot is a moment away and mostly says the same, and a strip
+ * that arrived with it would push the conversation up on every switch
+ * (docs/notes/thread-switch-place.md).
+ */
+export function useWaitListShown(threadId: string): boolean {
+  return useThreadStore((s) => {
+    const status = s.watches[threadId]?.status;
+    return status !== "retrying" && status !== "stopped";
   });
 }
 

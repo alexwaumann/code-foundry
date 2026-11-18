@@ -90,7 +90,6 @@ describe("WaitingStrip", () => {
   // A closed Watch keeps its log for the next visit: rows from then must not show as current.
   const stale = { wakes: [wake("sub-1", "timer")], shells: [shell("b1", "npm run dev")], agents: [agent("a1")] };
   it.each([
-    ["before this Watch's snapshot", { ...stale, synced: false, watch: "connecting" as const }],
     ["while its Watch cannot open", { ...stale, synced: false, watch: "retrying" as const }],
     ["while a Watch that opened is failing", { ...stale, watch: "retrying" as const }],
     ["after its Watch stopped for good", { ...stale, watch: "stopped" as const }],
@@ -98,6 +97,20 @@ describe("WaitingStrip", () => {
     setup(o);
     expect(screen.queryByTestId("waiting-strip")).toBeNull();
     expect(screen.queryByTestId("waiting-stop")).toBeNull();
+  });
+
+  // On a return the strip is there from the first frame (no dock growing under the conversation), with nothing to press yet.
+  it("shows the list kept from the last visit before this Watch's snapshot, its actions disabled until then", () => {
+    setup({ ...stale, synced: false, watch: "connecting" });
+    expect(screen.getByTestId("waiting-sentence").textContent).toBe("Waiting on 1 timer, 1 shell and 1 subagent");
+    expect(screen.getByTestId<HTMLButtonElement>("waiting-stop").disabled).toBe(true);
+    expand();
+    expect(screen.getByTestId<HTMLButtonElement>("waiting-remove").disabled).toBe(true);
+    act(() => {
+      useThreadStore.setState({ synced: { s: true }, watches: { s: { status: "open", error: null } } });
+    });
+    expect(screen.getByTestId<HTMLButtonElement>("waiting-stop").disabled).toBe(false);
+    expect(screen.getByTestId<HTMLButtonElement>("waiting-remove").disabled).toBe(false);
   });
 
   it("keeps its rows through a resync, and the snapshot then replaces them", () => {

@@ -17,12 +17,16 @@ a strip above the composer, collapsed by default, one row per thing when expande
   a count until the chevron is pressed. AgentsStrip stays in Ember's chat, which has no
   waiting strip: its wakes are the board's, and Stop waiting there would take them away. The
   daemon refuses the command on its thread too, for the palette and CLI.
-* **Nothing shows until the Watch has said what is current** (`useWaitListCurrent`). A closed
-  Watch keeps its log for the next visit, so a return would otherwise show the rows from
-  when the thread was left, with a live Stop waiting. The strip needs this Watch's snapshot,
-  and hides while the stream is `retrying` or `stopped`, so a Watch that cannot open leaves
-  no stale rows. `connecting` with a snapshot in hand stays up: that is the resync on return
-  to a visible window, and hiding there would blink it. Expanded state survives the gap.
+* **Nothing can be pressed until the Watch has said what is current** (`useWaitListCurrent`).
+  A closed Watch keeps its log for the next visit, so a return shows the rows from when the
+  thread was left. They show at once, with Stop waiting and each × disabled until this Watch's
+  snapshot. Until 2026-11-17 the strip itself waited for the snapshot: it then arrived a moment
+  after the pane, the dock grew, and the conversation moved up on every switch to a waiting
+  thread (`thread-switch-place.md`). A list that changed while the thread was away is corrected
+  by the snapshot, as any other change. The strip hides while the stream is `retrying` or
+  `stopped` (`useWaitListShown`), so a Watch that cannot open leaves no stale rows.
+  `connecting` with a snapshot in hand stays up: that is the resync on return to a visible
+  window, and hiding there would blink it. Expanded state survives the gap.
 * **A row gone under the press is not a failure.** NotFound from the × or a shell's Stop
   means the wake went or the shell ended, which is what was pressed for: no toast, the row
   leaves with the list. Any other failure toasts as before. `stopShell` is shared with the
