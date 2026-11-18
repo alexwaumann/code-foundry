@@ -17,13 +17,14 @@ const pane = (page: Page) => page.getByTestId("thread-pane");
 const timeline = (page: Page) => pane(page).getByTestId("thread-timeline");
 const chip = (page: Page) => page.getByTestId("thread-jump-bottom");
 
-/** What one frame shows of thread `id`'s list: the rows in view, the first one's index and top, and the chip. */
+/** What one frame shows of thread `id`'s list: the rows in view, the first one's index and top, the chip, and the composer dock's height. */
 interface Frame {
   rows: number;
   inView: number;
   first: number;
   top: number;
   chip: boolean;
+  dock: number;
 }
 
 /** Each frame of thread `id`'s pane while `act` runs and for half a second after. */
@@ -48,6 +49,7 @@ async function framesDuring(page: Page, id: string, act: () => Promise<void>): P
           first: first ? Number(first.dataset.index) : -1,
           top: first ? first.getBoundingClientRect().top - box.top : 0,
           chip: document.querySelector('[data-testid="thread-jump-bottom"]')?.getAttribute("data-shown") === "true",
+          dock: list.closest('[data-testid="thread-pane"]')?.querySelector(".dock")?.getBoundingClientRect().height ?? 0,
         });
       }
       if (!w.__stop) requestAnimationFrame(tick);
@@ -95,7 +97,7 @@ test("a thread left scrolled up opens at the same row, every frame, on each visi
   await expect(chip(page)).toHaveAttribute("data-shown", "true");
   // The rows above are measured as they come into view: wait for the list to stand still.
   const place = async () =>
-    (await framesDuring(page, "s-r1", async () => {})).at(-1) ?? { rows: 0, inView: 0, first: -1, top: 0, chip: false };
+    (await framesDuring(page, "s-r1", async () => {})).at(-1) ?? { rows: 0, inView: 0, first: -1, top: 0, chip: false, dock: 0 };
   await expect.poll(async () => { const a = await place(); const b = await place(); return a.first === b.first && Math.abs(a.top - b.top) < 1; }).toBe(true);
   const left = await place();
   expect(left.first).toBeGreaterThan(0);
@@ -118,4 +120,37 @@ test("a thread left scrolled up opens at the same row, every frame, on each visi
   await expect(timeline(page).locator('[data-index="119"]')).toBeVisible();
   await expect(timeline(page)).toHaveAttribute("data-at-bottom", "true");
   await expect(chip(page)).not.toHaveAttribute("data-shown", "true");
+});
+
+// Short rows at the end (folded turns, wake notes): more of them fill the pane than the
+// virtualizer renders around one offset, so the list has to settle before its first paint.
+test("a thread ending in short rows opens with its pane full, the same rows in every frame", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 1300 });
+  await mockPost("thread?state=short-turns");
+  await openLong(page);
+  await open(page, "s-4");
+  const frames = await framesDuring(page, "s-r1", () => open(page, "s-r1"));
+  expect(frames.length).toBeGreaterThan(3);
+  const settled = frames.at(-1) ?? { rows: 0, inView: 0, first: -1, top: 0, chip: false, dock: 0 };
+  // More rows in view than the nine a first render brings, and from the list's top edge.
+  expect(settled.inView).toBeGreaterThan(12);
+  expect(settled.top).toBeLessThanOrEqual(0);
+  expect(frames.filter((f) => f.first !== settled.first || Math.abs(f.top - settled.top) >= 1 || f.inView !== settled.inView)).toEqual([]);
+});
+
+// The strip is drawn from the list kept from the last visit, not when the Watch's snapshot
+// arrives a moment later (its actions wait for that: src/components/thread/WaitingStrip.test.tsx).
+test("a thread waiting on something opens with its waiting strip: the dock is the same height in every frame", async ({ page }) => {
+  await mockPost("thread?state=waiting");
+  await openApp(page);
+  await open(page, "s-r1");
+  await expect(page.getByTestId("waiting-strip")).toBeVisible();
+  await expect(page.getByTestId("waiting-stop")).toBeEnabled();
+  await open(page, "s-4");
+  const frames = await framesDuring(page, "s-r1", () => open(page, "s-r1"));
+  expect(frames.length).toBeGreaterThan(3);
+  const dock = frames.at(-1)?.dock ?? 0;
+  expect(frames.filter((f) => f.dock !== dock)).toEqual([]);
+  await expect(page.getByTestId("waiting-strip")).toBeVisible();
+  await expect(page.getByTestId("waiting-stop")).toBeEnabled();
 });

@@ -13,7 +13,7 @@ import { useAgentRun, useStripRunIds } from "@/stores/agents";
 import { openAgentRun, useCanOpenAgents } from "@/stores/subagentActions";
 import { stopShell } from "@/stores/threadActions";
 import { useThreadsStore } from "@/stores/threads";
-import { removeWake, stopWaiting, useWaitListCurrent, useWaitShells, useWakes } from "@/stores/waitList";
+import { removeWake, stopWaiting, useWaitListCurrent, useWaitListShown, useWaitShells, useWakes } from "@/stores/waitList";
 import { DOCK_STRIP, DOCK_STRIP_ICON, DockStripLine } from "./DockStrip";
 
 const ICON = DOCK_STRIP_ICON;
@@ -46,6 +46,8 @@ function RowName({ name, tip, children }: { name: string; tip: string; children?
 /** The × of a subscription row. It holds after a press: the row leaves when the list says so, and a failure toasts. */
 function RemoveButton({ threadId, wake }: { threadId: string; wake: WakeSubscriptionView }) {
   const [pending, setPending] = useState(false);
+  // Not before the Watch has said the row is still there (a list kept from an earlier visit).
+  const current = useWaitListCurrent(threadId);
   return (
     <Tip label="Stop listening for this">
       <Button
@@ -53,7 +55,7 @@ function RemoveButton({ threadId, wake }: { threadId: string; wake: WakeSubscrip
         size="icon-xs"
         className="text-cf-text-muted"
         aria-label={`Stop listening for ${wakeName(wake)}`}
-        disabled={pending}
+        disabled={pending || !current}
         data-testid="waiting-remove"
         onClick={() => {
           setPending(true);
@@ -177,8 +179,10 @@ function SubagentRow({ threadId, id }: { threadId: string; id: string }) {
  * line; expanded, a row per thing with its live status and action. It takes the agents
  * strip's place. A subagent cannot be stopped, so with only those left nothing offers
  * Stop waiting, and the thread stays Waiting until they end. Keyed by thread, so another
- * thread starts collapsed. Nothing shows until the thread's Watch has said what is current
- * (useWaitListCurrent).
+ * thread starts collapsed. On a return to a thread it shows at once what the thread waited on
+ * when it was left, so the dock does not grow under the conversation a moment later; Stop
+ * waiting and a row's × wait for the Watch to say what is current (useWaitListCurrent).
+ * Nothing shows while the Watch is failing (useWaitListShown).
  */
 export function WaitingStrip({ threadId }: { threadId: string }) {
   const wakes = useWakes(threadId);
@@ -186,9 +190,10 @@ export function WaitingStrip({ threadId }: { threadId: string }) {
   const runs = useStripRunIds(threadId);
   const live = useThreadsStore((s) => s.byId[threadId]?.archivedAtMs === null);
   const current = useWaitListCurrent(threadId);
+  const shown = useWaitListShown(threadId);
   const [open, setOpen] = useState(false);
   const [stopping, setStopping] = useState(false);
-  if (!live || !current || wakes.length + shells.length + runs.length === 0) return null;
+  if (!live || !shown || wakes.length + shells.length + runs.length === 0) return null;
   const sentence = waitSentence(waitCounts(wakes, shells.length, runs.length));
   return (
     <Collapsible
@@ -202,7 +207,7 @@ export function WaitingStrip({ threadId }: { threadId: string }) {
           <Button
             variant="outline"
             size="xs"
-            disabled={stopping}
+            disabled={stopping || !current}
             data-testid="waiting-stop"
             onClick={() => {
               setStopping(true);

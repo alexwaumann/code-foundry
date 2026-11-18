@@ -1,6 +1,6 @@
 import { type ReactNode, type SyntheticEvent, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
-import { useVirtualizer, type VirtualItem } from "@tanstack/react-virtual";
+import { observeElementOffset, useVirtualizer, type VirtualItem } from "@tanstack/react-virtual";
 import { ArrowDown } from "lucide-react";
 import { buildRows, buildTurns, decodeTimelineKey, foldingTurn, type TimelineRow } from "@/lib/threadTimeline";
 import { deferTurnFolds, foldDeferredTurns, getThreadItems, setTurnFolded, structOf, useDeferredTurns, useSetupShown, useTimelineKeys, useTurnFolds, watchTurnEnds } from "@/stores/thread";
@@ -284,6 +284,13 @@ export function TimelineList<R extends ListRow>({
       if (!pinned.current) deferTurnFolds(threadId, ids);
     });
   }, [threadId, turns]);
+  /**
+   * Tells the virtualizer where the scroller is now. It hears of a scroll from the scroll
+   * event, a frame after the scroll: a list this code just scrolled (to the bottom, to the
+   * place it was left at) would paint that frame with the rows of the offset before. Called
+   * in a layout effect, the rows of the new offset render before the paint.
+   */
+  const syncOffset = useRef<() => void>(() => {});
   // oxlint-disable-next-line react/incompatible-library -- TanStack Virtual returns unstable functions by design.
   const v = useVirtualizer({
     count: rows.length,
@@ -310,6 +317,13 @@ export function TimelineList<R extends ListRow>({
     // A row scrolled to its start (the prompt rail's jump) lands this far under the top.
     scrollPaddingStart: 16,
     useFlushSync: false,
+    observeElementOffset: (instance, cb) => {
+      syncOffset.current = () => {
+        const el = instance.scrollElement;
+        if (el && instance.scrollOffset !== el.scrollTop) cb(el.scrollTop, false);
+      };
+      return observeElementOffset(instance, cb);
+    },
     getItemKey: (i) => rows[i]?.key ?? i,
   });
 
@@ -371,6 +385,7 @@ export function TimelineList<R extends ListRow>({
     const s = spacer.current;
     if (s.px > 0) setSpacer(spacerAfterGrowth(s.px, s.rows, innerRef.current?.offsetHeight ?? 0));
     el.scrollTop = el.scrollHeight;
+    syncOffset.current();
   }, [restoreHeld, setSpacer]);
 
   // The cite layer brings a quoted item's row into view (stores/cite.ts): the thread's
@@ -410,8 +425,7 @@ export function TimelineList<R extends ListRow>({
     const top = Math.min(placeTop(p, start, row.own), el.scrollHeight - el.clientHeight);
     if (Math.abs(el.scrollTop - top) >= 1) {
       el.scrollTop = top;
-      // The virtualizer hears of a scroll from its event, a frame late: told now, it renders the place's rows in this pass.
-      el.dispatchEvent(new Event("scroll"));
+      syncOffset.current();
     }
     return true;
   }, [v, pin]);
@@ -468,6 +482,23 @@ export function TimelineList<R extends ListRow>({
     [v],
   );
 
+  // After every render, before its paint: the rows a render brings are measured as they
+  // mount, shorter or taller than their estimates, so the bottom (or the place the list was
+  // left at) has moved. Scrolling there now, and telling the virtualizer (syncOffset), renders
+  // the rows that belong in view in this same pass, again and again until nothing moves. Left
+  // to the resize observer below, each step would be a painted frame: a list whose last rows
+  // are short (folded turns, wake notes) opened with a gap above them that filled in after.
+  // Only when the rows' height changed: a pinned list may sit a little above the bottom
+  // (PIN_SLACK), and a render that moved nothing must leave it there.
+  const settledHeight = useRef(-1);
+  useLayoutEffect(() => {
+    const height = v.getTotalSize();
+    if (height !== settledHeight.current) {
+      settledHeight.current = height;
+      if (!applyPlace() && pinned.current && held.current === null) toBottom();
+    }
+    syncOffset.current();
+  });
   // Follow the bottom while pinned: whenever the content's height changes (rows measured,
   // text streaming in, the composer growing), or the list's own (a quick terminal opening
   // under the pane, e.g. a code block's Run in terminal).

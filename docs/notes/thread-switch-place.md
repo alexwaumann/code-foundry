@@ -62,14 +62,44 @@ run's view) and mounts at that place, unpinned, with the chip showing.
   virtualizer adds to its offset what a row that starts above it grows by when first measured. An
   offset inside the place's row therefore jumps past that row once it is measured, and the row
   unmounts: the first frame showed the rows after it with a gap above.
-- **`applyPlace` dispatches a `scroll` event after it scrolls**, so the virtualizer renders the
-  place's rows in the same pass instead of a frame later. The list's own `onScroll` gets it too
-  and finds nothing to do.
+- **`applyPlace` tells the virtualizer after it scrolls** (`syncOffset`, below), so the place's
+  rows render in the same pass instead of a frame later.
 - **Not covered:** a thread opened for the first time still shows "Loading the conversation…"
   until its snapshot arrives, and a place whose log was dropped from the kept logs is put back
   only once the snapshot brings the rows (a frame of the last rows first).
 - Measured in headless WebKit only, as each frame's DOM geometry. The real window was not
   recorded.
+
+## Follow-up: two shifts left after the first fix
+
+A user still saw the conversation move on some switches, on threads waiting on child threads.
+Two causes, both recorded frame by frame:
+
+- **The waiting strip arrived after the pane.** It showed only once the Watch's snapshot had
+  come, about 45 ms after the switch, so the dock grew and the list moved up. It now shows at
+  once from the kept list, its actions disabled until the snapshot (`waiting-strip.md`).
+- **Short rows at the end.** At offset `MAX_SAFE_INTEGER` the virtualizer renders the last row
+  and its overscan: nine rows. Folded turns and wake notes are 30 to 80 px each, so nine of them
+  do not fill a pane; the rest came a frame later, when the scroll event told the virtualizer
+  where the scroller really was. The first fix was only tested on a thread ending in one tall
+  row. Now the list settles before its first paint: a layout effect with no dependencies runs
+  after every render, scrolls to the bottom (or the place) again and tells the virtualizer the
+  scroller's offset (`syncOffset`), which renders the rows of that offset in the same pass,
+  until nothing moves.
+
+Gotchas:
+
+- **`syncOffset` goes through `observeElementOffset`**, the virtualizer's own option, wrapped to
+  keep its callback: calling it is what a scroll event does, minus the wait. A dispatched
+  `scroll` event does the same but marks the virtualizer as scrolling, which puts off measuring
+  the rows it then renders to the resize observer, a frame later. `applyPlace` uses
+  `syncOffset` too now.
+- **It only calls the callback when the offsets differ**, which is what ends the loop.
+- **The settle effect scrolls only when the rows' height changed.** A pinned list may sit up to
+  `PIN_SLACK` above the bottom (a small scroll up stays pinned). Scrolling to the bottom on every
+  render took that away: a hover's re-render snapped the list back, and Playwright could no
+  longer bring an answer's Copy button into view (`thread.spec.ts`, streaming).
+- The mock's `short-turns` state is the fixture: forty exchanges of one-line rows.
 
 ## Tests
 
@@ -77,3 +107,7 @@ run's view) and mounts at that place, unpinned, with the chip showing.
 - `e2e/thread-switch-place.spec.ts`: every frame of a return to a long thread has rows in view
   and no chip; a thread left scrolled up shows the same row at the same height in every frame of
   two visits, and follows the bottom again once left there. Both fail without the change.
+- The follow-up: a thread ending in short rows opens with its pane full and the same rows in
+  every frame; a waiting thread's dock is the same height in every frame
+  (`e2e/thread-switch-place.spec.ts`), and the strip's actions wait for the snapshot
+  (`WaitingStrip.test.tsx`). The two e2e tests fail without it.
