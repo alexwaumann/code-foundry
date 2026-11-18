@@ -16,6 +16,7 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/command/commandtest"
 	core "github.com/alexwaumann/code-foundry/internal/layout"
 	"github.com/alexwaumann/code-foundry/internal/store/layout/layouttest"
+	"github.com/alexwaumann/code-foundry/internal/store/notification"
 )
 
 // retiredVerbs are the classic window's side and bottom panel verbs, gone with it
@@ -43,6 +44,7 @@ type panelDeps struct {
 	prs      *commandtest.PullRequestChecks
 	layout   *layouttest.Fake
 	terms    *commandtest.Terminal
+	notes    notification.Store
 }
 
 // panelRegistry registers every command, with threads read from th and one window open.
@@ -144,6 +146,9 @@ func panelRegistryWith(t *testing.T, th *commandtest.Thread, d panelDeps) (*comm
 	t.Cleanup(func() { layouts.Delete(reg) })
 	if d.terms != nil {
 		deps.Terminal = d.terms
+	}
+	if d.notes != nil {
+		deps.Notification = d.notes
 	}
 	if err := all.Register(reg, deps); err != nil {
 		t.Fatal(err)
@@ -395,6 +400,7 @@ func TestPanelPR(t *testing.T) {
 		name     string
 		thread   *v1.Thread
 		number   string
+		repo     string // --repo-slug
 		prs      *commandtest.PullRequestChecks
 		wantSlug string
 		code     connect.Code
@@ -413,18 +419,35 @@ func TestPanelPR(t *testing.T) {
 		{name: "GitHub unreachable keeps its code", thread: richThread(), number: "12", code: connect.CodeUnavailable,
 			prs: &commandtest.PullRequestChecks{Err: connect.NewError(connect.CodeUnavailable, errors.New("offline"))}},
 		{name: "zero", thread: richThread(), number: "0", prs: ok(), argErr: "number"},
+		// --repo-slug names the repository: neither the links nor the project are asked.
+		{name: "--repo-slug over a link", thread: richThread(), number: "7", repo: "Other/Place", prs: ok(), wantSlug: "Other/Place"},
+		{name: "--repo-slug picks one of two linked repositories", number: "7", repo: "o/other", prs: ok(), wantSlug: "o/other",
+			thread: &v1.Thread{ProjectId: "r1", LinkedPullRequests: []*v1.LinkedPullRequest{{Slug: "o/r", Number: 7}, {Slug: "o/other", Number: 7}}}},
+		{name: "--repo-slug for a thread of no project", thread: &v1.Thread{}, number: "3", repo: "a/b", prs: ok(), wantSlug: "a/b"},
+		{name: "--repo-slug unknown to GitHub", thread: richThread(), number: "3", repo: "a/b", code: connect.CodeNotFound,
+			prs: &commandtest.PullRequestChecks{Err: connect.NewError(connect.CodeNotFound, errors.New("not found"))}},
+		{name: "--repo-slug not owner/name", thread: richThread(), number: "3", repo: "just-a-name", prs: ok(), argErr: "repo-slug"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			reg, emit := panelRegistryWith(t, &commandtest.Thread{Current: tt.thread}, panelDeps{windows: 1, projects: projects, prs: tt.prs})
-			res, err := reg.Invoke(context.Background(), inThread, "view.panel.pr", map[string]string{"number": tt.number})
+			args := map[string]string{"number": tt.number}
+			if tt.repo != "" {
+				args["repo-slug"] = tt.repo
+			}
+			res, err := reg.Invoke(context.Background(), inThread, "view.panel.pr", args)
 			if checkItemErr(t, err, tt.code, tt.argErr) {
 				openedNothing(t, reg, emit)
 				return
 			}
 			sameIntents(t, emit.Intents(), nil)
-			if tb := opened(t, reg, res); tb.Kind != "pullrequest" || !maps.Equal(tb.Params, map[string]string{"slug": tt.wantSlug, "number": tt.number}) {
-				t.Errorf("tab = %+v, want pull request %s#%s", tb, tt.wantSlug, tt.number)
+			if tb := opened(t, reg, res); tb.Kind != "pullrequest" || tb.Thread != "s-aaaaaaaaaaa1" || !maps.Equal(tb.Params, map[string]string{"slug": tt.wantSlug, "number": tt.number}) {
+				t.Errorf("tab = %+v, want pull request %s#%s of the thread", tb, tt.wantSlug, tt.number)
+			}
+			if tt.repo != "" {
+				if reqs := tt.prs.Requests(); len(reqs) != 1 || reqs[0].(*v1.GetPullRequestRequest).GetRepoSlug() != tt.repo {
+					t.Errorf("read %v, want %s", reqs, tt.repo)
+				}
 			}
 		})
 	}

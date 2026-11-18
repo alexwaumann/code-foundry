@@ -1,6 +1,7 @@
 package daemon
 
 import (
+	"maps"
 	"reflect"
 	"slices"
 	"strconv"
@@ -217,13 +218,13 @@ func TestGitHubNotificationCards(t *testing.T) {
 		project, inPrompts string
 	}{
 		{key(77, ghReviewRequested), "Review requested", "Acme/web #77 Move settings to tabbed pages · by lee-m, requested from you",
-			notification.LevelInfo, true, "", []string{"Open PR", "Review in a thread"}, []notification.ActionKind{notification.KindOpen, notification.KindStart}, "r-web", "Do not submit a review"},
+			notification.LevelInfo, true, "", []string{"Open PR", "Review in a thread"}, []notification.ActionKind{notification.KindCommand, notification.KindStart}, "r-web", "Do not submit a review"},
 		{key(78, ghReviewAgain), "Review again", "Acme/web #78 Move settings to tabbed pages · by lee-m, changed since your review",
-			notification.LevelInfo, true, "", []string{"Open PR", "Review in a thread"}, []notification.ActionKind{notification.KindOpen, notification.KindStart}, "r-web", "(on old0000); the head is now head1aa"},
+			notification.LevelInfo, true, "", []string{"Open PR", "Review in a thread"}, []notification.ActionKind{notification.KindCommand, notification.KindStart}, "r-web", "(on old0000); the head is now head1aa"},
 		{key(405, ghChangesRequested), "Changes requested on your PR", "Acme/web #405 Move settings to tabbed pages · dana-k and sam-r requested changes",
-			notification.LevelWarning, false, "", []string{"Open PR", "Fix in a thread"}, []notification.ActionKind{notification.KindOpen, notification.KindStart}, "r-web", "Check out its branch settings-tabs"},
+			notification.LevelWarning, false, "", []string{"Open PR", "Fix in a thread"}, []notification.ActionKind{notification.KindCommand, notification.KindStart}, "r-web", "Check out its branch settings-tabs"},
 		{key(406, ghConflict), "Merge conflict on your PR", "Acme/web #406 Move settings to tabbed pages · conflicts with main",
-			notification.LevelWarning, false, "", []string{"Open PR", "Fix in a thread"}, []notification.ActionKind{notification.KindOpen, notification.KindStart}, "r-web", "merge conflict with main (head head1aa)"},
+			notification.LevelWarning, false, "", []string{"Open PR", "Fix in a thread"}, []notification.ActionKind{notification.KindCommand, notification.KindStart}, "r-web", "merge conflict with main (head head1aa)"},
 	} {
 		p := postFor(t, in, tt.key)
 		if p.Source != githubSource || p.Title != tt.title || p.Body != tt.body || p.Level != tt.level || p.TimeSensitive != tt.timeSensitive || p.ThreadID != tt.thread {
@@ -237,8 +238,12 @@ func TestGitHubNotificationCards(t *testing.T) {
 		if !slices.Equal(labels, tt.labels) || !slices.Equal(kinds, tt.kinds) {
 			t.Errorf("%s: actions %v %v", tt.key, labels, kinds)
 		}
-		if p.Actions[0].URL == "" || !strings.HasPrefix(p.Actions[0].URL, "https://github.com/Acme/web/pull/") {
-			t.Errorf("%s: open %q", tt.key, p.Actions[0].URL)
+		// Open PR: the pull request's tab in the app, as GitHub spells the repository, brought
+		// forward; it never resolves the card.
+		pr, _, _ := parseGhKey(tt.key)
+		want := map[string]string{"repo-slug": "Acme/web", "number": strconv.Itoa(pr.number), "focus": "true"}
+		if a := p.Actions[0]; a.Command != "view.open.pr" || !maps.Equal(a.Args, want) || a.URL != "" || p.Actions[0].Resolves == nil || *p.Actions[0].Resolves {
+			t.Errorf("%s: open %+v", tt.key, p.Actions[0])
 		}
 		if a := p.Actions[1]; a.ProjectID != tt.project || !strings.Contains(a.Prompt, tt.inPrompts) {
 			t.Errorf("%s: start %+v", tt.key, a)

@@ -21,9 +21,11 @@ import (
 
 // The item verbs that open one item of a thread: a file (File tab), a changed file's diff
 // (Diff tab) and a pull request (Pull request tab) (docs/notes/control-5-fixes.md), as a tab
-// linked to the thread (commands_view_open.go). They are always scoped to a thread, the app's
-// selection included (its context names it): the item is the thread's. Each checks the item
-// first, so a call that would show nothing fails instead.
+// linked to the thread (commands_view_open.go). They are scoped to a thread, the app's
+// selection included (its context names it): the item is the thread's. The one exception is
+// view.open.pr --repo-slug with no thread, which opens any pull request the gh store can read
+// in a tab of no thread, as the Pull Requests page does (runPanelPR; a GitHub notification's
+// Open PR runs it). Each checks the item first, so a call that would show nothing fails instead.
 //
 // The tabs' params are what the window's surfaces read:
 //   - a File tab: path (absolute), line (1-based, optional), project and base (the thread's
@@ -66,15 +68,6 @@ var (
 // view.panel.<item> alias (commands_view_open.go).
 func (d ViewDeps) itemCommands() []Command {
 	thread := openThreadArg
-	item := func(kind string, check panelCheck) func(context.Context, Context, Args) (Result, error) {
-		return func(ctx context.Context, uctx Context, a Args) (Result, error) {
-			id := a.String("thread")
-			if id == "" {
-				return Result{}, InvalidArg("thread", "needs a thread whose tab to open (--thread, or run it inside a thread)")
-			}
-			return d.showItem(ctx, uctx, a, id, kind, check)
-		}
-	}
 	return withAliases(
 		Command{
 			Name:      "view.open.file",
@@ -120,16 +113,19 @@ func (d ViewDeps) itemCommands() []Command {
 			NoPalette: true,
 			Title:     "Open Pull Request Tab",
 			Description: "Open a pull request in a tab " + openLead +
-				"the pull request's summary, checks, reviews, timeline and changed files, with Merge and Review.",
+				"the pull request's summary, checks, reviews, timeline and changed files, with Merge and Review. " +
+				"With --repo-slug and no thread, any pull request GitHub shows you, in a tab of no thread in the user's current space, as the Pull Requests page opens one.",
 			Category:     "View",
 			NoKeybinding: true,
-			When:         hasThread,
+			// Any caller: with no thread, --repo-slug names the pull request (Run refuses neither).
 			Args: []ArgSpec{
 				{Name: "number", Type: Int, Required: true, Positional: true,
-					Description: "Pull request number: one the thread links, else one in its project's GitHub repository"},
+					Description: "Pull request number: one the thread links, else one in its project's GitHub repository (with --repo-slug: one there)"},
+				{Name: "repo-slug", Type: String,
+					Description: `GitHub repository, "owner/name", of the pull request: with no thread, its tab is one of no thread; with one, it names the repository instead of the thread's links and project`},
 				thread, openFocusArg, openPaneArg,
 			},
-			Run: item(tabPR, d.prCheck),
+			Run: d.runPanelPR,
 		},
 	)
 }
@@ -304,13 +300,90 @@ func (d ViewDeps) readCheck(ctx context.Context, t *v1.Thread, a Args) (params m
 	return params, res.Msg.GetOutsideHome(), nil
 }
 
-// prCheck is view.open.pr's check: the number names a pull request the thread links
-// (in whichever repository), else one in the thread's project's GitHub repository, and
-// the gh store can read it (from its cache, else GitHub).
-func (d ViewDeps) prCheck(ctx context.Context, t *v1.Thread, a Args) (map[string]string, error) {
+// runPanelPR is view.open.pr: the thread's tab (showItem, prCheck), or with --repo-slug and
+// no thread a tab of no thread in the current space, placed as the Pull Requests page's rows
+// place theirs (gui/frontend/src/stores/prPanel.ts openPullRequestInPanel: open_surface
+// with no thread, in the focused pane). A pull request tab is one per space whatever its
+// thread (internal/layout identity "pr:<owner/name lower case>#N"), so the page's tab, the
+// command's and a thread's for the same pull request are one tab: an open one is used where
+// it is.
+func (d ViewDeps) runPanelPR(ctx context.Context, uctx Context, a Args) (Result, error) {
+	if id := a.String("thread"); id != "" {
+		return d.showItem(ctx, uctx, a, id, tabPR, d.prCheck)
+	}
+	slug, err := repoSlugArg(a)
+	if err != nil {
+		return Result{}, err
+	}
+	if slug == "" {
+		return Result{}, InvalidArg("thread", "needs a thread whose tab to open (--thread, or run it inside a thread), or --repo-slug for a pull request's tab of no thread")
+	}
+	n, err := prNumber(a)
+	if err != nil {
+		return Result{}, err
+	}
+	params, err := d.readPR(ctx, slug, n)
+	if err != nil {
+		return Result{}, err
+	}
+	o := tabs{d.Layout}
+	focus := wantsFocus(uctx, a)
+	c, err := o.open(ctx, itemTab(tabPR, "", params), a.String("pane"), focus)
+	if err != nil {
+		return Result{}, err
+	}
+	out := PanelResult{Windows: windowsOf(d.Emitter)}
+	out.placed(c, focus)
+	if _, _, tb := o.store.Snapshot().State.FindTab(out.Tab); tb != nil {
+		out.TabThread = tb.Thread
+	}
+	res := Result{JSON: out}
+	if uctx.ActiveView == "" {
+		res.Message = out.message()
+	}
+	return res, nil
+}
+
+// repoSlugArg is view.open.pr's --repo-slug, trimmed: "" when not given, else "owner/name".
+func repoSlugArg(a Args) (string, error) {
+	slug := strings.TrimSpace(a.String("repo-slug"))
+	if slug == "" {
+		if a.Given("repo-slug") {
+			return "", InvalidArg("repo-slug", `want a GitHub repository, "owner/name"`)
+		}
+		return "", nil
+	}
+	owner, name, ok := strings.Cut(slug, "/")
+	if !ok || owner == "" || name == "" || strings.Contains(name, "/") || strings.ContainsFunc(slug, unicode.IsSpace) {
+		return "", InvalidArg("repo-slug", `want a GitHub repository, "owner/name", got %q`, slug)
+	}
+	return slug, nil
+}
+
+// prNumber is view.open.pr's number, from 1.
+func prNumber(a Args) (int, error) {
 	n := a.Int("number")
 	if n <= 0 {
-		return nil, InvalidArg("number", "want a pull request number from 1, got %d", n)
+		return 0, InvalidArg("number", "want a pull request number from 1, got %d", n)
+	}
+	return n, nil
+}
+
+// prCheck is view.open.pr's check for a thread: the number names a pull request in
+// --repo-slug's repository when given, else one the thread links (in whichever
+// repository), else one in the thread's project's GitHub repository, and the gh store can
+// read it (from its cache, else GitHub).
+func (d ViewDeps) prCheck(ctx context.Context, t *v1.Thread, a Args) (map[string]string, error) {
+	n, err := prNumber(a)
+	if err != nil {
+		return nil, err
+	}
+	slug, err := repoSlugArg(a)
+	if err != nil {
+		return nil, err
+	}
+	if slug != "" {
+		return d.readPR(ctx, slug, n)
 	}
 	var linked []string
 	for _, l := range t.GetLinkedPullRequests() {
@@ -318,7 +391,6 @@ func (d ViewDeps) prCheck(ctx context.Context, t *v1.Thread, a Args) (map[string
 			linked = append(linked, strings.ToLower(l.GetSlug()))
 		}
 	}
-	slug := ""
 	switch len(linked) {
 	case 0:
 		s, err := d.projectSlug(ctx, t.GetProjectId())
@@ -332,8 +404,14 @@ func (d ViewDeps) prCheck(ctx context.Context, t *v1.Thread, a Args) (map[string
 	case 1:
 		slug = linked[0]
 	default:
-		return nil, InvalidArg("number", "thread %s links #%d in %d repositories (%s); open it from the thread info card's pull request rows", t.GetId(), n, len(linked), strings.Join(linked, ", "))
+		return nil, InvalidArg("number", "thread %s links #%d in %d repositories (%s); name one with --repo-slug", t.GetId(), n, len(linked), strings.Join(linked, ", "))
 	}
+	return d.readPR(ctx, slug, n)
+}
+
+// readPR is the tab's params for pull request slug#n once the gh store can read it (from
+// its cache, else GitHub): the slug as GitHub spells it when the store knows, and the number.
+func (d ViewDeps) readPR(ctx context.Context, slug string, n int) (map[string]string, error) {
 	res, err := d.PullRequests.GetPullRequest(ctx, connect.NewRequest(&v1.GetPullRequestRequest{RepoSlug: slug, Number: int32(n)}))
 	switch {
 	case connect.CodeOf(err) == connect.CodeNotFound:

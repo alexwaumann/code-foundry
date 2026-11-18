@@ -56,7 +56,8 @@ func newNotificationRegistry(t *testing.T, fail error) (*command.Registry, *noti
 	forget := stand("plugin.ci.forget", "build")
 	forget.Confirm = "Forget build {build}?"
 	if err := r.RegisterAll(stand("thread.send", "id", "text"), stand("thread.new", "prompt", "project", "no-project"),
-		stand("view.open.url", "url"), stand("plugin.ci.retry", "build"), forget, stand("plugin.restart", "name")); err != nil {
+		stand("view.open.url", "url"), stand("plugin.ci.retry", "build"), forget, stand("plugin.restart", "name"),
+		stand("view.open.pr", "repo-slug", "number", "focus")); err != nil {
 		t.Fatal(err)
 	}
 	return r, s, &calls
@@ -203,6 +204,10 @@ func TestNotificationAct(t *testing.T) {
 		{name: "the plugins source's command action runs the verb it names", source: notification.SourcePlugins,
 			action:   notification.ActionSpec{Action: notification.Action{Label: "Restart", Kind: notification.KindCommand, Command: "plugin.restart", Args: map[string]string{"name": "hello"}}, Resolves: new(false)},
 			wantCall: call{name: "plugin.restart", args: map[string]string{"name": "hello"}}, wantState: "shown"},
+		{name: "the github source's Open PR runs view.open.pr and keeps the card", source: notification.SourceGitHub,
+			action: notification.ActionSpec{Action: notification.Action{Label: "Open PR", Kind: notification.KindCommand, Command: "view.open.pr",
+				Args: map[string]string{"repo-slug": "acme/web", "number": "77", "focus": "true"}}, Resolves: new(false)},
+			wantCall: call{name: "view.open.pr", args: map[string]string{"repo-slug": "acme/web", "number": "77", "focus": "true"}}, wantState: "shown"},
 		{name: "a plugin's command action never names a verb", source: "ci",
 			action:    notification.ActionSpec{Action: notification.Action{Label: "Restart", Kind: notification.KindCommand, Command: "plugin.restart", Args: map[string]string{"name": "hello"}}},
 			wantState: "shown", wantErr: func(err error) bool { return errors.Is(err, command.ErrUnknownCommand) }},

@@ -20,7 +20,8 @@
  *        card with Restart and Open plugins, off the warning one the daemon posts when it turned
  *        the plugin off, running withdraws it)
  *   POST /__mock/notifications/github[?quiet=1]   (the daemon's four GitHub cards: review again,
- *        review requested, changes requested naming s-4, a merge conflict)
+ *        review requested, changes requested naming s-4, a merge conflict; Open PR runs
+ *        view.open.pr --repo-slug --number --focus, the pull request's tab of no thread)
  *   POST /__mock/notifications/act-fail?message=…   (the next notification.act fails with it; empty: none)
  *   GET  /__mock/notifications                  ({ notifications, calls }: every one with its state)
  */
@@ -29,10 +30,21 @@ import { timestampFromDate } from "@bufbuild/protobuf/wkt";
 import { ArgType, type UiContext } from "../src/gen/codefoundry/v1/command_pb";
 import { NotificationLevel, NotificationStatus, type NotificationActionSchema, type NotificationEventSchema, type NotificationSnapshotSchema } from "../src/gen/codefoundry/v1/notification_pb";
 import { CommandError } from "./errors";
+import type { InvokeOut } from "./gitops";
 import type { SkillCommand } from "./skills";
 
 /** The daemon's own source for plugins that stopped (internal/daemon/plugin_health.go). */
 const PLUGINS_SOURCE = "plugins";
+
+/** The daemon's own source for the GitHub poll's cards (internal/daemon/github_notifications_rules.go). */
+const GITHUB_SOURCE = "github";
+
+/**
+ * The host sources whose command actions the mock runs as the registry verb they name, as the
+ * daemon's notification.act does (internal/command verbSources). The plugins source's are
+ * recorded only, as before: the mock's view.settings takes no --page.
+ */
+const VERB_SOURCES = [GITHUB_SOURCE];
 
 export type NotificationEventInit = MessageInitShape<typeof NotificationEventSchema>;
 type SnapshotInit = MessageInitShape<typeof NotificationSnapshotSchema>;
@@ -46,6 +58,8 @@ interface Action {
   kind: "command" | "send" | "start" | "open";
   /** The command's name, the send's text, the start's prompt, the URL. */
   arg: string;
+  /** A command action's args. */
+  args?: Record<string, string>;
   resolves: boolean;
 }
 
@@ -95,6 +109,8 @@ export class MockNotifications {
       publish: (ev: NotificationEventInit) => void;
       hasThread: (id: string) => boolean;
       send: (threadId: string, text: string) => void;
+      /** Runs a registry verb as notification.act does: with the caller's view and nothing else of its context. */
+      invoke?: (name: string, args: Record<string, string>, ctx: UiContext) => string | Promise<InvokeOut>;
     },
   ) {
     setInterval(() => {
@@ -123,7 +139,7 @@ export class MockNotifications {
         const base = { label: a.label, resolves: a.resolves };
         switch (a.kind) {
           case "command":
-            return { ...base, kind: { case: "command", value: { command: a.arg } } };
+            return { ...base, kind: { case: "command", value: { command: a.arg, args: { ...a.args } } } };
           case "send":
             return { ...base, kind: { case: "send", value: { threadId: n.threadId, text: a.arg } } };
           case "start":
@@ -233,16 +249,27 @@ export class MockNotifications {
     this.changed([], []);
   }
 
-  /** The daemon's four GitHub notifications (docs/notes/notifications-github.md), as it words them; the changes-requested one names s-4, a thread linked to its pull request. */
+  /**
+   * The daemon's four GitHub notifications (docs/notes/notifications-github.md), as it words them,
+   * for pull requests the mock's dashboard holds (mock/github.ts), so Open PR's tab shows one; the
+   * changes-requested one names s-4, a thread linked to its pull request.
+   */
   seedGitHub(quiet: boolean): void {
     const t = Date.now();
     const at = (min: number) => ({ quiet, arrivedAt: new Date(t - min * MINUTE) });
-    const open = (url: string): Action => ({ label: "Open PR", kind: "open", arg: url, resolves: false });
+    // Open PR: the pull request's tab in the app (view.open.pr --repo-slug, a tab of no thread), brought forward; the card stays.
+    const open = (url: string): Action => {
+      const [, slug = "", number = ""] = /\/([^/]+\/[^/]+)\/pull\/(\d+)$/.exec(url) ?? [];
+      return { label: "Open PR", kind: "command", arg: "view.open.pr", args: { "repo-slug": slug, number, focus: "true" }, resolves: false };
+    };
     const start = (label: string, prompt: string): Action => ({ label, kind: "start", arg: prompt, resolves: true });
-    this.post({ source: "github", key: "pr/acme/web#77/review-again", timeSensitive: true, title: "Review again", body: "acme/web #77 Move settings to tabbed pages · by lee-m, changed since your review", actions: [open("https://example.com/acme/web/pull/77"), start("Review in a thread", "Review pull request acme/web#77 again.")] }, at(1));
-    this.post({ source: "github", key: "pr/acme/web#79/review-requested", timeSensitive: true, title: "Review requested", body: "acme/web #79 Remember the last tab per project · by sam-r, requested from you", actions: [open("https://example.com/acme/web/pull/79"), start("Review in a thread", "Review pull request acme/web#79.")] }, at(3));
-    this.post({ source: "github", key: "pr/acme/api#405/changes-requested", level: "warning", title: "Changes requested on your PR", body: "acme/api #405 Cache the viewer query · dana-k requested changes", threadId: "s-4", actions: [open("https://example.com/acme/api/pull/405"), { label: "Send to thread", kind: "send", arg: "Changes were requested on acme/api#405: address them and push.", resolves: true }] }, at(6));
-    this.post({ source: "github", key: "pr/acme/api#412/conflict", level: "warning", title: "Merge conflict on your PR", body: "acme/api #412 Add retry budget to the client · conflicts with main", actions: [open("https://example.com/acme/api/pull/412"), start("Fix in a thread", "My pull request acme/api#412 has a merge conflict with main: resolve it and push.")] }, at(12));
+    const cf = "alexwaumann/code-foundry";
+    const gp = "alexwaumann/ghostty-playground";
+    const url = (slug: string, n: number) => `https://github.com/${slug}/pull/${String(n)}`;
+    this.post({ source: "github", key: `pr/${gp}#14/review-again`, timeSensitive: true, title: "Review again", body: `${gp} #14 renderer: subpixel glyph positioning · by teammate-kim, changed since your review`, actions: [open(url(gp, 14)), start("Review in a thread", `Review pull request ${gp}#14 again.`)] }, at(1));
+    this.post({ source: "github", key: `pr/${cf}#139/review-requested`, timeSensitive: true, title: "Review requested", body: `${cf} #139 feat(thread): JSONL transcript discovery · by teammate-kim, requested from you`, actions: [open(url(cf, 139)), start("Review in a thread", `Review pull request ${cf}#139.`)] }, at(3));
+    this.post({ source: "github", key: `pr/${cf}#145/changes-requested`, level: "warning", title: "Changes requested on your PR", body: `${cf} #145 fix(terminal): resize race between attach and first output · teammate-lee requested changes`, threadId: "s-4", actions: [open(url(cf, 145)), { label: "Send to thread", kind: "send", arg: `Changes were requested on ${cf}#145: address them and push.`, resolves: true }] }, at(6));
+    this.post({ source: "github", key: `pr/${gp}#12/conflict`, level: "warning", title: "Merge conflict on your PR", body: `${gp} #12 renderer: port glyph cache to the new atlas · conflicts with main`, actions: [open(url(gp, 12)), start("Fix in a thread", `My pull request ${gp}#12 has a merge conflict with main: resolve it and push.`)] }, at(12));
     this.changed([], []);
   }
 
@@ -355,7 +382,7 @@ export class MockNotifications {
       {
         cmd: cmd("notification.act", "Notifications: Run Action", "Run one of a notification's actions.", [id, { name: "action", type: ArgType.INT, required: false, description: "The action's number" }]),
         when: always,
-        run: (_c, a) => {
+        run: (c, a) => {
           record("notification.act", a);
           const n = this.find(a.id ?? "");
           const i = Number(a.action ?? "1") - 1;
@@ -367,11 +394,16 @@ export class MockNotifications {
             throw new CommandError("unavailable", message);
           }
           if (act.kind === "send") this.deps.send(n.threadId, act.arg);
-          if (act.resolves) {
-            n.state = "resolved";
-            this.changed([], []);
-          }
-          return `ran "${act.label}" on notification ${n.id}${act.resolves ? ", which is resolved" : ""}`;
+          const ran = act.kind === "command" && VERB_SOURCES.includes(n.source) ? this.deps.invoke?.(act.arg, { ...act.args }, { activeView: c?.activeView ?? "" } as UiContext) : undefined;
+          const done = (): string => {
+            if (act.resolves) {
+              n.state = "resolved";
+              this.changed([], []);
+            }
+            return `ran "${act.label}" on notification ${n.id}${act.resolves ? ", which is resolved" : ""}`;
+          };
+          // A verb that fails fails the act (the card's "<label> failed" toast) and leaves the card.
+          return ran instanceof Promise ? ran.then(() => ({ message: done(), resultJson: "" })) : done();
         },
       },
       {

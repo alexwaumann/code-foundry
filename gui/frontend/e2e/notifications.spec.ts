@@ -5,7 +5,8 @@ import { mockPost, mockUrl, openApp, resetMock } from "./fixtures";
  * The bell (docs/notes/notifications-3-bell.md), what only a real browser shows: the popover
  * under the bell inside the window and the keyboard's way in and out, an arrival toast over the
  * app whose button runs its action, and a card's thread link moving the window to the thread in
- * its own space. The list's order, counts, tones and which command each control runs:
+ * its own space, and a GitHub card's Open PR opening the pull request's tab across the layout
+ * stream. The list's order, counts, tones and which command each control runs:
  * src/components/notifications/NotificationBell.test.tsx; the toast rules:
  * src/stores/notificationToasts.test.ts. SHOTS=<dir> saves the PR's screenshots.
  */
@@ -85,6 +86,40 @@ test("a card's thread link moves the window to the thread in its own space", asy
   await expect(page.getByRole("tab", { name: /Investigate flaky e2e/ }).first()).toBeVisible();
 });
 
+/** The layout's pull request tabs, and the tab the current space's focused pane shows. */
+async function prTabs(): Promise<{ ids: string[]; focused: string }> {
+  type Node = { t: string; id: string; active?: string; tabs?: { id: string; kind: string }[]; children?: Node[] };
+  const res = await fetch(`${mockUrl}/__mock/layout`);
+  const { state } = (await res.json()) as { state: { current_space: string; spaces: { id: string; focus?: string; root?: Node }[] } };
+  const panes = (n?: Node): Node[] => (!n ? [] : n.t === "pane" ? [n] : (n.children ?? []).flatMap(panes));
+  const all = state.spaces.flatMap((sp) => panes(sp.root));
+  const sp = state.spaces.find((x) => x.id === state.current_space);
+  return { ids: all.flatMap((p) => p.tabs ?? []).filter((t) => t.kind === "pullrequest").map((t) => t.id), focused: all.find((p) => p.id === sp?.focus)?.active ?? "" };
+}
+
+test("a GitHub card's Open PR opens the pull request's tab in the app, focused; pressed again, the same tab", async ({ page }) => {
+  await openApp(page);
+  await mockPost("notifications/github?quiet=1");
+  const press = async () => {
+    await page.getByTestId("notification-bell").click();
+    const card = page.getByTestId("notification-card").filter({ hasText: "alexwaumann/code-foundry #139" });
+    await card.getByTestId("notification-action").filter({ hasText: "Open PR" }).click();
+  };
+  await press();
+  await expect(page.getByTestId("pr-surface")).toHaveAttribute("data-pr", "alexwaumann/code-foundry#139");
+  const focusedOne = async () => {
+    const t = await prTabs();
+    return t.ids.length === 1 && t.focused === t.ids[0] ? t.focused : `${String(t.ids.length)} tabs, ${t.focused} focused`;
+  };
+  await expect.poll(focusedOne).toMatch(/^t-/);
+  const first = await focusedOne();
+  await run(page, "thread.open", { id: "s-1", focus: "true" });
+  await expect.poll(async () => (await prTabs()).focused).not.toBe(first);
+  await press();
+  await expect.poll(focusedOne).toBe(first);
+  expect((await notifications()).notifications.find((n) => n.title === "Review requested")?.status).toBe("shown");
+});
+
 test("screenshots: the bell closed and open, and an arrival toast, dark and light", async ({ page }) => {
   test.skip(!process.env.SHOTS, "SHOTS=<dir> only");
   const shots = process.env.SHOTS ?? "";
@@ -155,5 +190,16 @@ test("screenshots: the GitHub notifications in the bell, dark and light", async 
     await popover.screenshot({ path: `${shots}/bell-github-${scheme}.png` });
     await page.keyboard.press("Escape");
     await expect(popover).toBeHidden();
+  }
+  // Open PR: the pull request's tab in the app.
+  await page.getByTestId("notification-bell").click();
+  await page.getByTestId("notification-card").filter({ hasText: "alexwaumann/code-foundry #139" }).getByTestId("notification-action").filter({ hasText: "Open PR" }).click();
+  await expect(page.getByTestId("pr-surface")).toHaveAttribute("data-pr", "alexwaumann/code-foundry#139");
+  await page.keyboard.press("Escape");
+  for (const scheme of ["dark", "light"] as const) {
+    await page.emulateMedia({ colorScheme: scheme });
+    await page.mouse.move(640, 790);
+    await page.waitForTimeout(400);
+    await page.screenshot({ path: `${shots}/github-open-pr-tab-${scheme}.png` });
   }
 });

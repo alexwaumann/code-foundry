@@ -18,7 +18,7 @@ import (
 // its fingerprint, keeps its cards as they are.
 
 // githubSource is the notifications' source; the bell shows it as "GitHub".
-const githubSource = "github"
+const githubSource = notification.SourceGitHub
 
 // ghKind is one of the four notifications a pull request can have.
 type ghKind string
@@ -310,17 +310,19 @@ const (
 	readOnlyReview = "Do not submit a review or post comments on GitHub: tell me what you find and I will decide what to send."
 )
 
-// prName is "owner/name #N" as GitHub spells the repository (its URL), else the store's
-// lower-case slug.
-func ghPRName(p gh.PullRequest) string {
-	repo := p.Repo
+// ghRepoName is the pull request's repository ("owner/name") as GitHub spells it (its URL),
+// else the store's lower-case slug.
+func ghRepoName(p gh.PullRequest) string {
 	if u, err := url.Parse(p.URL); err == nil {
 		if parts := strings.Split(strings.Trim(u.Path, "/"), "/"); len(parts) >= 2 && strings.EqualFold(parts[0]+"/"+parts[1], p.Repo) {
-			repo = parts[0] + "/" + parts[1]
+			return parts[0] + "/" + parts[1]
 		}
 	}
-	return fmt.Sprintf("%s #%d", repo, p.Number)
+	return p.Repo
 }
+
+// ghPRName is "owner/name #N" (ghRepoName).
+func ghPRName(p gh.PullRequest) string { return fmt.Sprintf("%s #%d", ghRepoName(p), p.Number) }
 
 // prRefText is "owner/name#N" for a prompt.
 func ghPRRef(p gh.PullRequest) string { return strings.Replace(ghPRName(p), " #", "#", 1) }
@@ -347,8 +349,15 @@ func byAuthor(p gh.PullRequest) string {
 	return "by " + p.Author + ", "
 }
 
+// openVerb is Open PR's registry verb (notification.SourceGitHub's command actions name one).
+const openVerb = "view.open.pr"
+
+// openAction is Open PR: the pull request's tab in the app (view.open.pr with its
+// repository, a tab of no thread in the current space), brought forward. It never resolves
+// the card: the card goes when its condition does. The tab links out to GitHub.
 func openAction(p gh.PullRequest) notification.ActionSpec {
-	return notification.ActionSpec{Action: notification.Action{Label: labelOpenPR, Kind: notification.KindOpen, URL: p.URL}}
+	return notification.ActionSpec{Action: notification.Action{Label: labelOpenPR, Kind: notification.KindCommand, Command: openVerb,
+		Args: map[string]string{"repo-slug": ghRepoName(p), "number": strconv.Itoa(p.Number), "focus": "true"}}, Resolves: noResolve}
 }
 
 func startAction(label, prompt string, p gh.PullRequest, in ghNotifyInput) notification.ActionSpec {
