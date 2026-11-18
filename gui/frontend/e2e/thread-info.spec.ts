@@ -659,14 +659,15 @@ async function openVeryLongWithCard(page: Page): Promise<void> {
 }
 
 /** Whether a mounted row of the list is under the list's top and bottom edges (a few px in), probed with elementsFromPoint in the rows' column (the composer floats over the bottom one). */
-async function edgesCovered(page: Page): Promise<{ top: boolean; bottom: boolean; scrollTop: number }> {
+async function edgesCovered(page: Page): Promise<{ top: boolean; bottom: boolean; scrollTop: number; fromBottom: number }> {
   return page.getByTestId("thread-timeline").evaluate(async (el) => {
     await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
     const box = el.getBoundingClientRect();
     const log = el.querySelector('[role="log"]')?.getBoundingClientRect();
     const x = log ? log.left + log.width / 2 : box.left + box.width / 3;
     const rowAt = (y: number) => document.elementsFromPoint(x, y).some((e) => el.contains(e) && e.closest("[data-index]") !== null);
-    return { top: rowAt(box.top + 2), bottom: rowAt(box.bottom - 2), scrollTop: el.scrollTop };
+    // How far the list is from its bottom: unlike scrollTop, it does not grow when a row above is measured taller than its estimate.
+    return { top: rowAt(box.top + 2), bottom: rowAt(box.bottom - 2), scrollTop: el.scrollTop, fromBottom: el.scrollHeight - el.clientHeight - el.scrollTop };
   });
 }
 
@@ -679,11 +680,10 @@ test("a wheel over the card leaves no gap: the rows under the list's top and bot
   const total = await timeline.evaluate((el) => el.scrollHeight);
   // Far more than the pane, and most rows unmounted: the virtualizer has to mount what the wheel brings in.
   expect(total).toBeGreaterThan(t.height * 5);
-  const before = await timeline.evaluate((el) => el.scrollTop);
   // Toward older content, at a trackpad's pace.
   await wheelAt(page, c.x + c.width / 2, c.y + c.height / 2, -120, 12);
   const up = await edgesCovered(page);
-  expect(up.scrollTop).toBeLessThan(before - 1000);
+  expect(up.fromBottom).toBeGreaterThan(1000);
   expect(up).toMatchObject({ top: true, bottom: true });
   await expect(page.getByTestId("thread-jump-bottom")).toHaveAttribute("data-shown", "true");
   // Further up, then toward newer content, short of the bottom.
@@ -692,7 +692,7 @@ test("a wheel over the card leaves no gap: the rows under the list's top and bot
   await wheelAt(page, c.x + c.width / 2, c.y + c.height / 2, 120, 8);
   const down = await edgesCovered(page);
   expect(down.scrollTop).toBeGreaterThan(higher + 500);
-  expect(down.scrollTop).toBeLessThan(before - 300);
+  expect(down.fromBottom).toBeGreaterThan(300);
   expect(down).toMatchObject({ top: true, bottom: true });
   await expect(timeline).not.toHaveAttribute("data-at-bottom");
 });

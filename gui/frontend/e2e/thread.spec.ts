@@ -382,8 +382,9 @@ test("reading deep into an open tool row when the turn ends: the row stays open 
 
 // Leaving a thread forgetting how it was folded (every finished turn folded, the rows the reader
 // opened closed): unit-tested in src/components/thread/timeline.test.tsx. Left here: back on
-// it, the list is pinned at the bottom again.
-test("leaving a thread scrolled up: back on it, the list is pinned at the bottom with the turn folded", async ({ page }) => {
+// it, the list is where it was left, scrolled up (docs/notes/thread-switch-place.md; the
+// place itself, frame by frame: thread-switch-place.spec.ts), with the turn that ended folded.
+test("leaving a thread scrolled up: back on it, the list is still scrolled up, with the turn folded", async ({ page }) => {
   await openThread(page, "streaming");
   const timeline = page.getByTestId("thread-timeline");
   await leaveSidebar(page, timeline);
@@ -399,8 +400,9 @@ test("leaving a thread scrolled up: back on it, the list is pinned at the bottom
   await expect(pane(page)).toHaveAttribute("data-thread-id", "s-2");
   await openRowThread(page, "s-r1");
   await expect(pane(page)).toHaveAttribute("data-thread-id", "s-r1");
-  await expect(timeline).toHaveAttribute("data-at-bottom", "true");
   await expect(headers(page).last()).toHaveAttribute("data-folded", "true");
+  await expect(timeline).not.toHaveAttribute("data-at-bottom", "true");
+  await expect(page.getByTestId("thread-jump-bottom")).toHaveAttribute("data-shown", "true");
 });
 
 // The live tool strip (one row per run of work in the running turn, "N steps", expanding in

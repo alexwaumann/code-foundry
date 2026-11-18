@@ -8,6 +8,7 @@ import { setupRowPhase } from "@/lib/threadSetup";
 import { registerTimeline } from "@/stores/cite";
 import { useThreadsStore } from "@/stores/threads";
 import { heldScroll, spacerAfterGrowth } from "@/lib/timelineHold";
+import { keepTimelinePlace, placeRow, placeTop, timelinePlace, type TimelinePlace } from "@/lib/timelinePlace";
 import { scrollIntent, type ScrollSample } from "@/lib/scrollIntent";
 import { FoldInPlaceContext, HoldTopContext, KeepRowContext } from "./context";
 import { PromptRail } from "./PromptRail";
@@ -21,6 +22,10 @@ const PIN_SLACK = 48;
 const USER_SCROLL_MS = 400;
 /** How long (ms) after a card asks for it its top is held (HoldTopContext): the resize's layout passes. */
 const HOLD_MS = 400;
+/** The space above the first row. */
+const PADDING_START = 28;
+/** How long (ms) after its first rows a list that mounted at the place it was left at is put back there as its rows are measured. */
+const PLACE_MS = 600;
 /** Keys that scroll the list. */
 const SCROLL_KEYS = new Set(["ArrowUp", "ArrowDown", "PageUp", "PageDown", "Home", "End", " "]);
 /** A page's frame under the pointer (an inline page card's): its wheel never reaches the list (lib/scrollIntent.ts). */
@@ -97,6 +102,8 @@ function useRows(threadId: string, working: boolean, strips: boolean): TimelineR
  * the list is pinned again (docs/notes/thread-fold-4-pinned-fold.md). Leaving the thread
  * forgets its fold and expand choices (ThreadPane's WatchedThread): every finished turn is
  * folded on the next visit. A visit to one of its subagent runs is not leaving it.
+ * Leaving keeps the reader's place, though (`place`, lib/timelinePlace.ts): a list left
+ * scrolled up opens there again, one left following the bottom opens at the bottom.
  * While the thread is on a turn (`strips`: working, or waiting on the user), that turn's
  * runs of work show as strip rows (docs/notes/live-tool-strip.md).
  * `bottomInset` is the floating composer's height: the last row scrolls clear of it.
@@ -135,6 +142,7 @@ export function Timeline({
       bottomInset={bottomInset}
       renderRow={renderTimelineRow}
       turns
+      place={threadId}
       unfold={unfold}
       inset={inset}
       overlay={rail ? overlay : undefined}
@@ -197,6 +205,7 @@ export function TimelineList<R extends ListRow>({
   renderRow,
   estimateRow = estimate,
   turns = false,
+  place,
   citable = turns,
   unfold,
   inset = 40,
@@ -209,6 +218,11 @@ export function TimelineList<R extends ListRow>({
   renderRow: (row: R) => ReactNode;
   estimateRow?: (row: R | undefined) => number;
   turns?: boolean;
+  /**
+   * The id the reader's place is kept under across mounts (lib/timelinePlace.ts): a list left
+   * scrolled up mounts there again. Without it every mount starts at the bottom.
+   */
+  place?: string;
   /** The cite layer can bring its rows into view (stores/cite registerTimeline): the thread's own timeline (turns) and Ember's chat. */
   citable?: boolean;
   /** Opens what folds the item away (Ember's work row, a thread's folded turn), for the cite layer and the find bar; false when nothing hides it. */
@@ -232,10 +246,20 @@ export function TimelineList<R extends ListRow>({
   const scrollRef = useRef<HTMLDivElement>(null);
   const innerRef = useRef<HTMLDivElement>(null);
   const pinnedRef = useRef<HTMLDivElement>(null);
-  const pinned = useRef(true);
+  // The place this list was left at, read once: it mounts there, unpinned, instead of at the bottom.
+  const [left] = useState<TimelinePlace<R> | undefined>(() => (place === undefined ? undefined : timelinePlace<R>(place)));
+  const pinned = useRef(left === undefined);
   /** When the user last gave scroll input (wheel, touch, key, a press that moved the list); Infinity while a pointer is down on the list (its scrollbar). */
   const userInput = useRef(-Infinity);
+  /**
+   * The place the list was left at, while it is being put back: the rows are estimates until
+   * they render, so the place's row moves as it and the rows above it are measured, and each
+   * layout pass scrolls to it again (applyPlace). The user's own input, a pin or a jump to a row ends it.
+   */
+  const placing = useRef<TimelinePlace<R> | null>(left ?? null);
+  const placeUntil = useRef(0);
   const markInput = useCallback(() => {
+    placing.current = null;
     if (userInput.current !== Infinity) userInput.current = performance.now();
   }, []);
   /** Where the scroller was when last seen (a scroll, a resize, a change of rows): what scrollIntent compares a scroll with. */
@@ -244,10 +268,11 @@ export function TimelineList<R extends ListRow>({
     const el = scrollRef.current;
     if (el) seen.current = { top: el.scrollTop, height: el.scrollHeight };
   }, []);
-  const [atBottom, setAtBottom] = useState(true);
+  const [atBottom, setAtBottom] = useState(left === undefined);
   /** Pins the list (it follows the bottom again); the turns left open while it was scrolled up fold. */
   const pin = useCallback(() => {
     pinned.current = true;
+    placing.current = null;
     if (turns) foldDeferredTurns(threadId);
   }, [threadId, turns]);
 
@@ -265,7 +290,22 @@ export function TimelineList<R extends ListRow>({
     getScrollElement: () => scrollRef.current,
     estimateSize: (i) => estimateRow(rows[i]),
     overscan: 8,
-    paddingStart: 28,
+    paddingStart: PADDING_START,
+    // The virtualizer starts where the list will be, not at the top: it only hears of a
+    // scroll a frame later, and until then would render the first rows under a viewport that
+    // is already somewhere else (a blank frame on every switch to a long thread). At the
+    // bottom (the browser clamps the overshoot), or at the place the list was left at, from
+    // the estimates since nothing is measured yet.
+    initialOffset: () => {
+      const row = left && placeRow(left, rows);
+      if (!left || !row) return Number.MAX_SAFE_INTEGER;
+      let start = PADDING_START;
+      for (let i = 0; i < row.at; i++) start += estimateRow(rows[i]);
+      // The row's start, however far into it the reader was: the row itself must render to be
+      // measured, and the virtualizer moves on by what a row that starts above its offset
+      // grows when measured, which would take it past this one. applyPlace then scrolls to the place itself.
+      return Math.max(Math.min(placeTop(left, start, row.own), start), 0);
+    },
     paddingEnd: bottomInset + 8,
     // A row scrolled to its start (the prompt rail's jump) lands this far under the top.
     scrollPaddingStart: 16,
@@ -343,6 +383,38 @@ export function TimelineList<R extends ListRow>({
     insetRef.current = bottomInset;
     unfoldRef.current = unfold;
   });
+  /**
+   * Scrolls to the place the list was left at; false when no place is being put back. With
+   * no rows yet (a first snapshot on its way) it waits. When nothing of the place is in the
+   * rows, the list opens at the bottom instead.
+   */
+  const applyPlace = useCallback((): boolean => {
+    const p = placing.current;
+    const el = scrollRef.current;
+    const now = rowsRef.current;
+    if (!p || !el) return false;
+    if (now.length === 0) return true;
+    if (placeUntil.current === 0) placeUntil.current = performance.now() + PLACE_MS;
+    const row = placeRow(p, now);
+    const start = row && measurements(v)[row.at]?.start;
+    if (!row || start === undefined) {
+      pin();
+      setAtBottom(true);
+      return false;
+    }
+    if (performance.now() > placeUntil.current) {
+      placing.current = null;
+      return false;
+    }
+    // Clamped, not pinned: the rows below are estimates too, and the list may yet grow under the place.
+    const top = Math.min(placeTop(p, start, row.own), el.scrollHeight - el.clientHeight);
+    if (Math.abs(el.scrollTop - top) >= 1) {
+      el.scrollTop = top;
+      // The virtualizer hears of a scroll from its event, a frame late: told now, it renders the place's rows in this pass.
+      el.dispatchEvent(new Event("scroll"));
+    }
+    return true;
+  }, [v, pin]);
   useEffect(() => {
     const el = scrollRef.current;
     if (!citable || !el) return;
@@ -351,6 +423,7 @@ export function TimelineList<R extends ListRow>({
       showRow: (key, align = "center") => {
         const i = rowsRef.current.findIndex((r) => r.key === key);
         if (i < 0) return false;
+        placing.current = null;
         if (align === "start") {
           pinned.current = false;
           held.current = null;
@@ -368,6 +441,7 @@ export function TimelineList<R extends ListRow>({
         return true;
       },
       unpin: () => {
+        placing.current = null;
         pinned.current = false;
       },
       unfold: unfoldRef.current ? (itemId) => unfoldRef.current?.(rowsRef.current, itemId) ?? false : undefined,
@@ -385,6 +459,7 @@ export function TimelineList<R extends ListRow>({
       rowStart: (index) => measurements(v)[index]?.start,
       scrollToRow: (index) => {
         if (index < 0 || index >= rowsRef.current.length) return;
+        placing.current = null;
         pinned.current = false;
         held.current = null;
         v.scrollToIndex(index, { align: "start" });
@@ -402,7 +477,7 @@ export function TimelineList<R extends ListRow>({
     if (pinned.current) toBottom();
     noteScroll();
     const ro = new ResizeObserver(() => {
-      if (!restoreHeld() && pinned.current) toBottom();
+      if (!applyPlace() && !restoreHeld() && pinned.current) toBottom();
       noteScroll();
     });
     ro.observe(inner);
@@ -410,7 +485,7 @@ export function TimelineList<R extends ListRow>({
     return () => {
       ro.disconnect();
     };
-  }, [toBottom, restoreHeld, noteScroll]);
+  }, [toBottom, restoreHeld, noteScroll, applyPlace]);
   // The pinned layer's box knows the list's height (--timeline-h) and its scrollbar's width
   // (--timeline-sb), set on the element so a resize re-renders nothing. The scrollbar
   // appearing narrows the content box, so the observer sees it.
@@ -432,12 +507,16 @@ export function TimelineList<R extends ListRow>({
   }, [pinnedLayerShown]);
   // Away from the bottom, the row at the top of the viewport (and how far it starts above
   // the viewport's top) is the anchor a change of rows keeps in place.
-  const anchor = useRef<{ index: number; offset: number; rows: readonly R[] } | null>(null);
+  // Kept as the list's place for its next mount (lib/timelinePlace.ts), except while the
+  // place it was left at is still being put back: that one stands until it is.
+  const anchor = useRef<TimelinePlace<R> | null>(null);
   const captureAnchor = useCallback(() => {
+    if (placing.current) return;
     const el = scrollRef.current;
     const vi = el ? v.getVirtualItemForOffset(el.scrollTop) : undefined;
     anchor.current = el && vi ? { index: vi.index, offset: vi.start - el.scrollTop, rows } : null;
-  }, [v, rows]);
+    if (place !== undefined) keepTimelinePlace(place, pinned.current ? null : anchor.current);
+  }, [v, rows, place]);
 
   // A header the user clicks (to fold or unfold its turn) and where it was on screen: the
   // next change of rows puts it back there, pinned or not (KeepRowContext).
@@ -473,18 +552,15 @@ export function TimelineList<R extends ListRow>({
       else pinned.current = false;
       el.scrollTop = Math.min(top, max);
       setAtBottom(max - el.scrollTop < PIN_SLACK);
+    } else if (applyPlace()) {
+      // The place the list was left at, on its first rows and while they are measured.
     } else if (!pinned.current && el && a && a.rows !== rows) {
-      const index = new Map(rows.map((r, i) => [r.key, i]));
-      let at = index.get(a.rows[a.index]?.key ?? "");
-      for (let i = a.index - 1; at === undefined && i >= 0; i--) at = index.get(a.rows[i]?.key ?? "");
-      for (let i = a.index + 1; at === undefined && i < a.rows.length; i++) at = index.get(a.rows[i]?.key ?? "");
-      const start = at === undefined ? undefined : measurements(v)[at]?.start;
-      if (start !== undefined) {
+      const row = placeRow(a, rows);
+      const start = row && measurements(v)[row.at]?.start;
+      if (row && start !== undefined) {
         // The anchor row itself keeps its offset; a row that takes its place starts at the
-        // viewport's top, not as far above it as the user had scrolled into the row that
-        // folded away (an open tool row's output can be hundreds of px).
-        const own = rows[at ?? -1]?.key === a.rows[a.index]?.key;
-        const top = start - (own ? a.offset : Math.max(a.offset, 0));
+        // viewport's top (lib/timelinePlace placeTop).
+        const top = placeTop(a, start, row.own);
         // Past the new bottom (the fold left too little below to keep the place): pin, so
         // the turn's answer ends up in view rather than wherever the clamp leaves it.
         if (top > el.scrollHeight - el.clientHeight) pin();
@@ -495,7 +571,7 @@ export function TimelineList<R extends ListRow>({
     else restoreHeld();
     captureAnchor();
     noteScroll();
-  }, [rows, bottomInset, toBottom, restoreHeld, v, captureAnchor, pin, noteScroll]);
+  }, [rows, bottomInset, toBottom, restoreHeld, v, captureAnchor, pin, noteScroll, applyPlace]);
 
   return (
     <KeepRowContext.Provider value={keepRow}>
@@ -516,6 +592,7 @@ export function TimelineList<R extends ListRow>({
           }}
           onPointerDown={(e) => {
             if (!inList(e)) return;
+            placing.current = null;
             const el = e.currentTarget;
             const from = el.scrollTop;
             const before = userInput.current;
@@ -540,8 +617,10 @@ export function TimelineList<R extends ListRow>({
             noteScroll();
             const theirs =
               scrollIntent({ input: performance.now() - userInput.current < USER_SCROLL_MS, overFrame: el.querySelector(HOVERED_FRAME) !== null, prev, now: seen.current }) === "user";
-            if (theirs) held.current = null;
-            else if (restoreHeld()) {
+            if (theirs) {
+              held.current = null;
+              placing.current = null;
+            } else if (applyPlace() || restoreHeld()) {
               captureAnchor();
               noteScroll();
               return;
@@ -552,7 +631,8 @@ export function TimelineList<R extends ListRow>({
             else if (pinned.current) toBottom();
             // Always, not when it differs from `atBottom`: two scrolls can land before a render,
             // and the second would compare with the state the first has already replaced.
-            setAtBottom(bottom);
+            // A pinned list that is not there yet was just sent there (toBottom above): no chip for that moment.
+            setAtBottom(bottom || pinned.current);
             captureAnchor();
             noteScroll();
           }}

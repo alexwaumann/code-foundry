@@ -45,12 +45,20 @@ async function inView(page: Page, el: Locator): Promise<boolean> {
   return box.y >= view.y - 1 && box.y + box.height <= Math.min(view.y + view.height, dock.y) + 1;
 }
 
-/** Scrolls the timeline to its start as the reader does (a wheel: a scroll with no input snaps back while pinned). */
+/**
+ * Scrolls the timeline to its start as the reader does (a wheel: a scroll with no input snaps
+ * back while pinned). Wheeled until it is there: the rows on the way are measured as they
+ * render, taller than their estimates, so one wheel can land short of the start.
+ */
 async function toStart(page: Page): Promise<void> {
   const view = await timeline(page).boundingBox();
   if (view) await page.mouse.move(view.x + view.width / 2, view.y + 60);
-  await page.mouse.wheel(0, -20000);
-  await expect.poll(() => timeline(page).evaluate((el) => el.scrollTop)).toBe(0);
+  await expect
+    .poll(async () => {
+      await page.mouse.wheel(0, -20000);
+      return timeline(page).evaluate((el) => el.scrollTop);
+    })
+    .toBe(0);
 }
 
 /** ThreadService.ShowHtml on the mock, as `code-foundry view.inline` calls it. */

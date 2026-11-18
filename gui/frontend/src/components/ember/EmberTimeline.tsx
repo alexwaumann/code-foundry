@@ -139,7 +139,7 @@ export function EmberTimeline({ threadId, working, bottomInset, pinnedLayer }: {
   const unfold = useMemo(() => unfoldIn(threadId), [threadId]);
   return (
     <TextMarkdownContext.Provider value={emberMarkdown}>
-      <TimelineList threadId={threadId} rows={rows} bottomInset={bottomInset} renderRow={renderRow} estimateRow={estimate} citable unfold={unfold} pinnedLayer={pinnedLayer} />
+      <TimelineList threadId={threadId} rows={rows} bottomInset={bottomInset} renderRow={renderRow} estimateRow={estimate} place={threadId} citable unfold={unfold} pinnedLayer={pinnedLayer} />
     </TextMarkdownContext.Provider>
   );
 }
