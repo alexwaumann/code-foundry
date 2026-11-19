@@ -1,22 +1,21 @@
 import { useState, type ReactNode } from "react";
-import { Bot, ChevronRight, Clock, GitPullRequest, Hourglass, MessagesSquare, Play, Plug, SquareTerminal, X, type LucideIcon } from "lucide-react";
+import { Bot, Clock, GitPullRequest, MessagesSquare, Play, Plug, SquareTerminal, X, type LucideIcon } from "lucide-react";
 import type { BackgroundShellView } from "@/api/threads";
 import type { WakeKind, WakeSubscriptionView } from "@/api/wakes";
 import { Button } from "@/components/ui/button";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Tip } from "@/components/ui/tooltip";
 import { agentName } from "@/lib/agents";
 import { useNow } from "@/lib/clock";
-import { cn } from "@/lib/utils";
-import { orderWakes, shellName, threadTargetStatus, waitCounts, waitSentence, wakeCondition, wakeName, wakeStatus, wakeTip } from "@/lib/waitList";
+import { waitTotal } from "@/lib/composerPill";
+import { orderWakes, shellName, threadTargetStatus, waitCounts, wakeCondition, wakeName, wakeStatus, wakeTip } from "@/lib/waitList";
 import { useAgentRun, useStripRunIds } from "@/stores/agents";
 import { openAgentRun, useCanOpenAgents } from "@/stores/subagentActions";
 import { stopShell } from "@/stores/threadActions";
 import { useThreadsStore } from "@/stores/threads";
-import { removeWake, stopWaiting, useWaitListCurrent, useWaitListShown, useWaitShells, useWakes } from "@/stores/waitList";
-import { DOCK_STRIP, DOCK_STRIP_ICON, DockStripLine } from "./DockStrip";
+import { removeWake, useWaitListCurrent, useWaitShells, useWakes } from "@/stores/waitList";
+import { useStopWaiting } from "./pillData";
 
-const ICON = DOCK_STRIP_ICON;
+const ICON = "size-3.5 shrink-0 text-cf-text-muted";
 const ROW = "flex min-h-8 min-w-0 items-center gap-2.5 border-t border-cf-border py-1 pr-2 pl-3";
 const NAME = "min-w-0 flex-1 truncate";
 const STATUS = "max-w-1/2 shrink-0 truncate text-cf-text-muted";
@@ -174,72 +173,39 @@ function SubagentRow({ threadId, id }: { threadId: string; id: string }) {
 }
 
 /**
- * The strip above the composer (docs/notes/waiting-strip.md): what will wake this thread
- * without the user, whatever its status says, and how to end that. Collapsed it is one
- * line; expanded, a row per thing with its live status and action. It takes the agents
- * strip's place. A subagent cannot be stopped, so with only those left nothing offers
- * Stop waiting, and the thread stays Waiting until they end. Keyed by thread, so another
- * thread starts collapsed. On a return to a thread it shows at once what the thread waited on
- * when it was left, so the dock does not grow under the conversation a moment later; Stop
- * waiting and a row's × wait for the Watch to say what is current (useWaitListCurrent).
- * Nothing shows while the Watch is failing (useWaitListShown).
+ * The waiting segment's panel, opened upward from the pill (ComposerRow): "Waiting on N" and
+ * "Stop waiting on all" in its header (left out with only subagents, which nothing can stop),
+ * then a row per thing with its live status and its own stop control.
  */
-export function WaitingStrip({ threadId }: { threadId: string }) {
+export function WaitingPanel({ threadId }: { threadId: string }) {
   const wakes = useWakes(threadId);
   const shells = useWaitShells(threadId);
   const runs = useStripRunIds(threadId);
-  const live = useThreadsStore((s) => s.byId[threadId]?.archivedAtMs === null);
-  const current = useWaitListCurrent(threadId);
-  const shown = useWaitListShown(threadId);
-  const [open, setOpen] = useState(false);
-  const [stopping, setStopping] = useState(false);
-  if (!live || !shown || wakes.length + shells.length + runs.length === 0) return null;
-  const sentence = waitSentence(waitCounts(wakes, shells.length, runs.length));
+  const { stop, disabled } = useStopWaiting(threadId);
+  const total = waitTotal(waitCounts(wakes, shells.length, runs.length));
   return (
-    <Collapsible
-      open={open}
-      onOpenChange={setOpen}
-      className={DOCK_STRIP}
-      data-testid="waiting-strip"
-    >
-      <DockStripLine icon={Hourglass} sentence={sentence} testId="waiting-sentence">
+    <div className="text-body-sm" data-testid="waiting-panel">
+      <div className="flex min-h-9 items-center gap-2 py-1 pr-2 pl-3">
+        <span className="min-w-0 flex-1 truncate font-medium" data-testid="waiting-panel-title">
+          Waiting on {total}
+        </span>
         {wakes.length + shells.length > 0 && (
-          <Button
-            variant="outline"
-            size="xs"
-            disabled={stopping || !current}
-            data-testid="waiting-stop"
-            onClick={() => {
-              setStopping(true);
-              void stopWaiting(threadId).finally(() => {
-                setStopping(false);
-              });
-            }}
-          >
-            Stop waiting
+          <Button variant="outline" size="xs" disabled={disabled} data-testid="waiting-stop-all" onClick={stop}>
+            Stop waiting on all
           </Button>
         )}
-        <Tip label={open ? "Hide what it waits on" : "Show what it waits on"}>
-          <CollapsibleTrigger asChild>
-            <Button variant="ghost" size="icon-xs" className="text-cf-text-muted" aria-label={open ? "Hide what it waits on" : "Show what it waits on"} data-testid="waiting-toggle">
-              <ChevronRight className={cn("transition-transform", open && "rotate-90")} />
-            </Button>
-          </CollapsibleTrigger>
-        </Tip>
-      </DockStripLine>
-      <CollapsibleContent>
-        <ul className="max-h-64 overflow-y-auto" data-testid="waiting-rows">
-          {orderWakes(wakes).map((w) => (
-            <WakeRow key={w.id} threadId={threadId} wake={w} wakes={wakes} />
-          ))}
-          {shells.map((sh) => (
-            <ShellRow key={sh.taskId} threadId={threadId} shell={sh} />
-          ))}
-          {runs.map((id) => (
-            <SubagentRow key={id} threadId={threadId} id={id} />
-          ))}
-        </ul>
-      </CollapsibleContent>
-    </Collapsible>
+      </div>
+      <ul className="max-h-64 overflow-y-auto" data-testid="waiting-rows">
+        {orderWakes(wakes).map((w) => (
+          <WakeRow key={w.id} threadId={threadId} wake={w} wakes={wakes} />
+        ))}
+        {shells.map((sh) => (
+          <ShellRow key={sh.taskId} threadId={threadId} shell={sh} />
+        ))}
+        {runs.map((id) => (
+          <SubagentRow key={id} threadId={threadId} id={id} />
+        ))}
+      </ul>
+    </div>
   );
 }

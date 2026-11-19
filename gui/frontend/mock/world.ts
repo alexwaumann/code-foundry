@@ -3032,6 +3032,18 @@ export class World {
     return `snoozed thread ${label} until ${until.toISOString()}`;
   }
 
+  /**
+   * POST /__mock/thread/snooze?…&live=1: the snooze set and nothing else, the thread left running.
+   * A message from another thread leaves a snooze in place while the thread works on it; the
+   * composer row's pill shows Working and the snooze together then.
+   */
+  markSnoozed(id: string, until: Date | null, saved: boolean): void {
+    const s = this.thread(id);
+    s.snoozedUntil = saved ? null : until;
+    s.savedAt = saved ? new Date() : null;
+    this.publishThread(s);
+  }
+
   /** thread.snooze with save, without its confirmation: a snooze with no wake time, so the tick never wakes it. Returns the message. */
   saveThread(id: string): string {
     const s = this.thread(id);

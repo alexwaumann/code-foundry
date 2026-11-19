@@ -4,8 +4,8 @@ import { openRowThread } from "./shell-threads";
 
 /**
  * The timeline's bottom inset is the composer dock's height (components/thread/activity.ts
- * useElementHeight): the last row scrolls clear of the composer and the Jump to bottom chip
- * floats above it. The dock remounts with the thread (PaneOverlay is keyed by thread), so
+ * useElementHeight): the last row scrolls clear of the composer and of the row above it
+ * (ComposerRow, docs/notes/composer-row-pill.md), which is part of the dock. The dock remounts with the thread (PaneOverlay is keyed by thread), so
  * the height must follow the current dock, not the first one (docs/notes/thread-dock-height.md).
  */
 
@@ -20,7 +20,7 @@ async function openScripted(page: Page): Promise<void> {
   await expect(page.getByTestId("thread-timeline").locator("[data-row-type]").first()).toBeVisible();
 }
 
-/** The last row's bottom and the composer's top, as offsets in the timeline, and the chip's offset from the bottom. */
+/** The last row's bottom, the composer row's top and the composer's top, as offsets in the timeline, and the dock's height. */
 async function bottomGeometry(page: Page) {
   return page.getByTestId("thread-timeline").evaluate((el) => {
     const top = el.getBoundingClientRect().top;
@@ -28,12 +28,12 @@ async function bottomGeometry(page: Page) {
     const last = rows[rows.length - 1];
     const composer = document.querySelector('[data-testid="thread-composer"]');
     const dock = document.querySelector<HTMLElement>(".cf-thread .dock");
-    const chip = document.querySelector<HTMLElement>('[data-testid="thread-jump-bottom"]');
+    const composerRow = document.querySelector('[data-testid="composer-row"]');
     return {
       lastBottom: last ? last.getBoundingClientRect().bottom - top : NaN,
       composerTop: composer ? composer.getBoundingClientRect().top - top : NaN,
       dockHeight: dock?.offsetHeight ?? NaN,
-      chipBottom: parseFloat(chip?.style.bottom ?? "NaN"),
+      rowTop: composerRow ? composerRow.getBoundingClientRect().top - top : NaN,
     };
   });
 }
@@ -41,7 +41,7 @@ async function bottomGeometry(page: Page) {
 // Set SHOTS=<dir> to save a screenshot of the end state in each scheme (PR bodies).
 const schemes = process.env.SHOTS ? (["dark", "light"] as const) : (["dark"] as const);
 for (const scheme of schemes) {
-  test(`after a switch to another thread and back, the answer's end clears the composer and the chip sits above it (${scheme})`, async ({ page }) => {
+  test(`after a switch to another thread and back, the answer's end clears the composer and the row above it (${scheme})`, async ({ page }) => {
   await page.emulateMedia({ colorScheme: scheme });
   await mockPost("thread?state=streaming");
   await openApp(page);
@@ -57,11 +57,11 @@ for (const scheme of schemes) {
   await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-thread-id", "s-2");
   await openScripted(page);
   await expect(page.getByTestId("thread-timeline")).toHaveAttribute("data-at-bottom", "true");
-  await expect.poll(async () => (await bottomGeometry(page)).chipBottom).toBeGreaterThan(12);
+  await expect.poll(async () => (await bottomGeometry(page)).dockHeight).toBeGreaterThan(100);
   const g = await bottomGeometry(page);
   expect(g.dockHeight).toBeGreaterThan(100);
-  expect(g.lastBottom).toBeLessThanOrEqual(g.composerTop);
-  expect(g.chipBottom).toBe(g.dockHeight - 20);
+  expect(g.rowTop).toBeLessThan(g.composerTop);
+  expect(g.lastBottom).toBeLessThanOrEqual(g.rowTop);
   const dir = process.env.SHOTS;
   if (dir) await page.screenshot({ path: `${dir}/thread-dock-height-${scheme}.png` });
   });

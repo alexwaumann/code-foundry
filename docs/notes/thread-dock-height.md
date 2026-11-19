@@ -1,5 +1,7 @@
 # Thread dock height after a thread switch
 
+> **Note (2026-11-19, composer-row-pill.md):** in a thread's pane and the inline thread there is no floating chip any more: Jump to bottom is a segment of the pill in the row above the composer, and the row is part of the dock, so `bottomInset` covers it. Ember's chat and the subagent view keep the chip at `dockHeight - 20`.
+
 Two users reported (2026-10-28) that a finished answer's last lines sat under the composer and
 the list would not scroll past them; one also saw the Jump to bottom chip drawn under the
 composer. Both come from one number: the timeline's `bottomInset`, the composer dock's height,

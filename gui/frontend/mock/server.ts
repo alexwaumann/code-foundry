@@ -67,7 +67,9 @@
  *                                                 creator no longer exists, so they join the sidebar)
  *   POST /__mock/thread/wake?id=s-1               (the snooze ends now: needs attention "snooze ended", World.wakeThread)
  *   POST /__mock/thread/snooze?id=s-1&until=2m|<RFC 3339>[&clear=true][&save=true]   (thread.snooze as the CLI's
- *                                                 --yes does it: closes, removes its shells, unpins, unarchives)
+ *                                                 --yes does it: closes, removes its shells, unpins, unarchives;
+ *                                                 live=1: only the snooze, the thread left running: World.markSnoozed)
+ *   POST /__mock/thread/wakes?id=s-r1             (the sample wake subscriptions on that thread in its current state: mock/wakes.ts)
  *   POST /__mock/thread/cache?id=s-r1&ago=<seconds>[&tokens=N&model=M]   (a thread's last result that long ago; only tokens: its context, the result's time kept; mock/context.ts)
  *   POST /__mock/thread?state=permission|question|streaming|idle|…   (the scripted thread s-r1:
  *        mock/thread.ts, every state in its THREAD_STATES); POST /__mock/thread/delta?text=… | /__mock/thread/stream?text=… |
@@ -1055,7 +1057,8 @@ function threadControl(res: ServerResponse, action: string, q: URLSearchParams):
         world.wakeThread(id);
         break;
       case "snooze":
-        if (q.get("save") === "true") world.saveThread(id);
+        if (q.get("live") === "1") world.markSnoozed(id, snoozeUntil({ until: q.get("until") ?? "", clear: q.get("clear") ?? "" }), q.get("save") === "true");
+        else if (q.get("save") === "true") world.saveThread(id);
         else world.snoozeThread(id, snoozeUntil({ until: q.get("until") ?? "", clear: q.get("clear") ?? "" }));
         break;
       case "transcript":
@@ -1341,6 +1344,10 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
     case "POST /__mock/thread/wake-fire":
       // sub=sub-pr: a one-shot fires, so its row goes (mock/wakes.ts).
       json(res, world.logs.removeWake(q.get("sub") ?? "") ? 200 : 404, { ok: true });
+      break;
+    case "POST /__mock/thread/wakes":
+      world.logs.addSampleWakes(q.get("id") ?? "s-r1");
+      json(res, 200, { ok: true });
       break;
     case "POST /__mock/thread/wake-status":
       // id=s-r1&sub=sub-pr&status=…: a target's status changes (mock/wakes.ts).

@@ -11,7 +11,8 @@ import { useProjectsStore } from "@/stores/projects";
 import { useThreadsStore } from "@/stores/threads";
 import { useUiStore } from "@/stores/ui";
 import { useThreadCheckouts } from "./useThreadCheckouts";
-import { WaitingStrip } from "./WaitingStrip";
+import { ComposerRow } from "./ComposerRow";
+import { TimelineBridge } from "./timelineBridge";
 
 /**
  * A thread with no worktree yet (docs/notes/instant-threads-3-gui.md): worktreePath and its
@@ -79,13 +80,13 @@ describe("a thread with no checkout yet", () => {
   it.each<[string, Partial<ThreadView>]>([
     ["failed", { state: "disconnected", status: "error", statusReason: "setup failed", setup: setup("failed") }],
     ["running", {}],
-  ])("shows nothing in the waiting strip: %s", (_n, o) => {
+  ])("shows no pill above the composer: %s", (_n, o) => {
     useThreadsStore.setState({ byId: { s: thread(o) }, order: ["s"] });
-    const { container } = render(
+    const { queryByTestId } = render(
       <TooltipProvider>
-        <WaitingStrip threadId="s" />
+        <ComposerRow threadId="s" working={false} bridge={new TimelineBridge()} />
       </TooltipProvider>,
     );
-    expect(container.textContent).toBe("");
+    expect(queryByTestId("composer-pill")).toBeNull();
   });
 });

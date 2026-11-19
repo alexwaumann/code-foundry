@@ -311,6 +311,11 @@ export class MockThreadLogs {
     return false;
   }
 
+  /** POST /__mock/thread/wakes: the sample subscriptions (mock/wakes.ts) on a thread in whatever state it is in (a working one too). */
+  addSampleWakes(id: string): void {
+    this.setWakes(id, sampleWakes(id));
+  }
+
   /** POST /__mock/thread/wake-status: the target's words change. */
   setWakeStatus(id: string, sub: string, status: string): void {
     this.setWakes(id, (this.wakes.get(id) ?? []).map((w) => (w.id === sub ? { ...w, targetStatus: status } : w)));

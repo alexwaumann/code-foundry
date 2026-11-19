@@ -137,14 +137,14 @@ test("a long message stops at the fold under a mask, its row measures that, and 
 test("a pinned list's newest message: Show more keeps its top, stops following the bottom and offers Jump to bottom", async ({ page }) => {
   await openThread(page);
   await send(page, longMessage(12));
-  await expect(page.getByTestId("thread-jump-bottom")).not.toHaveAttribute("data-shown", "true");
+  await expect(page.getByTestId("thread-jump-bottom")).toHaveCount(0);
   const box = fold(page, "the end of it");
   const tops = await topsDuring(page, box, () => toggle(page, "the end of it").click());
   expect(spread(tops)).toBeLessThan(1);
   await expect(page.getByTestId("thread-jump-bottom")).toHaveAttribute("data-shown", "true");
   // Back to the bottom, and Show less there: it settles over the composer, with no blank spacer, still following.
   await page.getByTestId("thread-jump-bottom").click();
-  await expect(page.getByTestId("thread-jump-bottom")).not.toHaveAttribute("data-shown", "true");
+  await expect(page.getByTestId("thread-jump-bottom")).toHaveCount(0);
   await toggle(page, "the end of it").click();
   await expect(box).toHaveAttribute("data-folded", "true");
   await expect(timeline(page)).toHaveAttribute("data-at-bottom", "true");

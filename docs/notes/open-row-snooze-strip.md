@@ -1,5 +1,7 @@
 # The open thread's row under a collapsed footer, and the snooze strip
 
+> **Superseded in part (2026-11-19, composer-row-pill.md):** the snooze strip and `DockStrip.tsx` are gone. The snooze is a segment of the pill in the row above the composer, its menu holding Dismiss snooze and the snooze presets. "The strip" section below describes the old dock.
+
 Frontend only. A user could open a snoozed or archived thread and lose sight of it in the
 sidebar, and the composer's Unsnooze read as part of the prompt.
 
