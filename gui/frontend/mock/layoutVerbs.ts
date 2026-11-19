@@ -12,7 +12,7 @@ import { neighbour, type Direction } from "../src/shell/geometry/neighbours";
 import { plainRects } from "../src/shell/geometry/rects";
 import type { GeoNode } from "../src/shell/geometry/types";
 import { CommandError } from "./errors";
-import { identify, layoutRpcError, panes, type MockLayout, type Node, type Op, type Space, type State, type Tab } from "./layout";
+import { conformPreview, identify, layoutRpcError, panes, type MockLayout, type Node, type Op, type Space, type State, type Tab } from "./layout";
 
 interface Arg {
   name: string;
@@ -46,6 +46,8 @@ export interface LayoutVerbsWorld {
   isSnoozed?(id: string): boolean;
   /** Whether another thread created it and that creator exists: thread.open --preview opens it as a preview. */
   isChild?(id: string): boolean;
+  /** Whether `from` created thread id, directly or further up its creator chain: thread.open --from opens it beside its lead under panes. */
+  createdUnder?(id: string, from: string): boolean;
   /** Archives a thread (space.remove --archive). */
   archiveThread?(id: string): void;
   /** Whether a thread exists. */
@@ -184,6 +186,8 @@ function verbs(world: LayoutVerbsWorld): Entry[] {
           edgeArg("outer", "In a new pane on this edge of the whole area"),
           focusArg,
           bool("preview", "As the space's preview tab when the thread is archived, snoozed or a child (otherwise a kept tab)"),
+          str("beside", "In a new pane on the right of this pane, or of this thread's pane; refused when layout.threads_open_as is single"),
+          str("from", "The thread the user opened it from: when that thread created it, under layout.threads_open_as panes it opens beside that thread's pane"),
         ],
       },
       when: always,
@@ -191,6 +195,8 @@ function verbs(world: LayoutVerbsWorld): Entry[] {
         const id = a.id ?? "";
         if (!world.hasThread(id)) refuse(`not found: thread ${id}`, "notfound");
         const st = L.state();
+        if (a.beside && (a.pane || a.split || a.outer || a.index)) refuse("invalid argument: --beside is a place of its own: no --pane, --split, --outer or --index");
+        if (a.beside && a.preview === "true") refuse("invalid argument: a preview opens where a thread's tab opens: no --pane, --split, --outer or --beside");
         if ([a.pane, a.split, a.outer].filter(Boolean).length > 1) refuse("invalid argument: give one of --pane, --split (with --edge) or --outer");
         if (a.split && !a.edge) refuse("invalid argument: --split needs --edge");
         if (a.edge && !a.split) refuse("invalid argument: --edge goes with --split; an edge of the whole area is --outer");
@@ -200,6 +206,8 @@ function verbs(world: LayoutVerbsWorld): Entry[] {
         if (a.index !== undefined && a.index !== "") op.index = Number(a.index);
         if (a.split) op.edge = a.edge;
         if (a.outer) op.edge = a.outer;
+        if (a.beside) op.beside = a.beside;
+        if (a.from && a.from !== id && world.createdUnder?.(id, a.from)) op.parent = a.from;
         if (world.isArchived?.(id)) op.archived = true;
         if (a.preview === "true") {
           if (a.pane || a.split || a.outer) refuse("invalid argument: a preview opens where a thread's tab opens: no --pane, --split or --outer");
@@ -208,6 +216,25 @@ function verbs(world: LayoutVerbsWorld): Entry[] {
           if (world.isChild?.(id)) op.child = true;
         }
         return run(op, (r) => `opened thread ${id} as tab ${r.result.tab ?? ""}`);
+      },
+    },
+    {
+      cmd: {
+        name: "layout.threads-open-as.preview",
+        title: "Preview Threads Open As",
+        category: CATEGORY,
+        description: "Say what switching the setting layout.threads_open_as to --to would change, without changing anything.",
+        keybindings: [],
+        noPalette: true,
+        args: [{ name: "to", type: ArgType.ENUM, required: true, positional: true, enumValues: ["tabs", "panes", "single"], description: "The value to switch to" }],
+      },
+      when: always,
+      run: (_c, a) => {
+        const to = a.to ?? "";
+        if (to !== "tabs" && to !== "panes" && to !== "single") refuse(`invalid argument: --to ${to}: not tabs, panes or single`);
+        const c = conformPreview(L.state(), to);
+        const n = c.thread_tabs + c.composers + c.panes + c.moved;
+        return { message: n === 0 ? `switching threads open as to ${to} changes nothing` : `switching threads open as to ${to} would close ${String(c.thread_tabs)} thread tabs`, resultJson: JSON.stringify({ to, ...c }) };
       },
     },
     {

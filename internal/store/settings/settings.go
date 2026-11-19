@@ -65,6 +65,9 @@ type Layout struct {
 	// ThreadInfo shows the info card of a thread whose card was never toggled (the GUI's
 	// thread pane; internal/layout info.go keeps each thread's own choice).
 	ThreadInfo bool
+	// ThreadsOpenAs is how a thread's own tab opens: ThreadsOpenAsTabs, ThreadsOpenAsPanes or
+	// ThreadsOpenAsSingle (internal/layout modes.go).
+	ThreadsOpenAs string
 }
 
 // Sidebar is consumed by the GUI.

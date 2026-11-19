@@ -34,6 +34,10 @@ type Options struct {
 	SmartSwap func() bool
 	// SmartPlacement reports the setting layout.smart_placement, read at every op; nil: on.
 	SmartPlacement func() bool
+	// ThreadsOpenAs reports the setting layout.threads_open_as (core.Mode), read at every op
+	// and when the layout loads (a layout stored under another mode is converted then); nil
+	// or an unknown value: tabs.
+	ThreadsOpenAs func() string
 }
 
 // Manager is the Store backed by SQLite.
@@ -106,6 +110,18 @@ func New(ctx context.Context, opts Options) (*Manager, error) {
 		st = core.NewState(opts.IDs.NewID("sp-"), FirstSpaceName)
 		repairs = append(repairs, "started over")
 	}
+	// A layout stored under another mode (the settings file edited while the daemon was
+	// down) is converted now, as a change of the setting converts it (core.Conform).
+	if mode := m.mode(); mode.Panes() && len(m.newer) == 0 {
+		vp := m.Viewport()
+		if next, res, err := core.ApplyWith(st, &core.Conform{W: vp.Width, H: vp.Height}, opts.IDs, m.coreOptions(ApplyOptions{})); err != nil {
+			m.log.Error("layout: converting the stored layout to threads open as "+string(mode), "err", err)
+		} else if res.Conformed != nil {
+			st = next
+			repairs = append(repairs, fmt.Sprintf("converted to threads open as %s: %d thread tabs and %d composers closed, %d panes closed, %d tabs moved",
+				mode, res.Conformed.ThreadTabs, res.Conformed.Composers, res.Conformed.Panes, res.Conformed.Moved))
+		}
+	}
 	switch {
 	case got.fresh:
 		m.log.Info("layout: first space", "space", st.Spaces[0].ID)
@@ -146,9 +162,7 @@ func (m *Manager) Apply(ctx context.Context, op core.Op, opts ApplyOptions) (Com
 	prev := m.state
 	vp := m.Viewport()
 	core.WithArea(op, vp.Width, vp.Height)
-	next, res, err := core.ApplyWith(prev, op, m.opts.IDs, core.Options{KeepFocus: opts.KeepFocus,
-		NoSmartSwap:      m.opts.SmartSwap != nil && !m.opts.SmartSwap(),
-		NoSmartPlacement: m.opts.SmartPlacement != nil && !m.opts.SmartPlacement()})
+	next, res, err := core.ApplyWith(prev, op, m.opts.IDs, m.coreOptions(opts))
 	if err != nil {
 		return Commit{}, err
 	}
@@ -181,6 +195,27 @@ func (m *Manager) Apply(ctx context.Context, op core.Op, opts ApplyOptions) (Com
 	m.snap.Store(m.snapshot())
 	m.publish(prev, opts.ClientID, op.OpName(), res)
 	return Commit{Rev: rev, Changed: true, Result: res}, nil
+}
+
+// mode is the setting layout.threads_open_as now; Tabs when unknown.
+func (m *Manager) mode() core.Mode {
+	if m.opts.ThreadsOpenAs == nil {
+		return core.ModeTabs
+	}
+	mode, err := core.ParseMode(m.opts.ThreadsOpenAs())
+	if err != nil {
+		return core.ModeTabs
+	}
+	return mode
+}
+
+// coreOptions are the settings an op runs with, read now.
+func (m *Manager) coreOptions(opts ApplyOptions) core.Options {
+	vp := m.Viewport()
+	return core.Options{KeepFocus: opts.KeepFocus,
+		NoSmartSwap:      m.opts.SmartSwap != nil && !m.opts.SmartSwap(),
+		NoSmartPlacement: m.opts.SmartPlacement != nil && !m.opts.SmartPlacement(),
+		Mode:             m.mode(), W: vp.Width, H: vp.Height}
 }
 
 // ImportLegacy implements Store.

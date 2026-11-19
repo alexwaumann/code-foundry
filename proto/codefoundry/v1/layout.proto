@@ -398,6 +398,7 @@ message LayoutOp {
     SetInfoOp set_info = 60;
 
     SetCollapsedOp set_collapsed = 70;
+    ConformOp conform = 80;
   }
 }
 
@@ -499,6 +500,11 @@ message SetCollapsedOp {
   string pane_id = 1;
   bool collapsed = 2;
 }
+
+// ConformOp changes nothing by itself: under the setting layout.threads_open_as panes or
+// single every op ends by putting the layout in that mode's form, and this op is that and
+// nothing else. The daemon applies it when the setting changes (internal/layout modes.go).
+message ConformOp {}
 
 // ReplaceTerminalOp points the tabs of terminal old_id (its open tab, and remembered tabs
 // still running) at terminal new_id: a reset terminal's tab follows the fresh shell. The

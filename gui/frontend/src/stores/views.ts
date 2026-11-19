@@ -28,8 +28,7 @@ import { isActingWindow } from "./windowFocus";
 import { previewTheme, resetThemePicker, setPickerQuery, setPickerSlot, useThemePickerStore, whenTheme, type ThemeSlot } from "./themePicker";
 import { afterLeavingEditor, editorBack, editorDirty, leaveEditor, startEditing, stopEditing, syncFromDisk, useThemeEditorStore } from "./themeEditor";
 import { themeById } from "@/themes";
-import { canStepFocus, stepFocus, useFocusHistoryStore } from "./focusHistory";
-import { useLayoutStore } from "./layout";
+import { canStepFocusNow, stepFocus } from "./focusHistory";
 import { shellDrawn, useShellViewStore } from "./shellView";
 import { presentFullscreen } from "@/shell/fullscreen";
 
@@ -256,7 +255,7 @@ export function historyCommand(by: 1 | -1): boolean {
       return true;
     }
   }
-  const can = canStepFocus(useFocusHistoryStore.getState(), useLayoutStore.getState(), by);
+  const can = canStepFocusNow(by);
   if (can) void stepFocus(by);
   return can;
 }

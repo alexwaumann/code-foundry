@@ -82,10 +82,25 @@ func (o *AddTab) apply(t *tx) (Result, error) {
 		return Result{Space: ssp.ID, Pane: sp2.ID, Tab: same.ID, Existing: true}, nil
 	}
 	w, h := viewport(o.W, o.H)
+	panes := t.opts.Mode.Panes() && !threadLike(tb)
+	if panes && pane != nil && holdsThread(pane) {
+		pane = nil // Panes and Single: a thread's pane takes no other tab (modes.go)
+	}
 	if pane == nil {
 		pane = hostPane(sp, w, h, tb)
 	} else if !canTake(sp, pane, w, h, tb) {
 		return Result{}, ErrNoRoom
+	}
+	if panes && pane != nil && holdsThread(pane) {
+		np, fold, err := t.surfacePane(sp, pane, tb, w, h)
+		if err != nil {
+			return Result{}, err
+		}
+		t.show(sp, np, tb.ID, o.Focus)
+		if fold {
+			t.refold(np.ID)
+		}
+		return Result{Space: sp.ID, Pane: np.ID, Tab: tb.ID, Collapsed: fold}, nil
 	}
 	if pane == nil {
 		pane = &Node{T: NodePane, ID: t.newID("p-"), Tabs: []*Tab{tb}, Active: tb.ID}
@@ -216,6 +231,14 @@ func (o *MoveTab) apply(t *tx) (Result, error) {
 	w, h := viewport(o.W, o.H)
 	// raised: the tab joins a pane whose minimum it raises; the result must then fit.
 	raised := false
+	if t.opts.Mode.Panes() && threadLike(tb) && target != nil && o.Edge == "" && target != src && !holdsThread(target) {
+		// Panes and Single: a thread never becomes a tab among other tabs; dropped into a
+		// pane of them, it opens in its own pane on that pane's left (modes.go). Into a
+		// thread's pane, it joins and conform closes the thread it replaces.
+		c := *o
+		c.Edge, c.Index = Left, nil
+		o = &c
+	}
 
 	switch {
 	case target != nil && o.Edge != "":

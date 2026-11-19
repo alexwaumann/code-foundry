@@ -42,5 +42,6 @@ export interface OpenThreadOptions {
 export function openThread(threadId: string, opts: OpenThreadOptions = {}): void {
   const preview = opts.preview ?? previewOnOpen(useThreadsStore.getState().byId, threadId, opts.from);
   const focusPrompt = opts.focusPrompt ?? true;
-  useUiStore.getState().select({ kind: "thread", id: threadId }, preview ? { focusPrompt, preview: true } : { focusPrompt });
+  const from = opts.from ? { from: opts.from } : {};
+  useUiStore.getState().select({ kind: "thread", id: threadId }, preview ? { focusPrompt, preview: true, ...from } : { focusPrompt, ...from });
 }

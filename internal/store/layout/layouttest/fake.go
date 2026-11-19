@@ -19,6 +19,9 @@ type Fake struct {
 	bus *bus.Bus
 	// Err, when set, is returned by every Apply and SetViewport.
 	Err error
+	// Mode is the setting layout.threads_open_as the ops run under ("": tabs). Set it before
+	// the fake is used.
+	Mode core.Mode
 
 	mu       sync.Mutex
 	ids      core.SeqIDs
@@ -77,7 +80,7 @@ func (f *Fake) Apply(ctx context.Context, op core.Op, opts layout.ApplyOptions) 
 	}
 	vp := f.viewport()
 	core.WithArea(op, vp.Width, vp.Height)
-	next, res, err := core.ApplyWith(f.snap.State, op, &f.ids, core.Options{KeepFocus: opts.KeepFocus})
+	next, res, err := core.ApplyWith(f.snap.State, op, &f.ids, core.Options{KeepFocus: opts.KeepFocus, Mode: f.Mode, W: vp.Width, H: vp.Height})
 	if err != nil {
 		return layout.Commit{}, err
 	}

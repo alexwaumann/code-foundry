@@ -321,7 +321,7 @@ func RegisterLayout(r *Registry, d LayoutDeps) error {
 	}))
 	r.SetRefResolver(SpaceID, l.resolveSpace)
 	var errs []error
-	for _, c := range slices.Concat(l.readCommands(), l.spaceCommands(), l.paneCommands(), l.tabCommands(), l.threadCommands(), l.composerCommands(), []Command{l.threadInfoCommand(), l.paneCollapseCommand()}) {
+	for _, c := range slices.Concat(l.readCommands(), l.spaceCommands(), l.paneCommands(), l.tabCommands(), l.threadCommands(), l.composerCommands(), []Command{l.threadInfoCommand(), l.paneCollapseCommand(), l.threadsOpenAsCommand()}) {
 		errs = append(errs, r.Register(c))
 	}
 	return errors.Join(errs...)

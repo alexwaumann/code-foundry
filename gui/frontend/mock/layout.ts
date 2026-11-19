@@ -104,6 +104,10 @@ export interface Result {
   rule?: string;
   /** The draft the op started, opened or ended. */
   draft?: string;
+  /** A new pane opened folded for want of room. */
+  collapsed?: boolean;
+  /** What conforming to Options.mode changed (modes.go conform). */
+  conformed?: Conformed;
 }
 
 /** The settings an op runs with (internal/layout Options); smart swap is not ported. */
@@ -111,6 +115,20 @@ export interface Options {
   keep_focus?: boolean;
   /** Smart placement off (the setting layout.smart_placement, on by default). */
   no_smart_placement?: boolean;
+  /** The setting layout.threads_open_as (internal/layout modes.go); absent: tabs. */
+  mode?: ThreadsOpenAs;
+}
+
+/** layout.threads_open_as: a thread opens as a tab, in place of its pane's thread, or in place of the space's one thread pane. */
+export type ThreadsOpenAs = "tabs" | "panes" | "single";
+
+/** What conforming a layout to Panes or Single changed (internal/layout Conformed). */
+export interface Conformed {
+  thread_tabs: number;
+  composers: number;
+  panes: number;
+  moved: number;
+  spaces: number;
 }
 
 /** An op in internal/layout's JSON form: its name and its fields. */
@@ -770,6 +788,201 @@ function kindHost(t: Tx, sp: Space, a: Area, own: Node | undefined, tb: Tab): { 
   return p ? { pane: p, at: (p.tabs ?? []).length, rule: "kind-any" } : undefined;
 }
 
+// ---- Threads open as (internal/layout modes.go, simplified: no remembered sets, no smart swap) ----
+
+/** Single refuses --beside (Go's errSingleBeside). */
+export const SINGLE_BESIDE =
+  "threads open as single (setting layout.threads_open_as): a space shows one thread at a time, so a thread cannot open beside another; open it without beside to replace the thread shown, or set layout.threads_open_as to panes";
+
+function threadLike(tb: Tab | undefined): boolean {
+  return tb?.kind === "thread" || tb?.kind === "compose";
+}
+
+/** sp's panes, the most recently focused first, then the rest in layout order (Go's recentPanes). */
+function recentPanes(sp: Space): Node[] {
+  const all = panes(sp.root);
+  const order: Node[] = [];
+  for (const id of sp.mru ?? []) for (const p of all) if (tabIndex(p, id) >= 0 && !order.includes(p)) order.push(p);
+  for (const p of all) if (!order.includes(p)) order.push(p);
+  return order;
+}
+
+/** The target thread pane: the focused pane when it holds a thread, else the one focused most recently (Go's threadPane). */
+function threadPane(sp: Space): Node | undefined {
+  const fp = panes(sp.root).find((p) => p.id === sp.focus);
+  if (fp && holdsThread(fp)) return fp;
+  return recentPanes(sp).find(holdsThread);
+}
+
+/** The thread-like tab a pane shows: its active one, else the most recently focused, else the first (Go's occupant). */
+function occupant(sp: Space, p: Node): Tab | undefined {
+  const tabs = p.tabs ?? [];
+  const act = tabs.find((tb) => tb.id === p.active);
+  if (threadLike(act)) return act;
+  for (const id of sp.mru ?? []) {
+    const tb = tabs.find((x) => x.id === id);
+    if (threadLike(tb)) return tb;
+  }
+  return tabs.find(threadLike);
+}
+
+/** Closes a thread-like tab as closing it closes it (the mock's close_thread for a thread). */
+function shut(t: Tx, tb: Tab): Tab[] {
+  if (tb.kind === "thread") return ops.close_thread(t, { op: "close_thread", thread: tb.thread ?? "" }).closed ?? [];
+  return ops.close_tab(t, { op: "close_tab", tab: tb.id }).closed ?? [];
+}
+
+/** open_thread under Panes and Single (Go's openPanes): replace the target thread pane's thread, or a new pane where a place asks. */
+function openPanes(t: Tx, o: Op, thread: string): Result {
+  const single = t.opts.mode === "single";
+  const a = areaOf(o);
+  let sp: Space;
+  let given: Node | undefined;
+  if (str(o, "pane")) {
+    const p = t.pane(str(o, "pane"));
+    if (o.archived === true && t.spaceOf(thread) !== p.sp.id) ((t.st.threads ??= {})[thread] ??= { space: p.sp.id }).space = p.sp.id;
+    if (t.spaceOf(thread) !== p.sp.id) fail("failed_precondition", `thread ${thread} lives in space ${t.spaceOf(thread)}, pane ${p.pane.id} is in ${p.sp.id}`);
+    sp = p.sp;
+    given = p.pane;
+  } else {
+    if (o.archived === true && t.spaceOf(thread) !== t.st.current_space) ((t.st.threads ??= {})[thread] ??= { space: t.st.current_space }).space = t.st.current_space;
+    sp = t.space(t.spaceOf(thread));
+  }
+  const edgeAsked = edgeOf(o, false);
+  let into: Node | undefined;
+  let anchor: Node | undefined;
+  let edge: Edge | "" = "";
+  const beside = str(o, "beside");
+  const parent = str(o, "parent");
+  const paneOfThread = (th: string): Node | undefined => panes(sp.root).find((p) => (p.tabs ?? []).some((tb) => tb.kind === "thread" && tb.thread === th));
+  if (beside) {
+    if (single) fail("failed_precondition", SINGLE_BESIDE);
+    anchor = panes(sp.root).find((p) => p.id === beside) ?? paneOfThread(beside) ?? fail("not_found", `beside "${beside}": no pane of space ${sp.id}, nor a thread open in it`);
+    edge = "right";
+  } else if (edgeAsked && !single) {
+    anchor = given;
+    edge = edgeAsked;
+  } else if (!edgeAsked && given && holdsThread(given)) {
+    into = given;
+  } else if (!edgeAsked && given && (!single || !threadPane(sp))) {
+    anchor = given;
+    edge = "left";
+  } else if (!given && parent && !single) {
+    anchor = paneOfThread(parent);
+    if (anchor) edge = "right";
+  }
+  if (!into && !anchor && !edge) into = threadPane(sp);
+  const preview = o.preview === true && (o.archived === true || o.child === true || t.st.threads?.[thread]?.snoozed === true);
+  const res: Result = { space: sp.id };
+  const closed: Tab[] = [];
+  const old = preview ? previewIn(sp) : null;
+  if (old && old.pane !== into) {
+    closed.push(...shut(t, old.tab));
+    if (anchor && !panes(sp.root).includes(anchor)) {
+      anchor = undefined;
+      edge = "";
+      into = threadPane(sp);
+    }
+  }
+  const tb: Tab = { id: "", kind: "thread", thread };
+  t.prepare(sp, tb);
+  if (preview) tb.preview = true;
+  let pane: Node;
+  let fold = false;
+  if (into) {
+    const was = occupant(sp, into);
+    if (was) {
+      if (was.kind === "thread") {
+        // Its linked tabs in the space close with it (the mock remembers nothing).
+        for (const p of panes(sp.root)) for (const x of [...(p.tabs ?? [])]) if (isLinked(x) && x.thread === was.thread) closed.push(...(ops.close_tab(t, { op: "close_tab", tab: x.id }).closed ?? []));
+      }
+      const tabs = into.tabs ?? [];
+      tabs[tabIndex(into, was.id)] = tb;
+      if (into.active === was.id) into.active = tb.id;
+      forget(sp, was.id);
+      closed.push(was);
+    } else (into.tabs ??= []).push(tb);
+    pane = into;
+    res.rule = "replace";
+  } else {
+    pane = { t: "pane", id: t.newID("p-"), tabs: [tb], active: tb.id };
+    if (!sp.root) sp.root = pane;
+    else {
+      if (anchor) insertBeside(sp, anchor.id, edge || "right", pane, undefined, t.newID("s-"));
+      else toOuter(t, sp, pane, edge || "left", undefined, a.w, a.h);
+      fold = !fitsSpace(sp, a);
+    }
+    res.rule = edge ? "edge" : "new";
+  }
+  t.show(sp, pane, tb.id, o.focus === true);
+  if (fold) {
+    pane.collapsed = true;
+    res.collapsed = true;
+  }
+  return { ...res, pane: pane.id, tab: tb.id, ...(closed.length ? { closed } : {}) };
+}
+
+/** Puts every space in the mode's form (Go's conform): one thread per pane, one thread pane per space under Single, other tabs out of a thread's pane into a new pane on its right. */
+function conform(t: Tx, res: Result): void {
+  const all: Conformed = { thread_tabs: 0, composers: 0, panes: 0, moved: 0, spaces: 0 };
+  const closed: Tab[] = [];
+  for (const sp of t.st.spaces) {
+    const c: Conformed = { thread_tabs: 0, composers: 0, panes: 0, moved: 0, spaces: 0 };
+    const close = (tb: Tab): void => {
+      if (!panes(sp.root).some((p) => tabIndex(p, tb.id) >= 0)) return;
+      closed.push(...shut(t, tb));
+      if (tb.kind === "thread") c.thread_tabs++;
+      else c.composers++;
+    };
+    for (const p of panes(sp.root)) {
+      const keep = occupant(sp, p);
+      if (keep) for (const tb of [...(p.tabs ?? [])]) if (tb !== keep && threadLike(tb)) close(tb);
+    }
+    if (t.opts.mode === "single") {
+      const keep = threadPane(sp);
+      for (const p of panes(sp.root)) {
+        if (p === keep || !holdsThread(p)) continue;
+        if ((p.tabs ?? []).length === 1) c.panes++;
+        for (const tb of [...(p.tabs ?? [])]) if (threadLike(tb)) close(tb);
+      }
+    }
+    const focused = focusedTab(sp);
+    for (const p of panes(sp.root)) {
+      if (!holdsThread(p) || (p.tabs ?? []).length < 2) continue;
+      const keep = occupant(sp, p);
+      if (!keep) continue;
+      const others = (p.tabs ?? []).filter((tb) => tb !== keep);
+      const active = p.active !== keep.id ? (p.active ?? "") : ((sp.mru ?? []).find((id) => others.some((tb) => tb.id === id)) ?? others[0]?.id ?? "");
+      p.tabs = [keep];
+      p.active = keep.id;
+      const np: Node = { t: "pane", id: t.newID("p-"), tabs: others, active };
+      insertBeside(sp, p.id, "right", np, undefined, t.newID("s-"));
+      if (others.some((tb) => tb.id === focused)) {
+        sp.focus = np.id;
+        np.active = focused;
+      }
+      c.moved += others.length;
+    }
+    if (c.thread_tabs + c.composers + c.panes + c.moved > 0) c.spaces = 1;
+    all.thread_tabs += c.thread_tabs;
+    all.composers += c.composers;
+    all.panes += c.panes;
+    all.moved += c.moved;
+    all.spaces += c.spaces;
+  }
+  if (all.thread_tabs + all.composers + all.panes + all.moved > 0) {
+    res.conformed = all;
+    res.closed = [...(res.closed ?? []), ...closed];
+  }
+}
+
+/** What switching st to mode would change (Go's ConformPreview); nothing changes. */
+export function conformPreview(st: State, mode: ThreadsOpenAs): Conformed {
+  const none = { thread_tabs: 0, composers: 0, panes: 0, moved: 0, spaces: 0 };
+  if (mode === "tabs") return none;
+  return applyOp(st, { op: "conform" }, seqIds(), { mode }).result.conformed ?? none;
+}
+
 type OpFn = (t: Tx, o: Op) => Result;
 
 /** The ops the mock runs, by internal/layout's names. */
@@ -796,6 +1009,11 @@ function previewIn(sp: Space): { pane: Node; tab: Tab } | null {
 }
 
 const ops = {
+  /** Nothing by itself: under Panes or Single applyOp conforms after it (Go's Conform). */
+  conform(): Result {
+    return {};
+  },
+
   add_tab(t: Tx, o: Op): Result {
     let sp = t.space(str(o, "space"));
     let pane: Node | undefined;
@@ -1263,6 +1481,7 @@ const ops = {
             t.show(sp, p, tb.id, o.focus === true);
             return { space: sp.id, pane: p.id, tab: tb.id, existing: true };
           }
+    if ((t.opts.mode === "panes" || t.opts.mode === "single") && !str(o, "compose")) return openPanes(t, o, thread);
     // A preview (Go's preview.go, simplified): the space's last preview goes; in the pane the new
     // one opens in, the new one takes its place.
     const preview = asked && (o.archived === true || o.child === true || t.st.threads?.[thread]?.snoozed === true);
@@ -1583,7 +1802,7 @@ function place(t: Tx, sp: Space, chosen: Node | null, tb: Tab, focus: boolean, a
 const opTable: Readonly<Record<string, OpFn | undefined>> = ops;
 
 /** The ops the mock runs that are a port of Go's and pinned to its cases. */
-export const PORTED_OPS = Object.keys(ops).filter((n) => !["open_thread", "close_thread", "move_thread"].includes(n));
+export const PORTED_OPS = Object.keys(ops).filter((n) => !["open_thread", "close_thread", "move_thread", "conform"].includes(n));
 
 /** The ops the mock runs, Go's or simplified. */
 export function mockRuns(op: string): boolean {
@@ -1596,6 +1815,10 @@ export function applyOp(st: State, op: Op, ids: IdSource, opts: Options = {}): {
   const t = new Tx(structuredClone(st), ids, opts);
   const result = fn(t, op);
   t.finish();
+  if (opts.mode === "panes" || opts.mode === "single") {
+    conform(t, result);
+    t.finish();
+  }
   if (opts.keep_focus) {
     keepFocus(st, t.st);
     // A call that keeps the user's focus does not open a pane either (internal/layout keepCollapsed).
@@ -1821,6 +2044,8 @@ export function opFromProto(m: LayoutOp | undefined): Op {
       return { op: "set_info", thread: c.value.threadId, open: c.value.open };
     case "setCollapsed":
       return { op: "set_collapsed", pane: c.value.paneId, collapsed: c.value.collapsed };
+    case "conform":
+      return { op: "conform" };
     default:
       return fail("unimplemented", `layout op ${c.case} is not available in the mock`);
   }
@@ -1990,6 +2215,8 @@ export class MockLayout {
       applied?: (op: Op, result: Result) => void;
       /** The setting layout.smart_placement, read at every op as the daemon does; absent: on. */
       smartPlacement?: () => boolean;
+      /** The setting layout.threads_open_as, read at every op as the daemon does; absent: tabs. */
+      threadsOpenAs?: () => ThreadsOpenAs;
     },
   ) {}
 
@@ -2040,7 +2267,8 @@ export class MockLayout {
     this.applied.push({ op, clientId });
     op = withArea(op, this.viewport);
     const smart = this.deps.smartPlacement?.() ?? true;
-    const { state, result } = applyOp(this.st, op, this.deps.ids ?? randomIds, { no_smart_placement: !smart, ...opts });
+    const mode = this.deps.threadsOpenAs?.() ?? "tabs";
+    const { state, result } = applyOp(this.st, op, this.deps.ids ?? randomIds, { no_smart_placement: !smart, mode, ...opts });
     this.commit(state, clientId);
     const rev = this.revision;
     this.deps.applied?.(op, result);

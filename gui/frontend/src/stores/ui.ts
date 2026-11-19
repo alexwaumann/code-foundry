@@ -252,6 +252,11 @@ export interface SelectOptions {
    * of those.
    */
   preview?: boolean;
+  /**
+   * The thread the click is in (thread.open --from): when it created the thread, the daemon opens
+   * it beside that thread's pane under layout.threads_open_as panes.
+   */
+  from?: string;
 }
 
 /**

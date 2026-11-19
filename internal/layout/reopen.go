@@ -175,6 +175,16 @@ func (t *tx) reopen(sp *Space, e *Closed, tabs []*Tab, w, h float64) (Result, er
 			tb.ID = ""
 		}
 	}
+	if e.Whole && t.opts.Mode.Panes() && !slices.ContainsFunc(fresh, func(tb *Tab) bool { return !threadLike(tb) }) {
+		// Panes and Single: a closed thread's pane comes back as its thread opens, replacing.
+		pick := fresh[0]
+		for _, tb := range fresh {
+			if tb.ID != "" && tb.ID == e.Active {
+				pick = tb
+			}
+		}
+		return t.reopenTab(sp, &Closed{Pane: e.Pane, Tabs: e.Tabs}, pick, w, h)
+	}
 	if e.Whole {
 		return t.reopenPane(sp, e, fresh, w, h)
 	}
@@ -190,6 +200,29 @@ func (t *tx) reopenTab(sp *Space, e *Closed, tb *Tab, w, h float64) (Result, err
 	if p != nil && !canTake(sp, p, w, h, tb) {
 		// Its pane is there but has no room for it: it opens as it would now.
 		p, e = nil, &Closed{Pane: e.Pane, Tabs: e.Tabs, Index: e.Index}
+	}
+	if t.opts.Mode.Panes() && threadLike(tb) {
+		// Panes and Single (modes.go): a thread or a composer comes back as it opens, in place
+		// of the thread of its old pane when that holds one, else of the space's thread pane.
+		if p != nil && !holdsThread(p) {
+			p = nil
+		}
+		var res Result
+		var err error
+		if tb.Kind == "thread" {
+			op := &OpenThread{Thread: tb.Thread, Focus: true, W: w, H: h}
+			if p != nil {
+				op.Pane = p.ID
+			}
+			res, err = op.apply(t)
+		} else {
+			res, err = t.place(sp, p, tb, true, w, h)
+		}
+		if err != nil {
+			return Result{}, err
+		}
+		res.Rule = ""
+		return res, nil
 	}
 	if tb.Kind == "thread" && (p != nil || e.Beside == nil) {
 		op := &OpenThread{Thread: tb.Thread, Focus: true, W: w, H: h}

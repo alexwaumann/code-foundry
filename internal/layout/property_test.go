@@ -139,7 +139,10 @@ func randomOp(s *bytesrc, st *State) Op {
 		i := pick(s, -1, 0, 1, 2, 9)
 		return &i
 	}
-	op, _ := NewOp(pick(s, OpNames()...))
+	// conform changes nothing under Tabs (modes_test.go runs ops under the other modes); leaving
+	// it out keeps the sequences the seeds below were chosen for.
+	names := slices.DeleteFunc(OpNames(), func(n string) bool { return n == "conform" })
+	op, _ := NewOp(pick(s, names...))
 	switch o := op.(type) {
 	case *AddTab:
 		o.Space, o.Pane, o.Tab, o.Index, o.Focus = pick(s, spaces...), pick(s, panes...), randomTab(s, st), index(), s.n(2) == 0

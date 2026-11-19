@@ -321,7 +321,8 @@ when the first working version is whole. Nothing partial is released.
   focused pane, which is the pane of the page it was opened from.
 - **Smart swap.** When a thread tab gains focus, every pane whose active tab is another thread's
   surface of the same type switches to this thread's, if that one is already open in that pane.
-  Nothing is opened, moved or closed. On by default; a user setting.
+  Nothing is opened, moved or closed. On by default; a user setting. Under "Threads open as"
+  Panes or Single it is on whatever the setting says (the setting's value is kept).
 - **Closing a thread** (its tab) closes the linked tabs in its space and remembers which were open and
   where. Opening it again restores them: into their old panes when the thread is back in the pane it
   was in, otherwise placed fresh beside it. A pane of theirs the user had collapsed comes back
@@ -349,6 +350,61 @@ when the first working version is whole. Nothing partial is released.
   not by a user setting (on by default). The card shows beside the conversation only when the pane is
   wide enough for it; in a narrower pane the toggle opens it as a temporary overlay instead, and
   showing the overlay turns that thread's card on for when the pane is wide again.
+
+## Threads open as
+
+The sidebar is the user's thread switcher, so thread tabs are a second list of the same threads.
+A user setting (`layout.threads_open_as`, Appearance › Panes) says how a thread opens: **Tabs**,
+**Panes** or **Single**. Tabs is the default for now; the decisions are in
+`docs/notes/threads-open-as-1-rules.md`.
+
+- **Tabs**: everything above, unchanged.
+- **Panes**: a pane that shows a thread (a **thread pane**) holds exactly one tab, that thread's
+  (or, while one is written, a composer), and nothing else. Linked surfaces and other tabs live in
+  other panes by the placement rules; where a rule would put one in a thread pane (the thread's
+  own pane, the focused pane, a "+" of a thread pane, a pane remembered from before) it goes to the
+  most recently focused pane of other tabs, else to a new pane on the right of that pane (folded
+  when there is no room).
+  - **Opening a thread replaces.** Every way a thread opens (a sidebar click, the palette, the
+    bell, a Needs you row, cmd+1…9, a link, `thread.open`) puts it in place of the thread of the
+    target thread pane: the focused pane when it is a thread pane, else the thread pane focused
+    most recently, else a new pane on the left edge of the pane area (or the first pane of an
+    empty space). The old thread closes as closing its tab closes it: its linked tabs in the space
+    join its remembered set and its terminals keep running; the new thread's remembered set comes
+    back by the usual rule, into the panes it was in, so the linked surfaces switch with the
+    thread. A thread already open in the space is focused where it is. A replaced thread is not
+    recorded for cmd+shift+t (Back reaches it).
+  - **A second thread pane** only by an explicit place: a row or tab dropped on a pane's edge or
+    the outer edge, `thread.open --beside <pane|thread>` (a new pane on its right), `--split` and
+    `--outer`, and a child opened from its lead (a lineage row of the info card, a wake note: on
+    the right of the lead's pane, a preview when it would have been a preview tab).
+  - **Drops.** A thread dropped on a thread pane's middle or strip replaces its thread. Dropped on
+    a pane of other tabs (a sidebar row or a thread's tab), it opens in its own new pane on that
+    pane's left: a thread never becomes a tab among other tabs.
+  - **No room.** A new thread pane that would not fit opens folded, as a rail.
+  - **Back and forward** replace too: an entry whose thread was replaced opens it again in place
+    of the one shown, so they are the pane's thread history. cmd+shift+t reopening a thread
+    replaces likewise.
+  - **The composer** is a thread pane's content while it is written: New thread and a draft's row
+    replace the target thread pane's thread with it (a draft whose tab is replaced stays listed);
+    sending turns it into the thread in place. A "+" of a pane of other tabs opens it in a new
+    thread pane on that pane's left.
+  - **Smart swap** is on, whatever its setting says.
+  - **Moving a thread** to another space opens it there in place of that space's thread pane's
+    thread.
+- **Single**: as Panes, with at most one thread pane per space. Every open replaces it, the
+  explicit ones too (an edge drop, a child from its lead, a drop on a pane of other tabs); Back
+  returns to the thread replaced. `thread.open --beside` is refused with an error that names the
+  setting and says to leave it out.
+- **Switching.** To Panes, in one layout change across all spaces: each pane keeps its active
+  thread tab (else the one focused most recently) and its other thread tabs close as closing a
+  thread closes them; other tabs that shared a pane with a thread move together, in their order,
+  into a new pane on its right (the thread keeps its pane). To Single, each space also keeps only
+  the thread pane focused most recently. Toward Tabs nothing changes. Nothing is deleted: closed
+  threads stay in the sidebar with their remembered sets. `layout.threads-open-as.preview --to X`
+  says what a switch would close and move, without changing anything. A layout stored under one
+  mode and loaded under another (the settings file edited while the app was closed) is converted
+  as it loads.
 
 ## Terminals
 
@@ -524,7 +580,8 @@ longer exists is not carried over, and no fresh shell is started in its place.
 ## Not in this change
 
 Thread colours, drawers inside a thread pane, panes that follow focus, replacing a tab on a sidebar
-click (beyond an archived or snoozed thread's preview), a file browser surface, content search across files, and the surface contract for plugins
+click under Tabs (beyond an archived or snoozed thread's preview; Panes and Single replace, "Threads
+open as"), a file browser surface, content search across files, and the surface contract for plugins
 beyond the identity rule above.
 
 ## Build

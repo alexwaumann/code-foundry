@@ -9,6 +9,7 @@ vi.mock("@/stores/commands", async (orig) => ({ ...(await orig<typeof import("@/
 
 const { canStepFocus, FOCUS_HISTORY_MAX, liveEntry, pushEntry, resetFocusHistory, startFocusHistory, stepFocus, stepIndex, useFocusHistoryStore } = await import("./focusHistory");
 const { resetLayout, useLayoutStore } = await import("./layout");
+const { useSettingsStore } = await import("./settings");
 const { useShellViewStore, resetShellView } = await import("./shellView");
 
 /** Two spaces: Main with two panes (a thread and a diff), Review with one pane of two tabs. */
@@ -147,7 +148,7 @@ describe("back and forward", () => {
     const s = useLayoutStore.getState();
     const h = useFocusHistoryStore.getState();
     expect(liveEntry(h.entries[1] ?? { space: "", pane: "", tab: "" }, s)).toBeNull();
-    expect(liveEntry(h.entries[0] ?? { space: "", pane: "", tab: "" }, s)).toEqual({ space: "sp-b", pane: "p-9", tab: "t-a" });
+    expect(liveEntry(h.entries[0] ?? { space: "", pane: "", tab: "" }, s)).toEqual({ space: "sp-b", pane: "p-9", tab: "t-a", thread: "s-1" });
     expect(stepIndex(h, s, -1)).toBe(0);
     await stepFocus(-1);
     expect(runs.at(-1)).toEqual({ name: "tab.focus", args: { tab: "t-a", focus: "true" } });
@@ -174,5 +175,32 @@ describe("back and forward", () => {
     await focus("t-x", 3);
     await stepFocus(-1);
     expect(runs.at(-1)).toEqual({ name: "space.switch", args: { space: "sp-c", focus: "true" } });
+  });
+
+  // Threads open as panes or single (docs/notes/threads-open-as-1-rules.md): opening a thread
+  // replaces the one its pane showed, so back and forward are the pane's thread history.
+  it("under panes, back opens a replaced thread again; under tabs it skips it", async () => {
+    // s-1 is focused (t-a); s-3 replaces it in p-1, as the daemon's open does.
+    LAYOUT.spaces = [space(pane("p-1", [tab("t-c", "thread", "s-3")]), "p-1", { id: "sp-a", name: "Main" }), LAYOUT.spaces[1] ?? space(null, "")];
+    await seedLayout({ ...LAYOUT, rev: 2, currentSpaceId: "sp-a" });
+    await flush();
+    const h = useFocusHistoryStore.getState();
+    expect(h.entries.map((e) => e.thread)).toEqual(["s-1", "s-3"]);
+    expect(canStepFocus(h, useLayoutStore.getState(), -1)).toBe(false);
+    expect(canStepFocus(h, useLayoutStore.getState(), -1, true)).toBe(true);
+    useSettingsStore.setState({ snapshot: { values: { "layout.threads_open_as": "tabs" } } as never });
+    expect(await stepFocus(-1)).toBe(false);
+    useSettingsStore.setState({ snapshot: { values: { "layout.threads_open_as": "panes" } } as never });
+    expect(await stepFocus(-1)).toBe(true);
+    expect(runs.at(-1)).toEqual({ name: "thread.open", args: { id: "s-1", focus: "true" } });
+    // s-1 comes back with a new tab id: still the same entry, so forward stays (nothing pushed).
+    LAYOUT.spaces = [space(pane("p-1", [tab("t-e", "thread", "s-1")]), "p-1", { id: "sp-a", name: "Main" }), LAYOUT.spaces[1] ?? space(null, "")];
+    await seedLayout({ ...LAYOUT, rev: 3, currentSpaceId: "sp-a" });
+    await flush();
+    expect(useFocusHistoryStore.getState()).toMatchObject({ index: 0 });
+    expect(useFocusHistoryStore.getState().entries).toHaveLength(2);
+    expect(await stepFocus(1)).toBe(true);
+    expect(runs.at(-1)).toEqual({ name: "thread.open", args: { id: "s-3", focus: "true" } });
+    useSettingsStore.setState({ snapshot: null });
   });
 });

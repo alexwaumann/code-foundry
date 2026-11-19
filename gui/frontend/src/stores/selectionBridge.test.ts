@@ -80,6 +80,8 @@ describe("routing a selection", () => {
     expect(planRoute({ kind: "thread", id: "s-2" }, s)).toEqual({ kind: "command", name: "thread.open", args: { id: "s-2", focus: "true" } });
     // An Archived or Snoozed row asks for a preview; the daemon decides whether it is one.
     expect(planRoute({ kind: "thread", id: "s-2" }, s, { preview: true })).toEqual({ kind: "command", name: "thread.open", args: { id: "s-2", focus: "true", preview: "true" } });
+    // The thread the click is in goes along: under threads open as panes, its child opens beside it.
+    expect(planRoute({ kind: "thread", id: "s-2" }, s, { preview: true, from: "s-1" })).toEqual({ kind: "command", name: "thread.open", args: { id: "s-2", focus: "true", preview: "true", from: "s-1" } });
     expect(planRoute({ kind: "thread", id: "s-1" }, s, { preview: true })).toEqual({ kind: "stay" });
   });
 

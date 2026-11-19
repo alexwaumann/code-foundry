@@ -43,7 +43,7 @@ import { shellCommands } from "./shells";
 import { mcpCommands } from "./mcp";
 import { HELLO_TERMINAL, HELLO_THREAD, MockPlugins } from "./plugins";
 import { MockActions } from "./actions";
-import { MockLayout, panes as layoutPanes } from "./layout";
+import { MockLayout, panes as layoutPanes, type ThreadsOpenAs } from "./layout";
 import { layoutCommands } from "./layoutVerbs";
 import { terminalShellCommands } from "./terminalVerbs";
 import { MockMemory } from "./memory";
@@ -857,6 +857,7 @@ export class World {
   readonly settings = new MockSettings(
     () => this.registry().map((e) => e.cmd),
     (snap) => {
+      this.convertLayoutOnModeChange();
       this.events.publish({ source: EventSource.SETTINGS, event: { event: { case: "settings", value: { event: { case: "snapshot", value: snap } } } } });
       // Like the daemon: a new cache TTL moves every expiry, so those threads are republished.
       for (const s of this.threads.values()) if (s.lastResultAt) this.publishThread(s);
@@ -976,7 +977,22 @@ export class World {
       this.endClosedTerminals(op, result);
     },
     smartPlacement: () => this.settings.value("layout.smart_placement") !== "false",
+    threadsOpenAs: () => this.threadsOpenAs(),
   });
+  /** The setting layout.threads_open_as as the daemon reads it (unknown: tabs). */
+  private threadsOpenAs(): ThreadsOpenAs {
+    const v = this.settings.value("layout.threads_open_as");
+    return v === "panes" || v === "single" ? v : "tabs";
+  }
+  /** The mode the layout was last converted to (internal/daemon layout_mode.go). */
+  private threadsOpenAsSeen: ThreadsOpenAs | null = null;
+  /** Converts the layout when layout.threads_open_as changes to panes or single, before the change is published, as the daemon does. */
+  private convertLayoutOnModeChange(): void {
+    const mode = this.threadsOpenAs();
+    const was = this.threadsOpenAsSeen ?? "tabs";
+    this.threadsOpenAsSeen = mode;
+    if (mode !== was && mode !== "tabs") this.layout.apply({ op: "conform" });
+  }
   /** The user's themes (mock/userThemes.ts); the EventService theme source. */
   readonly themes: MockThemes = new MockThemes({
     publish: (v) => this.events.publish({ source: EventSource.THEME, event: { event: { case: "theme", value: v } } }),
@@ -5619,6 +5635,14 @@ export class World {
         isChild: (id) => {
           const by = this.threads.get(id)?.createdBy ?? "";
           return by !== "" && this.threads.has(by);
+        },
+        createdUnder: (id, from) => {
+          const seen = new Set<string>();
+          for (let by = this.threads.get(id)?.createdBy ?? ""; by !== "" && !seen.has(by); by = this.threads.get(by)?.createdBy ?? "") {
+            if (by === from) return true;
+            seen.add(by);
+          }
+          return false;
         },
         archiveThread: (id) => {
           this.archiveThread(id, true);

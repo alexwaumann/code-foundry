@@ -61,6 +61,17 @@ func init() {
 // Child says another thread created the thread and that creator still exists (the sidebar
 // rule; its lead manages it). Only a preview reads it: a child's preview shows only its
 // conversation, as a snoozed thread's does; its remembered set waits for a kept open.
+//
+// Under Panes and Single (Options.Mode, modes.go openPanes) a thread pane holds one thread:
+// the thread replaces the thread (or composer) of the target thread pane, which closes as
+// closing its tab closes it, unless a place asks for a new pane: an Edge (with or without
+// Pane), Beside (a pane, or a thread whose tab is open: a new pane on its right), Parent (the
+// thread it was opened from, which created it: a new pane on the right of Parent's pane), or a
+// Pane of other tabs (a new pane on its left). A Pane that holds a thread is the target. Index
+// is not read. Under Single every open replaces, Beside is refused, and a new pane is made only
+// when the space has no thread pane. A new pane that does not fit opens folded
+// (Result.Collapsed). Under Tabs, Beside opens in a new pane on the right of that pane and
+// Parent is not read.
 type OpenThread struct {
 	Thread   string  `json:"thread"`
 	Pane     string  `json:"pane,omitempty"`
@@ -71,6 +82,8 @@ type OpenThread struct {
 	Snoozed  bool    `json:"snoozed,omitempty"`
 	Child    bool    `json:"child,omitempty"`
 	Preview  bool    `json:"preview,omitempty"`
+	Beside   string  `json:"beside,omitempty"`
+	Parent   string  `json:"parent,omitempty"`
 	Focus    bool    `json:"focus,omitempty"`
 	W        float64 `json:"w,omitempty"`
 	H        float64 `json:"h,omitempty"`
@@ -83,8 +96,11 @@ func (o *OpenThread) apply(t *tx) (Result, error) {
 	if o.Thread == "" {
 		return Result{}, fmt.Errorf("no thread given: %w", ErrInvalidArgument)
 	}
-	if o.Preview && (o.Pane != "" || o.Edge != "" || o.Index != nil || o.Compose != "") {
-		return Result{}, fmt.Errorf("a preview opens where a thread's tab opens: no pane, edge, index or composer: %w", ErrInvalidArgument)
+	if o.Preview && (o.Pane != "" || o.Edge != "" || o.Index != nil || o.Compose != "" || o.Beside != "") {
+		return Result{}, fmt.Errorf("a preview opens where a thread's tab opens: no pane, edge, index, beside or composer: %w", ErrInvalidArgument)
+	}
+	if o.Beside != "" && (o.Pane != "" || o.Edge != "" || o.Index != nil || o.Compose != "") {
+		return Result{}, fmt.Errorf("beside is a place of its own: no pane, edge, index or composer: %w", ErrInvalidArgument)
 	}
 	if o.Snoozed && o.Compose == "" {
 		threadState(t.st, o.Thread).Snoozed = true
@@ -109,6 +125,26 @@ func (o *OpenThread) apply(t *tx) (Result, error) {
 		return Result{}, fmt.Errorf("an index is a place in a pane's strip: give the pane and no edge: %w", ErrInvalidArgument)
 	case o.Compose != "" && (o.Edge != "" || o.Index != nil):
 		return Result{}, fmt.Errorf("a thread sent from a composer takes its place: %w", ErrInvalidArgument)
+	}
+	if t.opts.Mode.Panes() && o.Compose == "" {
+		return o.openPanes(t, preview, snoozed)
+	}
+	if o.Beside != "" {
+		// Tabs: a new pane on the right of that pane, as a drop on its edge.
+		sp, err := t.space(t.st.SpaceOf(o.Thread))
+		if o.Archived {
+			sp, err = t.space("")
+		}
+		if err != nil {
+			return Result{}, err
+		}
+		p, err := t.paneFor(sp, o.Beside)
+		if err != nil {
+			return Result{}, err
+		}
+		next := *o
+		next.Beside, next.Pane, next.Edge = "", p.ID, Right
+		return next.apply(t)
 	}
 	w, h := viewport(o.W, o.H)
 	var sp *Space
@@ -376,7 +412,7 @@ func (t *tx) putBack(sp *Space, rec RememberedTab, tb *Tab, threadTab string, w,
 	}
 	psp, p := t.st.FindPane(rec.Pane)
 	if p != nil {
-		if psp != sp || !besideThread() {
+		if psp != sp || !besideThread() || !t.admits(p, tb) {
 			return false
 		}
 		if !canTake(sp, p, w, h, tb) {
@@ -663,8 +699,16 @@ func (o *MoveThreadToSpace) apply(t *tx) (Result, error) {
 		if _, err := t.prepare(to, tb); err != nil {
 			return Result{}, err
 		}
-		pane := focusedPane(to)
-		if pane == nil {
+		var pane *Node
+		if t.opts.Mode.Panes() {
+			// Panes and Single: it opens there as a thread opens (modes.go seat), replacing
+			// the thread of the space's thread pane.
+			var r Result
+			if pane, err = t.seat(to, tb, nil, nil, "", w, h, &r); err != nil {
+				return Result{}, err
+			}
+			res.Closed, res.Kept, res.Collapsed = append(res.Closed, r.Closed...), append(res.Kept, r.Kept...), r.Collapsed
+		} else if pane = focusedPane(to); pane == nil {
 			pane = &Node{T: NodePane, ID: t.newID("p-"), Tabs: []*Tab{tb}}
 			to.Root = pane
 		} else {

@@ -85,7 +85,7 @@ describe("LineageGroup's links", () => {
     useUiStore.setState({ select } as never);
     render(<LineageGroup threadId="mid" />);
     fireEvent.click(row("leaf") as HTMLElement);
-    expect(select).toHaveBeenLastCalledWith({ kind: "thread", id: "leaf" }, { focusPrompt: true, preview: true });
+    expect(select).toHaveBeenLastCalledWith({ kind: "thread", id: "leaf" }, { focusPrompt: true, preview: true, from: "mid" });
     // "mid" is itself a child, but its lead opens as a kept tab from it.
     fireEvent.click(screen.getByTestId("ti-parent"));
     expect(select).toHaveBeenLastCalledWith({ kind: "thread", id: "lead" }, { focusPrompt: true });
