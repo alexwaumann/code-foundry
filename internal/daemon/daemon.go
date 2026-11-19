@@ -228,11 +228,12 @@ func Run(ctx context.Context, opts Options) (retErr error) {
 	shots := shot.New()
 	// Terminals answer color queries from the theme; dark until the GUI publishes one.
 	st.terminal.SetColors(ctx, terminalColors(theme.DefaultFrame(theme.SchemeDark)))
-	// Who owns each page, the user's answers for pages no thread owns and their storage
-	// (docs/notes/page-ownership-daemon.md). The preview's floor is theirs too: a file the
-	// preview refuses never gets an owner or an answer.
+	// Who owns each page, the user's answers for pages no thread owns and every page's
+	// storage (docs/notes/page-ownership-daemon.md, page-storage-per-file.md), carried over
+	// once from the threads' own. The preview's floor is theirs too: a file the preview
+	// refuses never gets an owner or an answer.
 	pages, err := page.New(ctx, page.Options{
-		DB: st.db, Home: st.home, PagesRoot: p.Pages(), StorageRoot: p.PageFileStorage(), Guarded: grants.Guarded,
+		DB: st.db, Home: st.home, PagesRoot: p.Pages(), StorageRoot: p.PageFileStorage(), ThreadStorageRoot: p.PageStorage(), Guarded: grants.Guarded,
 		ThreadExists: func(id string) bool { _, ok := st.thread.Snapshot().Thread(id); return ok },
 		Log:          log.With("store", "page"), Bus: events,
 	})
@@ -373,6 +374,7 @@ func Run(ctx context.Context, opts Options) (retErr error) {
 	defer startSkills(ctx, log.With("store", "skill"), events, st.update, st.skills)()
 	defer startSkillSetupExits(ctx, log.With("store", "skill"), st.terminal, st.skills)()
 	defer startPluginContexts(ctx, events, plugins)()
+	defer startPageThreadCleanup(ctx, events, pages)()
 	defer startPluginEnvWatch(ctx, events, st.thread)()
 	defer startPluginChecks(ctx, events, plugins)()
 	defer startPluginTerminalExits(ctx, log.With("component", "plugins"), st.terminal, plugins)()

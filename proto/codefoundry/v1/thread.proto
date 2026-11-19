@@ -344,14 +344,17 @@ service ThreadService {
   // adds, not Claude's) at the thread's current position, as ShowHtml places a page. It
   // starts no turn and does not unarchive the thread. INVALID_ARGUMENT for empty text.
   rpc AddNote(AddThreadNoteRequest) returns (AddThreadNoteResponse) {}
-  // PageStorage returns what the thread's pages keep with the bridge's cf.storage: the
-  // GUI host hands it to a page as it loads (docs/notes/bridge-fix-storage.md). Kept by
-  // the daemon, one file per thread, because WebKit keeps a page frame's own
-  // localStorage for the session only. NotFound for an unknown thread.
+  // PageStorage returns a thread's own page storage, one file per thread
+  // (docs/notes/bridge-fix-storage.md): where cf.storage was kept before a page's storage
+  // became its file's (PageService.PageStorage, PageAccess.storage_per_file;
+  // docs/notes/page-storage-per-file.md). A GUI that reads PageAccess.storage_per_file
+  // never calls it for a page; it still answers, for an older GUI, and its file is never
+  // rewritten by the daemon. NotFound for an unknown thread.
   rpc PageStorage(PageStorageRequest) returns (PageStorageResponse) {}
-  // SetPageStorage sets or removes one key of a thread's page storage and returns the
-  // storage after. InvalidArgument for an empty or too long key (1 KiB), a value that is
-  // not JSON, or a storage that would grow over 256 KiB (nothing is written then).
+  // SetPageStorage sets or removes one key of a thread's own page storage (PageStorage)
+  // and returns the storage after. InvalidArgument for an empty or too long key (1 KiB),
+  // a value that is not JSON, or a storage that would grow over 256 KiB (nothing is
+  // written then).
   rpc SetPageStorage(SetPageStorageRequest) returns (SetPageStorageResponse) {}
   // ProxyFetch makes one HTTP request for a page of the thread (the bridge's cf.fetch,
   // docs/notes/bridge-fetch.md): the daemon is not subject to the browser's CORS check, so

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -24,6 +25,8 @@ type env struct {
 	gone    map[string]bool // threads ThreadExists says are removed
 	now     time.Time
 	s       *Store
+	// reopen makes the store anew with other options (carryEnv).
+	reopen func()
 }
 
 func newEnv(t *testing.T) *env {
@@ -137,9 +140,12 @@ func TestResolve(t *testing.T) {
 	}
 }
 
-// The latest thread to show or write a page owns it, whichever spelling it used; a refused
-// path and an unknown thread record nothing.
-func TestRecordLatestWins(t *testing.T) {
+// Every thread that shows or writes a page owns it, whichever spelling it used, in the
+// order each first did; the first stays the page's default however often others show or
+// write it, and a thread showing it again keeps its place with its latest how. A refused path
+// and an unknown thread record nothing. (ownership fuzz #1 and #2: one row per page, latest
+// wins, lost the earlier owners.)
+func TestRecordKeepsEveryOwner(t *testing.T) {
 	ctx := context.Background()
 	e := newEnv(t)
 	p := e.file(e.home, "proj/index.html")
@@ -152,21 +158,23 @@ func TestRecordLatestWins(t *testing.T) {
 	}
 	steps := []struct {
 		id, path, how string
-		wantOwner     string
-		wantHow       string
+		want          []Owner
 	}{
-		{"t-a", p, Shown, "t-a", Shown},
-		{"t-b", link, Written, "t-b", Written},
-		{"t-a", link, Written, "t-a", Written},
-		{"t-b", p, Shown, "t-b", Shown},
+		{"t-a", p, Shown, []Owner{{"t-a", Shown}}},
+		{"t-b", link, Written, []Owner{{"t-a", Shown}, {"t-b", Written}}},
+		{"t-a", link, Written, []Owner{{"t-a", Written}, {"t-b", Written}}},
+		{"t-b", p, Shown, []Owner{{"t-a", Written}, {"t-b", Shown}}},
 	}
 	for i, st := range steps {
 		if err := e.s.Record(ctx, st.id, st.path, st.how); err != nil {
 			t.Fatalf("step %d: %v", i, err)
 		}
 		a := e.access(link)
-		if a.Owner != st.wantOwner || a.Recorded != st.wantOwner || a.How != st.wantHow || a.Path != real(t, p) || !a.Allowed() {
-			t.Fatalf("step %d: %+v, want owner %s by %s", i, a, st.wantOwner, st.wantHow)
+		if !slices.Equal(a.Owners, st.want) || a.Owner != "t-a" || a.How() != st.want[0].How || a.Path != real(t, p) || !a.Allowed() {
+			t.Fatalf("step %d: %+v, want owners %v", i, a, st.want)
+		}
+		if !a.Owns(st.id) || a.Owns("t-nope") || a.Owns("") {
+			t.Fatalf("step %d: Owns", i)
 		}
 	}
 	if err := e.s.Record(ctx, "t-nope", p, Shown); err == nil {
@@ -175,24 +183,25 @@ func TestRecordLatestWins(t *testing.T) {
 	if err := e.s.Record(ctx, "t-a", filepath.Join(e.home, "proj/missing.html"), Shown); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("a missing file: %v", err)
 	}
-	if a := e.access(p); a.Owner != "t-b" {
+	if a := e.access(p); len(a.Owners) != 2 {
 		t.Fatalf("after refused records: %+v", a)
 	}
 	var n int
-	if err := e.db.QueryRow(`SELECT count(*) FROM page_owners`).Scan(&n); err != nil || n != 1 {
-		t.Fatalf("rows %d, %v; want one per page", n, err)
+	if err := e.db.QueryRow(`SELECT count(*) FROM page_owners`).Scan(&n); err != nil || n != 2 {
+		t.Fatalf("rows %d, %v; want one per owner of the page", n, err)
 	}
 }
 
-// A removed thread's records go with its row, so its pages are no one's and fall back to the
-// user's answer; one whose row is still there but which the thread store says is removed reads
-// as no one's too.
-func TestRemovedThreadLeavesNoOwner(t *testing.T) {
+// A removed thread's claims go with its row: the page keeps its other owners, the next
+// becoming its default, and only a page with none left is no one's and falls back to the
+// user's answer. One whose row is still there but which the thread store says is removed
+// reads as gone too. (ownership fuzz #2, thread-pages #2.)
+func TestRemovedThreadLeavesOtherOwners(t *testing.T) {
 	ctx := context.Background()
 	e := newEnv(t)
 	p := e.file(e.home, "proj/index.html")
 	q := e.file(e.home, "proj/other.html")
-	for _, r := range []struct{ id, path string }{{"t-a", p}, {"t-b", q}} {
+	for _, r := range []struct{ id, path string }{{"t-a", p}, {"t-b", p}, {"t-b", q}} {
 		if err := e.s.Record(ctx, r.id, r.path, Shown); err != nil {
 			t.Fatal(err)
 		}
@@ -203,13 +212,21 @@ func TestRemovedThreadLeavesNoOwner(t *testing.T) {
 	if _, err := e.db.Exec(`DELETE FROM threads WHERE id = 't-a'`); err != nil {
 		t.Fatal(err)
 	}
-	a := e.access(p)
-	if a.Owner != "" || a.Recorded != "" || a.Consent != Allowed || !a.Allowed() {
-		t.Fatalf("after its thread's removal: %+v; want no owner, the user's answer", a)
+	if a := e.access(p); a.Owner != "t-b" || !slices.Equal(a.Owners, []Owner{{"t-b", Shown}}) {
+		t.Fatalf("after its first owner's removal: %+v; want t-b", a)
 	}
 	e.gone["t-b"] = true
-	if a := e.access(q); a.Owner != "" || a.Allowed() {
-		t.Fatalf("a removed thread's row: %+v; want no owner", a)
+	for _, path := range []string{p, q} {
+		a := e.access(path)
+		if a.Owner != "" || len(a.Owners) != 0 {
+			t.Fatalf("%s with no owner left: %+v", path, a)
+		}
+	}
+	if a := e.access(p); a.Consent != Allowed || !a.Allowed() {
+		t.Fatalf("p falls back to the user's answer: %+v", a)
+	}
+	if a := e.access(q); a.Allowed() {
+		t.Fatalf("q was never allowed: %+v", a)
 	}
 }
 
@@ -228,17 +245,24 @@ func TestPagesDirectory(t *testing.T) {
 		{"a removed thread's", gone, "", ""},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			if a := e.access(tt.path); a.Owner != tt.owner || a.PagesThread != tt.pagesThread || a.Recorded != "" {
+			if a := e.access(tt.path); a.Owner != tt.owner || a.PagesThread != tt.pagesThread || (tt.owner != "" && a.How() != PagesDirectory) {
 				t.Fatalf("%+v; want owner %q", a, tt.owner)
 			}
 		})
 	}
-	// A later show by another thread wins over the directory.
+	// Another thread that shows it owns it too; the directory's thread stays first, and
+	// its own show keeps it first with how it did.
 	if err := e.s.Record(ctx, "t-b", own, Shown); err != nil {
 		t.Fatal(err)
 	}
-	if a := e.access(own); a.Owner != "t-b" || a.PagesThread != "t-a" {
+	if a := e.access(own); a.Owner != "t-a" || !slices.Equal(a.Owners, []Owner{{"t-a", PagesDirectory}, {"t-b", Shown}}) {
 		t.Fatalf("after t-b showed it: %+v", a)
+	}
+	if err := e.s.Record(ctx, "t-a", own, Written); err != nil {
+		t.Fatal(err)
+	}
+	if a := e.access(own); !slices.Equal(a.Owners, []Owner{{"t-a", Written}, {"t-b", Shown}}) {
+		t.Fatalf("after t-a wrote it: %+v", a)
 	}
 }
 

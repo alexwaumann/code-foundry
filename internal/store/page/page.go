@@ -1,15 +1,17 @@
 // Package page keeps what the daemon knows about the HTML pages the GUI shows in frames
-// with the bridge (docs/notes/page-ownership-daemon.md):
+// with the bridge (docs/notes/page-ownership-daemon.md, page-storage-per-file.md):
 //
-//   - who owns each page file: the thread that last showed it (view.inline,
-//     view.open.page) or wrote it (Claude's Write, Edit, MultiEdit); latest wins. A file
-//     in a thread's pages directory (<home>/pages/<thread id>/) is that thread's unless a
-//     later thread showed or wrote it. A removed thread's records go with its threads row
-//     (ON DELETE CASCADE), so a page never points at a thread that is gone;
+//   - who owns each page file: every thread that showed it (view.inline, view.open.page)
+//     or wrote it (Claude's Write, Edit, MultiEdit), and the thread whose pages directory
+//     (<home>/pages/<thread id>/) holds it. The first owner (that thread, else the one that
+//     first showed or wrote the file) is the page's default, stable while it exists. A
+//     removed thread's claims go with its threads row (ON DELETE CASCADE): the page keeps
+//     its other owners, and is no thread's only once none is left;
 //   - the user's answer for a page no thread owns: allowed or refused, kept per file and
 //     never asked again when the file's content changes;
-//   - the storage of an allowed page no thread owns (cf.storage without a thread), one
-//     file per page, with the limits of a thread's (internal/pagestorage).
+//   - every page's storage (cf.storage), one file per page whichever thread the page acts
+//     for and whether or not a thread owns it (internal/pagestorage), carried over once
+//     from the threads' own storage of before (carry.go).
 //
 // Everything is keyed by the file's absolute path with its symlinks resolved, spelled as
 // its volume stores it (fsx.OnDiskPath): APFS ignores case and Unicode normalisation, so
@@ -80,22 +82,32 @@ func (c Consent) String() string {
 
 // How a thread came to own a page.
 const (
-	// Shown: the thread showed it (view.inline, view.open.page).
+	// Shown: the thread showed it (view.inline, view.open.page), the last it did with it.
 	Shown = "shown"
-	// Written: the thread's Claude wrote or edited it.
+	// Written: the thread's Claude wrote or edited it, the last it did with it.
 	Written = "written"
+	// PagesDirectory: the file is in the thread's pages directory, and the thread neither
+	// showed nor wrote it.
+	PagesDirectory = "pages-directory"
 )
+
+// Owner is one thread that owns a page, and how.
+type Owner struct {
+	Thread string
+	// How is Shown, Written or PagesDirectory.
+	How string
+}
 
 // Access is what the daemon says about one page file.
 type Access struct {
 	// Path is the file's absolute path, symlinks resolved, spelled as on disk
 	// (fsx.OnDiskPath): the key of everything here.
 	Path string
-	// Owner is the owning thread's id: Recorded's, else PagesThread; "" for none.
+	// Owners are every existing thread that owns the page: PagesThread first, then the
+	// threads that showed or wrote it by when they first did, oldest first (ties by id).
+	Owners []Owner
+	// Owner is the first owner's id (Owners[0]), the page's default thread; "" for none.
 	Owner string
-	// Recorded is the thread recorded as having last shown or written the file, "" for
-	// none, and How how ("shown", "written").
-	Recorded, How string
 	// PagesThread is the thread whose pages directory holds the file, "" for none (or one
 	// that no longer exists).
 	PagesThread string
@@ -103,10 +115,23 @@ type Access struct {
 	Consent Consent
 }
 
+// Owns reports whether thread id is one of the page's owners.
+func (a Access) Owns(id string) bool {
+	return id != "" && slices.ContainsFunc(a.Owners, func(o Owner) bool { return o.Thread == id })
+}
+
+// How is how the first owner came to own the page; "" for no owner.
+func (a Access) How() string {
+	if len(a.Owners) == 0 {
+		return ""
+	}
+	return a.Owners[0].How
+}
+
 // Changed is published on the bus (bus.Publish[page.Changed]) when the page at Path got
-// another owner (Record) or the user another answer (SetConsent), so every frame showing it
+// a new owner (Record) or the user another answer (SetConsent), so every frame showing it
 // reads its access again (docs/notes/page-access-live.md). A removed thread's pages lose
-// their owner without one: the API's page source tells clients from thread.Removed.
+// that owner without one: the API's page source tells clients from thread.Removed.
 type Changed struct {
 	// Path is the page's resolved path (Access.Path).
 	Path string
@@ -123,9 +148,13 @@ type Options struct {
 	Home string
 	// PagesRoot holds a pages directory per thread (paths.Paths.Pages).
 	PagesRoot string
-	// StorageRoot holds the storage of pages no thread owns, a directory per page
+	// StorageRoot holds every page's storage, a directory per page file
 	// (paths.Paths.PageFileStorage). Empty: none kept.
 	StorageRoot string
+	// ThreadStorageRoot holds each thread's own page storage of before storage was per
+	// file (paths.Paths.PageStorage, <root>/<thread id>/storage.json): New carries it into
+	// the pages' storage once (carry.go) and never writes it. Empty: nothing carried.
+	ThreadStorageRoot string
 	// Guarded reports a path the preview never serves (preview.Grants.Guarded); asked of
 	// both the path as given and its resolved one. Nil: none.
 	Guarded func(path string) bool
@@ -139,15 +168,17 @@ type Options struct {
 	Now func() time.Time
 }
 
-// Store keeps pages' owners, the user's answers and the storage of pages no thread owns.
-// Safe for concurrent use.
+// Store keeps pages' owners, the user's answers and the pages' storage. Safe for
+// concurrent use.
 type Store struct {
 	o       Options
 	homes   []string // Home as given and resolved
 	storeMu sync.Mutex
 }
 
-// New returns a Store and removes the storage of pages whose file is gone (Sweep).
+// New returns a Store. Before it returns it carries what is left to carry of the threads'
+// own page storage into the pages' storage (carry), and removes the storage of pages
+// whose file is gone (Sweep).
 func New(ctx context.Context, o Options) (*Store, error) {
 	if o.DB == nil {
 		return nil, errors.New("page: a database is required")
@@ -159,6 +190,7 @@ func New(ctx context.Context, o Options) (*Store, error) {
 		o.Now = time.Now
 	}
 	s := &Store{o: o, homes: spellings(o.Home)}
+	s.carry(ctx)
 	s.Sweep(ctx)
 	return s, nil
 }
@@ -253,9 +285,10 @@ func (s *Store) pagesThread(real string) string {
 	return ""
 }
 
-// Record records thread id as the owner of the page at path, how ("shown", "written"):
-// latest wins. A path Resolve refuses is not recorded (its error is returned); so is a
-// thread that does not exist (the foreign key refuses it).
+// Record records thread id as an owner of the page at path, how ("shown", "written"): a
+// thread already among its owners keeps its place and gets the new how. A path Resolve
+// refuses is not recorded (its error is returned); so is a thread that does not exist
+// (the foreign key refuses it).
 func (s *Store) Record(ctx context.Context, id, path, how string) error {
 	real, err := s.Resolve(path)
 	if err != nil {
@@ -270,15 +303,15 @@ func (s *Store) Record(ctx context.Context, id, path, how string) error {
 	}
 	now := s.o.Now().UnixMilli()
 	if err := s.write(ctx, "page_owners", real, func(tx *sql.Tx, key string) error {
-		_, err := tx.ExecContext(ctx, `INSERT INTO page_owners (path, thread_id, how, updated_at) VALUES (?, ?, ?, ?)
-			ON CONFLICT (path) DO UPDATE SET thread_id = excluded.thread_id, how = excluded.how, updated_at = excluded.updated_at`,
-			key, id, how, now)
+		_, err := tx.ExecContext(ctx, `INSERT INTO page_owners (path, thread_id, how, first_at, updated_at) VALUES (?, ?, ?, ?, ?)
+			ON CONFLICT (path, thread_id) DO UPDATE SET how = excluded.how, updated_at = excluded.updated_at`,
+			key, id, how, now, now)
 		return err
 	}); err != nil {
 		return fmt.Errorf("page: record %s as %s's: %w", real, id, err)
 	}
 	// Only a new owner changes what a frame gets: a thread writing its own page again is no news.
-	if before.Owner != id {
+	if !before.Owns(id) {
 		s.publish(real)
 	}
 	return nil
@@ -307,8 +340,8 @@ func (s *Store) keys(ctx context.Context, q queryer, table, real string) ([]stri
 		if err := rows.Scan(&p); err != nil {
 			return nil, err
 		}
-		if p == real || fsx.OtherSpelling(p, real) {
-			out = append(out, p)
+		if (p == real || fsx.OtherSpelling(p, real)) && !slices.Contains(out, p) {
+			out = append(out, p) // page_owners has a row per owner of a key
 		}
 	}
 	return out, rows.Err()
@@ -363,22 +396,25 @@ func (s *Store) Access(ctx context.Context, path string) (Access, error) {
 
 func (s *Store) access(ctx context.Context, real string) (Access, error) {
 	a := Access{Path: real, PagesThread: s.pagesThread(real)}
-	key, err := s.newest(ctx, "page_owners", real)
-	if err == nil && key != "" {
-		err = s.o.DB.QueryRowContext(ctx, `SELECT thread_id, how FROM page_owners WHERE path = ?`, key).Scan(&a.Recorded, &a.How)
+	owners, err := s.owners(ctx, real)
+	if err != nil {
+		return Access{}, fmt.Errorf("page: owners of %s: %w", real, err)
 	}
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		return Access{}, fmt.Errorf("page: owner of %s: %w", real, err)
+	if a.PagesThread != "" {
+		// The thread whose pages directory holds the page comes first, as it made it.
+		first := Owner{Thread: a.PagesThread, How: PagesDirectory}
+		if i := slices.IndexFunc(owners, func(o Owner) bool { return o.Thread == a.PagesThread }); i >= 0 {
+			first = owners[i]
+			owners = slices.Delete(owners, i, i+1)
+		}
+		owners = slices.Insert(owners, 0, first)
 	}
-	if a.Recorded != "" && s.o.ThreadExists != nil && !s.o.ThreadExists(a.Recorded) {
-		a.Recorded, a.How = "", "" // removed, its row not yet gone
-	}
-	a.Owner = a.Recorded
-	if a.Owner == "" {
-		a.Owner = a.PagesThread
+	a.Owners = owners
+	if len(owners) > 0 {
+		a.Owner = owners[0].Thread
 	}
 	var allowed sql.NullBool
-	key, err = s.newest(ctx, "page_consent", real)
+	key, err := s.newest(ctx, "page_consent", real)
 	if err == nil {
 		err = sql.ErrNoRows
 		if key != "" {
@@ -395,6 +431,67 @@ func (s *Store) access(ctx context.Context, real string) (Access, error) {
 		a.Consent = Refused
 	}
 	return a, nil
+}
+
+// owners are the threads recorded as having shown or written the page at real, under any
+// key of the file (keys), that still exist: by when each first did, oldest first (ties by
+// id), each with how it last did.
+func (s *Store) owners(ctx context.Context, real string) ([]Owner, error) {
+	keys, err := s.keys(ctx, s.o.DB, "page_owners", real)
+	if err != nil || len(keys) == 0 {
+		return nil, err
+	}
+	q := `SELECT thread_id, how, first_at, updated_at FROM page_owners WHERE path IN (?` + strings.Repeat(", ?", len(keys)-1) + `)`
+	args := make([]any, len(keys))
+	for i, k := range keys {
+		args[i] = k
+	}
+	rows, err := s.o.DB.QueryContext(ctx, q, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+	type claim struct {
+		how           string
+		first, latest int64
+	}
+	by := map[string]*claim{}
+	for rows.Next() {
+		var id, how string
+		var first, latest int64
+		if err := rows.Scan(&id, &how, &first, &latest); err != nil {
+			return nil, err
+		}
+		c := by[id]
+		if c == nil {
+			by[id] = &claim{how: how, first: first, latest: latest}
+			continue
+		}
+		c.first = min(c.first, first)
+		if latest > c.latest {
+			c.how, c.latest = how, latest
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	ids := make([]string, 0, len(by))
+	for id := range by {
+		if s.o.ThreadExists == nil || s.o.ThreadExists(id) { // removed, its rows not yet gone
+			ids = append(ids, id)
+		}
+	}
+	slices.SortFunc(ids, func(a, b string) int {
+		if d := by[a].first - by[b].first; d != 0 {
+			return int(min(max(d, -1), 1))
+		}
+		return strings.Compare(a, b)
+	})
+	out := make([]Owner, len(ids))
+	for i, id := range ids {
+		out[i] = Owner{Thread: id, How: by[id].how}
+	}
+	return out, nil
 }
 
 // SetConsent records the user's answer for the page at path, allowed or not, and returns
@@ -426,7 +523,7 @@ func (s *Store) SetConsent(ctx context.Context, path string, allowed bool) (Acce
 	return after, err
 }
 
-// Allow returns the page's access when it may use the bridge without a thread: a thread
+// Allow returns the page's access when it may use the bridge (storage, fetch): a thread
 // owns it, or the user allowed it. ErrNotAsked or ErrRefused otherwise, and Resolve's
 // errors.
 func (s *Store) Allow(ctx context.Context, path string) (Access, error) {
@@ -493,8 +590,8 @@ func (s *Store) storageOf(real string) (dir, key string) {
 	return dir, key
 }
 
-// Storage is what the page at path keeps with cf.storage without a thread: key → the
-// value's JSON text. Allow's errors for a page that may not.
+// Storage is what the page at path keeps with cf.storage, whichever thread it acts for:
+// key → the value's JSON text. Allow's errors for a page that may not.
 func (s *Store) Storage(ctx context.Context, path string) (map[string]string, error) {
 	a, err := s.Allow(ctx, path)
 	if err != nil {

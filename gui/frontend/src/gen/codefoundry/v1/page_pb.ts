@@ -10,7 +10,31 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file codefoundry/v1/page.proto.
  */
 export const file_codefoundry_v1_page: GenFile = /*@__PURE__*/
-  fileDesc("Chljb2RlZm91bmRyeS92MS9wYWdlLnByb3RvEg5jb2RlZm91bmRyeS52MSLeAQoKUGFnZUFjY2VzcxIMCgRwYXRoGAEgASgJEhQKDG93bmVyX3RocmVhZBgCIAEoCRI1Cgxvd25lcl9zb3VyY2UYAyABKA4yHy5jb2RlZm91bmRyeS52MS5QYWdlT3duZXJTb3VyY2USLAoHY29uc2VudBgEIAEoDjIbLmNvZGVmb3VuZHJ5LnYxLlBhZ2VDb25zZW50EisKBmFuc3dlchgFIAEoDjIbLmNvZGVmb3VuZHJ5LnYxLlBhZ2VDb25zZW50EhoKEnVuYXZhaWxhYmxlX3JlYXNvbhgGIAEoCSIeCg5HZXRQYWdlUmVxdWVzdBIMCgRwYXRoGAEgASgJIjsKD0dldFBhZ2VSZXNwb25zZRIoCgRwYWdlGAEgASgLMhouY29kZWZvdW5kcnkudjEuUGFnZUFjY2VzcyImChZQYWdlRmlsZVN0b3JhZ2VSZXF1ZXN0EgwKBHBhdGgYASABKAkijQEKF1BhZ2VGaWxlU3RvcmFnZVJlc3BvbnNlEkMKBnZhbHVlcxgBIAMoCzIzLmNvZGVmb3VuZHJ5LnYxLlBhZ2VGaWxlU3RvcmFnZVJlc3BvbnNlLlZhbHVlc0VudHJ5Gi0KC1ZhbHVlc0VudHJ5EgsKA2tleRgBIAEoCRINCgV2YWx1ZRgCIAEoCToCOAEiVAoZU2V0UGFnZUZpbGVTdG9yYWdlUmVxdWVzdBIMCgRwYXRoGAEgASgJEgsKA2tleRgCIAEoCRISCgV2YWx1ZRgDIAEoCUgAiAEBQggKBl92YWx1ZSKTAQoaU2V0UGFnZUZpbGVTdG9yYWdlUmVzcG9uc2USRgoGdmFsdWVzGAEgAygLMjYuY29kZWZvdW5kcnkudjEuU2V0UGFnZUZpbGVTdG9yYWdlUmVzcG9uc2UuVmFsdWVzRW50cnkaLQoLVmFsdWVzRW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgJOgI4ASLZAQoVUGFnZVByb3h5RmV0Y2hSZXF1ZXN0EgwKBHBhdGgYASABKAkSCwoDdXJsGAIgASgJEg4KBm1ldGhvZBgDIAEoCRJDCgdoZWFkZXJzGAQgAygLMjIuY29kZWZvdW5kcnkudjEuUGFnZVByb3h5RmV0Y2hSZXF1ZXN0LkhlYWRlcnNFbnRyeRIMCgRib2R5GAUgASgMEhIKCnRpbWVvdXRfbXMYBiABKA0aLgoMSGVhZGVyc0VudHJ5EgsKA2tleRgBIAEoCRINCgV2YWx1ZRgCIAEoCToCOAEizgEKFlBhZ2VQcm94eUZldGNoUmVzcG9uc2USDgoGc3RhdHVzGAEgASgNEkQKB2hlYWRlcnMYAiADKAsyMy5jb2RlZm91bmRyeS52MS5QYWdlUHJveHlGZXRjaFJlc3BvbnNlLkhlYWRlcnNFbnRyeRIMCgRib2R5GAMgASgMEgsKA3VybBgEIAEoCRITCgtzdGF0dXNfdGV4dBgFIAEoCRouCgxIZWFkZXJzRW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgJOgI4ASI/CglQYWdlRXZlbnQSDQoFcGF0aHMYASADKAkSFgoOcmVtb3ZlZF90aHJlYWQYAiABKAkSCwoDYWxsGAMgASgIKrEBCgtQYWdlQ29uc2VudBIcChhQQUdFX0NPTlNFTlRfVU5TUEVDSUZJRUQQABIWChJQQUdFX0NPTlNFTlRfT1dORUQQARIYChRQQUdFX0NPTlNFTlRfQUxMT1dFRBACEhgKFFBBR0VfQ09OU0VOVF9SRUZVU0VEEAMSGgoWUEFHRV9DT05TRU5UX05PVF9BU0tFRBAEEhwKGFBBR0VfQ09OU0VOVF9VTkFWQUlMQUJMRRAFKpcBCg9QYWdlT3duZXJTb3VyY2USIQodUEFHRV9PV05FUl9TT1VSQ0VfVU5TUEVDSUZJRUQQABIbChdQQUdFX09XTkVSX1NPVVJDRV9TSE9XThABEh0KGVBBR0VfT1dORVJfU09VUkNFX1dSSVRURU4QAhIlCiFQQUdFX09XTkVSX1NPVVJDRV9QQUdFU19ESVJFQ1RPUlkQAzKHAwoLUGFnZVNlcnZpY2USTAoHR2V0UGFnZRIeLmNvZGVmb3VuZHJ5LnYxLkdldFBhZ2VSZXF1ZXN0Gh8uY29kZWZvdW5kcnkudjEuR2V0UGFnZVJlc3BvbnNlIgASYAoLUGFnZVN0b3JhZ2USJi5jb2RlZm91bmRyeS52MS5QYWdlRmlsZVN0b3JhZ2VSZXF1ZXN0GicuY29kZWZvdW5kcnkudjEuUGFnZUZpbGVTdG9yYWdlUmVzcG9uc2UiABJpCg5TZXRQYWdlU3RvcmFnZRIpLmNvZGVmb3VuZHJ5LnYxLlNldFBhZ2VGaWxlU3RvcmFnZVJlcXVlc3QaKi5jb2RlZm91bmRyeS52MS5TZXRQYWdlRmlsZVN0b3JhZ2VSZXNwb25zZSIAEl0KClByb3h5RmV0Y2gSJS5jb2RlZm91bmRyeS52MS5QYWdlUHJveHlGZXRjaFJlcXVlc3QaJi5jb2RlZm91bmRyeS52MS5QYWdlUHJveHlGZXRjaFJlc3BvbnNlIgBCwQEKEmNvbS5jb2RlZm91bmRyeS52MUIJUGFnZVByb3RvUAFaR2dpdGh1Yi5jb20vYWxleHdhdW1hbm4vY29kZS1mb3VuZHJ5L2dlbi9nby9jb2RlZm91bmRyeS92MTtjb2RlZm91bmRyeXYxogIDQ1hYqgIOQ29kZWZvdW5kcnkuVjHKAg5Db2RlZm91bmRyeVxWMeICGkNvZGVmb3VuZHJ5XFYxXEdQQk1ldGFkYXRh6gIPQ29kZWZvdW5kcnk6OlYxYgZwcm90bzM");
+  fileDesc("Chljb2RlZm91bmRyeS92MS9wYWdlLnByb3RvEg5jb2RlZm91bmRyeS52MSJPCglQYWdlT3duZXISEQoJdGhyZWFkX2lkGAEgASgJEi8KBnNvdXJjZRgCIAEoDjIfLmNvZGVmb3VuZHJ5LnYxLlBhZ2VPd25lclNvdXJjZSKjAgoKUGFnZUFjY2VzcxIMCgRwYXRoGAEgASgJEhQKDG93bmVyX3RocmVhZBgCIAEoCRI1Cgxvd25lcl9zb3VyY2UYAyABKA4yHy5jb2RlZm91bmRyeS52MS5QYWdlT3duZXJTb3VyY2USLAoHY29uc2VudBgEIAEoDjIbLmNvZGVmb3VuZHJ5LnYxLlBhZ2VDb25zZW50EisKBmFuc3dlchgFIAEoDjIbLmNvZGVmb3VuZHJ5LnYxLlBhZ2VDb25zZW50EhoKEnVuYXZhaWxhYmxlX3JlYXNvbhgGIAEoCRIpCgZvd25lcnMYByADKAsyGS5jb2RlZm91bmRyeS52MS5QYWdlT3duZXISGAoQc3RvcmFnZV9wZXJfZmlsZRgIIAEoCCIeCg5HZXRQYWdlUmVxdWVzdBIMCgRwYXRoGAEgASgJIjsKD0dldFBhZ2VSZXNwb25zZRIoCgRwYWdlGAEgASgLMhouY29kZWZvdW5kcnkudjEuUGFnZUFjY2VzcyImChZQYWdlRmlsZVN0b3JhZ2VSZXF1ZXN0EgwKBHBhdGgYASABKAkijQEKF1BhZ2VGaWxlU3RvcmFnZVJlc3BvbnNlEkMKBnZhbHVlcxgBIAMoCzIzLmNvZGVmb3VuZHJ5LnYxLlBhZ2VGaWxlU3RvcmFnZVJlc3BvbnNlLlZhbHVlc0VudHJ5Gi0KC1ZhbHVlc0VudHJ5EgsKA2tleRgBIAEoCRINCgV2YWx1ZRgCIAEoCToCOAEiVAoZU2V0UGFnZUZpbGVTdG9yYWdlUmVxdWVzdBIMCgRwYXRoGAEgASgJEgsKA2tleRgCIAEoCRISCgV2YWx1ZRgDIAEoCUgAiAEBQggKBl92YWx1ZSKTAQoaU2V0UGFnZUZpbGVTdG9yYWdlUmVzcG9uc2USRgoGdmFsdWVzGAEgAygLMjYuY29kZWZvdW5kcnkudjEuU2V0UGFnZUZpbGVTdG9yYWdlUmVzcG9uc2UuVmFsdWVzRW50cnkaLQoLVmFsdWVzRW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgJOgI4ASLZAQoVUGFnZVByb3h5RmV0Y2hSZXF1ZXN0EgwKBHBhdGgYASABKAkSCwoDdXJsGAIgASgJEg4KBm1ldGhvZBgDIAEoCRJDCgdoZWFkZXJzGAQgAygLMjIuY29kZWZvdW5kcnkudjEuUGFnZVByb3h5RmV0Y2hSZXF1ZXN0LkhlYWRlcnNFbnRyeRIMCgRib2R5GAUgASgMEhIKCnRpbWVvdXRfbXMYBiABKA0aLgoMSGVhZGVyc0VudHJ5EgsKA2tleRgBIAEoCRINCgV2YWx1ZRgCIAEoCToCOAEizgEKFlBhZ2VQcm94eUZldGNoUmVzcG9uc2USDgoGc3RhdHVzGAEgASgNEkQKB2hlYWRlcnMYAiADKAsyMy5jb2RlZm91bmRyeS52MS5QYWdlUHJveHlGZXRjaFJlc3BvbnNlLkhlYWRlcnNFbnRyeRIMCgRib2R5GAMgASgMEgsKA3VybBgEIAEoCRITCgtzdGF0dXNfdGV4dBgFIAEoCRouCgxIZWFkZXJzRW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgJOgI4ASI/CglQYWdlRXZlbnQSDQoFcGF0aHMYASADKAkSFgoOcmVtb3ZlZF90aHJlYWQYAiABKAkSCwoDYWxsGAMgASgIKrEBCgtQYWdlQ29uc2VudBIcChhQQUdFX0NPTlNFTlRfVU5TUEVDSUZJRUQQABIWChJQQUdFX0NPTlNFTlRfT1dORUQQARIYChRQQUdFX0NPTlNFTlRfQUxMT1dFRBACEhgKFFBBR0VfQ09OU0VOVF9SRUZVU0VEEAMSGgoWUEFHRV9DT05TRU5UX05PVF9BU0tFRBAEEhwKGFBBR0VfQ09OU0VOVF9VTkFWQUlMQUJMRRAFKpcBCg9QYWdlT3duZXJTb3VyY2USIQodUEFHRV9PV05FUl9TT1VSQ0VfVU5TUEVDSUZJRUQQABIbChdQQUdFX09XTkVSX1NPVVJDRV9TSE9XThABEh0KGVBBR0VfT1dORVJfU09VUkNFX1dSSVRURU4QAhIlCiFQQUdFX09XTkVSX1NPVVJDRV9QQUdFU19ESVJFQ1RPUlkQAzKHAwoLUGFnZVNlcnZpY2USTAoHR2V0UGFnZRIeLmNvZGVmb3VuZHJ5LnYxLkdldFBhZ2VSZXF1ZXN0Gh8uY29kZWZvdW5kcnkudjEuR2V0UGFnZVJlc3BvbnNlIgASYAoLUGFnZVN0b3JhZ2USJi5jb2RlZm91bmRyeS52MS5QYWdlRmlsZVN0b3JhZ2VSZXF1ZXN0GicuY29kZWZvdW5kcnkudjEuUGFnZUZpbGVTdG9yYWdlUmVzcG9uc2UiABJpCg5TZXRQYWdlU3RvcmFnZRIpLmNvZGVmb3VuZHJ5LnYxLlNldFBhZ2VGaWxlU3RvcmFnZVJlcXVlc3QaKi5jb2RlZm91bmRyeS52MS5TZXRQYWdlRmlsZVN0b3JhZ2VSZXNwb25zZSIAEl0KClByb3h5RmV0Y2gSJS5jb2RlZm91bmRyeS52MS5QYWdlUHJveHlGZXRjaFJlcXVlc3QaJi5jb2RlZm91bmRyeS52MS5QYWdlUHJveHlGZXRjaFJlc3BvbnNlIgBCwQEKEmNvbS5jb2RlZm91bmRyeS52MUIJUGFnZVByb3RvUAFaR2dpdGh1Yi5jb20vYWxleHdhdW1hbm4vY29kZS1mb3VuZHJ5L2dlbi9nby9jb2RlZm91bmRyeS92MTtjb2RlZm91bmRyeXYxogIDQ1hYqgIOQ29kZWZvdW5kcnkuVjHKAg5Db2RlZm91bmRyeVxWMeICGkNvZGVmb3VuZHJ5XFYxXEdQQk1ldGFkYXRh6gIPQ29kZWZvdW5kcnk6OlYxYgZwcm90bzM");
+
+/**
+ * PageOwner is one thread that owns a page.
+ *
+ * @generated from message codefoundry.v1.PageOwner
+ */
+export type PageOwner = Message<"codefoundry.v1.PageOwner"> & {
+  /**
+   * @generated from field: string thread_id = 1;
+   */
+  threadId: string;
+
+  /**
+   * @generated from field: codefoundry.v1.PageOwnerSource source = 2;
+   */
+  source: PageOwnerSource;
+};
+
+/**
+ * Describes the message codefoundry.v1.PageOwner.
+ * Use `create(PageOwnerSchema)` to create a new message.
+ */
+export const PageOwnerSchema: GenMessage<PageOwner> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_page, 0);
 
 /**
  * PageAccess is what the daemon says about one page file.
@@ -27,14 +51,18 @@ export type PageAccess = Message<"codefoundry.v1.PageAccess"> & {
   path: string;
 
   /**
-   * The thread that owns the page, whose bridge it gets (the thread named), whatever
-   * thread the tab showing it is linked to. Empty: no thread owns it.
+   * The page's first owner (owners[0]): the thread a page acts for where no thread of its
+   * own is given, such as a File tab linked to a thread that is not one of its owners
+   * (docs/notes/page-storage-per-file.md). It stays the same while that thread exists,
+   * whoever shows or writes the page later. Empty: no thread owns it.
    *
    * @generated from field: string owner_thread = 2;
    */
   ownerThread: string;
 
   /**
+   * How owner_thread came to own the page.
+   *
    * @generated from field: codefoundry.v1.PageOwnerSource owner_source = 3;
    */
   ownerSource: PageOwnerSource;
@@ -60,6 +88,26 @@ export type PageAccess = Message<"codefoundry.v1.PageAccess"> & {
    * @generated from field: string unavailable_reason = 6;
    */
   unavailableReason: string;
+
+  /**
+   * Every thread that owns the page: each that showed or wrote it, and the thread whose
+   * pages directory holds it; that thread first, then the others by when they first
+   * showed or wrote it, oldest first. A removed thread's claim goes with it; the page is
+   * no thread's only once none is left. A File tab acts for its own thread when that is
+   * one of them, else for owner_thread; a thread's card acts for its thread.
+   *
+   * @generated from field: repeated codefoundry.v1.PageOwner owners = 7;
+   */
+  owners: PageOwner[];
+
+  /**
+   * The page's cf.storage is its file's (PageService.PageStorage), whichever thread the
+   * page acts for. Set by every daemon that keeps storage per page file; unset (an older
+   * daemon), a thread's page keeps it in the thread's (ThreadService.PageStorage).
+   *
+   * @generated from field: bool storage_per_file = 8;
+   */
+  storagePerFile: boolean;
 };
 
 /**
@@ -67,7 +115,7 @@ export type PageAccess = Message<"codefoundry.v1.PageAccess"> & {
  * Use `create(PageAccessSchema)` to create a new message.
  */
 export const PageAccessSchema: GenMessage<PageAccess> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_page, 0);
+  messageDesc(file_codefoundry_v1_page, 1);
 
 /**
  * @generated from message codefoundry.v1.GetPageRequest
@@ -84,7 +132,7 @@ export type GetPageRequest = Message<"codefoundry.v1.GetPageRequest"> & {
  * Use `create(GetPageRequestSchema)` to create a new message.
  */
 export const GetPageRequestSchema: GenMessage<GetPageRequest> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_page, 1);
+  messageDesc(file_codefoundry_v1_page, 2);
 
 /**
  * @generated from message codefoundry.v1.GetPageResponse
@@ -101,7 +149,7 @@ export type GetPageResponse = Message<"codefoundry.v1.GetPageResponse"> & {
  * Use `create(GetPageResponseSchema)` to create a new message.
  */
 export const GetPageResponseSchema: GenMessage<GetPageResponse> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_page, 2);
+  messageDesc(file_codefoundry_v1_page, 3);
 
 /**
  * @generated from message codefoundry.v1.PageFileStorageRequest
@@ -118,7 +166,7 @@ export type PageFileStorageRequest = Message<"codefoundry.v1.PageFileStorageRequ
  * Use `create(PageFileStorageRequestSchema)` to create a new message.
  */
 export const PageFileStorageRequestSchema: GenMessage<PageFileStorageRequest> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_page, 3);
+  messageDesc(file_codefoundry_v1_page, 4);
 
 /**
  * @generated from message codefoundry.v1.PageFileStorageResponse
@@ -137,7 +185,7 @@ export type PageFileStorageResponse = Message<"codefoundry.v1.PageFileStorageRes
  * Use `create(PageFileStorageResponseSchema)` to create a new message.
  */
 export const PageFileStorageResponseSchema: GenMessage<PageFileStorageResponse> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_page, 4);
+  messageDesc(file_codefoundry_v1_page, 5);
 
 /**
  * @generated from message codefoundry.v1.SetPageFileStorageRequest
@@ -166,7 +214,7 @@ export type SetPageFileStorageRequest = Message<"codefoundry.v1.SetPageFileStora
  * Use `create(SetPageFileStorageRequestSchema)` to create a new message.
  */
 export const SetPageFileStorageRequestSchema: GenMessage<SetPageFileStorageRequest> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_page, 5);
+  messageDesc(file_codefoundry_v1_page, 6);
 
 /**
  * @generated from message codefoundry.v1.SetPageFileStorageResponse
@@ -185,7 +233,7 @@ export type SetPageFileStorageResponse = Message<"codefoundry.v1.SetPageFileStor
  * Use `create(SetPageFileStorageResponseSchema)` to create a new message.
  */
 export const SetPageFileStorageResponseSchema: GenMessage<SetPageFileStorageResponse> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_page, 6);
+  messageDesc(file_codefoundry_v1_page, 7);
 
 /**
  * @generated from message codefoundry.v1.PageProxyFetchRequest
@@ -237,7 +285,7 @@ export type PageProxyFetchRequest = Message<"codefoundry.v1.PageProxyFetchReques
  * Use `create(PageProxyFetchRequestSchema)` to create a new message.
  */
 export const PageProxyFetchRequestSchema: GenMessage<PageProxyFetchRequest> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_page, 7);
+  messageDesc(file_codefoundry_v1_page, 8);
 
 /**
  * @generated from message codefoundry.v1.PageProxyFetchResponse
@@ -280,13 +328,13 @@ export type PageProxyFetchResponse = Message<"codefoundry.v1.PageProxyFetchRespo
  * Use `create(PageProxyFetchResponseSchema)` to create a new message.
  */
 export const PageProxyFetchResponseSchema: GenMessage<PageProxyFetchResponse> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_page, 8);
+  messageDesc(file_codefoundry_v1_page, 9);
 
 /**
  * PageEvent says which pages the daemon may now answer otherwise for (an owner, the user's
  * answer), so a client showing one reads its answer again (FilesystemService.PreviewFile or
  * GetPage) and every frame on it follows: a page refused in one window or from the CLI stops
- * in every window, and a page whose owning thread is removed is asked about again. It is
+ * in every window, and a page whose last owning thread is removed is asked about again. It is
  * EventService's page source (EVENT_SOURCE_PAGE). It names pages, never their answer, and
  * may name one whose answer did not change.
  *
@@ -294,14 +342,15 @@ export const PageProxyFetchResponseSchema: GenMessage<PageProxyFetchResponse> = 
  */
 export type PageEvent = Message<"codefoundry.v1.PageEvent"> & {
   /**
-   * The resolved paths (PageAccess.path) whose owner or answer changed.
+   * The resolved paths (PageAccess.path) that got an owner (owners) or another answer.
    *
    * @generated from field: repeated string paths = 1;
    */
   paths: string[];
 
   /**
-   * A thread that was removed: every page it owned (owner_thread) has no owner now.
+   * A thread that was removed: every page it owned lost it from owners (and has no owner
+   * now when it was the last).
    *
    * @generated from field: string removed_thread = 2;
    */
@@ -321,7 +370,7 @@ export type PageEvent = Message<"codefoundry.v1.PageEvent"> & {
  * Use `create(PageEventSchema)` to create a new message.
  */
 export const PageEventSchema: GenMessage<PageEvent> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_page, 9);
+  messageDesc(file_codefoundry_v1_page, 10);
 
 /**
  * The user's answer for a page, and whether the page may use the bridge.
@@ -391,22 +440,23 @@ export enum PageOwnerSource {
   UNSPECIFIED = 0,
 
   /**
-   * The thread last showed it (view.inline, view.open.page).
+   * The thread showed it (view.inline, view.open.page), the last it did with the page.
    *
    * @generated from enum value: PAGE_OWNER_SOURCE_SHOWN = 1;
    */
   SHOWN = 1,
 
   /**
-   * The thread's Claude last wrote or edited it (Write, Edit, MultiEdit).
+   * The thread's Claude wrote or edited it (Write, Edit, MultiEdit), the last it did
+   * with the page.
    *
    * @generated from enum value: PAGE_OWNER_SOURCE_WRITTEN = 2;
    */
   WRITTEN = 2,
 
   /**
-   * It lies in the thread's pages directory (<home>/pages/<thread id>/) and no thread
-   * showed or wrote it since.
+   * It lies in the thread's pages directory (<home>/pages/<thread id>/), and the thread
+   * neither showed nor wrote it.
    *
    * @generated from enum value: PAGE_OWNER_SOURCE_PAGES_DIRECTORY = 3;
    */
@@ -448,11 +498,12 @@ export const PageService: GenService<{
     output: typeof GetPageResponseSchema;
   },
   /**
-   * PageStorage is what a page no thread owns keeps with cf.storage: one JSON object per
-   * page file, handed back to the page as it loads. FailedPrecondition while the user has
-   * not answered for the page (NOT_ASKED), PermissionDenied when they did not allow it.
-   * A page a thread owns may use it too, but its frame uses ThreadService.PageStorage of
-   * its owner instead.
+   * PageStorage is what a page keeps with cf.storage: one JSON object per page file,
+   * whichever thread the page acts for and whether or not a thread owns it
+   * (docs/notes/page-storage-per-file.md), handed back to the page as it loads. Any page
+   * the bridge is given may use it: one a thread owns, or one the user allowed.
+   * FailedPrecondition while no thread owns the page and the user has not answered for
+   * it (NOT_ASKED), PermissionDenied when they did not allow it.
    *
    * @generated from rpc codefoundry.v1.PageService.PageStorage
    */
@@ -463,9 +514,9 @@ export const PageService: GenService<{
   },
   /**
    * SetPageStorage sets or removes one key of a page's storage and returns the storage
-   * after. The limits of a thread's: InvalidArgument for an empty or too long key (1
-   * KiB), a value that is not JSON, or a storage that would grow over 256 KiB per page
-   * (nothing is written then). The consent errors of PageStorage.
+   * after. InvalidArgument for an empty or too long key (1 KiB), a value that is not
+   * JSON, or a storage that would grow over 256 KiB per page (nothing is written then).
+   * The consent errors of PageStorage.
    *
    * @generated from rpc codefoundry.v1.PageService.SetPageStorage
    */

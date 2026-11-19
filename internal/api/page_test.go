@@ -105,6 +105,32 @@ func TestFilesystemPreviewFilePage(t *testing.T) {
 			t.Errorf("%s: path %q", tc.path, p.GetPath())
 		}
 	}
+	// Every owner, the pages directory's thread first; storage is the file's.
+	if err := e.store.Record(ctx, "t-1", filepath.Join(e.root, ".code-foundry/pages/t-1/own.html"), page.Shown); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := e.store.SetConsent(ctx, filepath.Join(e.root, "allowed.html"), true); err != nil {
+		t.Fatal(err)
+	}
+	for path, want := range map[string][]*v1.PageOwner{
+		"owned.html":                       {{ThreadId: "t-1", Source: v1.PageOwnerSource_PAGE_OWNER_SOURCE_WRITTEN}},
+		".code-foundry/pages/t-1/own.html": {{ThreadId: "t-1", Source: v1.PageOwnerSource_PAGE_OWNER_SOURCE_SHOWN}},
+		"allowed.html":                     nil,
+	} {
+		res, err := h.PreviewFile(ctx, connect.NewRequest(&v1.PreviewFileRequest{Path: filepath.Join(e.root, path)}))
+		if err != nil {
+			t.Fatal(err)
+		}
+		p := res.Msg.GetPage()
+		if !p.GetStoragePerFile() || len(p.GetOwners()) != len(want) {
+			t.Fatalf("%s: %v; want owners %v and storage per file", path, p, want)
+		}
+		for i, o := range want {
+			if got := p.GetOwners()[i]; got.GetThreadId() != o.GetThreadId() || got.GetSource() != o.GetSource() {
+				t.Errorf("%s: owner %d %v, want %v", path, i, got, o)
+			}
+		}
+	}
 	res, err := NewFilesystem(e.root, projecttest.New(nil), testGrants(e.root)).PreviewFile(ctx,
 		connect.NewRequest(&v1.PreviewFileRequest{Path: filepath.Join(e.root, "owned.html")}))
 	if err != nil || res.Msg.Page != nil {

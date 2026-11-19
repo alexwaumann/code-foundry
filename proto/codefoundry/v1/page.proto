@@ -18,16 +18,17 @@ package codefoundry.v1;
 service PageService {
   // GetPage says who owns the page and whether it may use the bridge.
   rpc GetPage(GetPageRequest) returns (GetPageResponse) {}
-  // PageStorage is what a page no thread owns keeps with cf.storage: one JSON object per
-  // page file, handed back to the page as it loads. FailedPrecondition while the user has
-  // not answered for the page (NOT_ASKED), PermissionDenied when they did not allow it.
-  // A page a thread owns may use it too, but its frame uses ThreadService.PageStorage of
-  // its owner instead.
+  // PageStorage is what a page keeps with cf.storage: one JSON object per page file,
+  // whichever thread the page acts for and whether or not a thread owns it
+  // (docs/notes/page-storage-per-file.md), handed back to the page as it loads. Any page
+  // the bridge is given may use it: one a thread owns, or one the user allowed.
+  // FailedPrecondition while no thread owns the page and the user has not answered for
+  // it (NOT_ASKED), PermissionDenied when they did not allow it.
   rpc PageStorage(PageFileStorageRequest) returns (PageFileStorageResponse) {}
   // SetPageStorage sets or removes one key of a page's storage and returns the storage
-  // after. The limits of a thread's: InvalidArgument for an empty or too long key (1
-  // KiB), a value that is not JSON, or a storage that would grow over 256 KiB per page
-  // (nothing is written then). The consent errors of PageStorage.
+  // after. InvalidArgument for an empty or too long key (1 KiB), a value that is not
+  // JSON, or a storage that would grow over 256 KiB per page (nothing is written then).
+  // The consent errors of PageStorage.
   rpc SetPageStorage(SetPageFileStorageRequest) returns (SetPageFileStorageResponse) {}
   // ProxyFetch is ThreadService.ProxyFetch for a page no thread owns: the same rules,
   // limits and errors, at most 8 requests at once per page file (more wait). The consent
@@ -55,13 +56,20 @@ enum PageConsent {
 // How a thread came to own a page.
 enum PageOwnerSource {
   PAGE_OWNER_SOURCE_UNSPECIFIED = 0;
-  // The thread last showed it (view.inline, view.open.page).
+  // The thread showed it (view.inline, view.open.page), the last it did with the page.
   PAGE_OWNER_SOURCE_SHOWN = 1;
-  // The thread's Claude last wrote or edited it (Write, Edit, MultiEdit).
+  // The thread's Claude wrote or edited it (Write, Edit, MultiEdit), the last it did
+  // with the page.
   PAGE_OWNER_SOURCE_WRITTEN = 2;
-  // It lies in the thread's pages directory (<home>/pages/<thread id>/) and no thread
-  // showed or wrote it since.
+  // It lies in the thread's pages directory (<home>/pages/<thread id>/), and the thread
+  // neither showed nor wrote it.
   PAGE_OWNER_SOURCE_PAGES_DIRECTORY = 3;
+}
+
+// PageOwner is one thread that owns a page.
+message PageOwner {
+  string thread_id = 1;
+  PageOwnerSource source = 2;
 }
 
 // PageAccess is what the daemon says about one page file.
@@ -69,9 +77,12 @@ message PageAccess {
   // The file's absolute path with its symlinks resolved: the key the answer, the storage
   // and the fetch cap are kept by. Empty with UNAVAILABLE when it could not be resolved.
   string path = 1;
-  // The thread that owns the page, whose bridge it gets (the thread named), whatever
-  // thread the tab showing it is linked to. Empty: no thread owns it.
+  // The page's first owner (owners[0]): the thread a page acts for where no thread of its
+  // own is given, such as a File tab linked to a thread that is not one of its owners
+  // (docs/notes/page-storage-per-file.md). It stays the same while that thread exists,
+  // whoever shows or writes the page later. Empty: no thread owns it.
   string owner_thread = 2;
+  // How owner_thread came to own the page.
   PageOwnerSource owner_source = 3;
   // Whether the page may use the bridge: OWNED and ALLOWED may.
   PageConsent consent = 4;
@@ -80,6 +91,16 @@ message PageAccess {
   PageConsent answer = 5;
   // Why the page is UNAVAILABLE, for the frame's notice.
   string unavailable_reason = 6;
+  // Every thread that owns the page: each that showed or wrote it, and the thread whose
+  // pages directory holds it; that thread first, then the others by when they first
+  // showed or wrote it, oldest first. A removed thread's claim goes with it; the page is
+  // no thread's only once none is left. A File tab acts for its own thread when that is
+  // one of them, else for owner_thread; a thread's card acts for its thread.
+  repeated PageOwner owners = 7;
+  // The page's cf.storage is its file's (PageService.PageStorage), whichever thread the
+  // page acts for. Set by every daemon that keeps storage per page file; unset (an older
+  // daemon), a thread's page keeps it in the thread's (ThreadService.PageStorage).
+  bool storage_per_file = 8;
 }
 
 message GetPageRequest {
@@ -139,13 +160,14 @@ message PageProxyFetchResponse {
 // PageEvent says which pages the daemon may now answer otherwise for (an owner, the user's
 // answer), so a client showing one reads its answer again (FilesystemService.PreviewFile or
 // GetPage) and every frame on it follows: a page refused in one window or from the CLI stops
-// in every window, and a page whose owning thread is removed is asked about again. It is
+// in every window, and a page whose last owning thread is removed is asked about again. It is
 // EventService's page source (EVENT_SOURCE_PAGE). It names pages, never their answer, and
 // may name one whose answer did not change.
 message PageEvent {
-  // The resolved paths (PageAccess.path) whose owner or answer changed.
+  // The resolved paths (PageAccess.path) that got an owner (owners) or another answer.
   repeated string paths = 1;
-  // A thread that was removed: every page it owned (owner_thread) has no owner now.
+  // A thread that was removed: every page it owned lost it from owners (and has no owner
+  // now when it was the last).
   string removed_thread = 2;
   // Any page may have changed: the source's snapshot (on connect, and after the client
   // missed events). Read every page shown again.

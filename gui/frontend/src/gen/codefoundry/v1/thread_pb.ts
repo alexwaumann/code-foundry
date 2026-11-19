@@ -4252,10 +4252,12 @@ export const ThreadService: GenService<{
     output: typeof AddThreadNoteResponseSchema;
   },
   /**
-   * PageStorage returns what the thread's pages keep with the bridge's cf.storage: the
-   * GUI host hands it to a page as it loads (docs/notes/bridge-fix-storage.md). Kept by
-   * the daemon, one file per thread, because WebKit keeps a page frame's own
-   * localStorage for the session only. NotFound for an unknown thread.
+   * PageStorage returns a thread's own page storage, one file per thread
+   * (docs/notes/bridge-fix-storage.md): where cf.storage was kept before a page's storage
+   * became its file's (PageService.PageStorage, PageAccess.storage_per_file;
+   * docs/notes/page-storage-per-file.md). A GUI that reads PageAccess.storage_per_file
+   * never calls it for a page; it still answers, for an older GUI, and its file is never
+   * rewritten by the daemon. NotFound for an unknown thread.
    *
    * @generated from rpc codefoundry.v1.ThreadService.PageStorage
    */
@@ -4265,9 +4267,10 @@ export const ThreadService: GenService<{
     output: typeof PageStorageResponseSchema;
   },
   /**
-   * SetPageStorage sets or removes one key of a thread's page storage and returns the
-   * storage after. InvalidArgument for an empty or too long key (1 KiB), a value that is
-   * not JSON, or a storage that would grow over 256 KiB (nothing is written then).
+   * SetPageStorage sets or removes one key of a thread's own page storage (PageStorage)
+   * and returns the storage after. InvalidArgument for an empty or too long key (1 KiB),
+   * a value that is not JSON, or a storage that would grow over 256 KiB (nothing is
+   * written then).
    *
    * @generated from rpc codefoundry.v1.ThreadService.SetPageStorage
    */

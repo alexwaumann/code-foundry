@@ -48,16 +48,17 @@ const (
 type PageServiceClient interface {
 	// GetPage says who owns the page and whether it may use the bridge.
 	GetPage(context.Context, *connect.Request[v1.GetPageRequest]) (*connect.Response[v1.GetPageResponse], error)
-	// PageStorage is what a page no thread owns keeps with cf.storage: one JSON object per
-	// page file, handed back to the page as it loads. FailedPrecondition while the user has
-	// not answered for the page (NOT_ASKED), PermissionDenied when they did not allow it.
-	// A page a thread owns may use it too, but its frame uses ThreadService.PageStorage of
-	// its owner instead.
+	// PageStorage is what a page keeps with cf.storage: one JSON object per page file,
+	// whichever thread the page acts for and whether or not a thread owns it
+	// (docs/notes/page-storage-per-file.md), handed back to the page as it loads. Any page
+	// the bridge is given may use it: one a thread owns, or one the user allowed.
+	// FailedPrecondition while no thread owns the page and the user has not answered for
+	// it (NOT_ASKED), PermissionDenied when they did not allow it.
 	PageStorage(context.Context, *connect.Request[v1.PageFileStorageRequest]) (*connect.Response[v1.PageFileStorageResponse], error)
 	// SetPageStorage sets or removes one key of a page's storage and returns the storage
-	// after. The limits of a thread's: InvalidArgument for an empty or too long key (1
-	// KiB), a value that is not JSON, or a storage that would grow over 256 KiB per page
-	// (nothing is written then). The consent errors of PageStorage.
+	// after. InvalidArgument for an empty or too long key (1 KiB), a value that is not
+	// JSON, or a storage that would grow over 256 KiB per page (nothing is written then).
+	// The consent errors of PageStorage.
 	SetPageStorage(context.Context, *connect.Request[v1.SetPageFileStorageRequest]) (*connect.Response[v1.SetPageFileStorageResponse], error)
 	// ProxyFetch is ThreadService.ProxyFetch for a page no thread owns: the same rules,
 	// limits and errors, at most 8 requests at once per page file (more wait). The consent
@@ -135,16 +136,17 @@ func (c *pageServiceClient) ProxyFetch(ctx context.Context, req *connect.Request
 type PageServiceHandler interface {
 	// GetPage says who owns the page and whether it may use the bridge.
 	GetPage(context.Context, *connect.Request[v1.GetPageRequest]) (*connect.Response[v1.GetPageResponse], error)
-	// PageStorage is what a page no thread owns keeps with cf.storage: one JSON object per
-	// page file, handed back to the page as it loads. FailedPrecondition while the user has
-	// not answered for the page (NOT_ASKED), PermissionDenied when they did not allow it.
-	// A page a thread owns may use it too, but its frame uses ThreadService.PageStorage of
-	// its owner instead.
+	// PageStorage is what a page keeps with cf.storage: one JSON object per page file,
+	// whichever thread the page acts for and whether or not a thread owns it
+	// (docs/notes/page-storage-per-file.md), handed back to the page as it loads. Any page
+	// the bridge is given may use it: one a thread owns, or one the user allowed.
+	// FailedPrecondition while no thread owns the page and the user has not answered for
+	// it (NOT_ASKED), PermissionDenied when they did not allow it.
 	PageStorage(context.Context, *connect.Request[v1.PageFileStorageRequest]) (*connect.Response[v1.PageFileStorageResponse], error)
 	// SetPageStorage sets or removes one key of a page's storage and returns the storage
-	// after. The limits of a thread's: InvalidArgument for an empty or too long key (1
-	// KiB), a value that is not JSON, or a storage that would grow over 256 KiB per page
-	// (nothing is written then). The consent errors of PageStorage.
+	// after. InvalidArgument for an empty or too long key (1 KiB), a value that is not
+	// JSON, or a storage that would grow over 256 KiB per page (nothing is written then).
+	// The consent errors of PageStorage.
 	SetPageStorage(context.Context, *connect.Request[v1.SetPageFileStorageRequest]) (*connect.Response[v1.SetPageFileStorageResponse], error)
 	// ProxyFetch is ThreadService.ProxyFetch for a page no thread owns: the same rules,
 	// limits and errors, at most 8 requests at once per page file (more wait). The consent

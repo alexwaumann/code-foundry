@@ -92,12 +92,13 @@ type PageOwnerSource int32
 
 const (
 	PageOwnerSource_PAGE_OWNER_SOURCE_UNSPECIFIED PageOwnerSource = 0
-	// The thread last showed it (view.inline, view.open.page).
+	// The thread showed it (view.inline, view.open.page), the last it did with the page.
 	PageOwnerSource_PAGE_OWNER_SOURCE_SHOWN PageOwnerSource = 1
-	// The thread's Claude last wrote or edited it (Write, Edit, MultiEdit).
+	// The thread's Claude wrote or edited it (Write, Edit, MultiEdit), the last it did
+	// with the page.
 	PageOwnerSource_PAGE_OWNER_SOURCE_WRITTEN PageOwnerSource = 2
-	// It lies in the thread's pages directory (<home>/pages/<thread id>/) and no thread
-	// showed or wrote it since.
+	// It lies in the thread's pages directory (<home>/pages/<thread id>/), and the thread
+	// neither showed nor wrote it.
 	PageOwnerSource_PAGE_OWNER_SOURCE_PAGES_DIRECTORY PageOwnerSource = 3
 )
 
@@ -144,15 +145,71 @@ func (PageOwnerSource) EnumDescriptor() ([]byte, []int) {
 	return file_codefoundry_v1_page_proto_rawDescGZIP(), []int{1}
 }
 
+// PageOwner is one thread that owns a page.
+type PageOwner struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ThreadId      string                 `protobuf:"bytes,1,opt,name=thread_id,json=threadId,proto3" json:"thread_id,omitempty"`
+	Source        PageOwnerSource        `protobuf:"varint,2,opt,name=source,proto3,enum=codefoundry.v1.PageOwnerSource" json:"source,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PageOwner) Reset() {
+	*x = PageOwner{}
+	mi := &file_codefoundry_v1_page_proto_msgTypes[0]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PageOwner) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PageOwner) ProtoMessage() {}
+
+func (x *PageOwner) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_page_proto_msgTypes[0]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PageOwner.ProtoReflect.Descriptor instead.
+func (*PageOwner) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_page_proto_rawDescGZIP(), []int{0}
+}
+
+func (x *PageOwner) GetThreadId() string {
+	if x != nil {
+		return x.ThreadId
+	}
+	return ""
+}
+
+func (x *PageOwner) GetSource() PageOwnerSource {
+	if x != nil {
+		return x.Source
+	}
+	return PageOwnerSource_PAGE_OWNER_SOURCE_UNSPECIFIED
+}
+
 // PageAccess is what the daemon says about one page file.
 type PageAccess struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// The file's absolute path with its symlinks resolved: the key the answer, the storage
 	// and the fetch cap are kept by. Empty with UNAVAILABLE when it could not be resolved.
 	Path string `protobuf:"bytes,1,opt,name=path,proto3" json:"path,omitempty"`
-	// The thread that owns the page, whose bridge it gets (the thread named), whatever
-	// thread the tab showing it is linked to. Empty: no thread owns it.
-	OwnerThread string          `protobuf:"bytes,2,opt,name=owner_thread,json=ownerThread,proto3" json:"owner_thread,omitempty"`
+	// The page's first owner (owners[0]): the thread a page acts for where no thread of its
+	// own is given, such as a File tab linked to a thread that is not one of its owners
+	// (docs/notes/page-storage-per-file.md). It stays the same while that thread exists,
+	// whoever shows or writes the page later. Empty: no thread owns it.
+	OwnerThread string `protobuf:"bytes,2,opt,name=owner_thread,json=ownerThread,proto3" json:"owner_thread,omitempty"`
+	// How owner_thread came to own the page.
 	OwnerSource PageOwnerSource `protobuf:"varint,3,opt,name=owner_source,json=ownerSource,proto3,enum=codefoundry.v1.PageOwnerSource" json:"owner_source,omitempty"`
 	// Whether the page may use the bridge: OWNED and ALLOWED may.
 	Consent PageConsent `protobuf:"varint,4,opt,name=consent,proto3,enum=codefoundry.v1.PageConsent" json:"consent,omitempty"`
@@ -161,13 +218,23 @@ type PageAccess struct {
 	Answer PageConsent `protobuf:"varint,5,opt,name=answer,proto3,enum=codefoundry.v1.PageConsent" json:"answer,omitempty"`
 	// Why the page is UNAVAILABLE, for the frame's notice.
 	UnavailableReason string `protobuf:"bytes,6,opt,name=unavailable_reason,json=unavailableReason,proto3" json:"unavailable_reason,omitempty"`
-	unknownFields     protoimpl.UnknownFields
-	sizeCache         protoimpl.SizeCache
+	// Every thread that owns the page: each that showed or wrote it, and the thread whose
+	// pages directory holds it; that thread first, then the others by when they first
+	// showed or wrote it, oldest first. A removed thread's claim goes with it; the page is
+	// no thread's only once none is left. A File tab acts for its own thread when that is
+	// one of them, else for owner_thread; a thread's card acts for its thread.
+	Owners []*PageOwner `protobuf:"bytes,7,rep,name=owners,proto3" json:"owners,omitempty"`
+	// The page's cf.storage is its file's (PageService.PageStorage), whichever thread the
+	// page acts for. Set by every daemon that keeps storage per page file; unset (an older
+	// daemon), a thread's page keeps it in the thread's (ThreadService.PageStorage).
+	StoragePerFile bool `protobuf:"varint,8,opt,name=storage_per_file,json=storagePerFile,proto3" json:"storage_per_file,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *PageAccess) Reset() {
 	*x = PageAccess{}
-	mi := &file_codefoundry_v1_page_proto_msgTypes[0]
+	mi := &file_codefoundry_v1_page_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -179,7 +246,7 @@ func (x *PageAccess) String() string {
 func (*PageAccess) ProtoMessage() {}
 
 func (x *PageAccess) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_page_proto_msgTypes[0]
+	mi := &file_codefoundry_v1_page_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -192,7 +259,7 @@ func (x *PageAccess) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PageAccess.ProtoReflect.Descriptor instead.
 func (*PageAccess) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_page_proto_rawDescGZIP(), []int{0}
+	return file_codefoundry_v1_page_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *PageAccess) GetPath() string {
@@ -237,6 +304,20 @@ func (x *PageAccess) GetUnavailableReason() string {
 	return ""
 }
 
+func (x *PageAccess) GetOwners() []*PageOwner {
+	if x != nil {
+		return x.Owners
+	}
+	return nil
+}
+
+func (x *PageAccess) GetStoragePerFile() bool {
+	if x != nil {
+		return x.StoragePerFile
+	}
+	return false
+}
+
 type GetPageRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Path          string                 `protobuf:"bytes,1,opt,name=path,proto3" json:"path,omitempty"`
@@ -246,7 +327,7 @@ type GetPageRequest struct {
 
 func (x *GetPageRequest) Reset() {
 	*x = GetPageRequest{}
-	mi := &file_codefoundry_v1_page_proto_msgTypes[1]
+	mi := &file_codefoundry_v1_page_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -258,7 +339,7 @@ func (x *GetPageRequest) String() string {
 func (*GetPageRequest) ProtoMessage() {}
 
 func (x *GetPageRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_page_proto_msgTypes[1]
+	mi := &file_codefoundry_v1_page_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -271,7 +352,7 @@ func (x *GetPageRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetPageRequest.ProtoReflect.Descriptor instead.
 func (*GetPageRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_page_proto_rawDescGZIP(), []int{1}
+	return file_codefoundry_v1_page_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *GetPageRequest) GetPath() string {
@@ -290,7 +371,7 @@ type GetPageResponse struct {
 
 func (x *GetPageResponse) Reset() {
 	*x = GetPageResponse{}
-	mi := &file_codefoundry_v1_page_proto_msgTypes[2]
+	mi := &file_codefoundry_v1_page_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -302,7 +383,7 @@ func (x *GetPageResponse) String() string {
 func (*GetPageResponse) ProtoMessage() {}
 
 func (x *GetPageResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_page_proto_msgTypes[2]
+	mi := &file_codefoundry_v1_page_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -315,7 +396,7 @@ func (x *GetPageResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetPageResponse.ProtoReflect.Descriptor instead.
 func (*GetPageResponse) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_page_proto_rawDescGZIP(), []int{2}
+	return file_codefoundry_v1_page_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *GetPageResponse) GetPage() *PageAccess {
@@ -334,7 +415,7 @@ type PageFileStorageRequest struct {
 
 func (x *PageFileStorageRequest) Reset() {
 	*x = PageFileStorageRequest{}
-	mi := &file_codefoundry_v1_page_proto_msgTypes[3]
+	mi := &file_codefoundry_v1_page_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -346,7 +427,7 @@ func (x *PageFileStorageRequest) String() string {
 func (*PageFileStorageRequest) ProtoMessage() {}
 
 func (x *PageFileStorageRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_page_proto_msgTypes[3]
+	mi := &file_codefoundry_v1_page_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -359,7 +440,7 @@ func (x *PageFileStorageRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PageFileStorageRequest.ProtoReflect.Descriptor instead.
 func (*PageFileStorageRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_page_proto_rawDescGZIP(), []int{3}
+	return file_codefoundry_v1_page_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *PageFileStorageRequest) GetPath() string {
@@ -379,7 +460,7 @@ type PageFileStorageResponse struct {
 
 func (x *PageFileStorageResponse) Reset() {
 	*x = PageFileStorageResponse{}
-	mi := &file_codefoundry_v1_page_proto_msgTypes[4]
+	mi := &file_codefoundry_v1_page_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -391,7 +472,7 @@ func (x *PageFileStorageResponse) String() string {
 func (*PageFileStorageResponse) ProtoMessage() {}
 
 func (x *PageFileStorageResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_page_proto_msgTypes[4]
+	mi := &file_codefoundry_v1_page_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -404,7 +485,7 @@ func (x *PageFileStorageResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PageFileStorageResponse.ProtoReflect.Descriptor instead.
 func (*PageFileStorageResponse) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_page_proto_rawDescGZIP(), []int{4}
+	return file_codefoundry_v1_page_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *PageFileStorageResponse) GetValues() map[string]string {
@@ -426,7 +507,7 @@ type SetPageFileStorageRequest struct {
 
 func (x *SetPageFileStorageRequest) Reset() {
 	*x = SetPageFileStorageRequest{}
-	mi := &file_codefoundry_v1_page_proto_msgTypes[5]
+	mi := &file_codefoundry_v1_page_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -438,7 +519,7 @@ func (x *SetPageFileStorageRequest) String() string {
 func (*SetPageFileStorageRequest) ProtoMessage() {}
 
 func (x *SetPageFileStorageRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_page_proto_msgTypes[5]
+	mi := &file_codefoundry_v1_page_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -451,7 +532,7 @@ func (x *SetPageFileStorageRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetPageFileStorageRequest.ProtoReflect.Descriptor instead.
 func (*SetPageFileStorageRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_page_proto_rawDescGZIP(), []int{5}
+	return file_codefoundry_v1_page_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *SetPageFileStorageRequest) GetPath() string {
@@ -485,7 +566,7 @@ type SetPageFileStorageResponse struct {
 
 func (x *SetPageFileStorageResponse) Reset() {
 	*x = SetPageFileStorageResponse{}
-	mi := &file_codefoundry_v1_page_proto_msgTypes[6]
+	mi := &file_codefoundry_v1_page_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -497,7 +578,7 @@ func (x *SetPageFileStorageResponse) String() string {
 func (*SetPageFileStorageResponse) ProtoMessage() {}
 
 func (x *SetPageFileStorageResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_page_proto_msgTypes[6]
+	mi := &file_codefoundry_v1_page_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -510,7 +591,7 @@ func (x *SetPageFileStorageResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetPageFileStorageResponse.ProtoReflect.Descriptor instead.
 func (*SetPageFileStorageResponse) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_page_proto_rawDescGZIP(), []int{6}
+	return file_codefoundry_v1_page_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *SetPageFileStorageResponse) GetValues() map[string]string {
@@ -539,7 +620,7 @@ type PageProxyFetchRequest struct {
 
 func (x *PageProxyFetchRequest) Reset() {
 	*x = PageProxyFetchRequest{}
-	mi := &file_codefoundry_v1_page_proto_msgTypes[7]
+	mi := &file_codefoundry_v1_page_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -551,7 +632,7 @@ func (x *PageProxyFetchRequest) String() string {
 func (*PageProxyFetchRequest) ProtoMessage() {}
 
 func (x *PageProxyFetchRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_page_proto_msgTypes[7]
+	mi := &file_codefoundry_v1_page_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -564,7 +645,7 @@ func (x *PageProxyFetchRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PageProxyFetchRequest.ProtoReflect.Descriptor instead.
 func (*PageProxyFetchRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_page_proto_rawDescGZIP(), []int{7}
+	return file_codefoundry_v1_page_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *PageProxyFetchRequest) GetPath() string {
@@ -625,7 +706,7 @@ type PageProxyFetchResponse struct {
 
 func (x *PageProxyFetchResponse) Reset() {
 	*x = PageProxyFetchResponse{}
-	mi := &file_codefoundry_v1_page_proto_msgTypes[8]
+	mi := &file_codefoundry_v1_page_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -637,7 +718,7 @@ func (x *PageProxyFetchResponse) String() string {
 func (*PageProxyFetchResponse) ProtoMessage() {}
 
 func (x *PageProxyFetchResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_page_proto_msgTypes[8]
+	mi := &file_codefoundry_v1_page_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -650,7 +731,7 @@ func (x *PageProxyFetchResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PageProxyFetchResponse.ProtoReflect.Descriptor instead.
 func (*PageProxyFetchResponse) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_page_proto_rawDescGZIP(), []int{8}
+	return file_codefoundry_v1_page_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *PageProxyFetchResponse) GetStatus() uint32 {
@@ -691,14 +772,15 @@ func (x *PageProxyFetchResponse) GetStatusText() string {
 // PageEvent says which pages the daemon may now answer otherwise for (an owner, the user's
 // answer), so a client showing one reads its answer again (FilesystemService.PreviewFile or
 // GetPage) and every frame on it follows: a page refused in one window or from the CLI stops
-// in every window, and a page whose owning thread is removed is asked about again. It is
+// in every window, and a page whose last owning thread is removed is asked about again. It is
 // EventService's page source (EVENT_SOURCE_PAGE). It names pages, never their answer, and
 // may name one whose answer did not change.
 type PageEvent struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// The resolved paths (PageAccess.path) whose owner or answer changed.
+	// The resolved paths (PageAccess.path) that got an owner (owners) or another answer.
 	Paths []string `protobuf:"bytes,1,rep,name=paths,proto3" json:"paths,omitempty"`
-	// A thread that was removed: every page it owned (owner_thread) has no owner now.
+	// A thread that was removed: every page it owned lost it from owners (and has no owner
+	// now when it was the last).
 	RemovedThread string `protobuf:"bytes,2,opt,name=removed_thread,json=removedThread,proto3" json:"removed_thread,omitempty"`
 	// Any page may have changed: the source's snapshot (on connect, and after the client
 	// missed events). Read every page shown again.
@@ -709,7 +791,7 @@ type PageEvent struct {
 
 func (x *PageEvent) Reset() {
 	*x = PageEvent{}
-	mi := &file_codefoundry_v1_page_proto_msgTypes[9]
+	mi := &file_codefoundry_v1_page_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -721,7 +803,7 @@ func (x *PageEvent) String() string {
 func (*PageEvent) ProtoMessage() {}
 
 func (x *PageEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_page_proto_msgTypes[9]
+	mi := &file_codefoundry_v1_page_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -734,7 +816,7 @@ func (x *PageEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PageEvent.ProtoReflect.Descriptor instead.
 func (*PageEvent) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_page_proto_rawDescGZIP(), []int{9}
+	return file_codefoundry_v1_page_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *PageEvent) GetPaths() []string {
@@ -762,7 +844,10 @@ var File_codefoundry_v1_page_proto protoreflect.FileDescriptor
 
 const file_codefoundry_v1_page_proto_rawDesc = "" +
 	"\n" +
-	"\x19codefoundry/v1/page.proto\x12\x0ecodefoundry.v1\"\xa2\x02\n" +
+	"\x19codefoundry/v1/page.proto\x12\x0ecodefoundry.v1\"a\n" +
+	"\tPageOwner\x12\x1b\n" +
+	"\tthread_id\x18\x01 \x01(\tR\bthreadId\x127\n" +
+	"\x06source\x18\x02 \x01(\x0e2\x1f.codefoundry.v1.PageOwnerSourceR\x06source\"\xff\x02\n" +
 	"\n" +
 	"PageAccess\x12\x12\n" +
 	"\x04path\x18\x01 \x01(\tR\x04path\x12!\n" +
@@ -770,7 +855,9 @@ const file_codefoundry_v1_page_proto_rawDesc = "" +
 	"\fowner_source\x18\x03 \x01(\x0e2\x1f.codefoundry.v1.PageOwnerSourceR\vownerSource\x125\n" +
 	"\aconsent\x18\x04 \x01(\x0e2\x1b.codefoundry.v1.PageConsentR\aconsent\x123\n" +
 	"\x06answer\x18\x05 \x01(\x0e2\x1b.codefoundry.v1.PageConsentR\x06answer\x12-\n" +
-	"\x12unavailable_reason\x18\x06 \x01(\tR\x11unavailableReason\"$\n" +
+	"\x12unavailable_reason\x18\x06 \x01(\tR\x11unavailableReason\x121\n" +
+	"\x06owners\x18\a \x03(\v2\x19.codefoundry.v1.PageOwnerR\x06owners\x12(\n" +
+	"\x10storage_per_file\x18\b \x01(\bR\x0estoragePerFile\"$\n" +
 	"\x0eGetPageRequest\x12\x12\n" +
 	"\x04path\x18\x01 \x01(\tR\x04path\"A\n" +
 	"\x0fGetPageResponse\x12.\n" +
@@ -850,47 +937,50 @@ func file_codefoundry_v1_page_proto_rawDescGZIP() []byte {
 }
 
 var file_codefoundry_v1_page_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_codefoundry_v1_page_proto_msgTypes = make([]protoimpl.MessageInfo, 14)
+var file_codefoundry_v1_page_proto_msgTypes = make([]protoimpl.MessageInfo, 15)
 var file_codefoundry_v1_page_proto_goTypes = []any{
 	(PageConsent)(0),                   // 0: codefoundry.v1.PageConsent
 	(PageOwnerSource)(0),               // 1: codefoundry.v1.PageOwnerSource
-	(*PageAccess)(nil),                 // 2: codefoundry.v1.PageAccess
-	(*GetPageRequest)(nil),             // 3: codefoundry.v1.GetPageRequest
-	(*GetPageResponse)(nil),            // 4: codefoundry.v1.GetPageResponse
-	(*PageFileStorageRequest)(nil),     // 5: codefoundry.v1.PageFileStorageRequest
-	(*PageFileStorageResponse)(nil),    // 6: codefoundry.v1.PageFileStorageResponse
-	(*SetPageFileStorageRequest)(nil),  // 7: codefoundry.v1.SetPageFileStorageRequest
-	(*SetPageFileStorageResponse)(nil), // 8: codefoundry.v1.SetPageFileStorageResponse
-	(*PageProxyFetchRequest)(nil),      // 9: codefoundry.v1.PageProxyFetchRequest
-	(*PageProxyFetchResponse)(nil),     // 10: codefoundry.v1.PageProxyFetchResponse
-	(*PageEvent)(nil),                  // 11: codefoundry.v1.PageEvent
-	nil,                                // 12: codefoundry.v1.PageFileStorageResponse.ValuesEntry
-	nil,                                // 13: codefoundry.v1.SetPageFileStorageResponse.ValuesEntry
-	nil,                                // 14: codefoundry.v1.PageProxyFetchRequest.HeadersEntry
-	nil,                                // 15: codefoundry.v1.PageProxyFetchResponse.HeadersEntry
+	(*PageOwner)(nil),                  // 2: codefoundry.v1.PageOwner
+	(*PageAccess)(nil),                 // 3: codefoundry.v1.PageAccess
+	(*GetPageRequest)(nil),             // 4: codefoundry.v1.GetPageRequest
+	(*GetPageResponse)(nil),            // 5: codefoundry.v1.GetPageResponse
+	(*PageFileStorageRequest)(nil),     // 6: codefoundry.v1.PageFileStorageRequest
+	(*PageFileStorageResponse)(nil),    // 7: codefoundry.v1.PageFileStorageResponse
+	(*SetPageFileStorageRequest)(nil),  // 8: codefoundry.v1.SetPageFileStorageRequest
+	(*SetPageFileStorageResponse)(nil), // 9: codefoundry.v1.SetPageFileStorageResponse
+	(*PageProxyFetchRequest)(nil),      // 10: codefoundry.v1.PageProxyFetchRequest
+	(*PageProxyFetchResponse)(nil),     // 11: codefoundry.v1.PageProxyFetchResponse
+	(*PageEvent)(nil),                  // 12: codefoundry.v1.PageEvent
+	nil,                                // 13: codefoundry.v1.PageFileStorageResponse.ValuesEntry
+	nil,                                // 14: codefoundry.v1.SetPageFileStorageResponse.ValuesEntry
+	nil,                                // 15: codefoundry.v1.PageProxyFetchRequest.HeadersEntry
+	nil,                                // 16: codefoundry.v1.PageProxyFetchResponse.HeadersEntry
 }
 var file_codefoundry_v1_page_proto_depIdxs = []int32{
-	1,  // 0: codefoundry.v1.PageAccess.owner_source:type_name -> codefoundry.v1.PageOwnerSource
-	0,  // 1: codefoundry.v1.PageAccess.consent:type_name -> codefoundry.v1.PageConsent
-	0,  // 2: codefoundry.v1.PageAccess.answer:type_name -> codefoundry.v1.PageConsent
-	2,  // 3: codefoundry.v1.GetPageResponse.page:type_name -> codefoundry.v1.PageAccess
-	12, // 4: codefoundry.v1.PageFileStorageResponse.values:type_name -> codefoundry.v1.PageFileStorageResponse.ValuesEntry
-	13, // 5: codefoundry.v1.SetPageFileStorageResponse.values:type_name -> codefoundry.v1.SetPageFileStorageResponse.ValuesEntry
-	14, // 6: codefoundry.v1.PageProxyFetchRequest.headers:type_name -> codefoundry.v1.PageProxyFetchRequest.HeadersEntry
-	15, // 7: codefoundry.v1.PageProxyFetchResponse.headers:type_name -> codefoundry.v1.PageProxyFetchResponse.HeadersEntry
-	3,  // 8: codefoundry.v1.PageService.GetPage:input_type -> codefoundry.v1.GetPageRequest
-	5,  // 9: codefoundry.v1.PageService.PageStorage:input_type -> codefoundry.v1.PageFileStorageRequest
-	7,  // 10: codefoundry.v1.PageService.SetPageStorage:input_type -> codefoundry.v1.SetPageFileStorageRequest
-	9,  // 11: codefoundry.v1.PageService.ProxyFetch:input_type -> codefoundry.v1.PageProxyFetchRequest
-	4,  // 12: codefoundry.v1.PageService.GetPage:output_type -> codefoundry.v1.GetPageResponse
-	6,  // 13: codefoundry.v1.PageService.PageStorage:output_type -> codefoundry.v1.PageFileStorageResponse
-	8,  // 14: codefoundry.v1.PageService.SetPageStorage:output_type -> codefoundry.v1.SetPageFileStorageResponse
-	10, // 15: codefoundry.v1.PageService.ProxyFetch:output_type -> codefoundry.v1.PageProxyFetchResponse
-	12, // [12:16] is the sub-list for method output_type
-	8,  // [8:12] is the sub-list for method input_type
-	8,  // [8:8] is the sub-list for extension type_name
-	8,  // [8:8] is the sub-list for extension extendee
-	0,  // [0:8] is the sub-list for field type_name
+	1,  // 0: codefoundry.v1.PageOwner.source:type_name -> codefoundry.v1.PageOwnerSource
+	1,  // 1: codefoundry.v1.PageAccess.owner_source:type_name -> codefoundry.v1.PageOwnerSource
+	0,  // 2: codefoundry.v1.PageAccess.consent:type_name -> codefoundry.v1.PageConsent
+	0,  // 3: codefoundry.v1.PageAccess.answer:type_name -> codefoundry.v1.PageConsent
+	2,  // 4: codefoundry.v1.PageAccess.owners:type_name -> codefoundry.v1.PageOwner
+	3,  // 5: codefoundry.v1.GetPageResponse.page:type_name -> codefoundry.v1.PageAccess
+	13, // 6: codefoundry.v1.PageFileStorageResponse.values:type_name -> codefoundry.v1.PageFileStorageResponse.ValuesEntry
+	14, // 7: codefoundry.v1.SetPageFileStorageResponse.values:type_name -> codefoundry.v1.SetPageFileStorageResponse.ValuesEntry
+	15, // 8: codefoundry.v1.PageProxyFetchRequest.headers:type_name -> codefoundry.v1.PageProxyFetchRequest.HeadersEntry
+	16, // 9: codefoundry.v1.PageProxyFetchResponse.headers:type_name -> codefoundry.v1.PageProxyFetchResponse.HeadersEntry
+	4,  // 10: codefoundry.v1.PageService.GetPage:input_type -> codefoundry.v1.GetPageRequest
+	6,  // 11: codefoundry.v1.PageService.PageStorage:input_type -> codefoundry.v1.PageFileStorageRequest
+	8,  // 12: codefoundry.v1.PageService.SetPageStorage:input_type -> codefoundry.v1.SetPageFileStorageRequest
+	10, // 13: codefoundry.v1.PageService.ProxyFetch:input_type -> codefoundry.v1.PageProxyFetchRequest
+	5,  // 14: codefoundry.v1.PageService.GetPage:output_type -> codefoundry.v1.GetPageResponse
+	7,  // 15: codefoundry.v1.PageService.PageStorage:output_type -> codefoundry.v1.PageFileStorageResponse
+	9,  // 16: codefoundry.v1.PageService.SetPageStorage:output_type -> codefoundry.v1.SetPageFileStorageResponse
+	11, // 17: codefoundry.v1.PageService.ProxyFetch:output_type -> codefoundry.v1.PageProxyFetchResponse
+	14, // [14:18] is the sub-list for method output_type
+	10, // [10:14] is the sub-list for method input_type
+	10, // [10:10] is the sub-list for extension type_name
+	10, // [10:10] is the sub-list for extension extendee
+	0,  // [0:10] is the sub-list for field type_name
 }
 
 func init() { file_codefoundry_v1_page_proto_init() }
@@ -898,14 +988,14 @@ func file_codefoundry_v1_page_proto_init() {
 	if File_codefoundry_v1_page_proto != nil {
 		return
 	}
-	file_codefoundry_v1_page_proto_msgTypes[5].OneofWrappers = []any{}
+	file_codefoundry_v1_page_proto_msgTypes[6].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_codefoundry_v1_page_proto_rawDesc), len(file_codefoundry_v1_page_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   14,
+			NumMessages:   15,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
