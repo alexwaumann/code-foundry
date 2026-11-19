@@ -1,0 +1,44 @@
+[
+  {
+    "id": "bb124a50-872d-4f75-a489-9585c6ee72c5",
+    "kind": "userMessage",
+    "ordinal": 1,
+    "text": "Remember the code word CHERRY. Then run "
+  },
+  {
+    "id": "msg_011ChBxsgr2a6dG8xwJ91aKd/0",
+    "kind": "thinking",
+    "ordinal": 2
+  },
+  {
+    "id": "toolu_018hqwkcKMk5tGButsPaLgmX",
+    "kind": "toolCall",
+    "ordinal": 3
+  },
+  {
+    "id": "turn-f96f50cf-1d5a-41a1-9143-99a8d7f6396a",
+    "kind": "turnEnd",
+    "ordinal": 4
+  },
+  {
+    "id": "9c632e38-3ddb-489d-bfa5-f104625ea2b2",
+    "kind": "userMessage",
+    "ordinal": 5,
+    "text": "Reply with just DONE."
+  },
+  {
+    "id": "msg_011ChBxtTpinWMNDZWf8q5V1/0",
+    "kind": "thinking",
+    "ordinal": 6
+  },
+  {
+    "id": "msg_011ChBxtTpinWMNDZWf8q5V1/1",
+    "kind": "assistantText",
+    "ordinal": 7
+  },
+  {
+    "id": "turn-9589521a-2d3b-45e1-978c-3054df988916",
+    "kind": "turnEnd",
+    "ordinal": 8
+  }
+]

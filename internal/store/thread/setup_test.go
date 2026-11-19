@@ -678,7 +678,7 @@ var refusedWithoutProcess = []struct {
 		return err
 	}},
 	{"fork", func(e *env, id string) error {
-		_, err := e.m.Fork(e.ctx(), id, "")
+		_, err := e.m.Fork(e.ctx(), id, ForkOptions{})
 		return err
 	}},
 	{"run in", func(e *env, id string) error {

@@ -1,0 +1,26 @@
+{"type":"user","uuid":"0420871a-68fe-4e22-a08d-358c788490e0","parentUuid":null,"turnOrigin":"sdk","message":{"role":"user","content":[{"type":"text","text":"Remember the code word APPLE. Reply with just OK"}]}}
+{"type":"attachment","uuid":"1534684f-9840-4b4c-ad5c-1a3dffcad8f5","parentUuid":"0420871a-68fe-4e22-a08d-358c788490e0","attachment":{"type":"environment"}}
+{"type":"attachment","uuid":"f3b26d4a-2ecb-474a-a15c-d13d921c66c0","parentUuid":"1534684f-9840-4b4c-ad5c-1a3dffcad8f5","attachment":{"type":"model"}}
+{"type":"attachment","uuid":"979ee57e-e811-48bc-bf51-af29f65ef0d3","parentUuid":"f3b26d4a-2ecb-474a-a15c-d13d921c66c0","attachment":{"type":"deferred_tools_delta"}}
+{"type":"attachment","uuid":"184a26c6-d918-4eca-b987-4b61db4cf736","parentUuid":"979ee57e-e811-48bc-bf51-af29f65ef0d3","attachment":{"type":"agent_listing_delta"}}
+{"type":"attachment","uuid":"7526e016-722f-4f43-80e6-2255d444134f","parentUuid":"184a26c6-d918-4eca-b987-4b61db4cf736","attachment":{"type":"skill_listing"}}
+{"type":"attachment","uuid":"ccd3cc51-0157-4e25-b965-0264bb20d06f","parentUuid":"7526e016-722f-4f43-80e6-2255d444134f","attachment":{"type":"total_tokens_reminder"}}
+{"type":"attachment","uuid":"f50df06f-8a44-4b71-a064-060c2b55cf50","parentUuid":"ccd3cc51-0157-4e25-b965-0264bb20d06f","attachment":{"type":"session_context"}}
+{"type":"attachment","uuid":"465a1a3f-9918-43b5-9d16-b8129317beb4","parentUuid":"f50df06f-8a44-4b71-a064-060c2b55cf50","attachment":{"type":"date"}}
+{"type":"attachment","uuid":"76374cfc-2cbc-4fe3-8584-9ccdf0074246","parentUuid":"465a1a3f-9918-43b5-9d16-b8129317beb4","attachment":{"type":"credential_org"}}
+{"type":"attachment","uuid":"73509149-8564-462d-8d07-683afa6e1354","parentUuid":"76374cfc-2cbc-4fe3-8584-9ccdf0074246","attachment":{"type":"prompt_snapshot"}}
+{"type":"assistant","uuid":"875aa60d-9491-401b-9e03-6aaef18855b2","parentUuid":"73509149-8564-462d-8d07-683afa6e1354","message":{"role":"assistant","id":"msg_011ChBy29wAQsy48C8SA4Z6n","content":[{"type":"thinking"}]}}
+{"type":"assistant","uuid":"019b8947-5bac-4f93-bd75-c484445d45e9","parentUuid":"875aa60d-9491-401b-9e03-6aaef18855b2","message":{"role":"assistant","id":"msg_011ChBy29wAQsy48C8SA4Z6n","content":[{"type":"text","text":"OK"}]}}
+{"type":"attachment","uuid":"7672033f-de74-49c3-bc79-b4bc471aab05","parentUuid":"019b8947-5bac-4f93-bd75-c484445d45e9","attachment":{"type":"prompt_snapshot"}}
+{"type":"user","uuid":"4a3ae60e-fd55-4099-b328-84dec751e091","parentUuid":"7672033f-de74-49c3-bc79-b4bc471aab05","turnOrigin":"sdk","message":{"role":"user","content":"<command-message>greet</command-message>\n<comman"}}
+{"type":"user","uuid":"3296bdba-175f-490a-a9f6-d23ad37f0d3e","parentUuid":"4a3ae60e-fd55-4099-b328-84dec751e091","isMeta":true,"message":{"role":"user","content":[{"type":"text","text":"Reply with just the word BONJOUR.\n"}]}}
+{"type":"attachment","uuid":"f03ad392-bc46-40de-8b46-8a9032204536","parentUuid":"3296bdba-175f-490a-a9f6-d23ad37f0d3e","attachment":{"type":"deferred_tools_delta"}}
+{"type":"attachment","uuid":"f822fc55-0ace-4c04-a08a-cb67787fcd91","parentUuid":"f03ad392-bc46-40de-8b46-8a9032204536","attachment":{"type":"mcp_instructions_delta"}}
+{"type":"attachment","uuid":"4612a439-15b6-4e76-b569-3814c24a8766","parentUuid":"f822fc55-0ace-4c04-a08a-cb67787fcd91","attachment":{"type":"command_permissions"}}
+{"type":"assistant","uuid":"610281d5-6aaa-427c-a323-de56fb43c20e","parentUuid":"4612a439-15b6-4e76-b569-3814c24a8766","message":{"role":"assistant","id":"msg_011ChBy2NXwwKkrUY2eQAoAb","content":[{"type":"text","text":"BONJOUR"}]}}
+{"type":"user","uuid":"2f829216-6cea-4bc5-9692-e77e627b6a86","parentUuid":"610281d5-6aaa-427c-a323-de56fb43c20e","isMeta":true,"message":{"role":"user","content":"<local-command-caveat>The command below was run "}}
+{"type":"user","uuid":"83579ff1-c636-4b31-979c-d25ef5cf4e60","parentUuid":"2f829216-6cea-4bc5-9692-e77e627b6a86","message":{"role":"user","content":"<command-name>/usage</command-name>\n            "}}
+{"type":"system","uuid":"aa0d5929-0481-4752-a98b-bb54a25f0249","parentUuid":"83579ff1-c636-4b31-979c-d25ef5cf4e60","subtype":"local_command"}
+{"type":"user","uuid":"f1cf710c-f3be-409b-ab09-6531c2a53fa8","parentUuid":"aa0d5929-0481-4752-a98b-bb54a25f0249","turnOrigin":"sdk","message":{"role":"user","content":[{"type":"text","text":"Reply with just DONE."}]}}
+{"type":"attachment","uuid":"39d5dad5-47da-409f-8e7d-4de58f15af8e","parentUuid":"f1cf710c-f3be-409b-ab09-6531c2a53fa8","attachment":{"type":"total_tokens_reminder"}}
+{"type":"assistant","uuid":"cceeaf4b-f9b9-4d71-b308-634997f72892","parentUuid":"39d5dad5-47da-409f-8e7d-4de58f15af8e","message":{"role":"assistant","id":"msg_011ChBy2d3q6SMyk5SkAZR4n","content":[{"type":"text","text":"DONE"}]}}

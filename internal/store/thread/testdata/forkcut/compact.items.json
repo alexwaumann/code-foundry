@@ -1,0 +1,102 @@
+[
+  {
+    "id": "a085990f-81e8-426d-9656-cb203065cfc1",
+    "kind": "userMessage",
+    "ordinal": 1,
+    "text": "Remember the code word APPLE. Reply with"
+  },
+  {
+    "id": "msg_011ChBxxqBigCQpbvbGkU4V3/0",
+    "kind": "thinking",
+    "ordinal": 2
+  },
+  {
+    "id": "msg_011ChBxxqBigCQpbvbGkU4V3/1",
+    "kind": "assistantText",
+    "ordinal": 3
+  },
+  {
+    "id": "turn-17326a1d-584e-4e74-9839-67157d270f94",
+    "kind": "turnEnd",
+    "ordinal": 4
+  },
+  {
+    "id": "cfd41e77-b463-411d-acfc-af2115c81d3c",
+    "kind": "userMessage",
+    "ordinal": 5,
+    "text": "Remember the second code word BANANA. Re"
+  },
+  {
+    "id": "msg_011ChBxy1CEG2px44P46VCD7/0",
+    "kind": "thinking",
+    "ordinal": 6
+  },
+  {
+    "id": "msg_011ChBxy1CEG2px44P46VCD7/1",
+    "kind": "assistantText",
+    "ordinal": 7
+  },
+  {
+    "id": "turn-96539684-12f9-43b3-95c4-f6c9e96e7917",
+    "kind": "turnEnd",
+    "ordinal": 8
+  },
+  {
+    "id": "d4c6719d-ddfc-44ad-a211-39bab463c13b",
+    "kind": "userMessage",
+    "ordinal": 9,
+    "text": "/compact"
+  },
+  {
+    "id": "compact-a34f458f-87d3-49c1-8732-f103db6ab207",
+    "kind": "compaction",
+    "ordinal": 10
+  },
+  {
+    "id": "cmd-b7de5961-4649-4e27-8acc-3001b5448b85",
+    "kind": "commandOutput",
+    "ordinal": 11
+  },
+  {
+    "id": "turn-0c3a27cd-4426-423b-b6ed-cb3945fe70a8",
+    "kind": "turnEnd",
+    "ordinal": 12
+  },
+  {
+    "id": "5a26a5bf-d55d-4a44-b030-4897070dc62d",
+    "kind": "userMessage",
+    "ordinal": 13,
+    "text": "Remember the third code word CHERRY. Rep"
+  },
+  {
+    "id": "msg_011ChBxySoLu8pa9vqT4xpZ9/0",
+    "kind": "thinking",
+    "ordinal": 14
+  },
+  {
+    "id": "msg_011ChBxySoLu8pa9vqT4xpZ9/1",
+    "kind": "assistantText",
+    "ordinal": 15
+  },
+  {
+    "id": "turn-91122ab7-bace-41c7-958a-37020f03c5d6",
+    "kind": "turnEnd",
+    "ordinal": 16
+  },
+  {
+    "id": "7768b3a6-886a-4e21-af1f-ddaece772db8",
+    "kind": "userMessage",
+    "ordinal": 17,
+    "text": "Remember the fourth code word DATE. Repl"
+  },
+  {
+    "id": "msg_011ChBxyZJGVcDQwHEgoMx7r/0",
+    "kind": "assistantText",
+    "ordinal": 18
+  },
+  {
+    "id": "turn-b0a1928b-26c2-41f0-9e5a-da376b4298fc",
+    "kind": "turnEnd",
+    "ordinal": 19
+  }
+]

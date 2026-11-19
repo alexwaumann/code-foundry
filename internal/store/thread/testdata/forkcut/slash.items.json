@@ -1,0 +1,71 @@
+[
+  {
+    "id": "0420871a-68fe-4e22-a08d-358c788490e0",
+    "kind": "userMessage",
+    "ordinal": 1,
+    "text": "Remember the code word APPLE. Reply with"
+  },
+  {
+    "id": "msg_011ChBy29wAQsy48C8SA4Z6n/0",
+    "kind": "thinking",
+    "ordinal": 2
+  },
+  {
+    "id": "msg_011ChBy29wAQsy48C8SA4Z6n/1",
+    "kind": "assistantText",
+    "ordinal": 3
+  },
+  {
+    "id": "turn-90443aa4-b3a0-40f7-be70-c5c3b7b24c6c",
+    "kind": "turnEnd",
+    "ordinal": 4
+  },
+  {
+    "id": "4a3ae60e-fd55-4099-b328-84dec751e091",
+    "kind": "userMessage",
+    "ordinal": 5,
+    "text": "/greet"
+  },
+  {
+    "id": "msg_011ChBy2NXwwKkrUY2eQAoAb/0",
+    "kind": "assistantText",
+    "ordinal": 6
+  },
+  {
+    "id": "turn-0a2de778-af06-4540-a81a-fdb3899cb9bf",
+    "kind": "turnEnd",
+    "ordinal": 7
+  },
+  {
+    "id": "83579ff1-c636-4b31-979c-d25ef5cf4e60",
+    "kind": "userMessage",
+    "ordinal": 8,
+    "text": "/cost"
+  },
+  {
+    "id": "49a5d9d3-102a-4366-88f0-51994324920c/t-1795076700920-3",
+    "kind": "assistantText",
+    "ordinal": 9
+  },
+  {
+    "id": "turn-bc52812c-e006-4205-8e57-3d9ace1d2d15",
+    "kind": "turnEnd",
+    "ordinal": 10
+  },
+  {
+    "id": "f1cf710c-f3be-409b-ab09-6531c2a53fa8",
+    "kind": "userMessage",
+    "ordinal": 11,
+    "text": "Reply with just DONE."
+  },
+  {
+    "id": "msg_011ChBy2d3q6SMyk5SkAZR4n/0",
+    "kind": "assistantText",
+    "ordinal": 12
+  },
+  {
+    "id": "turn-6ed17d3a-6a70-4ac5-bb0f-238ca7649d8e",
+    "kind": "turnEnd",
+    "ordinal": 13
+  }
+]

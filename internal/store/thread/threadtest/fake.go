@@ -354,9 +354,14 @@ func (f *Fake) ReadAttachment(_ context.Context, path string) ([]byte, string, e
 }
 
 // Fork adds a STARTING thread with ParentID set, in the parent's worktree (with what
-// it was made for: CreatedWorktree, BaseRef, Branch).
-func (f *Fake) Fork(_ context.Context, id, name string) (thread.Thread, error) {
+// it was made for: CreatedWorktree, BaseRef, Branch). With o.At it records
+// "Fork <id> at <at>" too (the fake has no conversation to cut).
+func (f *Fake) Fork(_ context.Context, id string, o thread.ForkOptions) (thread.Thread, error) {
+	name := o.Name
 	f.mu.Lock()
+	if o.At != "" {
+		f.calls = append(f.calls, "Fork "+id+" at "+o.At)
+	}
 	parent, err := f.get(id)
 	if err == nil {
 		err = f.refuseResident(id, "forked")

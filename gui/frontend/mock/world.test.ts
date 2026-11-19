@@ -112,6 +112,40 @@ describe("the mock world", () => {
     expect(f).toMatchObject({ name: "My fork", autoNamed: false });
   });
 
+  it("thread.fork --at copies up to that turn end and names the turn, or refuses as the daemon does", async () => {
+    const w = new World();
+    // s-3's log, then a second turn, a /compact and a third turn.
+    const log = w.logs.snapshotValue("s-3").items;
+    const first = log.findIndex((x) => x.payload?.case === "turnEnd");
+    const ord = (n: number) => BigInt(1000 + n);
+    log.push(
+      { id: "u2", ordinal: ord(1), payload: { case: "userMessage", value: { text: "two" } } },
+      { id: "turn-2", ordinal: ord(2), payload: { case: "turnEnd", value: {} } },
+      { id: "u3", ordinal: ord(3), payload: { case: "userMessage", value: { text: "/compact" } } },
+      { id: "compact-1", ordinal: ord(4), payload: { case: "compaction", value: {} } },
+      { id: "turn-3", ordinal: ord(5), payload: { case: "turnEnd", value: {} } },
+    );
+    const fork = async (at: string) => {
+      await run(w, "thread.fork", { activeThreadId: "s-3" }, { at, focus: "false" });
+      const f = [...w.threads.values()].filter((t) => t.parentId === "s-3").at(-1);
+      return w.logs.snapshotValue(f?.id ?? "").items;
+    };
+
+    const atTwo = await fork("turn-2");
+    expect(atTwo.map((x) => x.id)).toEqual([...log.slice(0, first + 1).map((x) => x.id), "u2", "turn-2", "note-fork-s-3"]);
+    expect(atTwo.at(-1)?.payload).toMatchObject({
+      case: "note",
+      value: { text: expect.stringMatching(/ at turn 2 of 3\. The files are as they are now, not as they were after that turn\.$/) as unknown },
+    });
+    expect((await fork(`#${String(ord(5))}`)).map((x) => x.id)).toContain("turn-3");
+
+    const before = w.threads.size;
+    await expect(fork("u2")).rejects.toThrow(/#1001 \(userMessage\) is not a turn end/);
+    await expect(fork("nope")).rejects.toThrow(/the thread has no item nope/);
+    await expect(fork(log[first]?.id ?? "")).rejects.toThrow(/the conversation was compacted after turn 1/);
+    expect(w.threads.size).toBe(before);
+  });
+
   it("project.worktree.new refuses a path a worktree has", async () => {
     const w = new World();
     const c = { activeProjectId: "repo-cf" };

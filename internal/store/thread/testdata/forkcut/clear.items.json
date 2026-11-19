@@ -1,0 +1,12 @@
+[
+  {"id": "67c3a07e-c1fb-42f3-986e-3fc2ba36624a", "kind": "userMessage", "ordinal": 1, "text": "Remember the code word APPLE. Reply with"},
+  {"id": "msg_011ChByB9E1EbkLwyEUha1Zt/0", "kind": "assistantText", "ordinal": 2},
+  {"id": "turn-clear-1", "kind": "turnEnd", "ordinal": 3},
+  {"id": "d83fd803-ada9-41d4-a537-6dd2df196b7e", "kind": "userMessage", "ordinal": 4, "text": "/clear"},
+  {"id": "turn-clear-2", "kind": "turnEnd", "ordinal": 5},
+  {"id": "45de4fa4-dd35-481c-a3c7-f6fba4c4c647", "kind": "userMessage", "ordinal": 6, "text": "List every code word I asked you to reme"},
+  {"id": "msg_011ChByBn5YjfGscoiuutgVU/0", "kind": "thinking", "ordinal": 7},
+  {"id": "toolu_01X83xZYf5zv4A3HzQFA6XAD", "kind": "toolCall", "ordinal": 8},
+  {"id": "msg_011ChByC9EnPAAucC33gMdzG/0", "kind": "assistantText", "ordinal": 9},
+  {"id": "turn-clear-3", "kind": "turnEnd", "ordinal": 10}
+]

@@ -1,0 +1,45 @@
+[
+  {
+    "id": "cea37b6e-50e6-449f-a79d-3fbe607f4393",
+    "kind": "userMessage",
+    "ordinal": 1,
+    "text": "Run the shell command 'sleep 10; echo sl"
+  },
+  {
+    "id": "toolu_01Sao3gzpki4A4k94kvPLpA2",
+    "kind": "toolCall",
+    "ordinal": 2
+  },
+  {
+    "id": "ac371b2e-7d97-49bb-8f5a-fafa30f95761",
+    "kind": "userMessage",
+    "ordinal": 3,
+    "text": "Also end your reply with the word STEER."
+  },
+  {
+    "id": "msg_011ChBxqDAqCQKhHi2xwvJoM/0",
+    "kind": "assistantText",
+    "ordinal": 4
+  },
+  {
+    "id": "turn-a4cb1c5b-7475-475e-9a59-adfae7a38575",
+    "kind": "turnEnd",
+    "ordinal": 5
+  },
+  {
+    "id": "65aed7ef-39b8-4c6d-b7e4-e44b52388aa0",
+    "kind": "userMessage",
+    "ordinal": 6,
+    "text": "Reply with just DONE."
+  },
+  {
+    "id": "msg_011ChBxqHYmBCFKefWZDxX3x/0",
+    "kind": "assistantText",
+    "ordinal": 7
+  },
+  {
+    "id": "turn-e740cbb7-3e54-4c38-9baf-c01ab8e0b4de",
+    "kind": "turnEnd",
+    "ordinal": 8
+  }
+]

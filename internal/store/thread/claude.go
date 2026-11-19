@@ -41,6 +41,18 @@ import (
 //	                          MCP servers); managed settings still apply. Used for
 //	                          naming instead of --strict-mcp-config, which Claude
 //	                          refuses under an enterprise MCP config (naming.go)
+//
+// and Claude Code 2.1.325 (hidden from --help; the CLI side of the SDK's resumeSessionAt):
+//
+//	--resume-session-at <uuid>  with --resume: keep the loaded transcript up to and
+//	                          including the record with this uuid (any record with a
+//	                          uuid: a message, an attachment, a system record), drop
+//	                          the rest; works with --fork-session and over stream-json.
+//	                          A uuid it did not load (unknown, or before the last
+//	                          compaction and not in its kept tail) prints "No message
+//	                          found with message.uuid of: <uuid>" and exits 1 before any
+//	                          session starts. The fork's transcript keeps the records'
+//	                          uuids, so a fork of a fork can be cut too (forkcut.go).
 
 // Efforts are the valid --effort levels.
 var Efforts = []string{"low", "medium", "high", "xhigh", "max"}
@@ -67,6 +79,9 @@ type launch struct {
 	fork bool
 	// newID is passed as --session-id for new conversations and forks.
 	newID string
+	// at, with resume, is passed as --resume-session-at: the conversation ends with
+	// that record (a fork from a turn, forkcut.go).
+	at string
 	// freshPrompt: a resumed conversation that recorded no system prompt (Create's
 	// ResumeSession), so this spawn's is rendered on its first request as a new one's.
 	freshPrompt bool
@@ -113,6 +128,9 @@ func (l launch) argv(claude string, a spawnArgs) []string {
 		argv = append(argv, "--resume", l.resume)
 		if l.fork {
 			argv = append(argv, "--fork-session")
+		}
+		if l.at != "" {
+			argv = append(argv, "--resume-session-at", l.at)
 		}
 	}
 	if l.newID != "" && (l.resume == "" || l.fork) {

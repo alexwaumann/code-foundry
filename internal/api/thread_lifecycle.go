@@ -63,7 +63,7 @@ func (h *Thread) Create(ctx context.Context, req *connect.Request[v1.CreateThrea
 
 // Fork continues a thread's conversation in a new thread.
 func (h *Thread) Fork(ctx context.Context, req *connect.Request[v1.ForkThreadRequest]) (*connect.Response[v1.ForkThreadResponse], error) {
-	s, err := h.store.Fork(ctx, req.Msg.GetId(), req.Msg.GetName())
+	s, err := h.store.Fork(ctx, req.Msg.GetId(), thread.ForkOptions{Name: req.Msg.GetName(), At: req.Msg.GetAt()})
 	if err != nil {
 		return nil, threadError(err)
 	}

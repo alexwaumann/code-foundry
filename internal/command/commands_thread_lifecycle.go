@@ -370,12 +370,16 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter, opts ...Th
 			Name:        "thread.fork",
 			Page:        PageState,
 			Title:       "Fork Thread",
-			Description: "Start a new thread that continues this thread's conversation.",
+			Description: "Start a new thread that continues this thread's conversation, all of it or, with at, up to and including one finished turn. The fork works in this thread's checkouts as they are now: files are never rewound to that turn.",
 			Category:    "Thread",
-			Args:        []ArgSpec{idArg, {Name: "name", Type: String, Description: "Name for the fork"}, createdFocusArg},
-			When:        hasThread,
+			Args: []ArgSpec{idArg, {Name: "name", Type: String, Description: "Name for the fork"}, {
+				Name: "at", Type: String,
+				Description: "A finished turn to fork from: its turn end's item id, or its #ordinal (a \"turn end\" line of thread items). " +
+					"The fork's conversation and timeline end with that turn; later turns, and items placed after it, are left out (default: the whole conversation)",
+			}, createdFocusArg},
+			When: hasThread,
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
-				res, err := b.Fork(ctx, connect.NewRequest(&v1.ForkThreadRequest{Id: a.String("id"), Name: a.String("name")}))
+				res, err := b.Fork(ctx, connect.NewRequest(&v1.ForkThreadRequest{Id: a.String("id"), Name: a.String("name"), At: a.String("at")}))
 				if err != nil {
 					return Result{}, err
 				}

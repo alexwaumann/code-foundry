@@ -3807,9 +3807,18 @@ func (x *CreateThreadResponse) GetMadeBranch() bool {
 }
 
 type ForkThreadRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Id    string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Name  string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	// A turn to fork from: its turn_end item id (or "#<ordinal>"). The fork's conversation
+	// is the parent's up to and including that turn, and its items are the parent's up to
+	// that turn end; empty forks the whole conversation. The files are not rewound: the
+	// fork works in the parent's checkouts as they are. Whether a turn can be forked from
+	// is known only here, from Claude's transcript: FAILED_PRECONDITION says why not (the
+	// turn is still running; it came before a /clear or a reseed; the conversation was
+	// compacted after it; the next turn's start is not in the transcript yet),
+	// INVALID_ARGUMENT for an item that is not a turn end or no such item.
+	At            string `protobuf:"bytes,3,opt,name=at,proto3" json:"at,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -3854,6 +3863,13 @@ func (x *ForkThreadRequest) GetId() string {
 func (x *ForkThreadRequest) GetName() string {
 	if x != nil {
 		return x.Name
+	}
+	return ""
+}
+
+func (x *ForkThreadRequest) GetAt() string {
+	if x != nil {
+		return x.At
 	}
 	return ""
 }
@@ -8028,10 +8044,11 @@ const file_codefoundry_v1_thread_lifecycle_proto_rawDesc = "" +
 	"sharedWith\x122\n" +
 	"\x15worktree_mode_dropped\x18\a \x01(\bR\x13worktreeModeDropped\x12\x1f\n" +
 	"\vmade_branch\x18\b \x01(\bR\n" +
-	"madeBranch\"7\n" +
+	"madeBranch\"G\n" +
 	"\x11ForkThreadRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
-	"\x04name\x18\x02 \x01(\tR\x04name\"D\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12\x0e\n" +
+	"\x02at\x18\x03 \x01(\tR\x02at\"D\n" +
 	"\x12ForkThreadResponse\x12.\n" +
 	"\x06thread\x18\x01 \x01(\v2\x16.codefoundry.v1.ThreadR\x06thread\"J\n" +
 	"\x12ListThreadsRequest\x124\n" +

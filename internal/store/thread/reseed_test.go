@@ -315,7 +315,7 @@ func TestEnsureResident(t *testing.T) {
 	if err := e.m.Remove(e.ctx(), r.ID); !errors.Is(err, ErrFailedPrecondition) {
 		t.Errorf("Remove err = %v", err)
 	}
-	if _, err := e.m.Fork(e.ctx(), r.ID, ""); !errors.Is(err, ErrFailedPrecondition) {
+	if _, err := e.m.Fork(e.ctx(), r.ID, ForkOptions{}); !errors.Is(err, ErrFailedPrecondition) {
 		t.Errorf("Fork err = %v", err)
 	}
 	if _, err := e.m.Archive(e.ctx(), r.ID, false); err != nil {

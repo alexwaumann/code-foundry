@@ -211,7 +211,7 @@ func TestLinksNotAcrossForks(t *testing.T) {
 	e := newEnv(t)
 	ids, names := lineage(e, [][2]string{{"p", ""}, {"c", "p"}})
 	e.resumable(ids["c"])
-	f, err := e.m.Fork(e.ctx(), ids["c"], "f")
+	f, err := e.m.Fork(e.ctx(), ids["c"], ForkOptions{Name: "f"})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -2,8 +2,12 @@ package thread
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"reflect"
 	"slices"
+	"strconv"
+	"strings"
 	"testing"
 	"time"
 )
@@ -81,6 +85,36 @@ func TestForkItems(t *testing.T) {
 	}
 }
 
+// A fork from a turn copies the items up to its turn end (Fork slices them in timeline
+// order): what came after, a background agent's later items and a message placed after
+// the turn end included, is not copied.
+func TestForkItemsAtTurn(t *testing.T) {
+	now := time.Date(2026, 11, 19, 9, 0, 0, 0, time.UTC)
+	items := []Item{
+		{ID: "u1", Ordinal: 1, Kind: KindUserMessage, Text: "go"},
+		{ID: "agent", Ordinal: 2, Kind: KindToolCall, Tool: &ToolCall{ToolUseID: "agent", Name: "Agent", Status: ToolDone}},
+		{ID: "sub/0", Ordinal: 3, Kind: KindAssistantText, ParentToolUseID: "agent", Text: "agent works"},
+		{ID: "late", Ordinal: 4, Kind: KindUserMessage, PlacedAfter: 6, Text: "read late"},
+		{ID: "m1/0", Ordinal: 5, Kind: KindAssistantText, Text: "started it"},
+		{ID: "turn-1", Ordinal: 6, Kind: KindTurnEnd, Turn: &TurnEnd{Subtype: "success"}},
+		{ID: "sub/1", Ordinal: 7, Kind: KindAssistantText, ParentToolUseID: "agent", Text: "agent done"},
+		{ID: "m2/0", Ordinal: 8, Kind: KindAssistantText, Text: "answer"},
+		{ID: "turn-2", Ordinal: 9, Kind: KindTurnEnd, Turn: &TurnEnd{Subtype: "success"}},
+	}
+	slices.SortStableFunc(items, itemOrder)
+	turn, err := forkAt(items, "turn-1", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	parent := Thread{ID: "s-p", Name: "base"}
+	got := history(forkItems(items[:turn.end+1], forkNotePrefix+parent.ID, forkTurnNoteText(parent, turn), now))
+	want := []string{"user_message u1 go", "tool_call agent ", "assistant_text sub/0 agent works", "assistant_text m1/0 started it",
+		"turn_end turn-1 ", "note note-fork-s-p Forked from base at turn 1 of 2. The files are as they are now, not as they were after that turn."}
+	if !slices.Equal(got, want) {
+		t.Errorf("fork items = %q; want %q", got, want)
+	}
+}
+
 func TestForkNoteText(t *testing.T) {
 	for _, tt := range []struct {
 		parent Thread
@@ -145,7 +179,7 @@ func TestForkCopiesItems(t *testing.T) {
 		t.Fatalf("parent pending = %+v", parent.Pending)
 	}
 
-	f, err := e.m.Fork(e.ctx(), s.ID, "")
+	f, err := e.m.Fork(e.ctx(), s.ID, ForkOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -195,7 +229,7 @@ func TestForkOfAFork(t *testing.T) {
 	s := e.connected(CreateOptions{Name: "base"})
 	e.resumable(s.ID)
 	e.putItems(s.ID, Item{ID: "u1", Kind: KindUserMessage, Text: "one"}, Item{ID: "turn-1", Kind: KindTurnEnd, Turn: &TurnEnd{Subtype: "success"}})
-	f, err := e.m.Fork(e.ctx(), s.ID, "first")
+	f, err := e.m.Fork(e.ctx(), s.ID, ForkOptions{Name: "first"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -207,7 +241,7 @@ func TestForkOfAFork(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	g, err := e.m.Fork(e.ctx(), f.ID, "second")
+	g, err := e.m.Fork(e.ctx(), f.ID, ForkOptions{Name: "second"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -222,13 +256,162 @@ func TestForkOfAThreadWithoutItems(t *testing.T) {
 	e := newEnv(t)
 	s := e.connected(CreateOptions{Name: "empty"})
 	e.resumable(s.ID)
-	f, err := e.m.Fork(e.ctx(), s.ID, "")
+	f, err := e.m.Fork(e.ctx(), s.ID, ForkOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	want := []string{"note note-fork-" + s.ID + " Forked from empty"}
 	if got := history(e.items(f.ID).Items); !slices.Equal(got, want) {
 		t.Errorf("fork items = %q; want %q", got, want)
+	}
+	e.waitFor(f.ID, "fork connected", func(s Thread) bool { return s.State == StateConnected })
+}
+
+// transcriptRecord is a transcript line with a uuid: a user record (opening a turn,
+// turnOrigin sdk) when msg is "", else an assistant record of message msg.
+func transcriptRecord(uuid, parent, msg string) string {
+	p := "null"
+	if parent != "" {
+		p = strconv.Quote(parent)
+	}
+	if msg == "" {
+		return fmt.Sprintf(`{"type":"user","uuid":%q,"parentUuid":%s,"turnOrigin":"sdk","message":{"role":"user","content":"hi"}}`, uuid, p)
+	}
+	return fmt.Sprintf(`{"type":"assistant","uuid":%q,"parentUuid":%s,"message":{"id":%q,"role":"assistant","content":[{"type":"text","text":"ok"}]}}`, uuid, p, msg)
+}
+
+// twoTurns gives a connected thread two finished turns, in its items and transcript,
+// and a note after them (a background agent's report, later than both turns).
+func (e *env) twoTurns(o CreateOptions, transcript ...string) Thread {
+	e.t.Helper()
+	s := e.connected(o)
+	cid := argOf(e.spec(s.ID).Argv, "--session-id")
+	if len(transcript) == 0 {
+		transcript = []string{
+			transcriptRecord("u1", "", ""), transcriptRecord("a1", "u1", "m1"),
+			transcriptRecord("u2", "a1", ""), transcriptRecord("a2", "u2", "m2"),
+		}
+	}
+	e.writeTranscript(cid, transcript...)
+	s = e.waitFor(s.ID, "discovered", func(s Thread) bool { return s.ClaudeSessionID == cid })
+	e.putItems(s.ID,
+		Item{ID: "u1", Kind: KindUserMessage, Text: "one"},
+		Item{ID: "m1/0", Kind: KindAssistantText, Text: "ONE"},
+		Item{ID: "turn-1", Kind: KindTurnEnd, Turn: &TurnEnd{Subtype: "success"}},
+		Item{ID: "u2", Kind: KindUserMessage, Text: "two"},
+		Item{ID: "m2/0", Kind: KindAssistantText, Text: "TWO"},
+		Item{ID: "turn-2", Kind: KindTurnEnd, Turn: &TurnEnd{Subtype: "success"}},
+		Item{ID: "agent-x", Kind: KindNote, Text: "Agent finished"},
+	)
+	return s
+}
+
+func TestForkFromTurn(t *testing.T) {
+	e := newEnv(t)
+	s := e.twoTurns(CreateOptions{Name: "base"})
+	noteFor := func(n int) string {
+		return "note note-fork-" + s.ID + " Forked from base at turn " + strconv.Itoa(n) +
+			" of 2. The files are as they are now, not as they were after that turn."
+	}
+	tests := []struct {
+		at       string
+		wantCut  string // --resume-session-at; "" for none
+		wantItem []string
+	}{
+		{"turn-1", "a1", []string{"user_message u1 one", "assistant_text m1/0 ONE", "turn_end turn-1 ", noteFor(1)}},
+		// The latest turn of an idle thread is the whole conversation; the later note is
+		// not the turn's.
+		{"#6", "", []string{"user_message u1 one", "assistant_text m1/0 ONE", "turn_end turn-1 ",
+			"user_message u2 two", "assistant_text m2/0 TWO", "turn_end turn-2 ", noteFor(2)}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.at, func(t *testing.T) {
+			f, err := e.m.Fork(e.ctx(), s.ID, ForkOptions{At: tt.at})
+			if err != nil {
+				t.Fatal(err)
+			}
+			argv := e.spec(f.ID).Argv
+			if argOf(argv, "--resume") != s.ClaudeSessionID || !slices.Contains(argv, "--fork-session") ||
+				argOf(argv, "--resume-session-at") != tt.wantCut || tt.wantCut == "" && slices.Contains(argv, "--resume-session-at") {
+				t.Errorf("fork argv = %q; want --resume-session-at %q", argv, tt.wantCut)
+			}
+			if got := history(e.items(f.ID).Items); !slices.Equal(got, tt.wantItem) {
+				t.Errorf("fork items = %q; want %q", got, tt.wantItem)
+			}
+			if f.ParentID != s.ID || f.WorktreePath != s.WorktreePath {
+				t.Errorf("fork = %+v", f)
+			}
+			e.waitFor(f.ID, "fork connected", func(s Thread) bool { return s.State == StateConnected })
+		})
+	}
+	if got := len(e.items(s.ID).Items); got != 7 {
+		t.Errorf("parent has %d items after the forks; want 7", got)
+	}
+}
+
+// A fork from a turn is refused before anything is made: no thread, no spawn.
+func TestForkFromTurnRefusals(t *testing.T) {
+	compacted := []string{
+		transcriptRecord("u1", "", ""), transcriptRecord("a1", "u1", "m1"),
+		transcriptRecord("u2", "a1", ""), transcriptRecord("a2", "u2", "m2"),
+		`{"type":"system","subtype":"compact_boundary","uuid":"b","parentUuid":null,"logicalParentUuid":"a2","compactMetadata":{"preservedMessages":{"uuids":["a2"]}}}`,
+		`{"type":"user","uuid":"sum","parentUuid":"b","isCompactSummary":true,"message":{"role":"user","content":"summary"}}`,
+	}
+	tests := []struct {
+		name       string
+		transcript []string
+		at         string
+		wantErr    error
+		errSubstr  string
+	}{
+		{"no such item", nil, "nope", ErrInvalidArgument, "the thread has no item nope"},
+		{"not a turn end", nil, "u2", ErrInvalidArgument, "#4 (user message) is not a turn end"},
+		{"a subagent's item", nil, "agent-x", ErrInvalidArgument, "not a turn end"},
+		{"compacted away", compacted, "turn-1", ErrFailedPrecondition, "the conversation was compacted after turn 1"},
+		{"another conversation", []string{transcriptRecord("x1", "", ""), transcriptRecord("y1", "x1", "mx")}, "turn-1",
+			ErrFailedPrecondition, "turn 1 is not in the thread's current Claude conversation"},
+		{"the next message not written yet", []string{transcriptRecord("u1", "", ""), transcriptRecord("a1", "u1", "m1")}, "turn-1",
+			ErrFailedPrecondition, "the start of the turn after turn 1 is not in Claude's transcript yet"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			e := newEnv(t)
+			s := e.twoTurns(CreateOptions{Name: "base"}, tt.transcript...)
+			before, err := e.m.List(e.ctx(), ListOptions{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, err = e.m.Fork(e.ctx(), s.ID, ForkOptions{At: tt.at})
+			if !errors.Is(err, tt.wantErr) || !strings.Contains(err.Error(), tt.errSubstr) {
+				t.Fatalf("err = %v; want %v with %q", err, tt.wantErr, tt.errSubstr)
+			}
+			after, err := e.m.List(e.ctx(), ListOptions{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(after) != len(before) {
+				t.Errorf("threads %d -> %d: a refused fork made one", len(before), len(after))
+			}
+		})
+	}
+}
+
+// The kept tail of the last compaction can be forked from.
+func TestForkFromTurnKeptTail(t *testing.T) {
+	e := newEnv(t)
+	s := e.twoTurns(CreateOptions{Name: "base"},
+		transcriptRecord("u1", "", ""), transcriptRecord("a1", "u1", "m1"),
+		transcriptRecord("u2", "a1", ""), transcriptRecord("a2", "u2", "m2"),
+		`{"type":"system","subtype":"compact_boundary","uuid":"b","parentUuid":null,"logicalParentUuid":"a2","compactMetadata":{"preservedMessages":{"uuids":["a2"]}}}`,
+		`{"type":"user","uuid":"sum","parentUuid":"b","isCompactSummary":true,"message":{"role":"user","content":"summary"}}`,
+		transcriptRecord("u3", "sum", ""))
+	e.putItems(s.ID, Item{ID: "u3", Kind: KindUserMessage, Text: "three"})
+	f, err := e.m.Fork(e.ctx(), s.ID, ForkOptions{At: "turn-2"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cut := argOf(e.spec(f.ID).Argv, "--resume-session-at"); cut != "a2" {
+		t.Errorf("cut = %q; want a2 (the boundary's logical parent, in its kept tail)", cut)
 	}
 	e.waitFor(f.ID, "fork connected", func(s Thread) bool { return s.State == StateConnected })
 }

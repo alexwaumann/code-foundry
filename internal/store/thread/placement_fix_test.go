@@ -259,7 +259,7 @@ func TestForkRemakesMemberWithNoteAndHook(t *testing.T) {
 	r, _ := rr.Snapshot().Project("r1")
 	r.Worktrees = slices.DeleteFunc(slices.Clone(r.Worktrees), func(w project.Worktree) bool { return w.Path == repoWT })
 	rr.Put(r)
-	f, err := e.m.Fork(e.ctx(), s.ID, "")
+	f, err := e.m.Fork(e.ctx(), s.ID, ForkOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}

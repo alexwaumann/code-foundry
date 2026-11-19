@@ -192,6 +192,8 @@ func TestThreadLifecycleCommands(t *testing.T) {
 		{name: "regenerate name unavailable without a thread", cmd: "thread.regenerate-name", ctx: command.Context{ActiveView: "pullrequests"}, wantErr: command.ErrUnavailable},
 		{name: "fork", cmd: "thread.fork", ctx: command.Context{ActiveThreadID: "s5"},
 			wantMsg: "forked s5 into s2", wantReqs: []proto.Message{&v1.ForkThreadRequest{Id: "s5"}}, wantIntent: focusIntent("s2")},
+		{name: "fork from a turn", cmd: "thread.fork", ctx: command.Context{ActiveThreadID: "s5"}, args: map[string]string{"at": "turn-abc", "name": "retry"},
+			wantMsg: "forked s5 into retry (s2)", wantReqs: []proto.Message{&v1.ForkThreadRequest{Id: "s5", Name: "retry", At: "turn-abc"}}, wantIntent: focusIntent("s2")},
 		{name: "remove", cmd: "thread.remove", args: map[string]string{"id": "s5"},
 			wantMsg: "removed thread s5", wantReqs: []proto.Message{&v1.RemoveThreadRequest{Id: "s5"}}},
 		{name: "run in queues a move", cmd: "thread.run-in", ctx: command.Context{ActiveThreadID: "s5"}, args: map[string]string{"project": "api"},

@@ -1240,16 +1240,48 @@ export class MockThreadLogs {
   }
 
   /**
+   * thread.fork --at, like the daemon (internal/store/thread/forkcut.go) as far as the
+   * items tell: the index in the parent's log of the turn end `at` names (its id or
+   * "#<ordinal>"), its number and the number of turns. Refused as the daemon does for
+   * an item that is not a top-level turn end, one of the turn still running, and a turn
+   * a later /compact dropped (the mock's stand-in for the transcript: the turn right
+   * before a compaction is in its kept tail).
+   */
+  forkTurn(parentId: string, at: string, busy: boolean): { end: number; n: number; total: number } {
+    const items = this.logs.get(parentId)?.items ?? [];
+    let idx = items.findIndex((x) => x.id === at);
+    if (idx < 0 && at.startsWith("#")) idx = items.findIndex((x) => String(x.ordinal) === at.slice(1));
+    const it = items.at(idx);
+    if (idx < 0 || !it) throw new CommandError("invalid", `the thread has no item ${at} (give a turn end's item id, or its #ordinal from thread items)`);
+    const isEnd = (x: ItemInit) => x.payload?.case === "turnEnd" && !x.parentToolUseId;
+    const ends = items.flatMap((x, i) => (isEnd(x) ? [i] : []));
+    if (!isEnd(it)) {
+      if (busy && idx > (ends.at(-1) ?? -1) && !it.parentToolUseId) {
+        throw new CommandError("unavailable", `#${String(it.ordinal)} is in the turn that is still running: fork from its turn end once it finishes`);
+      }
+      throw new CommandError("invalid", `#${String(it.ordinal)} (${it.payload?.case ?? "item"}) is not a turn end: --at takes the turn end of a finished turn (a "turn end" line of thread items)`);
+    }
+    const n = ends.indexOf(idx) + 1;
+    const compaction = items.findIndex((x, i) => i > idx && x.payload?.case === "compaction");
+    if (compaction >= 0 && ends.some((e) => e > idx && e < compaction)) {
+      throw new CommandError("unavailable", `the conversation was compacted after turn ${String(n)} and Claude keeps only a summary of it, so a fork cannot start from it; fork from a later turn, or fork the whole thread`);
+    }
+    return { end: idx, n, total: ends.length };
+  }
+
+  /**
    * thread.fork, like the daemon (internal/store/thread/fork.go): the fork's log starts
    * as a copy of the parent's items, renumbered, never live (streaming text dropped, a
    * running tool an error, a pending request cancelled), then the note "Forked from
-   * <parent>" where the copy ends.
+   * <parent>" where the copy ends. With turn (forkTurn), the copy ends with that turn's
+   * end and the note names it.
    */
-  fork(parentId: string, id: string, parentName: string): void {
+  fork(parentId: string, id: string, parentName: string, turn?: { end: number; n: number; total: number }): void {
     this.logs.delete(id);
     const why = "the thread was forked before it finished";
     const l = this.log(id);
-    for (const src of this.logs.get(parentId)?.items ?? []) {
+    const src0 = this.logs.get(parentId)?.items ?? [];
+    for (const src of turn ? src0.slice(0, turn.end + 1) : src0) {
       if (src.streaming) continue;
       const it = structuredClone(src);
       it.ordinal = BigInt(l.nextOrdinal++ * 10);
@@ -1264,7 +1296,10 @@ export class MockThreadLogs {
       }
       l.items.push(it);
     }
-    l.items.push(this.item(id, { case: "note", value: { text: `Forked from ${parentName}` } }, { id: `note-fork-${parentId}` }));
+    const text = turn
+      ? `Forked from ${parentName} at turn ${String(turn.n)} of ${String(turn.total)}. The files are as they are now, not as they were after that turn.`
+      : `Forked from ${parentName}`;
+    l.items.push(this.item(id, { case: "note", value: { text } }, { id: `note-fork-${parentId}` }));
     l.seq = l.items.length;
   }
 

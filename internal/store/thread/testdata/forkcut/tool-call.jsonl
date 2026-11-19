@@ -1,0 +1,22 @@
+{"type":"user","uuid":"defc61bc-94bf-44a3-bc73-c33df75d49dd","parentUuid":null,"turnOrigin":"sdk","message":{"role":"user","content":[{"type":"text","text":"Run the shell command 'ls' with the Bash tool an"}]}}
+{"type":"attachment","uuid":"770f7b94-fa26-4678-a29c-6545bb75f19a","parentUuid":"defc61bc-94bf-44a3-bc73-c33df75d49dd","attachment":{"type":"environment"}}
+{"type":"attachment","uuid":"d247e8c8-1acd-4782-8ce0-e4aa29a829d5","parentUuid":"770f7b94-fa26-4678-a29c-6545bb75f19a","attachment":{"type":"model"}}
+{"type":"attachment","uuid":"5c5f40f5-9950-46cf-847e-8a68a18d33db","parentUuid":"d247e8c8-1acd-4782-8ce0-e4aa29a829d5","attachment":{"type":"deferred_tools_delta"}}
+{"type":"attachment","uuid":"ced421c6-3b7c-4221-a9ea-b31954b4b53a","parentUuid":"5c5f40f5-9950-46cf-847e-8a68a18d33db","attachment":{"type":"agent_listing_delta"}}
+{"type":"attachment","uuid":"a5878d46-b96c-48ca-985c-09d505bdbccf","parentUuid":"ced421c6-3b7c-4221-a9ea-b31954b4b53a","attachment":{"type":"skill_listing"}}
+{"type":"attachment","uuid":"b6c9ff62-ca0c-40eb-9c9b-75a97da4b536","parentUuid":"a5878d46-b96c-48ca-985c-09d505bdbccf","attachment":{"type":"total_tokens_reminder"}}
+{"type":"attachment","uuid":"36e47671-6646-4bbe-8eec-9a5e20ac2d80","parentUuid":"b6c9ff62-ca0c-40eb-9c9b-75a97da4b536","attachment":{"type":"session_context"}}
+{"type":"attachment","uuid":"047cbd4f-3662-481c-8fe2-ad32eae45c95","parentUuid":"36e47671-6646-4bbe-8eec-9a5e20ac2d80","attachment":{"type":"date"}}
+{"type":"attachment","uuid":"6e1a581b-3fb7-4fc7-aae3-2859863407a9","parentUuid":"047cbd4f-3662-481c-8fe2-ad32eae45c95","attachment":{"type":"credential_org"}}
+{"type":"attachment","uuid":"23d0dae9-7842-443d-a0ca-3140cdcf4280","parentUuid":"6e1a581b-3fb7-4fc7-aae3-2859863407a9","attachment":{"type":"prompt_snapshot"}}
+{"type":"assistant","uuid":"458f404b-398a-4c43-948f-378d0819147a","parentUuid":"23d0dae9-7842-443d-a0ca-3140cdcf4280","message":{"role":"assistant","id":"msg_011ChBxodAuANqbhzz4UxeLJ","content":[{"type":"tool_use","id":"toolu_01E3AA5XN6b5NKeG8smdZpBx","name":"Bash"}]}}
+{"type":"user","uuid":"3f242e9b-ede4-47bc-9f33-bbd690cfe647","parentUuid":"458f404b-398a-4c43-948f-378d0819147a","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_01E3AA5XN6b5NKeG8smdZpBx"}]}}
+{"type":"attachment","uuid":"193e7a74-0cd6-4194-8d9a-02a452bde2e7","parentUuid":"3f242e9b-ede4-47bc-9f33-bbd690cfe647","attachment":{"type":"prompt_snapshot"}}
+{"type":"attachment","uuid":"a39dae0e-16c6-4ea5-af0b-084f3979268b","parentUuid":"193e7a74-0cd6-4194-8d9a-02a452bde2e7","attachment":{"type":"deferred_tools_delta"}}
+{"type":"attachment","uuid":"2b5505d4-46b3-4c21-a32f-7e1fa21ea17d","parentUuid":"a39dae0e-16c6-4ea5-af0b-084f3979268b","attachment":{"type":"mcp_instructions_delta"}}
+{"type":"attachment","uuid":"19d7d78a-0b27-46cb-b0b8-00aa8e874c87","parentUuid":"2b5505d4-46b3-4c21-a32f-7e1fa21ea17d","attachment":{"type":"total_tokens_reminder"}}
+{"type":"assistant","uuid":"0981f72e-4f67-46ae-8cd6-a00beb37c5d0","parentUuid":"19d7d78a-0b27-46cb-b0b8-00aa8e874c87","message":{"role":"assistant","id":"msg_011ChBxokUCHhi74yTYXREPS","content":[{"type":"thinking"}]}}
+{"type":"assistant","uuid":"8b4d5741-2efb-4e2e-8ad8-91f11ab091d2","parentUuid":"0981f72e-4f67-46ae-8cd6-a00beb37c5d0","message":{"role":"assistant","id":"msg_011ChBxokUCHhi74yTYXREPS","content":[{"type":"text","text":"The `ls` command printed no output, so it listed"}]}}
+{"type":"user","uuid":"6c7b3884-5cd9-40bd-9cf9-b30888516977","parentUuid":"8b4d5741-2efb-4e2e-8ad8-91f11ab091d2","turnOrigin":"sdk","message":{"role":"user","content":[{"type":"text","text":"Reply with just DONE."}]}}
+{"type":"attachment","uuid":"a88dfe2a-ae90-4d35-95e6-d96f4f926a96","parentUuid":"6c7b3884-5cd9-40bd-9cf9-b30888516977","attachment":{"type":"total_tokens_reminder"}}
+{"type":"assistant","uuid":"2eabbda2-7569-45cd-9294-3c188de109d3","parentUuid":"a88dfe2a-ae90-4d35-95e6-d96f4f926a96","message":{"role":"assistant","id":"msg_011ChBxorDySWJCF77bLkBcc","content":[{"type":"text","text":"DONE"}]}}

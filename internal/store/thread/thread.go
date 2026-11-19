@@ -619,6 +619,16 @@ type NewWorktree struct {
 	BaseFromOrigin *bool
 }
 
+// ForkOptions are a fork's (Store.Fork).
+type ForkOptions struct {
+	// Name is the fork's name; empty takes the parent's ("<name> (fork)").
+	Name string
+	// At is the turn end item (its id, or "#<ordinal>") the fork's conversation ends
+	// with; empty forks the whole conversation. The files are not rewound: a fork works
+	// in the parent's checkouts as they are.
+	At string
+}
+
 // Store is the thread store API. *Manager implements it; threadtest.Fake is an
 // in-memory fake.
 type Store interface {
@@ -627,8 +637,9 @@ type Store interface {
 	// used within RequestIDTTL returns that thread with reused set and makes nothing.
 	// An empty key is a plain Create.
 	CreateOnce(ctx context.Context, requestID string, opts CreateOptions) (t Thread, reused bool, err error)
-	// Fork starts a new thread continuing id's conversation (claude --fork-session).
-	Fork(ctx context.Context, id, name string) (Thread, error)
+	// Fork starts a new thread continuing id's conversation (claude --fork-session), all
+	// of it or, with o.At, up to and including that turn.
+	Fork(ctx context.Context, id string, o ForkOptions) (Thread, error)
 	Get(ctx context.Context, id string) (Thread, error)
 	// Rename sets a user-chosen name and disables auto-naming.
 	Rename(ctx context.Context, id, name string) (Thread, error)

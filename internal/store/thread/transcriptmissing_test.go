@@ -118,7 +118,7 @@ func TestTranscriptMissingRefuses(t *testing.T) {
 			return err
 		}},
 		{name: "fork", call: func(e *env, id string) error {
-			_, err := e.m.Fork(e.ctx(), id, "")
+			_, err := e.m.Fork(e.ctx(), id, ForkOptions{})
 			return err
 		}},
 	}

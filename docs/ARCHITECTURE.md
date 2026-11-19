@@ -236,7 +236,8 @@ before load. A third listener, the pages listener, serves no API at all (§13).
 
 Services (v1):
 
-* `ThreadService`, the lifecycle — Create, Fork, List, Get, Rename, Remove (keeps a
+* `ThreadService`, the lifecycle — Create, Fork (all of a conversation, or up to and
+  including a finished turn: `at`, `docs/notes/fork-from-turn.md`), List, Get, Rename, Remove (keeps a
   24 h in-memory tombstone: Get is NOT_FOUND with a `RemovedThread` detail, Wait answers
   `removed`, List adds them on `include_removed`, subscribers get a `removed` wake;
   `docs/notes/removed-thread-signal.md`), RunIn, Move,

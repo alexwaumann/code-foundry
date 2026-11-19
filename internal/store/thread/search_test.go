@@ -330,7 +330,7 @@ func TestSearchForks(t *testing.T) {
 	s := e.connected(CreateOptions{Name: "Original"})
 	e.resumable(s.ID)
 	e.putItems(s.ID, Item{ID: "u1", Kind: KindUserMessage, Text: "the needle before the fork"}, Item{ID: "turn-1", Kind: KindTurnEnd, Turn: &TurnEnd{Subtype: "success"}})
-	f, err := e.m.Fork(e.ctx(), s.ID, "Fork")
+	f, err := e.m.Fork(e.ctx(), s.ID, ForkOptions{Name: "Fork"})
 	if err != nil {
 		t.Fatal(err)
 	}

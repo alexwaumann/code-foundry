@@ -1,0 +1,45 @@
+{"type":"user","uuid":"a085990f-81e8-426d-9656-cb203065cfc1","parentUuid":null,"turnOrigin":"sdk","message":{"role":"user","content":[{"type":"text","text":"Remember the code word APPLE. Reply with just OK"}]}}
+{"type":"attachment","uuid":"f5e8d585-fc77-4475-a2a5-5f4d11e404e4","parentUuid":"a085990f-81e8-426d-9656-cb203065cfc1","attachment":{"type":"environment"}}
+{"type":"attachment","uuid":"7976e8b0-a9ca-47c4-b10a-ec3f855e3a14","parentUuid":"f5e8d585-fc77-4475-a2a5-5f4d11e404e4","attachment":{"type":"model"}}
+{"type":"attachment","uuid":"678f98d5-b00e-4cb6-8ad4-618ec9a508b0","parentUuid":"7976e8b0-a9ca-47c4-b10a-ec3f855e3a14","attachment":{"type":"deferred_tools_delta"}}
+{"type":"attachment","uuid":"97f40baa-73bb-45ce-996b-97e74e9d9bff","parentUuid":"678f98d5-b00e-4cb6-8ad4-618ec9a508b0","attachment":{"type":"agent_listing_delta"}}
+{"type":"attachment","uuid":"89f3429b-7c86-4984-8274-656f8efe16b9","parentUuid":"97f40baa-73bb-45ce-996b-97e74e9d9bff","attachment":{"type":"skill_listing"}}
+{"type":"attachment","uuid":"5e4d4ba9-16fd-46cb-99a1-bf12b911324b","parentUuid":"89f3429b-7c86-4984-8274-656f8efe16b9","attachment":{"type":"total_tokens_reminder"}}
+{"type":"attachment","uuid":"44e556e1-7ffc-435e-a980-608dcbecacc7","parentUuid":"5e4d4ba9-16fd-46cb-99a1-bf12b911324b","attachment":{"type":"session_context"}}
+{"type":"attachment","uuid":"65f87101-14f4-49ad-8fde-5a8d941542a3","parentUuid":"44e556e1-7ffc-435e-a980-608dcbecacc7","attachment":{"type":"date"}}
+{"type":"attachment","uuid":"1d99405d-cf61-4305-a7ea-6e3afcc9b6b2","parentUuid":"65f87101-14f4-49ad-8fde-5a8d941542a3","attachment":{"type":"credential_org"}}
+{"type":"attachment","uuid":"db8a248f-08dc-458e-9940-c98edb6d00f5","parentUuid":"1d99405d-cf61-4305-a7ea-6e3afcc9b6b2","attachment":{"type":"prompt_snapshot"}}
+{"type":"assistant","uuid":"1836a783-eb26-4b5d-b260-7e4b3da1cffb","parentUuid":"db8a248f-08dc-458e-9940-c98edb6d00f5","message":{"role":"assistant","id":"msg_011ChBxxqBigCQpbvbGkU4V3","content":[{"type":"thinking"}]}}
+{"type":"assistant","uuid":"20d8a49f-8720-48e5-a0b9-1005ed7a6e9c","parentUuid":"1836a783-eb26-4b5d-b260-7e4b3da1cffb","message":{"role":"assistant","id":"msg_011ChBxxqBigCQpbvbGkU4V3","content":[{"type":"text","text":"OK"}]}}
+{"type":"attachment","uuid":"4210143d-b576-41d0-b649-0228212d4baa","parentUuid":"20d8a49f-8720-48e5-a0b9-1005ed7a6e9c","attachment":{"type":"prompt_snapshot"}}
+{"type":"user","uuid":"cfd41e77-b463-411d-acfc-af2115c81d3c","parentUuid":"4210143d-b576-41d0-b649-0228212d4baa","turnOrigin":"sdk","message":{"role":"user","content":[{"type":"text","text":"Remember the second code word BANANA. Reply with"}]}}
+{"type":"attachment","uuid":"14f15410-8367-4d62-bca9-efb50c617c1e","parentUuid":"cfd41e77-b463-411d-acfc-af2115c81d3c","attachment":{"type":"deferred_tools_delta"}}
+{"type":"attachment","uuid":"223b1f32-1b63-44ab-b279-372855be59e8","parentUuid":"14f15410-8367-4d62-bca9-efb50c617c1e","attachment":{"type":"mcp_instructions_delta"}}
+{"type":"attachment","uuid":"7d7f0d09-222e-4d74-8251-5d3a5771bd09","parentUuid":"223b1f32-1b63-44ab-b279-372855be59e8","attachment":{"type":"total_tokens_reminder"}}
+{"type":"assistant","uuid":"82089509-e890-4846-a61f-0997265052fc","parentUuid":"7d7f0d09-222e-4d74-8251-5d3a5771bd09","message":{"role":"assistant","id":"msg_011ChBxy1CEG2px44P46VCD7","content":[{"type":"thinking"}]}}
+{"type":"assistant","uuid":"1dfa79b1-2ebb-44e2-9577-fc939a84f3c5","parentUuid":"82089509-e890-4846-a61f-0997265052fc","message":{"role":"assistant","id":"msg_011ChBxy1CEG2px44P46VCD7","content":[{"type":"text","text":"OK"}]}}
+{"type":"system","uuid":"a34f458f-87d3-49c1-8732-f103db6ab207","parentUuid":null,"subtype":"compact_boundary","logicalParentUuid":"1dfa79b1-2ebb-44e2-9577-fc939a84f3c5","compactMetadata":{"trigger":"manual","preservedSegment":{"headUuid":"82089509-e890-4846-a61f-0997265052fc","anchorUuid":"57f2ac03-3f0f-4b99-8e99-04da647f6954","tailUuid":"1dfa79b1-2ebb-44e2-9577-fc939a84f3c5"},"preservedMessages":{"anchorUuid":"57f2ac03-3f0f-4b99-8e99-04da647f6954","uuids":["82089509-e890-4846-a61f-0997265052fc","1dfa79b1-2ebb-44e2-9577-fc939a84f3c5"],"allUuids":["82089509-e890-4846-a61f-0997265052fc","1dfa79b1-2ebb-44e2-9577-fc939a84f3c5"]}}}
+{"type":"user","uuid":"57f2ac03-3f0f-4b99-8e99-04da647f6954","parentUuid":"a34f458f-87d3-49c1-8732-f103db6ab207","isCompactSummary":true,"message":{"role":"user","content":"This session is being continued from a previous "}}
+{"type":"user","uuid":"4cceb9fe-f70c-4ca7-b717-2a380486887d","parentUuid":"57f2ac03-3f0f-4b99-8e99-04da647f6954","isMeta":true,"message":{"role":"user","content":"<local-command-caveat>The command below was run "}}
+{"type":"user","uuid":"d4c6719d-ddfc-44ad-a211-39bab463c13b","parentUuid":"4cceb9fe-f70c-4ca7-b717-2a380486887d","message":{"role":"user","content":"<command-name>/compact</command-name>\n          "}}
+{"type":"user","uuid":"b7de5961-4649-4e27-8acc-3001b5448b85","parentUuid":"d4c6719d-ddfc-44ad-a211-39bab463c13b","message":{"role":"user","content":"<local-command-stdout>Compacted </local-command-"}}
+{"type":"attachment","uuid":"b7096f7e-f43b-4263-9dfa-937117b0be18","parentUuid":"b7de5961-4649-4e27-8acc-3001b5448b85","attachment":{"type":"deferred_tools_delta"}}
+{"type":"attachment","uuid":"75bcd444-fb6d-4b33-ac55-2f07aa417c59","parentUuid":"b7096f7e-f43b-4263-9dfa-937117b0be18","attachment":{"type":"agent_listing_delta"}}
+{"type":"attachment","uuid":"597d14d3-43b7-40a5-af6e-fc3479a33359","parentUuid":"75bcd444-fb6d-4b33-ac55-2f07aa417c59","attachment":{"type":"skill_listing"}}
+{"type":"attachment","uuid":"d200ea75-11c3-435d-8db8-12d7988aa5fb","parentUuid":"597d14d3-43b7-40a5-af6e-fc3479a33359","attachment":{"type":"mcp_instructions_delta"}}
+{"type":"attachment","uuid":"0f554549-c658-443e-9cba-fceef7ab2c5b","parentUuid":"d200ea75-11c3-435d-8db8-12d7988aa5fb","attachment":{"type":"environment"}}
+{"type":"attachment","uuid":"6d1f94bd-cdb0-4398-bcad-b1a93fad0145","parentUuid":"0f554549-c658-443e-9cba-fceef7ab2c5b","attachment":{"type":"model"}}
+{"type":"user","uuid":"5a26a5bf-d55d-4a44-b030-4897070dc62d","parentUuid":"6d1f94bd-cdb0-4398-bcad-b1a93fad0145","turnOrigin":"sdk","message":{"role":"user","content":[{"type":"text","text":"Remember the third code word CHERRY. Reply with "}]}}
+{"type":"attachment","uuid":"84bf8781-0523-44fa-8dfa-31b8c721ca43","parentUuid":"5a26a5bf-d55d-4a44-b030-4897070dc62d","attachment":{"type":"deferred_tools_delta"}}
+{"type":"attachment","uuid":"5da2e7a9-c3b0-44b1-aef1-931f9ca28fcc","parentUuid":"84bf8781-0523-44fa-8dfa-31b8c721ca43","attachment":{"type":"total_tokens_reminder"}}
+{"type":"attachment","uuid":"3c814aca-f172-4e15-97c7-8f770a4f2a38","parentUuid":"5da2e7a9-c3b0-44b1-aef1-931f9ca28fcc","attachment":{"type":"session_context"}}
+{"type":"attachment","uuid":"10e3e19e-7858-4857-a2e8-8d62c80794c0","parentUuid":"3c814aca-f172-4e15-97c7-8f770a4f2a38","attachment":{"type":"date"}}
+{"type":"attachment","uuid":"b378619a-27a1-408e-94a8-818f7145f67c","parentUuid":"10e3e19e-7858-4857-a2e8-8d62c80794c0","attachment":{"type":"credential_org"}}
+{"type":"attachment","uuid":"3f98b5be-26f0-4cef-81f3-0d4c811c2fa6","parentUuid":"b378619a-27a1-408e-94a8-818f7145f67c","attachment":{"type":"prompt_snapshot"}}
+{"type":"attachment","uuid":"77910a44-9fe1-4758-aa8a-2dae9dfd267f","parentUuid":"3f98b5be-26f0-4cef-81f3-0d4c811c2fa6","attachment":{"type":"thinking_drop"}}
+{"type":"assistant","uuid":"8408e140-e88f-4d39-9edf-cb3b96c1f7a3","parentUuid":"77910a44-9fe1-4758-aa8a-2dae9dfd267f","message":{"role":"assistant","id":"msg_011ChBxySoLu8pa9vqT4xpZ9","content":[{"type":"thinking"}]}}
+{"type":"assistant","uuid":"27c0b313-64d5-499e-9432-e69faa3575e8","parentUuid":"8408e140-e88f-4d39-9edf-cb3b96c1f7a3","message":{"role":"assistant","id":"msg_011ChBxySoLu8pa9vqT4xpZ9","content":[{"type":"text","text":"OK"}]}}
+{"type":"attachment","uuid":"1407bf2a-68a5-403f-b930-117bf4182fc1","parentUuid":"27c0b313-64d5-499e-9432-e69faa3575e8","attachment":{"type":"prompt_snapshot"}}
+{"type":"user","uuid":"7768b3a6-886a-4e21-af1f-ddaece772db8","parentUuid":"1407bf2a-68a5-403f-b930-117bf4182fc1","turnOrigin":"sdk","message":{"role":"user","content":[{"type":"text","text":"Remember the fourth code word DATE. Reply with j"}]}}
+{"type":"attachment","uuid":"1d46a4a0-2e60-46dc-ab15-afb8b70a5d5c","parentUuid":"7768b3a6-886a-4e21-af1f-ddaece772db8","attachment":{"type":"total_tokens_reminder"}}
+{"type":"assistant","uuid":"cd87b226-b7cd-4797-bfce-3243a9e5864f","parentUuid":"1d46a4a0-2e60-46dc-ab15-afb8b70a5d5c","message":{"role":"assistant","id":"msg_011ChBxyZJGVcDQwHEgoMx7r","content":[{"type":"text","text":"OK"}]}}
