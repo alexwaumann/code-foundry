@@ -1,0 +1,6 @@
+# Closes an open pull request without merging it (SetPullRequestClosed with closed true).
+mutation ClosePullRequest($id: ID!) {
+  closePullRequest(input: { pullRequestId: $id }) {
+    pullRequest { state }
+  }
+}

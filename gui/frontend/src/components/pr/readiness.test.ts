@@ -99,6 +99,8 @@ function detail(s: Shape = {}): PullRequestDetailView {
     autoMergeAllowed: true,
     defaultBranch: "trunk",
     viewerPermission: "write",
+    viewerCanClose: true,
+    viewerCanReopen: false,
     fetchedAtMs: NOW,
     lastError: "",
     fetchFailed: false,

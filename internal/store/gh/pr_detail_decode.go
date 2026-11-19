@@ -71,6 +71,8 @@ type pullRequestFullJSON struct {
 	MergedBy    *loginJSON `json:"mergedBy"`
 	// AutoMergeRequest is non-null while auto-merge is enabled.
 	AutoMergeRequest *autoMergeRequestJSON `json:"autoMergeRequest"`
+	ViewerCanClose   bool                  `json:"viewerCanClose"`
+	ViewerCanReopen  bool                  `json:"viewerCanReopen"`
 	Labels           *struct {
 		TotalCount int     `json:"totalCount"`
 		Nodes      []Label `json:"nodes"`
@@ -145,6 +147,8 @@ func decodeFullPullRequest(data []byte) (FullPullRequest, checksPage, error) {
 		Body:             p.Body,
 		ClosedAt:         p.ClosedAt,
 		ViewerPermission: d.Repository.ViewerPermission,
+		ViewerCanClose:   p.ViewerCanClose,
+		ViewerCanReopen:  p.ViewerCanReopen,
 		AutoMerge:        p.AutoMergeRequest != nil,
 		AutoMergeAllowed: d.Repository.AutoMergeAllowed,
 	}

@@ -156,3 +156,17 @@ func (f *Gh) SetPullRequestAutoMerge(_ context.Context, r *connect.Request[v1.Se
 	}
 	return connect.NewResponse(&v1.SetPullRequestAutoMergeResponse{Enabled: true, Method: r.Msg.GetMethod(), Message: "Auto-merge on for #" + n}), nil
 }
+
+// SetPullRequestClosed implements command.GhBackend: the requested state and the
+// daemon's message for it.
+func (f *Gh) SetPullRequestClosed(_ context.Context, r *connect.Request[v1.SetPullRequestClosedRequest]) (*connect.Response[v1.SetPullRequestClosedResponse], error) {
+	f.record(r.Msg)
+	if f.Err != nil {
+		return nil, f.Err
+	}
+	n := strconv.Itoa(int(r.Msg.GetNumber()))
+	if r.Msg.GetClosed() {
+		return connect.NewResponse(&v1.SetPullRequestClosedResponse{State: v1.PullRequestState_PULL_REQUEST_STATE_CLOSED, Message: "Closed #" + n}), nil
+	}
+	return connect.NewResponse(&v1.SetPullRequestClosedResponse{State: v1.PullRequestState_PULL_REQUEST_STATE_OPEN, Message: "Reopened #" + n}), nil
+}

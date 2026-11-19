@@ -1,7 +1,7 @@
 /**
  * Mock GhService pull request detail panel: GetPullRequestDetail, ListReviewerCandidates,
  * SetReviewRequest, RevertPullRequest, MergePullRequest, SubmitPullRequestReview,
- * AddPullRequestComment, SetPullRequestDraft, SetPullRequestAutoMerge. Two rich fixtures on alexwaumann/code-foundry, and the
+ * AddPullRequestComment, SetPullRequestDraft, SetPullRequestAutoMerge, SetPullRequestClosed. Two rich fixtures on alexwaumann/code-foundry, and the
  * mergeable one:
  *
  *   #145 open, draft, failing, in-progress and queued checks, changes requested by a
@@ -59,6 +59,14 @@
  * #145 is a draft, so it needs pr.ready first; #147 (checks failing, blocked) takes
  * auto-merge. A change flips the fixture (draft, auto_merge_enabled and
  * auto_merge_method) and announces it.
+ *
+ * Close and reopen (pr.close, which asks first naming the pull request, and pr.reopen;
+ * SetPullRequestClosed), with the daemon's refusals: closing what is not open
+ * (FAILED_PRECONDITION), reopening what is open or merged (FAILED_PRECONDITION), and a
+ * viewer GitHub would not let (PERMISSION_DENIED: #140, read access on someone else's).
+ * viewer_can_close is the viewer's write access or authorship, and viewer_can_reopen that
+ * on a closed pull request (closeFields), on every read. #131 is closed: Reopen. A change
+ * flips the fixture's state (and the summary the dashboards list) and announces it.
  */
 import { create, toJson, type MessageInitShape } from "@bufbuild/protobuf";
 import { timestampFromDate, type Timestamp } from "@bufbuild/protobuf/wkt";
@@ -82,6 +90,7 @@ import {
   SubmitPullRequestReviewResponseSchema,
   SetPullRequestAutoMergeResponseSchema,
   SetPullRequestCheckboxResponseSchema,
+  SetPullRequestClosedResponseSchema,
   SetPullRequestDraftResponseSchema,
   MergeStateStatus,
   Mergeable,
@@ -201,6 +210,17 @@ const AUTO_MERGE_OFF = new Set(["other-org/lib"]);
 const autoMergeAllowed = (slug: string) => !AUTO_MERGE_OFF.has(slug.toLowerCase());
 
 /** A pull request state as the daemon's refusals say it ("merged", "closed"). */
+/**
+ * d with GitHub's viewerCanClose (write access, or the viewer's own pull request) and
+ * viewerCanReopen (that, on a closed pull request), as the daemon reads them.
+ */
+function closeFields<T extends DetailInit>(d: T, viewer: string): T {
+  const may = (d.viewerCanUpdate ?? false) || d.pullRequest?.author === viewer;
+  d.viewerCanClose = may;
+  d.viewerCanReopen = may && d.pullRequest?.state === PullRequestState.CLOSED;
+  return d;
+}
+
 const stateWord = (s: PullRequestState | undefined) => (s === PullRequestState.MERGED ? "merged" : s === PullRequestState.CLOSED ? "closed" : "open");
 
 /** ListReviewerCandidates returns at most this many matches, as GitHub's search does (first: 20). */
@@ -761,7 +781,7 @@ export class PrDetailWorld {
     this.h.count("GetPullRequestDetail");
     const d = this.detailOf(slug, number);
     if (refresh) d.fetchedAt = timestampFromDate(new Date());
-    return this.staleFirst(slug, number, d);
+    return closeFields(this.staleFirst(slug, number, d), this.h.viewer);
   }
 
   /** The daemon's stale-first read: the copy as it was, marked refreshing, and the fetch behind it starts (pr-stale). */
@@ -1035,6 +1055,33 @@ export class PrDetailWorld {
           return out(r.message, toJson(SetPullRequestDraftResponseSchema, create(SetPullRequestDraftResponseSchema, r)));
         },
       })),
+      ...(["pr.close", "pr.reopen"] as const).map((name) => ({
+        cmd: {
+          name, noPalette: true,
+          title: name === "pr.close" ? "Close Pull Request" : "Reopen Pull Request",
+          category: "Pull Request",
+          description:
+            name === "pr.close"
+              ? "Close an open pull request without merging it (GitHub's Close pull request button); pr.reopen reopens it."
+              : "Reopen a closed pull request that was not merged (GitHub's Reopen pull request button).",
+          keybindings: [],
+          args: [slugArg, numberArg],
+          // Like the daemon: only pr.close asks, naming the pull request by its title.
+          ...(name === "pr.close"
+            ? {
+                confirmIf: (_ctx: UiContext | undefined, args: Record<string, string>) => Number(args.number) > 0 && (args["repo-slug"] ?? "").trim() !== "",
+                confirm: (_ctx: UiContext | undefined, args: Record<string, string>) => this.closeConfirm(args["repo-slug"] ?? "", Number(args.number)),
+                confirmLabel: "Close pull request",
+              }
+            : {}),
+        },
+        when: always,
+        run: (_ctx: UiContext | undefined, args: Record<string, string>) => {
+          const [slug, n] = target(args);
+          const r = prDetailCall(() => this.setClosed(slug, n, name === "pr.close"));
+          return out(r.message, toJson(SetPullRequestClosedResponseSchema, create(SetPullRequestClosedResponseSchema, r)));
+        },
+      })),
       {
         cmd: {
           name: "pr.checkbox", noPalette: true,
@@ -1231,6 +1278,52 @@ export class PrDetailWorld {
     this.touch(d, timestampFromDate(new Date()));
     this.h.publishGh({ event: { case: "pullRequestDetailUpdated", value: { repoSlug: slug.toLowerCase(), number } } });
     return { draft, message: draft ? `Converted #${String(number)} to a draft` : `Marked #${String(number)} ready for review` };
+  }
+
+  /** pr.close's question: "Close #N “title” in owner/name without merging it? …", or without the title when there is no detail. */
+  private closeConfirm(slug: string, number: number): string {
+    let title = "";
+    try {
+      title = (this.detailOf(slug, number).pullRequest?.title ?? "").trim();
+    } catch {
+      // the daemon's static question
+    }
+    if (!title) return `Close #${String(number)} in ${slug} without merging it?`;
+    const cut = title.length > 80 ? `${title.slice(0, 79).trim()}…` : title;
+    return `Close #${String(number)} “${cut}” in ${slug} without merging it? It can be reopened later.`;
+  }
+
+  /**
+   * Closes an open pull request or reopens a closed one (SetPullRequestClosed, pr.close,
+   * pr.reopen), refused like the daemon: closing what is not open, reopening what is open
+   * or merged, and a viewer who may not (closeFields). The fixture's state flips (and the
+   * summary the dashboards list) and it is announced.
+   */
+  setClosed(slug: string, number: number, closed: boolean): { state: PullRequestState; message: string } {
+    this.h.count("SetPullRequestClosed");
+    const d = closeFields(this.detailOf(slug, number), this.h.viewer);
+    const pr = d.pullRequest;
+    if (!pr) throw new PrDetailError("not_found", `Could not resolve to a PullRequest with the number of ${String(number)}.`);
+    const refuse = (why: string) => new PrDetailError("failed_precondition", `failed precondition: pull request #${String(number)} ${why}`);
+    if (closed && pr.state !== PullRequestState.OPEN) throw refuse(`is ${stateWord(pr.state)}, not open`);
+    if (!closed && pr.state === PullRequestState.MERGED) throw refuse("is merged; a merged pull request cannot be reopened");
+    if (!closed && pr.state !== PullRequestState.CLOSED) throw refuse("is already open");
+    if (!(closed ? d.viewerCanClose : d.viewerCanReopen)) {
+      throw new PrDetailError("permission_denied", `permission denied on github: GitHub does not let you ${closed ? "close" : "reopen"} pull request #${String(number)} in ${slug}`);
+    }
+    const now = timestampFromDate(new Date());
+    const state = closed ? PullRequestState.CLOSED : PullRequestState.OPEN;
+    pr.state = state;
+    pr.updatedAt = now;
+    d.closedAt = closed ? now : undefined;
+    const found = this.h.findPr(slug, number);
+    if (found && found !== pr) {
+      found.state = state;
+      found.updatedAt = now;
+    }
+    this.touch(d, now);
+    this.h.publishGh({ event: { case: "pullRequestDetailUpdated", value: { repoSlug: slug.toLowerCase(), number } } });
+    return { state, message: `${closed ? "Closed" : "Reopened"} #${String(number)}` };
   }
 
   /**

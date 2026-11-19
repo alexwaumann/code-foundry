@@ -322,6 +322,10 @@ export interface PullRequestDetailView {
   defaultBranch: string;
   /** "admin" | "maintain" | "write" | "triage" | "read" | "". */
   viewerPermission: string;
+  /** GitHub's viewerCanClose: the viewer may close it (its author, or triage access or more); GitHub reports it in any state. */
+  viewerCanClose: boolean;
+  /** GitHub's viewerCanReopen: it is closed, not merged, and the viewer may reopen it. */
+  viewerCanReopen: boolean;
   fetchedAtMs: number | null;
   /** The last fetch's error when this is the cached copy (fetchFailed), or why checks is incomplete. */
   lastError: string;
@@ -640,6 +644,8 @@ export function toPullRequestDetailView(d: PullRequestDetail): PullRequestDetail
     autoMergeAllowed: d.autoMergeAllowed,
     defaultBranch: d.defaultBranch,
     viewerPermission: d.viewerPermission,
+    viewerCanClose: d.viewerCanClose,
+    viewerCanReopen: d.viewerCanReopen,
     fetchedAtMs: ms(d.fetchedAt),
     lastError: d.lastError,
     fetchFailed: d.fetchFailed,

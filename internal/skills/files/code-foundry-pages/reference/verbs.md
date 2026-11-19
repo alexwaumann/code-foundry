@@ -11,6 +11,8 @@ Args by name, values after them in plain text; `code-foundry help <verb>` has th
 | `pr.merge` (asks first) | `repo-slug`, `number`, `method` merge, squash or rebase, `head-sha` the PR's `headSha` |
 | `pr.auto-merge` (asks first) | `repo-slug`, `number`, `method` merge, squash or rebase, or `off` true |
 | `pr.ready`, `pr.draft` (no dialog) | `repo-slug`, `number` |
+| `pr.close` (asks first) | `repo-slug`, `number` |
+| `pr.reopen` (no dialog) | `repo-slug`, `number` |
 | `pr.checks` (read) | `repo-slug`, `number`; watch one PR: run it again in `cf.on("gh", …)` |
 | `thread.archive` (asks when busy) | `id`; `archived` false unarchives |
 | `thread.snooze` | `id`, `until` 1h, 3h, tomorrow, next-week, mon…sun or a date; or `save` true (no wake); or `clear` true |
