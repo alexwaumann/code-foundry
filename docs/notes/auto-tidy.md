@@ -11,7 +11,7 @@ process and ends the terminals), `save-for-later-1-daemon.md` and `archive-threa
 | Key | Values | Says |
 | --- | --- | --- |
 | `threads.auto_save_after` | `off` (default), `1d`, `3d`, `1w`, `2w`, `1mo` | "Save idle threads for later": a thread with no activity for this long (no message to or from Claude) moves to Snoozed with no alarm. Pinned threads, and threads that are working or asking, stay. |
-| `threads.auto_archive_after` | `off` (default), `1w`, `2w`, `1mo`, `3mo` | "Archive saved threads": a thread that has sat in Snoozed with no alarm for this long is archived. Its work is kept. |
+| `threads.auto_archive_after` | `off` (default), `1w`, `2w`, `1mo`, `3mo` | "Archive saved threads": a thread that has sat in Snoozed with no alarm or event for this long is archived. Its work is kept. |
 
 `settings.TidyAfter` reads a value (a month is 30 days). Both are read on every tick, so a
 change applies at the next one.
