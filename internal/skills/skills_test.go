@@ -101,6 +101,7 @@ func TestRender(t *testing.T) {
 		"code-foundry-orchestrate/SKILL.md",
 		"code-foundry-orchestrate/reference/patterns.md", "code-foundry-orchestrate/reference/wakes.md",
 		"code-foundry-orchestrate/reference/leads.md", "code-foundry-orchestrate/reference/sidebar.md",
+		"code-foundry-orchestrate/reference/messages.md",
 		"code-foundry-help/SKILL.md", "code-foundry-help/reference/getting-started.md",
 		"code-foundry-help/reference/settings.md",
 		"code-foundry-help/reference/themes.md", "code-foundry-help/reference/reading-the-source.md",

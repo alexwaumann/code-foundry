@@ -249,7 +249,7 @@ func TestListPromptsLeavesOutThreadSends(t *testing.T) {
 	e := newEnv(t)
 	lead := e.connected(CreateOptions{Name: "Lead"})
 	worker := e.connected(CreateOptions{Name: "Worker", CreatedBy: lead.ID, InitialPrompt: "do the thing"})
-	if _, err := e.m.Send(e.ctx(), worker.ID, Message{Text: "status?", ByThreadID: lead.ID}); err != nil {
+	if _, err := e.m.Send(e.ctx(), worker.ID, Message{Text: "status?", ByThreadID: lead.ID, Reply: ReplyWanted}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := e.m.Send(e.ctx(), worker.ID, Message{Text: "mine"}); err != nil {

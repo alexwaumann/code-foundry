@@ -467,6 +467,35 @@ message UserMessageItem {
   // of a fresh session a ThreadService.Reseed asked for starts with it. Empty for most
   // messages.
   string seed_prefix = 9;
+  // The thread that sent it: another thread's thread send, or a created thread's first
+  // prompt (its creator). Empty for the user's messages and wakes. Prompt history
+  // (ListPrompts) leaves such messages out.
+  string sent_by_thread_id = 10;
+  // A message another thread sent with thread send: what that thread is to this one, and
+  // its reply mark (docs/notes/thread-reply-mark.md). UNSPECIFIED for the user's messages,
+  // wakes, a created thread's first prompt (its task) and items from before the mark.
+  ThreadRelation sender_relation = 11;
+  ReplyMark reply = 12;
+}
+
+// What one thread is to another.
+enum ThreadRelation {
+  THREAD_RELATION_UNSPECIFIED = 0;
+  // It created the other thread.
+  THREAD_RELATION_LEAD = 1;
+  // The other thread created it.
+  THREAD_RELATION_WORKER = 2;
+  // Neither: a peer, the user's other thread, a lead's lead.
+  THREAD_RELATION_OTHER = 3;
+}
+
+// A thread-to-thread message's reply mark: whether its sender waits for an answer.
+enum ReplyMark {
+  REPLY_MARK_UNSPECIFIED = 0;
+  // The receiver answers it once; the answer wakes the sender.
+  REPLY_MARK_WANTED = 1;
+  // The receiver acts on it and does not confirm or report back.
+  REPLY_MARK_NONE = 2;
 }
 
 // MessageOrigin is who sent a user_message item.
@@ -618,6 +647,30 @@ message NoteItem {
   // list for the creator's current name; the text keeps the name at creation, the
   // fallback for a removed creator.
   string created_by = 2;
+  // A message this thread sent to another thread (not to its own worker), as the sender's
+  // record of it: "Asked "Docs" (s-…) · waiting for a reply", then "· replied"; "Told … ·
+  // no reply needed". Updated in place (docs/notes/thread-reply-mark.md).
+  ThreadMessageSent sent = 3;
+}
+
+// A note's record of a message its thread sent to another thread.
+message ThreadMessageSent {
+  string to_thread_id = 1;
+  // The receiver's name when it was sent.
+  string to_name = 2;
+  // What the receiver is to the sender (WORKER never: its card shows those).
+  ThreadRelation relation = 3;
+  ReplyMark reply = 4;
+  // The message's user_message item in the receiver's timeline.
+  string item_id = 5;
+  int64 ordinal = 6;
+  // WANTED: when the answer came, and its item in this thread's timeline (the receiver's
+  // next message here). Unset while waiting.
+  google.protobuf.Timestamp replied_at = 7;
+  string reply_item_id = 8;
+  // WANTED, no answer: "turn ended" (the turn that read it ended without one; an answer
+  // may still come), "archived" or "removed". Empty while waiting and once answered.
+  string unanswered = 9;
 }
 
 // A request waiting on the user.
@@ -934,8 +987,14 @@ message SendThreadMessageRequest {
   string by_thread_id = 5;
   // A send by_thread_id to a thread whose --notify subscription from it ended (the thread
   // finished) subscribes it again the same way, armed on this message; true opts out
-  // (thread send --notify=false, and --wait, which waits instead).
+  // (thread send --notify=false, and --wait, which waits instead), and a wanted reply sets
+  // up no wake for its answer.
   bool no_notify = 6;
+  // Required when by_thread_id is another thread than thread_id (INVALID_ARGUMENT
+  // without): WANTED when the sender needs the answer (woken by it), NONE for an
+  // instruction, a hand-off or information (the receiver does not confirm or report back;
+  // no --notify renewal). Ignored on the user's messages (docs/notes/thread-reply-mark.md).
+  ReplyMark reply = 7;
 }
 
 message SendThreadMessageResponse {

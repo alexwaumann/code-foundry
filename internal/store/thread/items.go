@@ -130,6 +130,15 @@ type Item struct {
 	// prompt, its creator); "" for the user. Prompt history leaves such messages out
 	// (prompts.go).
 	SentBy string
+	// SenderRelation and Reply: a message another thread sent with thread send, what the
+	// sender is to this thread (its lead, one of its workers, another thread) and its reply
+	// mark (replies.go); empty for the user's messages, wakes, a created thread's first
+	// prompt and items from before the mark.
+	SenderRelation Relation
+	Reply          Reply
+	// Sent: a note's record of a message this thread sent to another thread (replies.go):
+	// the "asked · waiting for a reply" / "told · no reply needed" line. nil otherwise.
+	Sent *SentMessage
 	// ResumeNote: user_message's resume note, the line Claude got before the text after
 	// something other than the user stopped its previous turn (resumenote.go).
 	ResumeNote string
@@ -298,8 +307,12 @@ type Message struct {
 	// item as SentBy; "" for the user.
 	ByThreadID string
 	// NoNotify: the send does not subscribe ByThreadID again to a thread whose --notify
-	// subscription ended (thread send --notify=false, --wait; subscriptions_until.go).
+	// subscription ended (thread send --notify=false, --wait; subscriptions_until.go), and
+	// sets up no wake for a wanted reply: the sender waits itself (replies.go).
 	NoNotify bool
+	// Reply is the reply mark of a message from one thread to another: required when
+	// ByThreadID is another thread than the receiver (replies.go); "" for the user's.
+	Reply Reply
 	// compact: Compact's /compact (compact.go).
 	compact bool
 }
@@ -716,6 +729,10 @@ func cloneItem(it Item) Item {
 	if it.HTML != nil {
 		h := *it.HTML
 		it.HTML = &h
+	}
+	if it.Sent != nil {
+		c := *it.Sent
+		it.Sent = &c
 	}
 	if it.Theme != nil {
 		c := *it.Theme

@@ -52,7 +52,8 @@ func TestAskWakesTheCreator(t *testing.T) {
 	}
 	items := e.waitItems(parent.ID, "the wake", func(items []Item) bool { return len(wakes(items)) == 1 })
 	w := wakes(items)[0]
-	for _, want := range []string{"asks you something and keeps working", "> Which port?\n> The spec says two.", "> I use 8080", "thread send --id " + kid.ID} {
+	for _, want := range []string{"asks you something and keeps working", "> Which port?\n> The spec says two.", "> I use 8080",
+		"If the assumption is right, do not answer", "thread send --id " + kid.ID + " --reply none"} {
 		if !strings.Contains(w.Text, want) {
 			t.Errorf("text lacks %q:\n%s", want, w.Text)
 		}
@@ -81,35 +82,5 @@ func TestAskCountsAgainstTheWakeLimit(t *testing.T) {
 	}
 	if _, _, err := e.m.Ask(e.ctx(), kid.ID, "two?", "a"); !errors.Is(err, ErrFailedPrecondition) || !strings.Contains(err.Error(), "wake limit") {
 		t.Errorf("err = %v", err)
-	}
-}
-
-func TestSenderNote(t *testing.T) {
-	e := newEnv(t)
-	parent, kid, other := e.stopped("parent"), e.stopped("kid"), e.stopped("other")
-	e.m.update(kid.ID, false, func(rec *record) { rec.s.CreatedBy = parent.ID })
-	parent, _ = e.m.Snapshot().Thread(parent.ID)
-	kid, _ = e.m.Snapshot().Thread(kid.ID)
-	tests := []struct {
-		name string
-		to   Thread
-		msg  Message
-		want string
-	}{
-		{"the user", kid, Message{}, ""},
-		{"its creator", kid, Message{ByThreadID: parent.ID}, ""},
-		{"itself", kid, Message{ByThreadID: kid.ID}, ""},
-		{"a wake", parent, Message{ByThreadID: kid.ID, Origin: OriginWake}, ""},
-		{"a child to its parent", parent, Message{ByThreadID: kid.ID}, `From thread "kid" (` + kid.ID + `), not the user`},
-		{"a stranger", kid, Message{ByThreadID: other.ID}, `From thread "other"`},
-		{"a thread that is gone", kid, Message{ByThreadID: "s-gone"}, "From thread s-gone, not the user"},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := e.m.senderNote(tt.to, tt.msg)
-			if (tt.want == "") != (got == "") || !strings.Contains(got, tt.want) {
-				t.Errorf("note = %q", got)
-			}
-		})
 	}
 }

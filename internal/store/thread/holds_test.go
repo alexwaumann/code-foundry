@@ -109,7 +109,7 @@ func TestArchivedRefusesThreadsThatDidNotCreateIt(t *testing.T) {
 	other := func(l family) string { return l.other.ID }
 	grand := func(l family) string { return l.grand.ID }
 	send := func(e *env, id, by string) error {
-		_, err := e.m.Send(e.ctx(), id, Message{Text: "hello", ByThreadID: by})
+		_, err := e.m.Send(e.ctx(), id, Message{Text: "hello", ByThreadID: by, Reply: ReplyNone})
 		return err
 	}
 	unarchive := func(e *env, id, by string) error {
@@ -219,8 +219,8 @@ func TestSnoozeHoldsAMessage(t *testing.T) {
 		msg  func(l family) Message
 		held bool
 	}{
-		{"an unrelated thread's message", func(l family) Message { return Message{Text: "do it", ByThreadID: l.other.ID} }, true},
-		{"its creator's message", func(l family) Message { return Message{Text: "do it", ByThreadID: l.lead.ID} }, true},
+		{"an unrelated thread's message", func(l family) Message { return Message{Text: "do it", ByThreadID: l.other.ID, Reply: ReplyNone} }, true},
+		{"its creator's message", func(l family) Message { return Message{Text: "do it", ByThreadID: l.lead.ID, Reply: ReplyNone} }, true},
 		{"a wake", func(family) Message { return Message{Text: "wake", Origin: OriginWake, WakeTitle: "t"} }, true},
 		{"the user's message", func(family) Message { return Message{Text: "do it"} }, false},
 	}
@@ -312,7 +312,7 @@ func TestSnoozeHoldsThroughAnAsk(t *testing.T) {
 	asker := e.stopped("asker")
 	b := e.stopped("snoozed")
 	snoozed := e.snoozeFor(b.ID)
-	if _, err := e.m.Send(e.ctx(), b.ID, Message{Text: "write", ByThreadID: asker.ID}); err != nil {
+	if _, err := e.m.Send(e.ctx(), b.ID, Message{Text: "write", ByThreadID: asker.ID, Reply: ReplyNone}); err != nil {
 		t.Fatal(err)
 	}
 	ask := e.asking(b.ID)
@@ -336,7 +336,7 @@ func TestSnoozeEndsWhileWorking(t *testing.T) {
 	asker := e.stopped("asker")
 	b := e.stopped("snoozed")
 	e.snoozeFor(b.ID)
-	if _, err := e.m.Send(e.ctx(), b.ID, Message{Text: "go", ByThreadID: asker.ID}); err != nil {
+	if _, err := e.m.Send(e.ctx(), b.ID, Message{Text: "go", ByThreadID: asker.ID, Reply: ReplyNone}); err != nil {
 		t.Fatal(err)
 	}
 	busy := e.waitFor(b.ID, "busy", func(s Thread) bool { return s.State == StateConnected && s.Status == StatusBusy })

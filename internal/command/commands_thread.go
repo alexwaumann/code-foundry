@@ -138,7 +138,9 @@ func RegisterThread(r *Registry, b ThreadBackend) error {
 			Description: "Send a message to a thread, also while it works: Claude picks it up mid-turn. " +
 				"A thread whose Claude is not running starts with it. During a setup it waits behind the first prompt; " +
 				"after a failed or cancelled setup it tries the setup again. " +
-				"From a thread: a snoozed thread gets it and stays snoozed; an archived thread it did not create refuses it (read it, or ask the user).",
+				"From a thread: a snoozed thread gets it and stays snoozed; an archived thread it did not create refuses it (read it, or ask the user). " +
+				"From a thread to another thread, reply is required: wanted when you need its answer (you are woken when it answers; do not poll), " +
+				"none for an instruction, a hand-off or information (it does not confirm or report back, and you do not hear back).",
 			Category: "Thread",
 			Args: []ArgSpec{
 				idArg,
@@ -154,7 +156,10 @@ func RegisterThread(r *Registry, b ThreadBackend) error {
 				withDefault(ArgSpec{Name: "for", Type: String, Description: "With wait: how long to wait at most, as thread.wait's for"},
 					waitForArg.Default),
 				{Name: "notify", Type: Bool, Default: "true", Description: "When by's --notify subscription to the thread ended with its finish, subscribe it again, " +
-					"so the answer wakes it (=false: no; never with wait, which waits instead)"},
+					"so the answer wakes it (=false: no; never with wait, which waits instead, or reply none)"},
+				{Name: "reply", Type: Enum, Enum: ReplyMarks, Description: "Required from a thread to another thread: wanted (a question, or a request whose result " +
+					"you need: it answers once and that wakes you) or none (an instruction, a hand-off or information: it does not confirm or report back). " +
+					"wait implies wanted. The user's own messages take none"},
 			},
 			When: hasThread,
 			Run: func(ctx context.Context, uctx Context, a Args) (Result, error) {
@@ -169,10 +174,17 @@ func RegisterThread(r *Registry, b ThreadBackend) error {
 				// it may do to a snoozed or archived thread hangs on it
 				// (docs/notes/snooze-holds-archive-refuses.md).
 				by := cmp.Or(a.String("by"), askingThread(uctx))
+				reply := a.String("reply")
+				if a.Bool("wait") {
+					if reply == "none" {
+						return Result{}, InvalidArg("reply", "--wait waits for its answer, so it goes with --reply wanted (or none given), not none")
+					}
+					reply = "wanted"
+				}
 				res, err := b.Send(ctx, connect.NewRequest(&v1.SendThreadMessageRequest{
 					ThreadId: a.String("id"), Text: a.String("text"), Attachments: splitList(a.String("attachments")),
 					ComposerText: a.String("composer-text"), ByThreadId: by,
-					NoNotify: !a.Bool("notify") || a.Bool("wait"),
+					NoNotify: !a.Bool("notify") || a.Bool("wait"), Reply: replyMarks[reply],
 				}))
 				if r, ok := removedFrom(err); ok {
 					return removedWaitResult(r, ""), nil // exit 1, not a usage error
@@ -182,11 +194,16 @@ func RegisterThread(r *Registry, b ThreadBackend) error {
 				}
 				id, item := a.String("id"), res.Msg.GetItem()
 				sent := "sent to thread " + id
-				if n := item.GetOrdinal(); n > 0 {
+				n := item.GetOrdinal()
+				if n > 0 {
 					sent += fmt.Sprintf(" (#%d)", n)
-					if !a.Bool("wait") {
-						sent += "; " + sendNext(ctx, b, uctx.CallerThreadID, id, n)
-					}
+				}
+				switch marked := item.GetUserMessage().GetReply(); {
+				case a.Bool("wait"):
+				case marked != v1.ReplyMark_REPLY_MARK_UNSPECIFIED:
+					sent += ". " + sentReply(ctx, b, by, id, marked, n)
+				case n > 0:
+					sent += "; " + sendNext(ctx, b, uctx.CallerThreadID, id, n)
 				}
 				if !a.Bool("wait") {
 					return Result{Message: sent, JSON: item}, nil
@@ -402,18 +419,51 @@ func RegisterThread(r *Registry, b ThreadBackend) error {
 // idle or attention; E3, W2: the wait hint contradicted --notify), else the wait for
 // the answer, ready to paste. A failed look-up gives the wait hint.
 func sendNext(ctx context.Context, b SubscriptionBackend, caller, id string, n int64) string {
-	if caller != "" && caller != id {
-		res, err := b.ListSubscriptions(ctx, connect.NewRequest(&v1.ListThreadSubscriptionsRequest{SubscriberThreadId: caller}))
-		if err == nil {
-			for _, s := range res.Msg.GetSubscriptions() {
-				if s.GetTarget() == v1.ThreadSubscriptionTarget_THREAD_SUBSCRIPTION_TARGET_THREAD && s.GetTargetId() == id &&
-					slices.Contains(answerConditions, s.GetCondition()) {
-					return "you are subscribed (" + s.GetId() + "): end your turn; it wakes you"
-				}
-			}
-		}
+	if sub := answerSubscription(ctx, b, caller, id); sub != "" {
+		return "you are subscribed (" + sub + "): end your turn; it wakes you"
 	}
 	return fmt.Sprintf("wait with: code-foundry thread wait %s --after %d", id, n)
+}
+
+// ReplyMarks are thread.send's reply values (docs/notes/thread-reply-mark.md).
+var ReplyMarks = []string{"wanted", "none"}
+
+var replyMarks = map[string]v1.ReplyMark{"wanted": v1.ReplyMark_REPLY_MARK_WANTED, "none": v1.ReplyMark_REPLY_MARK_NONE}
+
+// sentReply is what thread by is told after sending thread id the message #n with reply
+// mark marked: whether it hears back, and how.
+func sentReply(ctx context.Context, b SubscriptionBackend, by, id string, marked v1.ReplyMark, n int64) string {
+	sub := answerSubscription(ctx, b, by, id)
+	if marked == v1.ReplyMark_REPLY_MARK_NONE {
+		out := "Delivered, no reply expected. You will not hear back, not even a confirmation, unless that thread needs something from you."
+		if sub != "" {
+			out += " (Your subscription " + sub + " to it still wakes you when its turn ends.)"
+		}
+		return out
+	}
+	if sub == "" {
+		return fmt.Sprintf("Delivered, but no wake could be set up for its answer: wait with code-foundry thread wait %s --after %d", id, n)
+	}
+	return "Delivered. You will be woken when it answers; do not poll it."
+}
+
+// answerSubscription is the id of a subscription of thread by to thread id that its
+// answer meets (a reply-wait included); "" for none, or when it cannot be listed.
+func answerSubscription(ctx context.Context, b SubscriptionBackend, by, id string) string {
+	if by == "" || by == id {
+		return ""
+	}
+	res, err := b.ListSubscriptions(ctx, connect.NewRequest(&v1.ListThreadSubscriptionsRequest{SubscriberThreadId: by}))
+	if err != nil {
+		return ""
+	}
+	for _, s := range res.Msg.GetSubscriptions() {
+		if s.GetTarget() == v1.ThreadSubscriptionTarget_THREAD_SUBSCRIPTION_TARGET_THREAD && s.GetTargetId() == id &&
+			slices.Contains(answerConditions, s.GetCondition()) {
+			return s.GetId()
+		}
+	}
+	return ""
 }
 
 // answerConditions are the wake conditions a thread's answer to a message meets.

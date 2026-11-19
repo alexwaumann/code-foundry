@@ -68,6 +68,9 @@ func (m *Manager) fireRemovedLocked(r RemovedThread) {
 			continue
 		}
 		told[sr.s.SubscriberID] = true
+		if sr.s.ReplyWait() {
+			m.closeAsksLater(sr.s.SubscriberID, r.ID, UnansweredRemoved)
+		}
 		m.fireLocked(sr, func(sub Subscription, at time.Time) Message { return removedWake(sub, r, at) })
 	}
 }

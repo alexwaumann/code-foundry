@@ -23,6 +23,7 @@ import { daemon, type DaemonConnection } from "./endpoint";
 import { HEARTBEAT, type Heartbeat } from "./stream";
 import { toAgentRunViews, type AgentRunView } from "./agents";
 import { toWakeViews, type WakeSubscriptionView } from "./wakes";
+import { fromOf, sentOf, type MessageFromView, type SentMessageView } from "./replies";
 import { toMcpStatusView, type McpStatusView } from "./mcp";
 import { toSlashCommandViews, type SlashCommandView } from "./slashCommands";
 import { toUserThemeFile } from "./theme";
@@ -135,8 +136,19 @@ export type ThreadItemView = ItemBase &
      * resumeNote: the line Claude got before the text after something other than the user stopped its previous turn
      * (the budget stop, another thread's interrupt, an app restart; docs/notes/orch-child-context.md).
      * queued: set while Claude has not read it yet (sent while it worked; docs/notes/orch-queued-placement.md).
+     * from: set when another thread sent it with thread send: who, what it is to this thread, and its reply mark
+     * (docs/notes/thread-reply-mark.md).
      */
-    | { kind: "user"; text: string; attachments: readonly string[]; composerText: string; wake?: WakeView; resumeNote?: string; queued?: true }
+    | {
+        kind: "user";
+        text: string;
+        attachments: readonly string[];
+        composerText: string;
+        wake?: WakeView;
+        resumeNote?: string;
+        queued?: true;
+        from?: MessageFromView;
+      }
     /**
      * Claude's text. apiError: Claude Code's synthetic API-error message (the request failed:
      * auth, rate limit, timeout, overload), so the text is its error wording, not a reply
@@ -154,9 +166,10 @@ export type ThreadItemView = ItemBase &
     /**
      * A line the daemon adds, not Claude (a fork's "Forked from <parent>", where the copied
      * history ends). createdBy: the creator thread's id when it is the "Created by …" note
-     * at the top of an agent-made thread (a fork's copy too), else "".
+     * at the top of an agent-made thread (a fork's copy too), else "". sent: the record of a
+     * message this thread sent another thread, updated in place (docs/notes/thread-reply-mark.md).
      */
-    | { kind: "note"; text: string; createdBy: string }
+    | { kind: "note"; text: string; createdBy: string; sent?: SentMessageView }
     /**
      * An HTML page the model showed inline (code-foundry view.inline; docs/notes/inline-html.md):
      * path relative to baseDir (the thread's cwd when it was shown) or absolute; title as the
@@ -279,6 +292,7 @@ export function toThreadItemView(it: ThreadItem): ThreadItemView | null {
         ...(p.value.origin === MessageOrigin.WAKE ? { wake: { title: p.value.wakeTitle, json: p.value.wakeJson } } : {}),
         ...(p.value.resumeNote ? { resumeNote: p.value.resumeNote } : {}),
         ...(p.value.queued ? { queued: true as const } : {}),
+        ...fromOf(p.value),
       };
     case "assistantText":
       return { ...base, kind: "text", text: p.value.text, ...(p.value.apiError ? { apiError: true as const } : {}) };
@@ -329,7 +343,7 @@ export function toThreadItemView(it: ThreadItem): ThreadItemView | null {
     case "commandOutput":
       return { ...base, kind: "commandOutput", text: p.value.text };
     case "note":
-      return { ...base, kind: "note", text: p.value.text, createdBy: p.value.createdBy };
+      return { ...base, kind: "note", text: p.value.text, createdBy: p.value.createdBy, ...sentOf(p.value.sent) };
     case "html":
       return { ...base, kind: "html", path: p.value.path, title: p.value.title, baseDir: p.value.baseDir };
     case "theme":

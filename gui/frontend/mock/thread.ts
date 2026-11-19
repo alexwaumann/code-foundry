@@ -52,6 +52,7 @@ import { mcpFixture, type McpStatusInit } from "./mcp";
 import { SETUP_PROMPT, type SetupMessage } from "./setup";
 import { refuseSlashCommand, slashCommandsFixture, type SlashCommandInit } from "./slashCommands";
 import { scriptServers, shellSummary, type ShellCall } from "./shells";
+import { answerReply, scriptReplies } from "./replies";
 
 export { MOCK_ATTACHMENT };
 
@@ -154,8 +155,8 @@ const COMPACT_MS = 600;
  * item and the daemon's process_ended turn end; mock/world.ts stops the thread with status
  * error "did not start").
  */
-export type ThreadState = "permission" | "question" | "streaming" | "idle" | "multi" | "subagent" | "agents" | "waiting" | "servers" | "crashed" | "html" | "html-idle" | "html-scroll" | "long" | "short-turns" | "html-repeat" | "theme" | "bridge" | "pagelib";
-export const THREAD_STATES: readonly ThreadState[] = ["permission", "question", "streaming", "idle", "multi", "subagent", "agents", "waiting", "servers", "crashed", "html", "html-idle", "html-scroll", "long", "short-turns", "html-repeat", "theme", "bridge", "pagelib"];
+export type ThreadState = "permission" | "question" | "streaming" | "idle" | "multi" | "subagent" | "agents" | "waiting" | "servers" | "crashed" | "html" | "html-idle" | "html-scroll" | "long" | "short-turns" | "html-repeat" | "theme" | "bridge" | "pagelib" | "replies";
+export const THREAD_STATES: readonly ThreadState[] = ["permission", "question", "streaming", "idle", "multi", "subagent", "agents", "waiting", "servers", "crashed", "html", "html-idle", "html-scroll", "long", "short-turns", "html-repeat", "theme", "bridge", "pagelib", "replies"];
 
 /** The stderr line of the "crashed" state's claude (Thread.last_error). */
 export const CRASH_STDERR = "error: unknown option '--bogus'";
@@ -498,6 +499,18 @@ export class MockThreadLogs {
     this.source({ event: { case: "pending", value } });
   }
 
+  /** The open question's answer (or, with unanswered, why none came): mock/replies.ts. */
+  answerReply(id: string, unanswered: string): boolean {
+    return answerReply(
+      this.log(id).items,
+      unanswered,
+      (payload) => this.append(id, this.item(id, payload)),
+      (it) => {
+        this.update(id, it);
+      },
+    );
+  }
+
   /** A new streaming text item (e.g. a subagent's reply arriving while a prompt waits); /delta extends it. */
   stream(id: string, text: string): void {
     this.append(id, this.item(id, { case: "assistantText", value: { text } }, { streaming: true }));
@@ -784,6 +797,14 @@ export class MockThreadLogs {
       l.seq = l.items.length;
       this.world.setStatus(id, ThreadStatus.IDLE, waitingReason({ children: 2, subagents: 1, shells: 1 }));
       this.world.agentsChanged(id);
+      return;
+    }
+    if (state === "replies") {
+      // Reply marks (mock/replies.ts): told one thread, asked another (still waiting), and
+      // answered a third's question; idle at its prompt.
+      scriptReplies({ cwd, it, tool });
+      l.seq = l.items.length;
+      this.world.setStatus(id, ThreadStatus.IDLE, "at prompt");
       return;
     }
     if (state === "servers") {

@@ -67,15 +67,14 @@ ones you create stay out of it: they are yours to answer.
      minute, prefer `--notify`, or run the wait as a background Bash task).
    - End your turn. `--notify` sends you a `[code-foundry wake]` message when the child
      settles, until the wake that says it finished: that one is its last, and your next
-     `thread send` to it subscribes you again by itself. Best for long work. For several children whose pieces do not feed each
+     `thread send --reply wanted` to it subscribes you again. For several children whose pieces do not feed each
      other, `--notify-group <name>` in place of it on each: one wake when all of them
      settled, and at once for a failure, a prompt or a question.
    - For a pull request's CI or review: `code-foundry thread subscribe --pr <owner/name#N>
      --until checks_done --repeat` (or `--until review --repeat`), then end your turn (§4).
 
    Pick ONE. With `--notify`, end your turn: no `thread wait` too, or every child wakes
-   you twice. `thread send` prints the message's ordinal; a plain `thread wait` after it
-   waits for the answer to that message (`--after <ordinal>`). A timed-out wait exits 1.
+   you twice. A timed-out wait exits 1.
 
    A wake says the child's state, quotes its last message whole, gives what git says about
    its branch, and when it needs you, the pending permission prompt or question with the
@@ -86,7 +85,7 @@ ones you create stay out of it: they are yours to answer.
    restarts, interrupts, and following up from a wake turn (never `send --wait` there).
 3. **Collect.** `code-foundry thread reports --created-by $CODE_FOUNDRY_THREAD` prints one
    line per child (`finished`: its turn ended, with the head of its last message; `-`: not
-   yet; `--json` for the data). `thread read <id>` prints
+   yet). `thread read <id>` prints
    its last 20 items (`--since <nextSince>` reads on); answer with `thread respond --id`.
 4. **Check the batch before the roll-up**: for each pair of branches that touch one
    file, whether they fit together (`reference/patterns.md` §8: pairwise `git merge-tree`,
@@ -123,6 +122,8 @@ To discard a child's work: `reference/patterns.md` §7.
 - `$CODE_FOUNDRY_THREAD` (you) is the default for `--id`, `--context-thread` and
   `thread new --created-by` (so a thread you create is your child). **Never send input
   to your own thread**: always pass `--id <child>` to `thread send`/`respond`/`interrupt`.
+- `thread send` to another thread takes `--reply wanted` (you need its answer: it wakes
+  you) or `--reply none` (it neither confirms nor reports back): `reference/messages.md`.
 - Ids (`s-...`, `r-...`, `sub-...`) take a unique suffix of 4+ characters (`thread read 7d10`).
 - `--request-id <task-key>` makes `thread new` safe to retry: the same key returns the
   first thread (for 24 hours) and starts nothing. `--budget 5` caps a child's cost in USD.

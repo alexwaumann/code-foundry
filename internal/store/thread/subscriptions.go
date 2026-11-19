@@ -221,6 +221,10 @@ type SubscribeOptions struct {
 	// endsOnFinish makes a --notify subscription (notifyCreator, renotify): it ends once
 	// its thread finished a turn (UntilFinished, subscriptions_until.go).
 	endsOnFinish bool
+	// replyWait makes a reply-wait (replies.go): a wanted reply's safety net, a thread
+	// target with the idle condition, never repeated; it is what the target is to the
+	// subscriber.
+	replyWait Relation
 	// BeforeSend and AfterOrdinal (thread targets only, not both) tie a subscription to a
 	// message sent to the target: pr.task's forward wakes its sender once the turn that
 	// handled the task ended (docs/notes/pr-task-forward.md). It subscribes BeforeSend,
@@ -618,6 +622,12 @@ func (m *Manager) Subscribe(ctx context.Context, o SubscribeOptions) (SubscribeR
 		}
 		args[untilArg] = untilFinished
 	}
+	if o.replyWait != "" {
+		if kind != TargetThread || cond != CondIdle || o.Repeat || args != nil {
+			return SubscribeResult{}, fmt.Errorf("%w: a reply-wait takes a thread, the idle condition and no repeat", ErrInvalidArgument)
+		}
+		args = map[string]string{replyArg: string(o.replyWait)}
+	}
 	now := m.opts.Now().Round(0).Truncate(time.Millisecond)
 	repeat := o.Repeat && kind != TargetActionRun
 	if kind == TargetTimer {
@@ -699,7 +709,10 @@ func (m *Manager) subscribe(sub Subscription, run ActionRun, pr *PullRequestInfo
 			return SubscribeResult{}, fmt.Errorf("%w: thread %s is archived, so it will not change; unarchive it first", ErrFailedPrecondition, sub.TargetID)
 		}
 		for _, r := range s.byID {
-			if r.s.SubscriberID == sub.TargetID && r.s.TargetKind == TargetThread && r.s.TargetID == sub.SubscriberID {
+			// A reply-wait fires once and goes with the answer, so it cannot wake two threads
+			// in a loop: two threads may wait on each other's answers, and a worker on its lead's.
+			if r.s.SubscriberID == sub.TargetID && r.s.TargetKind == TargetThread && r.s.TargetID == sub.SubscriberID &&
+				!r.s.ReplyWait() && !sub.ReplyWait() {
 				return SubscribeResult{}, fmt.Errorf("%w: thread %s already subscribes to thread %s (%s); subscribing back would wake them in a loop",
 					ErrFailedPrecondition, sub.TargetID, sub.SubscriberID, r.s.ID)
 			}
@@ -772,6 +785,7 @@ func (m *Manager) subscribe(sub Subscription, run ActionRun, pr *PullRequestInfo
 		return SubscribeResult{Subscription: r.s, Fired: true}, nil
 	}
 	if fired && (!r.s.Repeat || prTerminal(r.s.Condition)) {
+		m.replyWaitFiredLocked(r)
 		m.log.Info("wake subscription fired at once", "subscription", sub.ID, "subscriber", sub.SubscriberID,
 			"target", sub.TargetID, "condition", sub.Condition)
 		return SubscribeResult{Subscription: r.s, Fired: true}, nil
@@ -816,6 +830,7 @@ func (m *Manager) armLocked(r *subRec, target Thread, ordinal int64, note string
 	}
 	out := r.s
 	m.firedThreadLocked(r, target)
+	m.replyWaitFiredLocked(r)
 	m.log.Info("wake subscription fired as it was armed", "subscription", r.s.ID, "subscriber", r.s.SubscriberID, "target", r.s.TargetID)
 	return SubscribeResult{Subscription: out, Existed: true, Fired: true}
 }
@@ -865,6 +880,7 @@ func (m *Manager) observeLocked(t Thread) {
 		}
 		if m.fireThreadLocked(r, t) {
 			m.firedThreadLocked(r, t)
+			m.replyWaitFiredLocked(r)
 		}
 	}
 }

@@ -186,7 +186,7 @@ func TestPutAwaySelfCancelled(t *testing.T) {
 			return err
 		}},
 		{"a message from another thread", func(e *env, s Thread) error {
-			_, err := e.m.Send(e.ctx(), s.ID, Message{Text: "more work", ByThreadID: "s-other"})
+			_, err := e.m.Send(e.ctx(), s.ID, Message{Text: "more work", ByThreadID: "s-other", Reply: ReplyNone})
 			return err
 		}},
 		{"an unarchive", func(e *env, s Thread) error { _, err := e.m.Archive(e.ctx(), s.ID, false); return err }},

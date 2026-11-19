@@ -185,7 +185,13 @@ func prTaskBy(uctx Context) string {
 // sendPRTaskTo sends prompt into th, as thread.send, and returns the message's ordinal;
 // removed when th was removed since it was read.
 func (d PullRequestThreadDeps) sendPRTaskTo(ctx context.Context, uctx Context, th *v1.Thread, prompt string) (int64, *v1.RemovedThread, error) {
-	res, err := d.Thread.Send(ctx, connect.NewRequest(&v1.SendThreadMessageRequest{ThreadId: th.GetId(), Text: prompt, ByThreadId: prTaskBy(uctx)}))
+	// A task from a thread carries no reply wanted: the turn that handles it is the result,
+	// and a forward wakes the sender with it (docs/notes/thread-reply-mark.md).
+	req := &v1.SendThreadMessageRequest{ThreadId: th.GetId(), Text: prompt, ByThreadId: prTaskBy(uctx)}
+	if by := req.GetByThreadId(); by != "" && by != th.GetId() {
+		req.Reply = v1.ReplyMark_REPLY_MARK_NONE
+	}
+	res, err := d.Thread.Send(ctx, connect.NewRequest(req))
 	if r, ok := removedFrom(err); ok {
 		return 0, r, nil
 	}

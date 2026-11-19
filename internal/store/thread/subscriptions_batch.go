@@ -464,7 +464,7 @@ func batchHeader(parts []threadWakePart) (string, *wakeSiblings) {
 	settled, stopped := true, true
 	var sib *wakeSiblings
 	for _, part := range parts {
-		titles = append(titles, threadWakeTitle(part.sub.Condition, part.t, part.d))
+		titles = append(titles, partTitle(part.sub, part.t, part.d))
 		settled = settled && part.sub.Condition == CondSettled
 		stopped = stopped && part.d.appStopped
 		sib = cmp.Or(sib, part.d.siblings)

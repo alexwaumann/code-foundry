@@ -28,6 +28,10 @@ type PendingFirst struct {
 	ItemID string `json:"item_id,omitempty"`
 	// By is the item's SentBy: the creator thread of a thread another thread created.
 	By string `json:"by,omitempty"`
+	// Relation and Reply: the item's SenderRelation and Reply (a message from another
+	// thread sent during the setup; replies.go).
+	Relation Relation `json:"relation,omitempty"`
+	Reply    Reply    `json:"reply,omitempty"`
 	// Compact: it is Compact's /compact, which nothing goes before (compact.go).
 	Compact bool `json:"compact,omitempty"`
 }
@@ -42,7 +46,7 @@ type firstAttachment struct {
 
 // pendingFirstOf is o as a pending first message.
 func pendingFirstOf(o *outgoing) *PendingFirst {
-	p := &PendingFirst{Text: o.text, Composer: o.composer, Prompt: o.prompt, ItemID: o.itemID, By: o.by, Compact: o.compact}
+	p := &PendingFirst{Text: o.text, Composer: o.composer, Prompt: o.prompt, ItemID: o.itemID, By: o.by, Relation: o.relation, Reply: o.reply, Compact: o.compact}
 	for _, a := range o.attachments {
 		p.Attachments = append(p.Attachments, firstAttachment{Path: a.path, Size: a.size, PDF: a.pdf, Pages: a.pages, Exact: a.exact})
 	}
@@ -52,7 +56,8 @@ func pendingFirstOf(o *outgoing) *PendingFirst {
 // outgoing is p as the message a spawn delivers first; first marks it, so sendMessage
 // clears the row's once it went out.
 func (p *PendingFirst) outgoing() *outgoing {
-	o := &outgoing{text: p.Text, composer: p.Composer, prompt: p.Prompt, itemID: p.ItemID, by: p.By, first: true, compact: p.Compact}
+	o := &outgoing{text: p.Text, composer: p.Composer, prompt: p.Prompt, itemID: p.ItemID, by: p.By, relation: p.Relation, reply: p.Reply,
+		first: true, compact: p.Compact}
 	for _, a := range p.Attachments {
 		o.attachments = append(o.attachments, attachment{path: a.Path, size: a.Size, pdf: a.PDF, pages: a.Pages, exact: a.Exact})
 	}

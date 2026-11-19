@@ -79,6 +79,8 @@
  *        /__mock/thread/api-error[?text=…] (the next message's turn ends with Claude Code's API-error
  *        text, api_error set; default "Invalid API key · Fix external API key"); GET /__mock/thread/calls;
  *        /__mock/thread/wake-fire?sub=…, /__mock/thread/wake-status?sub=…&status=… (state=waiting's wake rows: mock/wakes.ts) |
+ *        /__mock/thread/reply?id=s-r1[&unanswered=turn ended|archived|removed] (state=replies's open question answered, or
+ *        not: mock/replies.ts) |
  *        /__mock/thread/mcp-age?id=s-r1&ago=720 (the last MCP check that many seconds ago: mock/mcp.ts) |
  *        /__mock/thread/mcp-servers?id=s-r1&keep=t3-code,github (only those of the six: mock/mcp.ts)
  *   POST /__mock/thread/retry?id=s-r1&in=20&attempt=3&max=10&status=429&error=rate_limit | ?id=…&clear=1
@@ -1401,6 +1403,10 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
     case "POST /__mock/thread/delta":
       world.logs.delta(q.get("id") ?? "s-r1", q.get("text") ?? "");
       json(res, 200, { ok: true });
+      break;
+    case "POST /__mock/thread/reply":
+      // The "replies" state's open question is answered, or (unanswered=…) none came: mock/replies.ts.
+      json(res, world.logs.answerReply(q.get("id") ?? "s-r1", q.get("unanswered") ?? "") ? 200 : 404, { ok: true });
       break;
     case "POST /__mock/thread/finish":
       world.logs.finish(q.get("id") ?? "s-r1", {

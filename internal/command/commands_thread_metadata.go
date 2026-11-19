@@ -301,7 +301,8 @@ func threadAskCmd(b ThreadBackend, idArg ArgSpec) Command {
 			if err != nil {
 				return Result{}, err
 			}
-			msg := "asked thread " + threadLabel(res.Msg.GetCreator()) + "; keep working, its answer arrives at your next tool call"
+			msg := "asked thread " + threadLabel(res.Msg.GetCreator()) + "; keep working on your assumption. If it is right you will not hear back; " +
+				"if it is wrong, the answer arrives at your next tool call"
 			if res.Msg.GetRepeated() {
 				msg = "you just asked thread " + threadLabel(res.Msg.GetCreator()) + " that; nothing was sent"
 			}

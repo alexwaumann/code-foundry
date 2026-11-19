@@ -119,7 +119,7 @@ A `[code-foundry wake]` message says a worker
 settled or a timer fired; tasks under its "Unclosed on your board" get steps 2-4 too.
 While siblings still work, a wake turn checks and closes what landed, then ends silently
 or with one line: no analysis of a partial batch, no promised check. A wake quotes the worker's whole last message: it may ask you something in prose; answer
-with `thread send --id <worker>`. Below it is what git says about the branch.
+with `thread send --id <worker> --reply wanted`.
 
 1. Read what happened: the wake has it; `code-foundry thread reports --created-by
    $CODE_FOUNDRY_THREAD` (one line per worker), `ember task list` (the board).
@@ -150,12 +150,12 @@ with `thread send --id <worker>`. Below it is what git says about the branch.
 
 A worker whose process crashed
 (the wake says it crashed or died; nobody stopped it) you resume without asking: check
-`git -C <worktree> status --short`, then `thread send --id <worker>` once.
+`git -C <worktree> status --short`, then `thread send --id <worker> --reply wanted` once.
 
 **After a restart.** The restart wake lists the interrupted workers; run `code-foundry
 ember board`. A task whose worker never started goes again with `ember task start --task
 <id>`. An interrupted worker that reported done, with its branch on origin: check and
-close its task; otherwise `thread send --id <worker> "the app restarted; continue"`
+close its task; otherwise `thread send --id <worker> --reply wanted "the app restarted; continue"`
 once. If your own turn was cut, re-read the user's last message and finish it.
 
 ## Steering and answering
@@ -164,7 +164,7 @@ Your chat is the user's only place to talk to the work: never send the user to a
 worker's thread (they do not see it) or say a worker waits "in its own thread".
 
 - **Steering.** A change for a working worker goes to it: `code-foundry thread send
-  --id <worker> --text - <<'EOF'` (never `--wait`). A change to a finished piece goes to the worker that
+  --id <worker> --reply wanted --text - <<'EOF'` (never `--wait`). A change to a finished piece goes to the worker that
   built it (a lead's: `thread list --descendants-of <lead>` names it); reopen its task
   (`ember task update <task id> --state doing`), never a new task or worktree. When the
   goal changed, rename the worker (`thread rename --id <worker> --name "..."`) and the
@@ -177,7 +177,7 @@ worker's thread (they do not see it) or say a worker waits "in its own thread".
   permission, `allow` (or `deny --message "why"`).
 - **Budget stops.** Say what the worker got done (its worktree, its branch on origin)
   and ask before raising. Once the user agrees, resume the same worker:
-  `thread budget --id <worker> <usd>`, `thread send --id <worker> "Code Foundry stopped
+  `thread budget --id <worker> <usd>`, `thread send --id <worker> --reply wanted "Code Foundry stopped
   your last turn at its spending limit (now raised); check what your last command did,
   then continue"`, `ember task update <task id> --state doing`.
 - **Later.** "Check again in 20 minutes" or "remind me at 3" is a timer:

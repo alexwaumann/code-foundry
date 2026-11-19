@@ -53,10 +53,23 @@ func (r *runner) exchange(ctx context.Context, cmd threadCmd) (threadReply, erro
 // a snooze as it is, and is refused on an archived thread unless that thread created it
 // (holds.go). A thread's message to a thread whose --notify
 // subscription to it ended subscribes it again (renotify, subscriptions_until.go).
+//
+// A message from another thread carries a reply mark (replies.go): without one it is
+// refused; with one its item records it, the receiver is told what it asks, and the
+// sender keeps a note of it and, for a wanted reply, a wake for the answer.
 func (m *Manager) Send(ctx context.Context, id string, msg Message) (Item, error) {
+	if err := checkReply(id, msg); err != nil {
+		return Item{}, err
+	}
+	if _, ok := msg.fromThread(id); !ok {
+		msg.Reply = "" // the user's own message, a wake, a thread's to itself: no mark
+	}
 	it, err := m.send(ctx, id, msg)
 	if err == nil {
-		m.renotify(ctx, id, msg, it)
+		if msg.Reply != ReplyNone { // no reply wanted: no wake for the turn that reads it
+			m.renotify(ctx, id, msg, it)
+		}
+		m.afterThreadSend(ctx, id, msg, it)
 	}
 	return it, err
 }
@@ -103,7 +116,8 @@ func (m *Manager) send(ctx context.Context, id string, msg Message) (Item, error
 	if s.setupUnfinished() {
 		// No process to send it to, and maybe no worktrees yet (setup_actions.go).
 		o := &outgoing{text: strings.TrimSpace(msg.Text), composer: strings.TrimSpace(msg.ComposerText), attachments: attachments, prompt: prompt,
-			by: strings.TrimSpace(msg.ByThreadID)}
+			by: strings.TrimSpace(msg.ByThreadID), reply: msg.Reply}
+		o.relation, _, _ = m.sender(s, msg)
 		m.nameFromFirstMessage(id, log, o)
 		it, handled, err := m.sendToSetup(ctx, id, log, o, rv)
 		if handled || err != nil {
@@ -132,11 +146,13 @@ func (m *Manager) send(ctx context.Context, id string, msg Message) (Item, error
 	if note != "" {
 		prompt = note + "\n\n" + prompt
 	}
-	if from := m.senderNote(s, msg); from != "" {
+	rel, who, fromThread := m.sender(s, msg)
+	if from := fromNote(rel, who, strings.TrimSpace(msg.ByThreadID), msg.Reply); fromThread && from != "" {
 		prompt = from + "\n\n" + prompt
 	}
 	o := &outgoing{text: strings.TrimSpace(msg.Text), composer: strings.TrimSpace(msg.ComposerText), attachments: attachments, prompt: prompt,
-		origin: msg.Origin, wakeTitle: msg.WakeTitle, wakeJSON: msg.WakeJSON, by: strings.TrimSpace(msg.ByThreadID), note: note, resume: resume, itemID: written, compact: msg.compact}
+		origin: msg.Origin, wakeTitle: msg.WakeTitle, wakeJSON: msg.WakeJSON, by: strings.TrimSpace(msg.ByThreadID), relation: rel, reply: msg.Reply,
+		note: note, resume: resume, itemID: written, compact: msg.compact}
 	m.nameFromFirstMessage(id, log, o)
 	for {
 		live, closing, reserved, _, err := m.lifecycle(id)

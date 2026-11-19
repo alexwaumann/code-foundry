@@ -7,9 +7,11 @@ and what to do in the turn it starts. Every command runs in your Bash tool.
 
 ## Following up from a wake turn
 
-From a wake turn, follow up with `thread send --id <child>` WITHOUT `--wait` and end the
-turn (`send --wait` there holds back your other children's wakes); the send subscribes you
-to it again, so its answer wakes you. Never subscribe or unsubscribe by hand for this.
+From a wake turn, follow up with `thread send --id <child> --reply wanted` WITHOUT `--wait`
+and end the turn (`send --wait` there holds back your other children's wakes); the send
+subscribes you to it again, so its answer wakes you. Never subscribe or unsubscribe by hand
+for this. Information it only acts on is `--reply none`: no wake for that turn
+(`reference/messages.md`).
 
 ## Finished
 
@@ -18,7 +20,7 @@ child until you `thread send` to it: a turn the user runs in it wakes nobody. A 
 question, an error, a budget stop or a blocked or failed report is no finish: its finish
 still comes. Under "It said" is the child's
 own last message, whole: its result, and maybe a question asked in prose (answer with
-`thread send --id <child>`). You need no `thread read` for it. `Report: blocked` or `failed`
+`thread send --id <child> --reply wanted`, or `none` when you need nothing back). You need no `thread read` for it. `Report: blocked` or `failed`
 is the child's own word that it could not finish.
 
 Under "From the app, not the thread" is what git says, not the child's claim: the branch and
@@ -38,9 +40,9 @@ in YOUR turn holds back your other children). Supervised children:
 ## A child asks while it works
 
 "asks you something and keeps working" is a child's `thread ask`: it did not stop, and goes on
-with the assumption the wake quotes. If that assumption is right, say nothing. If not, answer at
-once with `thread send --id <child> "..."`, without `--wait`: it reads that at its next tool
-call. Only if you cannot answer, relay it to the user. A `thread wait` ends early for it and
+with the assumption the wake quotes. If that assumption is right, say nothing: it expects no
+reply then. If not, answer once, at once, with `thread send --id <child> --reply none "..."`,
+without `--wait`: it reads that at its next tool call. Only if you cannot answer, relay it to the user. A `thread wait` ends early for it and
 prints the same; wait again after you answered.
 
 ## Budget stops
@@ -65,8 +67,8 @@ once B is done. Routine approvals of a supervised child: no text at all.
 
 ## Messaging a child
 
-Do not message a finished child only to inform it: every message starts a turn and a
-wake. A `thread send` to a working child is read at its next tool call, not held: work
+Do not message a finished child only to inform it: every message starts a turn (and,
+with `--reply wanted`, a wake). A `thread send` to a working child is read at its next tool call, not held: work
 it already pushed stays pushed; `thread interrupt --id <id>` first if it must stop now.
 When a follow-up changes the task, `thread rename --id <id> --name "<new name>"`.
 
@@ -77,18 +79,19 @@ it: the user, or you with `thread interrupt`. Its last tool call shows `[running
 error such as "was NOT written": that is the interrupt, not a rejection, and nothing is
 wrong with the child. Check its worktree (`git status`, `git diff`: an edit may sit there
 uncommitted), and for a user's interrupt ask the user before resuming; a `thread
-interrupt` of your own you resume with `thread send --id <child>` saying what you checked.
+interrupt` of your own you resume with `thread send --id <child> --reply wanted` saying what
+you checked.
 
 A child whose process crashed (reason `crashed`, or the wake says its process died and
 nobody stopped it) is not the user's interrupt: check its worktree the same way and
-resume it once with `thread send --id <child>` without asking.
+resume it once with `thread send --id <child> --reply wanted` without asking.
 
 ## After the app restarts
 
 When a wake says the app restarted, or the user does: the restart wake lists the
 interrupted children (`error (interrupted)`, reason "daemon stopped"); each lost its
 current turn only. For each, check its worktree (`git status`, `git diff`), then `thread
-send --id <child> "the app restarted; continue"` once. Subscriptions survive a restart:
+send --id <child> --reply wanted "the app restarted; continue"` once. Subscriptions survive a restart:
 do not subscribe again. `thread reports --created-by $CODE_FOUNDRY_THREAD --all` shows
 what had been reported before the stop.
 
