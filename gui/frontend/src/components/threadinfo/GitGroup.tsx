@@ -190,7 +190,7 @@ const CHECK_ICON: Record<"ok" | "failed" | "running", ReactNode> = {
   running: <LoaderCircle className="animate-spin text-cf-warning-text" aria-hidden />,
 };
 
-/** One linked pull request: title; #n and its status (→ #base when stacked); its project when not the cwd's. A click opens its tab; the ellipsis offers GitHub and Copy URL. */
+/** One linked pull request: title; #n and its status (→ #base when stacked); its project (every row's in a thread of several projects, none for its own in a thread of one; prRows). A click opens its tab; the ellipsis offers GitHub and Copy URL. */
 function PrRowView({ row }: { row: PrRow }) {
   const ref = { slug: row.slug, number: row.number };
   const warm = usePrPrefetch(pullRequestKey(row.slug, row.number));

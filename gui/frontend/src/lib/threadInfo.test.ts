@@ -157,7 +157,7 @@ describe("prRows", () => {
   ]);
   const input = (slug: string, p: PullRequestView | null): PrInput => ({ slug, number: p?.number ?? 9, url: `u${String(p?.number ?? 9)}`, pr: p });
 
-  it("drops closed and unloaded ones, puts the cwd's project first, open before merged, newest first", () => {
+  it("drops closed and unloaded ones, puts the cwd's project first, open before merged, newest first, every row named in a set of several", () => {
     const rows = prRows(
       [input("acme/lib", pr(51, { state: "merged" })), input("acme/lib", pr(57)), input("acme/api", pr(398, { state: "merged" })), input("acme/api", pr(412)), input("acme/api", pr(400, { state: "closed" })), input("acme/api", null)],
       projects,
@@ -165,8 +165,8 @@ describe("prRows", () => {
       "api",
     );
     expect(rows.map((r) => [r.number, r.state, r.project])).toEqual([
-      [412, "open", ""],
-      [398, "merged", ""],
+      [412, "open", "api"],
+      [398, "merged", "api"],
       [57, "open", "auth-lib"],
       [51, "merged", "auth-lib"],
     ]);
@@ -184,6 +184,14 @@ describe("prRows", () => {
   it("states a draft by its icon, and names a repository no member has by its slug", () => {
     const [row] = prRows([input("other/x", pr(5, { draft: true }))], projects, ["api"], "api");
     expect(row).toMatchObject({ state: "draft", project: "other/x", check: { icon: null, word: "draft" } });
+  });
+
+  it.each([
+    ["one project: its own unnamed", ["api"], ["", "other/x"]],
+    ["several projects: its own named too", ["api", "lib"], ["api", "other/x"]],
+  ])("%s, a repository no member has by its slug", (_name, members, want) => {
+    const rows = prRows([input("acme/api", pr(412)), input("other/x", pr(5))], projects, members, "api");
+    expect(rows.map((r) => r.project)).toEqual(want);
   });
 });
 

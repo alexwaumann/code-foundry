@@ -329,13 +329,13 @@ describe("ThreadInfoCard: other scenarios", () => {
     });
     expect(document.querySelectorAll("[data-sonner-toast]")).toHaveLength(0);
 
-    // Pull requests over four projects: the cwd's first and unnamed, the others with their project; a stacked one names its base.
+    // Pull requests over four projects: the cwd's first, every one named with its project (the cwd's too); a stacked one names its base.
     await waitFor(() => {
       expect(screen.getAllByTestId("ti-pr")).toHaveLength(7);
     });
     const pr = (n: number) => byTest(cardEl(), "ti-pr", `[data-number="${String(n)}"]`) as HTMLElement;
     expect(screen.getAllByTestId("ti-pr")[0]?.dataset.number).toBe("412");
-    expect(within(pr(412)).queryByTestId("ti-pr-project")).toBeNull();
+    expect(within(pr(412)).getByTestId("ti-pr-project").textContent).toBe("api");
     expect(oneLine(within(pr(58)).getByTestId("ti-pr-stacked"))).toBe("#57");
     expect(within(pr(58)).getByTestId("ti-pr-project").textContent).toBe("auth-lib");
     expect(pr(19).dataset.state).toBe("draft");

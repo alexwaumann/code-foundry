@@ -193,7 +193,7 @@ export interface PrRow {
   check: PrCheck;
   /** The linked pull request this one is stacked on (its base is that one's head); null otherwise. */
   stackedOn: number | null;
-  /** Its project's name when that is not the cwd's project; "" otherwise. */
+  /** Its project's name ("" for the cwd's project in a thread of one project), or its slug when no member has its repository. */
   project: string;
 }
 
@@ -232,7 +232,10 @@ const STATE_ORDER: Readonly<Record<PrRowState, number>> = {
  * not read yet: its state is unknown). Grouped by project, the cwd's
  * first, then the set's order (other repositories last); in a project open and draft ones
  * before merged ones, newest number first. `projects` maps a lower-case GitHub slug to the
- * member's id and name.
+ * member's id and name; `memberOrder` is the thread's set. Each row names its project: every
+ * row when the set has several projects (named workspace or not), so no row leaves the reader
+ * to work out which project it is; in a thread of one project, none for that project's own.
+ * A repository no member has is named by its slug.
  */
 export function prRows(
   inputs: readonly PrInput[],
@@ -240,6 +243,7 @@ export function prRows(
   memberOrder: readonly string[],
   cwdProjectId: string,
 ): PrRow[] {
+  const several = memberOrder.length > 1;
   const known = inputs.filter((i): i is PrInput & { pr: PullRequestView } => i.pr !== null && (i.pr.state === "open" || i.pr.state === "merged"));
   const rank = (slug: string): number => {
     const p = projects.get(slug.toLowerCase());
@@ -264,7 +268,7 @@ export function prRows(
       state,
       check: prCheck(pr),
       stackedOn: base ? base.number : null,
-      project: p && p.id !== cwdProjectId ? p.name : p ? "" : i.slug,
+      project: !p ? i.slug : several || p.id !== cwdProjectId ? p.name : "",
       rank: rank(i.slug),
     };
   });

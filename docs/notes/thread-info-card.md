@@ -93,7 +93,9 @@ window. The toggle stays on and pressed, its tooltip says "Not enough room"
   children and the worktree branch's PR), each detail watched while the card shows. Closed
   ones and ones whose detail has not loaded are left out. Order: the cwd's project first,
   then members, then other repositories (named by slug); open and draft before merged,
-  newest number first. The review in the PR tab's words: approved, changes requested,
+  newest number first. Each row's project is a muted sub line: in a thread of several
+  projects (named workspace or not) every row names its project, the cwd's too; in a
+  thread of one project, its own pull requests have none (pr-row-project-name.md). The review in the PR tab's words: approved, changes requested,
   "review requested" only while someone is asked, else "review required" or "no review".
   Stacked: the base is another linked open PR's head.
 * **Lineage**: subagent runs and the threads this one created (hidden ones too) are the
