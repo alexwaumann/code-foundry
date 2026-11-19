@@ -250,6 +250,7 @@ func (m *Manager) unarchiveLocked(rec *record) bool {
 		return false
 	}
 	rec.s.ArchivedAt = time.Time{}
+	rec.s.ReturnedAt = m.opts.Now().Round(0).Truncate(time.Millisecond) // auto-tidy's clock restarts
 	return true
 }
 

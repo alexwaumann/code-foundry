@@ -10,6 +10,7 @@ import { SnoozePresetItems } from "@/components/snooze/SnoozeMenu";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { agentsLabel } from "@/lib/agents";
+import { autoSavedSentence } from "@/lib/autoTidy";
 import { useNowSelect } from "@/lib/clock";
 import { formatAge, formatDuration } from "@/lib/duration";
 import { QUIET } from "@/lib/quiet";
@@ -538,8 +539,27 @@ function TipMoving({ id }: { id: string }) {
 }
 
 /**
+ * "Saved automatically after 3 days without activity" for a thread auto-tidy saved for later:
+ * the row says only "Auto". Nothing for any other thread, nor for one snoozed until an event
+ * (TipSnoozeEvent says what it waits on, as its row does).
+ */
+function TipAutoSaved({ id }: { id: string }) {
+  const sentence = useThreadsStore((s) => {
+    const t = s.byId[id];
+    return (t?.savedAtMs ?? null) === null || t?.snoozeEvent ? null : autoSavedSentence(t?.autoSavedAfterMs);
+  });
+  if (sentence === null) return null;
+  return (
+    <div className="mb-[3px] flex items-start gap-2 leading-5" data-testid="tip-auto-saved">
+      <Bookmark className="mt-[3px] size-3.5 shrink-0 text-cf-text-muted" aria-hidden />
+      <span className="min-w-0 break-words">{sentence}</span>
+    </div>
+  );
+}
+
+/**
  * The tooltip's body: name, status (attention or error only; a thread waiting on its child
- * threads says on which, TipWaiting), who created it (a thread an agent made), a queued move,
+ * threads says on which, TipWaiting), who created it (a thread an agent made), that auto-tidy saved it (TipAutoSaved), a queued move,
  * where it works (ThreadPlaceRows), model, the linked pull requests (TipLinkedPrs), and the
  * notifications naming the thread (TipNotifications). Mounted only while open
  * (docs/notes/sidebar-thread-card.md).
@@ -558,6 +578,7 @@ function ThreadTipBody({ id, onMenuOpenChange }: { id: string; onMenuOpenChange:
       <TipSnoozeEvent id={id} />
       <TipWaiting id={id} />
       <TipCreatedBy id={id} />
+      <TipAutoSaved id={id} />
       <TipMoving id={id} />
       <ThreadPlaceRows id={id} />
       <TipRow icon={<ClaudeMark className="size-3.5 shrink-0" style={{ color: CLAUDE_ORANGE }} />} testId="tip-model">
@@ -764,12 +785,16 @@ function EventMark({ kind, label }: { kind: ThreadSnoozeEventView["kind"]; label
   );
 }
 
-/** A thread saved for later: a bookmark and "Saved", where a snoozed row counts down (it never wakes). */
-function SavedMark() {
+/**
+ * A thread saved for later: a bookmark and "Saved", where a snoozed row counts down (it never
+ * wakes); "Auto" when the daemon saved it on its own (auto-tidy, docs/notes/auto-tidy.md), whose
+ * full sentence is the hover card's (TipAutoSaved).
+ */
+function SavedMark({ auto }: { auto: boolean }) {
   return (
-    <span className="ml-auto flex shrink-0 items-center gap-1 pl-1 text-caption-sm text-cf-sidebar-muted-foreground" data-testid="row-saved">
+    <span className="ml-auto flex shrink-0 items-center gap-1 pl-1 text-caption-sm text-cf-sidebar-muted-foreground" data-testid="row-saved" data-auto={auto || undefined}>
       <Bookmark className="size-3 shrink-0" aria-hidden data-testid="row-saved-icon" />
-      Saved
+      {auto ? "Auto" : "Saved"}
     </span>
   );
 }
@@ -783,9 +808,10 @@ function SnoozeLeft({ id }: { id: string }) {
   const until = useThreadsStore((s) => s.byId[id]?.snoozedUntilMs ?? null);
   const saved = useThreadsStore((s) => (s.byId[id]?.savedAtMs ?? null) !== null);
   const event = useThreadsStore(useShallow((s) => eventMarkOf(s.byId[id]?.snoozeEvent)));
+  const auto = useThreadsStore((s) => (s.byId[id]?.autoSavedAfterMs ?? 0) > 0);
   const left = useNowSelect(30_000, (now) => (until === null ? "" : shortRemaining(until, now)));
   if (event) return <EventMark kind={event.kind} label={event.label} />;
-  if (saved) return <SavedMark />;
+  if (saved) return <SavedMark auto={auto} />;
   if (until === null) return null;
   return (
     <span className="ml-auto flex shrink-0 items-center gap-1 pl-1 text-caption-sm text-cf-sidebar-muted-foreground tabular-nums" data-testid="row-snooze-left">

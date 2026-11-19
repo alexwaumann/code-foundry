@@ -94,6 +94,8 @@ function content(n: Pick<Note, "level" | "timeSensitive" | "title" | "body" | "t
   return JSON.stringify([n.level, n.timeSensitive, n.title, n.body, n.threadId, n.actions]);
 }
 
+export type MockNotificationAction = Action;
+
 export interface PostInput {
   source?: string;
   key?: string;
@@ -245,6 +247,22 @@ export class MockNotifications {
     this.notes.push(n);
     this.changed(opts.quiet ? [] : [n.id], []);
     return n;
+  }
+
+  /**
+   * A host source's card under a fixed key, replacing the last (the daemon's auto-tidy,
+   * internal/daemon/auto_tidy.go post): an update in place while the last is active; otherwise
+   * the last is retired first, so the same words arrive anew after a dismissal.
+   */
+  replace(p: PostInput & { source: string; key: string }): Note {
+    const old = this.notes.find((n) => n.source === p.source && n.key === p.key);
+    if (old && old.state !== "active") old.state = "withdrawn";
+    return this.post(p);
+  }
+
+  /** The thread ids an active notification names (its thread, or an action's): auto-tidy leaves those threads where they are. */
+  namedThreads(): Set<string> {
+    return new Set(this.notes.filter((n) => n.state === "active" && n.threadId !== "").map((n) => n.threadId));
   }
 
   withdraw(key: string, source = "command"): void {

@@ -226,6 +226,8 @@ const (
 	KeyDefaultWorktree           = "threads.default_worktree"
 	KeyDefaultSnooze             = "threads.default_snooze"
 	KeySnoozeEvents              = "threads.snooze_events"
+	KeyAutoSaveAfter             = "threads.auto_save_after"
+	KeyAutoArchiveAfter          = "threads.auto_archive_after"
 	KeyAutoName                  = "threads.auto_name"
 	KeyUtilityModel              = "models.utility"
 	KeyCacheTTL                  = "threads.cache_ttl_seconds"
@@ -428,6 +430,24 @@ var staticFields = []Field{
 		EnumLabels:  []string{"1 hour", "3 hours", "Tomorrow, 9:00 AM", "Next week, Monday 9:00 AM", "Save for later"},
 		Default:     command.SnoozeDefaultFallback,
 		bind:        func(s *Settings) any { return &s.Threads.DefaultSnooze },
+	},
+	{
+		// Auto-tidy's first step (internal/daemon/auto_tidy.go, docs/notes/auto-tidy.md): the
+		// clock is the thread's last activity, which a look at it does not move.
+		Key: KeyAutoSaveAfter, Group: GroupThreads, Page: PageGeneral, Section: "threads", Type: Enum, Title: "Save idle threads for later",
+		Description: "A thread with no activity for this long (no message to or from Claude) moves to Snoozed with no alarm. Pinned threads, and threads that are working or asking, stay.",
+		Enum:        AutoSaveAfterValues, EnumLabels: []string{"Off", "After 1 day", "After 3 days", "After 1 week", "After 2 weeks", "After 1 month"},
+		Default: TidyOff,
+		bind:    func(s *Settings) any { return &s.Threads.AutoSaveAfter },
+	},
+	{
+		// Auto-tidy's second step: counted from when the thread was saved, by the user or the
+		// first step.
+		Key: KeyAutoArchiveAfter, Group: GroupThreads, Page: PageGeneral, Section: "threads", Type: Enum, Title: "Archive saved threads",
+		Description: "A thread that has sat in Snoozed with no alarm for this long is archived. Its work is kept.",
+		Enum:        AutoArchiveAfterValues, EnumLabels: []string{"Off", "After 1 week", "After 2 weeks", "After 1 month", "After 3 months"},
+		Default: TidyOff,
+		bind:    func(s *Settings) any { return &s.Threads.AutoArchiveAfter },
 	},
 	{
 		Key: KeyAutoName, Group: GroupThreads, Page: PageGeneral, Section: "threads", Type: Bool, Title: "Name threads automatically",

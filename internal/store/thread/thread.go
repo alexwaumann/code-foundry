@@ -243,6 +243,18 @@ type Thread struct {
 	// was merged"); "" when it ended otherwise. Meaningful while StatusReason is
 	// ReasonSnoozeEnded. Persisted in thread_snooze_events.
 	SnoozeEndedBy string
+	// AutoSavedAfter is set while the thread is saved for later because the daemon saved
+	// it on its own (AutoSave; auto-tidy, docs/notes/auto-tidy.md): how long it had been
+	// without activity by the setting threads.auto_save_after then. Zero when the user (or
+	// a thread) saved it, or it is not saved. Whatever clears SavedAt clears it, and so
+	// does the user saving it again (it is then theirs). Persisted (thread_tidy).
+	AutoSavedAfter time.Duration
+	// ReturnedAt is when the thread last came back to the list from Snoozed or Archived: an
+	// unsnooze (the user's, or a message, pin or archive ending it), its snooze's time
+	// arriving, an unarchive. Auto-tidy's idle clock starts no earlier (AutoSaveDue), so a
+	// thread the user takes back out of Snoozed is not saved again at the next tick. Zero
+	// when never. Persisted (thread_tidy).
+	ReturnedAt time.Time
 	// TurnStartedAt is when the latest turn started: the first top-level message Claude
 	// read after the turn before it ended (lastTurn, turn.go). Zero before any. Published
 	// with the status while the thread runs and when its process ends. Persisted.

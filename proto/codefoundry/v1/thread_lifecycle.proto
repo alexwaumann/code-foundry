@@ -504,6 +504,12 @@ message Thread {
   // #812 (2 of 14)", "#812 was merged", "Deploy finished (Hello)"); "" when it ended
   // otherwise. Shown while status_reason is "snooze ended". Persisted.
   string snooze_ended_by = 81;
+  // Set while the thread is saved for later because the daemon saved it on its own
+  // (auto-tidy: the setting threads.auto_save_after): how long it had been without activity
+  // by that setting then. Unset when the user (or a thread) saved it, or it is not saved;
+  // whatever clears saved_at clears it, and so does saving it again. Persisted. See
+  // docs/notes/auto-tidy.md.
+  google.protobuf.Duration auto_saved_after = 82;
 }
 
 // ThreadSnoozeEvent is the event a snoozed thread waits on (Thread.snooze_event).

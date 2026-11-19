@@ -50,6 +50,12 @@ const SourceGitHub = "github"
 // registry verb itself (Open settings is view.settings --setting).
 const SourceApp = "app"
 
+// SourceThreads is the source of the daemon's own notifications about threads it put away
+// on its own (auto-tidy: "3 idle threads were saved for later"; docs/notes/auto-tidy.md),
+// one per kind under a fixed key, replaced each time. Its command action names a registry
+// verb itself (view.settings).
+const SourceThreads = "threads"
+
 // Level is how serious a notification is. There is no success level.
 type Level string
 
@@ -97,7 +103,7 @@ type ActionKind string
 
 const (
 	// KindCommand runs one of the source plugin's manifest commands with args
-	// (plugin.<source>.<command>); from SourcePlugins and SourceGitHub, the registry verb it names. Not for
+	// (plugin.<source>.<command>); from SourcePlugins, SourceGitHub and SourceThreads, the registry verb it names. Not for
 	// SourceCommand.
 	KindCommand ActionKind = "command"
 	// KindSend sends text to a thread.

@@ -259,7 +259,9 @@ func formatThreadList(threads []*v1.Thread, removed []*v1.RemovedThread, project
 		if s.GetSnoozedUntil() != nil {
 			marks = append(marks, "snoozed")
 		}
-		if s.GetSavedAt() != nil {
+		if s.GetSavedAt() != nil && s.GetAutoSavedAfter() != nil {
+			marks = append(marks, "saved automatically") // auto-tidy (docs/notes/auto-tidy.md)
+		} else if s.GetSavedAt() != nil {
 			marks = append(marks, "saved")
 		}
 		if m := residentMark(s); m != "" { // commands_thread_reseed.go

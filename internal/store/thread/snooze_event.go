@@ -257,7 +257,7 @@ func (m *Manager) SnoozeUntilEvent(ctx context.Context, id string, ev EventSnooz
 		if keepErr = m.keepSnoozeEventLocked(rec, sub, meta); keepErr != nil {
 			return // left as it was; the commit is harmless
 		}
-		rec.s.SnoozedUntil = time.Time{}
+		rec.s.SnoozedUntil, rec.s.AutoSavedAfter = time.Time{}, 0 // the user's snooze now, not auto-tidy's save
 		if rec.s.SavedAt.IsZero() {
 			rec.s.SavedAt = meta.since
 		}
@@ -441,6 +441,7 @@ func (m *Manager) endSnoozesLocked(ends []snoozeEnd) []string {
 			m.log.Error("record why a snooze ended", "thread", e.thread, "err", err)
 		}
 		rec.s.SnoozedUntil, rec.s.SavedAt, rec.s.SnoozeEvent, rec.s.SnoozeEndedBy = time.Time{}, time.Time{}, nil, e.why
+		rec.s.AutoSavedAfter, rec.s.ReturnedAt = 0, now.Truncate(time.Millisecond) // back in the list: auto-tidy's clock restarts
 		if rec.run == nil && rec.s.State == StateDisconnected {
 			rec.s.Status, rec.s.StatusReason, rec.s.StatusChangedAt = StatusNeedsAttention, ReasonSnoozeEnded, now
 		} else {
