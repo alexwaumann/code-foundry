@@ -903,6 +903,7 @@ export class PrDetailWorld {
         cmd: {
           name: "pr.merge", noPalette: true,
           title: "Merge Pull Request",
+          confirmTone: "success" as const,
           category: "Pull Request",
           description:
             "Merge an open pull request with a merge commit, squash, or rebase (GitHub's merge button); --delete-branch deletes its branch on GitHub afterwards (never local branches or worktrees).",
@@ -1108,6 +1109,7 @@ export class PrDetailWorld {
         cmd: {
           name: "pr.auto-merge", noPalette: true,
           title: "Auto-merge Pull Request",
+          confirmTone: "success" as const,
           category: "Pull Request",
           description:
             "Turn on GitHub's auto-merge for an open pull request (--method: it merges by itself once its required checks and reviews pass; the repository must allow auto-merge), or turn it off (--off).",

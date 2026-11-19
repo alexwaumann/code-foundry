@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { MergeableView, MergeMethodView, PrStateView, PullRequestDetailView } from "@/api/gh";
-import { branchDelete, defaultMergeMethod, mergeArgs, mergeAvailability, mergeMethodHint } from "./merge";
+import { branchDelete, defaultMergeMethod, MERGE_BUSY_LABELS, mergeArgs, mergeAvailability, mergeMethodHint, mergeOutcome } from "./merge";
 
 interface Shape {
   state?: PrStateView;
@@ -103,5 +103,22 @@ describe("merge args and labels", () => {
     ["rebase", 0, "Replays its commits onto main."],
   ] as const)("hint for %s with %d commits", (m, n, want) => {
     expect(mergeMethodHint(m, n, "main")).toBe(want);
+  });
+});
+
+describe("the merge words", () => {
+  it.each([
+    ["merge", 3, "3 commits and a merge commit"],
+    ["squash", 3, "3 commits become 1"],
+    ["squash", 1, "1 commit, as is"],
+    ["rebase", 3, "3 commits replayed on top"],
+    ["rebase", 1, "1 commit replayed on top"],
+    ["squash", 0, "Its commits become 1"],
+  ] as const)("mergeOutcome(%s, %i) is %s", (method, n, want) => {
+    expect(mergeOutcome(method, n)).toBe(want);
+  });
+
+  it("each method has its own busy words", () => {
+    expect(MERGE_BUSY_LABELS).toEqual({ merge: "Merging…", squash: "Squashing and merging…", rebase: "Rebasing and merging…" });
   });
 });

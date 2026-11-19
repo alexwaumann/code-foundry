@@ -64,6 +64,8 @@ const urlsOpened = () => invocationsOf("view.open.url").map((i) => i.args.url);
 const children = (id: string) => [...byTestId(id).children] as HTMLElement[];
 const input = (id: string) => byTestId(id) as HTMLTextAreaElement;
 const menuItems = (menu: HTMLElement) => within(menu).getAllByRole("menuitem").map((i) => i.textContent);
+/** A merge menu's methods: one-pick items (the default has the tick). */
+const methodItems = (menu: HTMLElement) => within(menu).getAllByRole("menuitemradio").map((i) => i.textContent);
 
 async function expectToast(text: string | RegExp): Promise<void> {
   await vi.waitFor(() => {
@@ -860,8 +862,9 @@ describe("the merge button", () => {
   const button = () => byTestId("pr-merge-button");
   const chevron = () => byTestId("pr-merge-button-menu-button");
   const merges = () => invocationsOf("pr.merge").map((i) => [i.args, i.confirmed]);
+  const checked = (id: string) => byTestId(id).getAttribute("aria-checked");
 
-  it("#142 merges: the main part squashes (the default) after the confirmation, with the head and the branch deleted; the box turns Merged", async () => {
+  it("#142: a method picked in the menu is the default at once: the label changes, the menu closes, nothing merges", async () => {
     renderPrPanel();
     await openPr(142);
     expect(byTestId("pr-state").textContent).toBe("Open");
@@ -872,26 +875,54 @@ describe("the merge button", () => {
     expect(chevron().getAttribute("aria-label")).toBe("Merge options");
     press(chevron());
     const menu = byTestId("pr-merge-button-menu");
-    const items = menuItems(menu);
+    expect(byTestId("pr-merge-menu-heading").textContent).toBe("Merge into main · your pick becomes the default here");
+    const items = methodItems(menu);
     expect(items).toHaveLength(3);
     [/^Create a merge commit/, /^Squash and merge/, /^Rebase and merge/].forEach((re, i) => {
       expect(items[i]).toMatch(re);
     });
-    expect(byTestId("pr-merge-delete-branch").getAttribute("aria-checked")).toBe("true");
+    // The default has the tick.
+    expect(["merge", "squash", "rebase"].map((m) => checked(`pr-merge-method-${m}`))).toEqual(["false", "true", "false"]);
+    expect(checked("pr-merge-delete-branch")).toBe("true");
     expect(byTestId("pr-merge-delete-branch-note").textContent).toBe("Deletes origin/feat/sidebar; local branches and worktrees are untouched");
-    fireEvent.keyDown(menu, { key: "Escape" });
 
+    await pick(byTestId("pr-merge-method-rebase"));
+    expect(queryTestId("pr-merge-button-menu")).toBeNull();
+    expect(button().textContent).toBe("Rebase and merge");
+    expect(queryTestId("pr-merge-dialog")).toBeNull();
+    expect(merges()).toEqual([]);
+    press(chevron());
+    expect(checked("pr-merge-method-rebase")).toBe("true");
+  });
+
+  it("#142 merges: the main part opens the merge dialog, its Merge is the one question; busy in the method's words until the box turns Merged", async () => {
+    renderPrPanel();
+    await openPr(142);
     fireEvent.click(button());
     await settle();
-    expect(byTestId("confirm-dialog").textContent).toContain(`Merge #142 “feat(gui): virtualized sidebar tree with thread rows” into main in ${SLUG} with squash? Branch origin/feat/sidebar is deleted afterwards.`);
-    fireEvent.click(byTestId("confirm-ok"));
-    await settle(3);
-    // With the head the panel shows: the daemon refuses if GitHub's moved since.
-    const args = { "repo-slug": SLUG, number: "142", method: "squash", "delete-branch": "true", "head-sha": HEAD_142 };
-    expect(merges()).toEqual([
-      [args, false],
-      [args, true],
-    ]);
+    // The merge's own dialog, not the warning-looking confirm; nothing sent yet.
+    expect(queryTestId("confirm-dialog")).toBeNull();
+    expect(merges()).toEqual([]);
+    expect(byTestId("pr-merge-dialog-title").textContent).toBe("Squash and merge #142");
+    expect(byTestId("pr-merge-dialog-pr-title").textContent).toBe("feat(gui): virtualized sidebar tree with thread rows");
+    expect(byTestId("pr-merge-dialog-into").textContent).toBe("IntomainIts commits become 1");
+    expect(byTestId("pr-merge-dialog-from").textContent).toBe("Fromfeat/sidebar");
+    expect(["merge", "squash", "rebase"].map((m) => checked(`pr-merge-dialog-method-${m}`))).toEqual(["false", "true", "false"]);
+    expect(byTestId("pr-merge-dialog-branch").textContent).toBe("BranchDelete it on origin after merging");
+    expect(byTestId("pr-merge-dialog-delete-branch").getAttribute("aria-checked")).toBe("true");
+    expect(byTestId("pr-merge-dialog-confirm").textContent).toBe("Squash and merge");
+    expect(document.activeElement).toBe(byTestId("pr-merge-dialog-confirm"));
+
+    const release = world.hold("pr.merge");
+    fireEvent.click(byTestId("pr-merge-dialog-confirm"));
+    await settle();
+    expect(queryTestId("pr-merge-dialog")).toBeNull();
+    expect(queryTestId("confirm-dialog")).toBeNull();
+    // Sent once, already confirmed, with the head the panel shows.
+    expect(merges()).toEqual([[{ "repo-slug": SLUG, number: "142", method: "squash", "delete-branch": "true", "head-sha": HEAD_142 }, true]]);
+    expect(button().getAttribute("aria-busy")).toBe("true");
+    expect(button().textContent).toBe("Squashing and merging…");
+    release();
     await vi.waitFor(() => {
       expect(byTestId("pr-state").textContent).toBe("Merged");
     });
@@ -901,8 +932,39 @@ describe("the merge button", () => {
     await expectToast("deleted origin/feat/sidebar");
   });
 
+  it("#142: the dialog's Method changes its words and the repository's default; its branch box and Cancel", async () => {
+    renderPrPanel();
+    await openPr(142);
+    fireEvent.click(button());
+    await settle();
+    fireEvent.click(byTestId("pr-merge-dialog-method-merge"));
+    await settle();
+    expect(byTestId("pr-merge-dialog-title").textContent).toBe("Merge #142");
+    expect(byTestId("pr-merge-dialog-outcome").textContent).toBe("Its commits and a merge commit");
+    expect(byTestId("pr-merge-dialog-confirm").textContent).toBe("Merge");
+    // The default moved with it: the button behind the dialog says so too.
+    expect(button().textContent).toBe("Merge");
+    fireEvent.click(byTestId("pr-merge-dialog-delete-branch"));
+    expect(byTestId("pr-merge-dialog-delete-branch").getAttribute("aria-checked")).toBe("false");
+    fireEvent.click(byTestId("pr-merge-dialog-cancel"));
+    await settle();
+    expect(queryTestId("pr-merge-dialog")).toBeNull();
+    expect(merges()).toEqual([]);
+    expect(button().hasAttribute("aria-busy")).toBe(false);
+    // The branch box is the menu's too: unchecked for the next merge of this pull request.
+    press(chevron());
+    expect(checked("pr-merge-delete-branch")).toBe("false");
+    fireEvent.keyDown(byTestId("pr-merge-button-menu"), { key: "Escape" });
+    fireEvent.click(button());
+    await settle();
+    fireEvent.click(byTestId("pr-merge-dialog-method-rebase"));
+    fireEvent.click(byTestId("pr-merge-dialog-confirm"));
+    await settle(3);
+    expect(merges()).toEqual([[{ "repo-slug": SLUG, number: "142", method: "rebase", "delete-branch": "false", "head-sha": HEAD_142 }, true]]);
+  });
+
   // Four cases that were one test: each opens only what it needs, so none nears the timeout under load.
-  it("#145 (draft): disabled with the reason; a click sends nothing; the menu says why and offers nothing", async () => {
+  it("#145 (draft): disabled with the reason; a click opens nothing; the menu says why", async () => {
     renderPrPanel();
     await openPr(145);
     expect(button().getAttribute("aria-disabled")).toBe("true");
@@ -913,10 +975,9 @@ describe("the merge button", () => {
     expect(document.getElementById(button().getAttribute("aria-describedby") ?? "")?.textContent).toBe("Draft pull requests cannot be merged");
     fireEvent.click(button());
     await settle();
-    expect(queryTestId("confirm-dialog")).toBeNull();
+    expect(queryTestId("pr-merge-dialog")).toBeNull();
     press(chevron());
     expect(texts("pr-merge-note")).toEqual(["Draft pull requests cannot be merged"]);
-    expect(byTestId("pr-merge-method-squash").hasAttribute("data-disabled")).toBe(true);
     expect(merges()).toEqual([]);
   });
 
@@ -930,43 +991,20 @@ describe("the merge button", () => {
     expect(queryTestId("pr-auto-merge-button")).toBeNull();
   });
 
-  it("#142: unchecking the branch and a method from the menu, then declining, sends nothing; the button is idle and its default unchanged", async () => {
-    renderPrPanel();
-    await openPr(142);
-    expect(byTestId("pr-merge-button-split").dataset.blocked).toBeUndefined();
-    for (const part of [button(), chevron()]) expect(part.classList.contains("opacity-50")).toBe(false);
-    press(chevron());
-    fireEvent.click(byTestId("pr-merge-delete-branch"));
-    expect(byTestId("pr-merge-delete-branch").getAttribute("aria-checked")).toBe("false");
-    expect(byTestId("pr-merge-button-menu")).toBeTruthy();
-    await pick(byTestId("pr-merge-method-merge"));
-    expect(byTestId("confirm-dialog").textContent).toContain(`Merge #142 “feat(gui): virtualized sidebar tree with thread rows” into main in ${SLUG} with a merge commit?`);
-    expect(byTestId("confirm-dialog").textContent).not.toContain("deleted afterwards");
-    fireEvent.click(byTestId("confirm-cancel"));
-    await settle();
-    expect(queryTestId("confirm-dialog")).toBeNull();
-    // Declined: the button is idle again, its menu does not come back by itself, and the default method is unchanged.
-    expect(button().hasAttribute("aria-busy")).toBe(false);
-    expect(queryTestId("pr-merge-button-menu")).toBeNull();
-    expect(button().textContent).toBe("Squash and merge");
-    expect(merges().filter(([, confirmed]) => confirmed)).toEqual([]);
-    // The branch stays unchecked for the next merge of this pull request.
-    press(chevron());
-    expect(byTestId("pr-merge-delete-branch").getAttribute("aria-checked")).toBe("false");
-  });
-
-  it("#142: GitHub refuses (the head moved): a spinner while it runs, then toasted, still open, the button usable again and its default unchanged", async () => {
+  it("#142: GitHub refuses (the head moved): busy in the method's words while it runs, then toasted, still open, the button usable again", async () => {
     renderPrPanel();
     await openPr(142);
     world.failNext.add("pr.merge");
     const release = world.hold("pr.merge");
     press(chevron());
-    fireEvent.click(byTestId("pr-merge-delete-branch"));
     await pick(byTestId("pr-merge-method-rebase"));
-    fireEvent.click(byTestId("confirm-ok"));
+    fireEvent.click(button());
+    await settle();
+    fireEvent.click(byTestId("pr-merge-dialog-confirm"));
     await settle();
     expect(button().getAttribute("aria-busy")).toBe("true");
     expect(button().getAttribute("aria-disabled")).toBe("true");
+    expect(button().textContent).toBe("Rebasing and merging…");
     release();
     await expectToast("Merge Pull Request failed");
     await expectToast(/changed on GitHub since it was loaded/);
@@ -975,25 +1013,31 @@ describe("the merge button", () => {
     });
     expect(button().hasAttribute("aria-disabled")).toBe(false);
     expect(byTestId("pr-state").textContent).toBe("Open");
-    expect(merges().filter(([, confirmed]) => confirmed)).toEqual([[{ "repo-slug": SLUG, number: "142", method: "rebase", "delete-branch": "false", "head-sha": HEAD_142 }, true]]);
-    // Refused: the default is still the one before.
-    expect(button().textContent).toBe("Squash and merge");
+    expect(button().textContent).toBe("Rebase and merge");
   });
 
-  it("#146 from a fork: the branch cannot be deleted, and a merge asking anyway toasts that it was kept", async () => {
+  it("#146 from a fork: no branch to delete in the menu or the dialog; pr.merge asked elsewhere confirms calmly and toasts that the branch was kept", async () => {
     renderPrPanel();
     await openPr(146);
     expect(byTestId("pr-state").textContent).toBe("Open");
     press(chevron());
-    expect(byTestId("pr-merge-delete-branch").getAttribute("aria-checked")).toBe("false");
+    expect(checked("pr-merge-delete-branch")).toBe("false");
     expect(byTestId("pr-merge-delete-branch").getAttribute("data-disabled")).toBe("");
     expect(byTestId("pr-merge-delete-branch-note").textContent).toBe("The branch is in a fork");
     fireEvent.keyDown(byTestId("pr-merge-button-menu"), { key: "Escape" });
     expect(queryTestId("pr-merge-button-menu")).toBeNull();
+    fireEvent.click(button());
+    await settle();
+    expect(queryTestId("pr-merge-dialog-branch")).toBeNull();
+    fireEvent.click(byTestId("pr-merge-dialog-cancel"));
+    await settle();
 
-    // pr.merge with delete-branch on (as the CLI can): the daemon's answer says it kept the branch.
+    // pr.merge not from the dialog, with delete-branch on (as the CLI can): the command's own
+    // question, in the success tone; the daemon's answer says it kept the branch.
     void mergePullRequest({ slug: SLUG, number: 146 }, "squash", true, "f04c146000000000000000000000000000000000");
     await settle();
+    expect(byTestId("confirm-dialog").dataset.tone).toBe("success");
+    expect(byTestId("confirm-icon").dataset.tone).toBe("success");
     fireEvent.click(byTestId("confirm-ok"));
     await settle(3);
     await vi.waitFor(() => {
@@ -1024,26 +1068,31 @@ describe("auto-merge", () => {
     await openPr(163);
     expect(byTestId("pr-ready-headline").textContent).toBe("Waiting on checks3 running");
     expect(queryTestId("pr-merge-button")).toBeNull();
-    // Declining the confirmation leaves the default method alone.
-    const label = byTestId("pr-auto-merge-button").textContent;
+    // The menu picks the repository's default, as Merge's does: the pick turns nothing on.
     press(byTestId("pr-auto-merge-button-menu-button"));
-    await pick(byTestId("pr-auto-merge-method-merge"));
-    fireEvent.click(byTestId("confirm-cancel"));
-    await settle();
-    expect(byTestId("pr-auto-merge-button").textContent).toBe(label);
-    expect(autoMerges()).toEqual([[{ "repo-slug": SLUG, number: "163", method: "merge", "head-sha": head163 }, false]]);
-    // A method from the menu: rebase.
-    press(byTestId("pr-auto-merge-button-menu-button"));
-    expect(menuItems(byTestId("pr-auto-merge-button-menu"))).toEqual([
+    expect(byTestId("pr-auto-merge-menu-heading").textContent).toBe("Merge once requirements pass · your pick becomes the default here");
+    expect(methodItems(byTestId("pr-auto-merge-button-menu"))).toEqual([
       "Create a merge commitGitHub merges it with a merge commit once its required checks and reviews pass.",
       "Squash and mergeGitHub merges it as one commit once its required checks and reviews pass.",
       "Rebase and mergeGitHub merges it by rebasing once its required checks and reviews pass.",
     ]);
+    expect(byTestId("pr-auto-merge-method-squash").getAttribute("aria-checked")).toBe("true");
     await pick(byTestId("pr-auto-merge-method-rebase"));
+    expect(queryTestId("pr-auto-merge-button-menu")).toBeNull();
+    expect(autoMerges()).toEqual([]);
+    // The main part asks (calmly, the success tone); declining sends nothing more.
+    fireEvent.click(byTestId("pr-auto-merge-button"));
+    await settle();
+    expect(byTestId("confirm-dialog").dataset.tone).toBe("success");
     expect(byTestId("confirm-dialog").textContent).toContain("Turn on auto-merge for #163 with rebase?");
+    fireEvent.click(byTestId("confirm-cancel"));
+    await settle();
+    const args = { "repo-slug": SLUG, number: "163", method: "rebase", "head-sha": head163 };
+    expect(autoMerges()).toEqual([[args, false]]);
+    fireEvent.click(byTestId("pr-auto-merge-button"));
+    await settle();
     fireEvent.click(byTestId("confirm-ok"));
     await settle(3);
-    const args = { "repo-slug": SLUG, number: "163", method: "rebase", "head-sha": head163 };
     expect(autoMerges().slice(1)).toEqual([
       [args, false],
       [args, true],
@@ -1649,7 +1698,7 @@ describe("Review ▾", () => {
     fireEvent.change(reviewInput(), { target: { value: "Looks done." } });
     fireEvent.click(byTestId("pr-merge-button"));
     await settle();
-    fireEvent.click(byTestId("confirm-ok"));
+    fireEvent.click(byTestId("pr-merge-dialog-confirm"));
     await settle(3);
     await vi.waitFor(() => {
       expect(byTestId("pr-state").textContent).toBe("Merged");

@@ -93,6 +93,9 @@ func TestRegisterValidation(t *testing.T) {
 		{"bind confirm to a positional", valid(func(c *Command) {
 			c.Confirm, c.BindConfirm, c.Args = "Sure?", "d", []ArgSpec{{Name: "d", Type: String, Positional: true}}
 		}), "BindConfirm"},
+		{"confirm tone success", valid(func(c *Command) { c.Confirm, c.ConfirmTone = "Sure?", ConfirmToneSuccess }), ""},
+		{"confirm tone without confirm", valid(func(c *Command) { c.ConfirmTone = ConfirmToneSuccess }), "ConfirmTone"},
+		{"confirm tone unknown", valid(func(c *Command) { c.Confirm, c.ConfirmTone = "Sure?", "danger" }), "ConfirmTone"},
 		{"confirm bind without bind confirm", valid(func(c *Command) {
 			c.Confirm, c.ConfirmBind = "Sure?", func(context.Context, Context, Args, string) string { return "" }
 		}), "ConfirmBind"},

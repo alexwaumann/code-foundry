@@ -37,6 +37,8 @@ func mergeCommand(b GhBackend, slug, number ArgSpec) Command {
 			{Name: "head-sha", Type: String, Description: "Merge only if the head is still this commit (full SHA): refused when the pull request changed since you looked"},
 		},
 		Confirm: "Merge #{number} in {repo-slug} with {method}?",
+		// A merge is the step the pull request was made for: asked calmly, not as a warning.
+		ConfirmTone: ConfirmToneSuccess,
 		DynamicConfirm: func(ctx context.Context, _ Context, a Args) string {
 			return mergeConfirm(ctx, b, a)
 		},

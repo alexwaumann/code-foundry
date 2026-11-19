@@ -18,7 +18,7 @@ vi.mock("@/api/command", async (orig) => ({
 vi.mock("@/lib/notify", () => ({ notify: vi.fn(), notifyProgress: vi.fn(), dismissNotice: vi.fn() }));
 
 const { CONFIRM_ARM_MS, ConfirmDialog } = await import("./ConfirmDialog");
-const { runCommand } = await import("@/stores/commands");
+const { runCommand, runCommandForResult } = await import("@/stores/commands");
 const { answerConfirm, requestChoice, requestConfirm, useConfirmStore } = await import("@/stores/confirm");
 
 const ctx = { activeTerminalId: "", activeThreadId: "", activeProjectId: "", activeWorktreePath: "", activeView: "settings", activeWorkspaceId: "" };
@@ -216,6 +216,62 @@ describe("ConfirmDialog", () => {
     expect(screen.getByTestId("confirm-ok").getAttribute("data-variant")).toBe("destructive");
   });
 
+  it("a success-toned question (a merge) is calm: the success icon and a non-destructive confirm", () => {
+    render(<ConfirmDialog />);
+    act(() => {
+      void requestConfirm({ title: "Merge Pull Request", message: "Merge #142 into main?", confirmLabel: "Merge Pull Request", tone: "success" });
+    });
+    expect(screen.getByTestId("confirm-dialog").dataset.tone).toBe("success");
+    expect(screen.getByTestId("confirm-icon").dataset.tone).toBe("success");
+    expect(screen.getByTestId("confirm-icon").getAttribute("class")).toContain("text-cf-success-text");
+    const ok = screen.getByTestId("confirm-ok");
+    expect(ok.getAttribute("data-variant")).toBe("default");
+    expect(ok.className).toContain("bg-cf-success");
+    // Without a tone, the warning look.
+    act(() => {
+      answerConfirm(false);
+      void requestConfirm({ title: "t", message: "m", confirmLabel: "Remove" });
+    });
+    expect(screen.getByTestId("confirm-icon").dataset.tone).toBe("warning");
+    expect(screen.getByTestId("confirm-ok").className).not.toContain("bg-cf-success");
+  });
+
+  it("a guarded success-toned question keeps the guard: fixed colours, Cancel focused, Confirm off until armed", () => {
+    vi.useFakeTimers();
+    try {
+      render(<ConfirmDialog />);
+      act(() => {
+        void requestConfirm({ title: "Merge Pull Request", message: "Merge #142 into main?", confirmLabel: "Merge Pull Request", tone: "success", guarded: true, caller: "a page" });
+      });
+      const dialog = screen.getByTestId("confirm-dialog");
+      expect(dialog.classList.contains("cf-guarded")).toBe(true);
+      expect(dialog.dataset.tone).toBe("success");
+      expect(document.activeElement).toBe(screen.getByTestId("confirm-cancel"));
+      expect(screen.getByTestId<HTMLButtonElement>("confirm-ok").disabled).toBe(true);
+      act(() => {
+        vi.advanceTimersByTime(CONFIRM_ARM_MS);
+      });
+      expect(screen.getByTestId<HTMLButtonElement>("confirm-ok").disabled).toBe(false);
+      act(() => {
+        answerConfirm(false);
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("runCommand passes the daemon's tone to the dialog", async () => {
+    invokeCommand.mockRejectedValueOnce(new NeedsConfirm({ command: "pr.merge", title: "Merge Pull Request", message: "Merge #142 into main?", tone: "success" }));
+    render(<ConfirmDialog />);
+    let done!: Promise<boolean>;
+    act(() => {
+      done = runCommand("pr.merge", { "repo-slug": "o/r", number: "142", method: "squash" }, ctx);
+    });
+    expect((await screen.findByTestId("confirm-dialog")).dataset.tone).toBe("success");
+    fireEvent.click(screen.getByTestId("confirm-cancel"));
+    expect(await done).toBe(false);
+  });
+
   it("names who asked when it was not the user (a page's or a plugin's call)", async () => {
     render(<ConfirmDialog />);
     let done!: Promise<boolean>;
@@ -266,5 +322,24 @@ describe("ConfirmDialog", () => {
     expect(await second).toBe(true);
     expect(confirmedFlags()).toEqual([false, false, true]);
     expect(invokeCommand).toHaveBeenLastCalledWith("thread.remove", ctx, { id: "s-3" }, undefined, { confirmed: true });
+  });
+
+  it("`asked` (the app's own dialog already asked): sent confirmed at once, no dialog; a caller's call never is", async () => {
+    invokeCommand.mockResolvedValue({ message: "", resultJson: "" });
+    render(<ConfirmDialog />);
+    await expect(runCommandForResult("pr.merge", { number: "142" }, { ctx, quiet: true, asked: true })).resolves.not.toBeNull();
+    expect(screen.queryByTestId("confirm-dialog")).toBeNull();
+    expect(invokeCommand).toHaveBeenLastCalledWith("pr.merge", ctx, { number: "142" }, undefined, { confirmed: true });
+
+    invokeCommand.mockReset();
+    invokeCommand.mockRejectedValueOnce(new NeedsConfirm({ command: "pr.merge", title: "Merge Pull Request", message: "Merge #142?", tone: "success" }));
+    let done!: Promise<unknown>;
+    act(() => {
+      done = runCommandForResult("pr.merge", { number: "142" }, { ctx, quiet: true, asked: true, caller: "Hello" });
+    });
+    await screen.findByTestId("confirm-dialog");
+    expect(confirmedFlags()).toEqual([false]);
+    fireEvent.click(screen.getByTestId("confirm-cancel"));
+    await expect(done).resolves.toBeNull();
   });
 });

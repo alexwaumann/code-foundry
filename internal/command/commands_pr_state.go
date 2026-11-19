@@ -74,6 +74,8 @@ func autoMergeCommand(b GhBackend, slug, number ArgSpec) Command {
 			{Name: "head-sha", Type: String, Description: "Turn it on only if the head is still this commit (full SHA): refused when the pull request changed since you looked"},
 		},
 		Confirm: "Turn on auto-merge for #{number} in {repo-slug} with {method}?",
+		// A merge to come, asked like pr.merge: calmly.
+		ConfirmTone: ConfirmToneSuccess,
 		// Only a request Run would send asks: a bad one is refused without a question.
 		ConfirmIf: func(_ context.Context, _ Context, a Args) bool {
 			_, ok := mergeMethods[a.String("method")]

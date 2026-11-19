@@ -547,10 +547,11 @@ async function settledAnimations(page: Page, testId: string): Promise<void> {
   await page.getByTestId(testId).evaluate((el) => Promise.all(el.getAnimations({ subtree: true }).map((a) => a.finished)));
 }
 
-// The merge menu's items, the delete-branch note, the confirmation, pr.merge's args with the head, the
-// toast; draft, read-only and merged pull requests; unchecking the branch, declining, the spinner, a
-// refusal; a fork's branch: src/components/pr/PullRequestSurface.test.tsx ("the merge button").
-test("#142 merges from a menu inside the side panel; the dashboard moves it to recently merged", async ({ page }) => {
+// The merge menu's items, the default's tick, a pick as the default, the delete-branch note, the merge
+// dialog's rows and Method, pr.merge's args with the head (sent confirmed once), the busy words, the
+// toast; draft, read-only and merged pull requests; unchecking the branch, cancelling, a refusal; a
+// fork's branch: src/components/pr/PullRequestSurface.test.tsx ("the merge button").
+test("#142 merges from the side panel: a pick in the menu, then the merge dialog; the dashboard moves it to recently merged", async ({ page }) => {
   await shotViewport(page);
   await openPrBesidePage(page, 142);
   await page.getByTestId("pr-merge-button-menu-button").click();
@@ -560,7 +561,11 @@ test("#142 merges from a menu inside the side panel; the dashboard moves it to r
   await shot(page, "merge-button");
 
   await page.getByTestId("pr-merge-method-squash").click();
-  await page.getByTestId("confirm-ok").click();
+  await expect(page.getByTestId("pr-merge-button-menu")).toHaveCount(0);
+  await page.getByTestId("pr-merge-button").click();
+  await expect(page.getByTestId("pr-merge-dialog")).toBeVisible();
+  // Enter on the focused Merge merges.
+  await page.keyboard.press("Enter");
   await expect(page.getByTestId("pr-state")).toHaveText("Merged");
   // The daemon announces the dashboard change: the row moves to recently merged.
   await expect(prRow(page, "merged", 142)).toBeVisible();
@@ -581,6 +586,28 @@ test("at 280px the merge split button stays inside the box and its dropdown insi
   await settledAnimations(page, "pr-merge-button-menu");
   await shot(page, "merge-button-280");
 });
+
+/** SHOTS=<dir>: the merge flow, dark and light: the menu, the merge dialog, the busy button. Its logic: PullRequestSurface.test.tsx ("the merge button"). */
+for (const scheme of ["dark", "light"] as const) {
+  test(`merge menu, dialog and busy button (screenshots, ${scheme})`, async ({ page }) => {
+    test.skip(!shots, "SHOTS=<dir> only: the screenshots are all it adds");
+    await page.emulateMedia({ colorScheme: scheme });
+    await shotViewport(page);
+    await openPrBesidePage(page, 142);
+    await page.getByTestId("pr-merge-button-menu-button").click();
+    await settledAnimations(page, "pr-merge-button-menu");
+    await shot(page, `merge-menu-${scheme}`);
+    await page.keyboard.press("Escape");
+    await page.getByTestId("pr-merge-button").click();
+    await expect(page.getByTestId("pr-merge-dialog")).toBeVisible();
+    await shot(page, `merge-dialog-${scheme}`);
+    await mockPost("gh/pr-delay?ms=30000");
+    await page.getByTestId("pr-merge-dialog-confirm").click();
+    await expect(page.getByTestId("pr-merge-button")).toHaveText("Squashing and merging…");
+    await page.mouse.move(5, 5);
+    await shot(page, `merge-busy-${scheme}`);
+  });
+}
 
 // ---- Review ▾ (pr.review; docs/notes/pr-review-submit-2-gui.md) ----------------------
 

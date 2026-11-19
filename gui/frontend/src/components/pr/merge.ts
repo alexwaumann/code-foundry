@@ -21,9 +21,39 @@ export const MERGE_BUTTON_LABELS: Record<MergeMethodView, string> = {
   rebase: "Rebase and merge",
 };
 
+/** The split button's words while that method's merge runs (until the detail shows it merged). */
+export const MERGE_BUSY_LABELS: Record<MergeMethodView, string> = {
+  merge: "Merging…",
+  squash: "Squashing and merging…",
+  rebase: "Rebasing and merging…",
+};
+
+/** The merge dialog's Method segments. */
+export const MERGE_SHORT_LABELS: Record<MergeMethodView, string> = {
+  merge: "Merge commit",
+  squash: "Squash",
+  rebase: "Rebase",
+};
+
 /**
- * The split button's method: the one last chosen in this repository when it is still
- * allowed, else squash when allowed, else the first allowed.
+ * What a method does to the pull request's commits, at the right of the merge dialog's
+ * Into row: "3 commits become 1". commitCount 0 is unknown.
+ */
+export function mergeOutcome(method: MergeMethodView, commitCount: number): string {
+  const commits = commitCount === 1 ? "1 commit" : commitCount > 1 ? `${String(commitCount)} commits` : "Its commits";
+  switch (method) {
+    case "merge":
+      return `${commits} and a merge commit`;
+    case "squash":
+      return commitCount === 1 ? "1 commit, as is" : `${commits} become 1`;
+    case "rebase":
+      return `${commits} replayed on top`;
+  }
+}
+
+/**
+ * The split button's method: the one last picked in this repository (stores/mergeDefaults.ts)
+ * when it is still allowed, else squash when allowed, else the first allowed.
  */
 export function defaultMergeMethod(methods: readonly MergeMethodView[], last: MergeMethodView | undefined): MergeMethodView {
   if (last && methods.includes(last)) return last;

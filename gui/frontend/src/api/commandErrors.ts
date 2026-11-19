@@ -8,8 +8,8 @@ import { Code, ConnectError } from "@connectrpc/connect";
 import { CommandFailedSchema, ConfirmationRequiredSchema } from "@/gen/codefoundry/v1/command_pb";
 
 /** How the daemon asks for a confirmation: FailedPrecondition with a ConfirmationRequired detail (api/command confirmationOf reads it). */
-export function confirmationRequiredError(c: { command: string; title?: string; message: string; args?: Record<string, string>; confirmLabel?: string }): ConnectError {
-  const detail = create(ConfirmationRequiredSchema, { command: c.command, title: c.title ?? "", message: c.message, args: c.args ?? {}, confirmLabel: c.confirmLabel ?? "" });
+export function confirmationRequiredError(c: { command: string; title?: string; message: string; args?: Record<string, string>; confirmLabel?: string; tone?: string }): ConnectError {
+  const detail = create(ConfirmationRequiredSchema, { command: c.command, title: c.title ?? "", message: c.message, args: c.args ?? {}, confirmLabel: c.confirmLabel ?? "", tone: c.tone ?? "" });
   return new ConnectError(c.message, Code.FailedPrecondition, undefined, [{ desc: ConfirmationRequiredSchema, value: detail }]);
 }
 

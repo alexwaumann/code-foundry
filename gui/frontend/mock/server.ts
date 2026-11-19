@@ -327,7 +327,7 @@ function rpcError(err: unknown): ConnectError {
   if (err instanceof ConnectError) return err;
   if (err instanceof ConfirmNeeded) {
     return new ConnectError(err.message, Code.FailedPrecondition, undefined, [
-      { desc: ConfirmationRequiredSchema, value: { command: err.command, title: err.title, message: err.message, confirmLabel: err.confirmLabel, args: err.args } },
+      { desc: ConfirmationRequiredSchema, value: { command: err.command, title: err.title, message: err.message, confirmLabel: err.confirmLabel, args: err.args, tone: err.tone } },
     ]);
   }
   if (err instanceof SettingsValidation) {

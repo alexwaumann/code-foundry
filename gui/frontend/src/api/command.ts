@@ -65,7 +65,12 @@ export interface ConfirmationView {
   declined?: InvokeResultView;
   /** The confirm button's words when the command names them ("Forget all"). */
   confirmLabel?: string;
+  /** How the question looks: absent, a warning; "success", a step forward (a merge). */
+  tone?: ConfirmTone;
 }
+
+/** A confirmation's look (ConfirmationRequired.tone): only "success" is sent; anything else is the warning. */
+export type ConfirmTone = "success";
 
 /**
  * The confirm button's words: the command's own (ConfirmationView.confirmLabel), else
@@ -146,6 +151,7 @@ export function confirmationOf(err: unknown): ConfirmationView | null {
   if (Object.keys(d.bind).length > 0) view.bind = { ...d.bind };
   if (d.declined) view.declined = { message: d.declined.message, resultJson: d.declined.resultJson };
   if (d.confirmLabel) view.confirmLabel = d.confirmLabel;
+  if (d.tone === "success") view.tone = "success";
   return view;
 }
 

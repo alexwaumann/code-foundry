@@ -811,7 +811,11 @@ type ConfirmationRequired struct {
 	Bind map[string]string `protobuf:"bytes,6,rep,name=bind,proto3" json:"bind,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	// The confirm button's words when the command names them ("Forget all"); empty: the
 	// title without a "Category: " prefix.
-	ConfirmLabel  string `protobuf:"bytes,7,opt,name=confirm_label,json=confirmLabel,proto3" json:"confirm_label,omitempty"`
+	ConfirmLabel string `protobuf:"bytes,7,opt,name=confirm_label,json=confirmLabel,proto3" json:"confirm_label,omitempty"`
+	// How the GUI draws the question: "" a warning (it ends or deletes something: a red
+	// icon and a destructive confirm button), "success" a step the user is taking
+	// forward (a merge: the success tone, never an error's look). The CLI ignores it.
+	Tone          string `protobuf:"bytes,8,opt,name=tone,proto3" json:"tone,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -891,6 +895,13 @@ func (x *ConfirmationRequired) GetBind() map[string]string {
 func (x *ConfirmationRequired) GetConfirmLabel() string {
 	if x != nil {
 		return x.ConfirmLabel
+	}
+	return ""
+}
+
+func (x *ConfirmationRequired) GetTone() string {
+	if x != nil {
+		return x.Tone
 	}
 	return ""
 }
@@ -1011,7 +1022,7 @@ const file_codefoundry_v1_command_proto_rawDesc = "" +
 	"\vresult_json\x18\x02 \x01(\tR\n" +
 	"resultJson\x12\x1b\n" +
 	"\texit_code\x18\x03 \x01(\x05R\bexitCode\x12\x1a\n" +
-	"\bwarnings\x18\x04 \x03(\tR\bwarnings\"\xc2\x03\n" +
+	"\bwarnings\x18\x04 \x03(\tR\bwarnings\"\xd6\x03\n" +
 	"\x14ConfirmationRequired\x12\x18\n" +
 	"\acommand\x18\x01 \x01(\tR\acommand\x12\x18\n" +
 	"\amessage\x18\x02 \x01(\tR\amessage\x12\x14\n" +
@@ -1019,7 +1030,8 @@ const file_codefoundry_v1_command_proto_rawDesc = "" +
 	"\x04args\x18\x04 \x03(\v2..codefoundry.v1.ConfirmationRequired.ArgsEntryR\x04args\x12A\n" +
 	"\bdeclined\x18\x05 \x01(\v2%.codefoundry.v1.InvokeCommandResponseR\bdeclined\x12B\n" +
 	"\x04bind\x18\x06 \x03(\v2..codefoundry.v1.ConfirmationRequired.BindEntryR\x04bind\x12#\n" +
-	"\rconfirm_label\x18\a \x01(\tR\fconfirmLabel\x1a7\n" +
+	"\rconfirm_label\x18\a \x01(\tR\fconfirmLabel\x12\x12\n" +
+	"\x04tone\x18\b \x01(\tR\x04tone\x1a7\n" +
 	"\tArgsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\x1a7\n" +

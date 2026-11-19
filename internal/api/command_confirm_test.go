@@ -57,6 +57,9 @@ func TestCommandInvokeConfirm(t *testing.T) {
 	if ran != 0 {
 		t.Fatal("ran without confirmation")
 	}
+	if got.GetTone() != "" {
+		t.Fatalf("tone = %q, want none (the warning look)", got.GetTone())
+	}
 
 	res, err := h.Invoke(ctx, connect.NewRequest(&v1.InvokeCommandRequest{
 		Name: "thread.remove", Args: map[string]string{"id": "s1"}, Confirmed: true,

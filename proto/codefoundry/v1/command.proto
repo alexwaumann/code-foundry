@@ -179,6 +179,10 @@ message ConfirmationRequired {
   // The confirm button's words when the command names them ("Forget all"); empty: the
   // title without a "Category: " prefix.
   string confirm_label = 7;
+  // How the GUI draws the question: "" a warning (it ends or deletes something: a red
+  // icon and a destructive confirm button), "success" a step the user is taking
+  // forward (a merge: the success tone, never an error's look). The CLI ignores it.
+  string tone = 8;
 }
 
 // CommandFailed is the error detail of an Invoke whose command could not do what it was

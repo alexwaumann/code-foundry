@@ -6,6 +6,7 @@
  * dialog and the app's own dialogs (registerOwnDialog).
  */
 import { create } from "zustand";
+import type { ConfirmTone } from "@/api/command";
 
 export interface ConfirmRequest {
   title: string;
@@ -18,6 +19,12 @@ export interface ConfirmRequest {
    * then is the plain default, since Enter on it is the safe answer.
    */
   alternateLabel?: string;
+  /**
+   * The command's look (ConfirmationRequired.tone): absent, a warning (red icon, destructive
+   * button); "success", a step forward the user takes (a merge), asked in the success tone so
+   * it never reads like an error.
+   */
+  tone?: ConfirmTone;
   /** Centered in the window instead of near the top (questions about the content under it). */
   centered?: boolean;
   /** The command being confirmed and its args, when a command asks (runCommand). */

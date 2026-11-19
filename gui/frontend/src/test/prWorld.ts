@@ -666,7 +666,7 @@ class PrWorld {
       if (!inv.confirmed) {
         let msg = `Merge #${String(n)} “${pr.title}” into ${pr.baseRef} in ${slug} with ${methodWords[method] ?? method}?`;
         if (inv.args["delete-branch"] === "true" && !pr.isCrossRepository) msg += ` Branch origin/${pr.headRef} is deleted afterwards.`;
-        throw needsConfirm({ command: "pr.merge", title: titles["pr.merge"], message: msg });
+        throw needsConfirm({ command: "pr.merge", title: titles["pr.merge"], message: msg, tone: "success" });
       }
       await this.gate("pr.merge");
       if (pr.state !== "open") throw this.refuse(`pull request #${String(n)} is ${pr.state}, not open`);
@@ -761,7 +761,7 @@ class PrWorld {
       if (off) await this.gate("pr.auto-merge");
       const [slug, n, d] = this.target(inv);
       const method = inv.args.method as PullRequestDetailView["autoMergeMethod"];
-      if (!off && !inv.confirmed) throw needsConfirm({ command: "pr.auto-merge", title: titles["pr.auto-merge"], message: `Turn on auto-merge for #${String(n)} with ${methodWords[method ?? ""] ?? ""}?` });
+      if (!off && !inv.confirmed) throw needsConfirm({ command: "pr.auto-merge", title: titles["pr.auto-merge"], message: `Turn on auto-merge for #${String(n)} with ${methodWords[method ?? ""] ?? ""}?`, tone: "success" });
       if (off && !d.autoMergeEnabled) throw this.refuse(`pull request #${String(n)} does not have auto-merge on`);
       if (!off && d.pullRequest.mergeState === "clean") throw this.refuse(`pull request #${String(n)} can be merged now, so GitHub will not wait to auto-merge it; merge it instead`);
       this.details.set(key(slug, n), { ...d, autoMergeEnabled: !off, autoMergeMethod: off ? null : method, fetchedAtMs: Date.now() });

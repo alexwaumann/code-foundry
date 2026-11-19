@@ -22,6 +22,8 @@ import { openPullRequestInPanel, reviewerCandidatesResource, usePrPanelStore } f
 import { usePrThreadsStore } from "@/stores/prThreads";
 import { usePrTasksStore } from "@/stores/prTasks";
 import { useReviewerRecentsStore } from "@/stores/reviewerRecents";
+import { useMergeDefaultsStore } from "@/stores/mergeDefaults";
+import { useMergeDialogStore } from "@/stores/mergeDialog";
 import { useUiStore, type Selection } from "@/stores/ui";
 import { useViewsStore } from "@/stores/views";
 import { layoutSettled, resetFakeLayout, threadSeed, type FakeLayoutState } from "./fakeLayout";
@@ -43,7 +45,9 @@ export async function resetPrStores(selection: Selection = PR_PAGE, seed?: FakeL
   reviewerCandidatesResource.store.setState({ entries: {} });
   dashboardResource.store.setState({ entries: {} });
   viewerResource.store.setState({ entries: {} });
-  usePrPanelStore.setState({ byTab: {}, refreshing: {}, requesting: {}, confirmed: {}, merging: {}, reviewing: {}, changing: {}, reverting: {}, taskChecks: {}, mergeMethods: {} });
+  usePrPanelStore.setState({ byTab: {}, refreshing: {}, requesting: {}, confirmed: {}, merging: {}, reviewing: {}, changing: {}, reverting: {}, taskChecks: {} });
+  useMergeDefaultsStore.setState({ bySlug: {} });
+  useMergeDialogStore.setState({ open: null });
   usePrThreadsStore.setState({ starting: {} });
   usePrTasksStore.setState({ running: {} });
   useReviewerRecentsStore.setState({ bySlug: {} });

@@ -8,7 +8,7 @@
  */
 import { notify } from "@/lib/notify";
 import { create } from "zustand";
-import { listReviewerCandidates, parseMergeResult, parseRefreshResult, parseRevertResult, type MergeMethodView } from "@/api/gh";
+import { listReviewerCandidates, parseMergeResult, parseRefreshResult, parseRevertResult, type MergeMethodView, type PullRequestDetailView } from "@/api/gh";
 import { mergeArgs } from "@/components/pr/merge";
 import type { Verdict } from "@/components/pr/review";
 import { copyText } from "@/lib/clipboard";
@@ -57,8 +57,8 @@ interface PrPanelState {
    * GitHub, or is still running, never flips the check back.
    */
   confirmed: Readonly<Record<string, boolean>>;
-  /** pullRequestKey → a pr.merge in flight (from its confirmation on). */
-  merging: Readonly<Record<string, boolean>>;
+  /** pullRequestKey → the method of the pr.merge in flight (until the detail shows it merged). */
+  merging: Readonly<Record<string, MergeMethodView>>;
   /** pullRequestKey → a pr.review in flight (until the detail shows it). */
   reviewing: Readonly<Record<string, boolean>>;
   /** pullRequestKey → the pr.ready, pr.draft or pr.auto-merge in flight (until the detail shows it). */
@@ -67,11 +67,9 @@ interface PrPanelState {
   reverting: Readonly<Record<string, boolean>>;
   /** taskCheckKey → the state a pr.checkbox in flight asks for (until the detail shows it). */
   taskChecks: Readonly<Record<string, boolean>>;
-  /** Lower-case repository slug → the merge method last chosen there (the split button's default). */
-  mergeMethods: Readonly<Record<string, MergeMethodView>>;
 }
 
-export const usePrPanelStore = create<PrPanelState>()(() => ({ byTab: {}, refreshing: {}, requesting: {}, confirmed: {}, merging: {}, reviewing: {}, changing: {}, reverting: {}, taskChecks: {}, mergeMethods: {} }));
+export const usePrPanelStore = create<PrPanelState>()(() => ({ byTab: {}, refreshing: {}, requesting: {}, confirmed: {}, merging: {}, reviewing: {}, changing: {}, reverting: {}, taskChecks: {} }));
 
 /**
  * Drops inner state of tabs no pane holds any more (a closed tab reopens fresh). Every open tab is
@@ -256,7 +254,6 @@ export async function revertPullRequest(ref: PrRef, panel: TabTarget): Promise<P
     const res = await runCommandForResult("pr.revert", prArgs(ref), { quiet: true });
     if (!res) return null;
     const made = parseRevertResult(res.resultJson);
-    pullRequestDetailResource.invalidate(key);
     if (!made) {
       if (res.message) notify({ level: "success", title: "Revert pull request", description: res.message });
       return null;
@@ -272,6 +269,9 @@ export async function revertPullRequest(ref: PrRef, panel: TabTarget): Promise<P
     openPullRequestInPanel(next, panel);
     return next;
   } finally {
+    // Either way read it now, not at the next poll: the revert's cross-reference, or after
+    // a refusal GitHub's state.
+    pullRequestDetailResource.invalidate(key);
     usePrPanelStore.setState((s) => {
       const { [key]: _done, ...rest } = s.reverting;
       return { reverting: rest };
@@ -280,33 +280,73 @@ export async function revertPullRequest(ref: PrRef, panel: TabTarget): Promise<P
 }
 
 /**
- * The merge button: pr.merge with the head commit the panel shows (the daemon refuses
- * if GitHub's head moved since; the daemon asks for confirmation and the confirm dialog
- * handles it). On success, toasts the daemon's message ("Merged #N (sha)", with the
- * branch deletion as the description). Either way the detail is read again: the daemon
- * also announces it, and after a refusal (the head moved) it shows GitHub's state.
- * Returns whether it merged; a second call while one runs sends nothing.
+ * Resolves once key's detail satisfies done, once nothing shows it (no view to wait for),
+ * or after timeoutMs. A read that settles without it is asked for once more: a read begun
+ * before the change may land after it.
  */
-export async function mergePullRequest(ref: PrRef, method: MergeMethodView, deleteBranch: boolean, headSha: string): Promise<boolean> {
+async function detailShows(key: string, done: (d: PullRequestDetailView) => boolean, timeoutMs = 15_000): Promise<void> {
+  const r = pullRequestDetailResource;
+  const met = () => {
+    const d = r.store.getState().entries[key]?.data;
+    return (d != null && done(d)) || !r.watched().includes(key);
+  };
+  await settled(r, (k) => k === key, timeoutMs);
+  if (met()) return;
+  r.invalidate(key);
+  await new Promise<void>((resolve) => {
+    const finish = () => {
+      clearTimeout(timer);
+      unsub();
+      resolve();
+    };
+    const timer = setTimeout(finish, timeoutMs);
+    const unsub = r.store.subscribe(() => {
+      if (met()) finish();
+    });
+  });
+}
+
+/**
+ * The merge dialog's Merge: pr.merge with the method, the branch choice and the head
+ * commit the panel shows (the daemon refuses if GitHub's head moved since). `asked`: the
+ * merge dialog already put exactly this to the user, so the daemon's question is not
+ * asked again (runCommandForResult's `asked`); without it the confirm dialog asks, in the
+ * success tone. Busy (`merging`, holding the method for the button's words) from the
+ * start until the detail shows the pull request merged, so the button never comes back
+ * green in between; a merge GitHub queued instead waits for the detail's re-read, and a
+ * failure or a declined question frees it once the re-read is asked for. On success,
+ * toasts the daemon's message ("Merged #N (sha)", the branch deletion as the
+ * description). Returns whether it merged; a second call while one runs sends nothing.
+ */
+export async function mergePullRequest(ref: PrRef, method: MergeMethodView, deleteBranch: boolean, headSha: string, opts: { asked?: boolean } = {}): Promise<boolean> {
   const key = pullRequestKey(ref.slug, ref.number);
   if (usePrPanelStore.getState().merging[key]) return false;
-  usePrPanelStore.setState((s) => ({ merging: { ...s.merging, [key]: true } }));
+  usePrPanelStore.setState((s) => ({ merging: { ...s.merging, [key]: method } }));
+  let wait: "merged" | "read" | null = null;
   try {
-    const res = await runCommandForResult("pr.merge", mergeArgs(ref, method, deleteBranch, headSha), { quiet: true });
+    const res = await runCommandForResult("pr.merge", mergeArgs(ref, method, deleteBranch, headSha), { quiet: true, ...(opts.asked ? { asked: true } : {}) });
     if (!res) return false;
-    // Only a merge that ran sets the default: a declined confirmation or a refusal does not.
-    rememberMergeMethod(ref.slug, method);
-    const message = parseMergeResult(res.resultJson)?.message || res.message || `Merged #${String(ref.number)}`;
+    const result = parseMergeResult(res.resultJson);
+    wait = result && !result.merged ? "read" : "merged";
+    const message = result?.message || res.message || `Merged #${String(ref.number)}`;
     const [title = message, ...rest] = message.split("; ");
     notify({ level: "success", title, ...(rest.length > 0 ? { description: rest.join("; ") } : {}) });
     return true;
   } finally {
+    // Read now, not at the next poll: the daemon reads GitHub again after a write.
     pullRequestDetailResource.invalidate(key);
+    if (wait === "merged") await detailShows(key, (d) => d.pullRequest.state === "merged");
+    else if (wait === "read") await settled(pullRequestDetailResource, (k) => k === key);
     usePrPanelStore.setState((s) => {
       const { [key]: _done, ...others } = s.merging;
       return { merging: others };
     });
   }
+}
+
+/** The method of the merge running on ref (null: none): the busy button's words, the box's "Merging…". */
+export function useMergingMethod(ref: PrRef): MergeMethodView | null {
+  return usePrPanelStore((s) => s.merging[pullRequestKey(ref.slug, ref.number)] ?? null);
 }
 
 /**
@@ -337,13 +377,6 @@ export async function submitReview(ref: PrRef, verdict: Verdict, body: string): 
       return { reviewing: rest };
     });
   }
-}
-
-/** Remembers the merge method chosen in slug's repository: the split buttons' default there. */
-export function rememberMergeMethod(slug: string, method: MergeMethodView): void {
-  const k = slug.toLowerCase();
-  if (usePrPanelStore.getState().mergeMethods[k] === method) return;
-  usePrPanelStore.setState((s) => ({ mergeMethods: { ...s.mergeMethods, [k]: method } }));
 }
 
 /**
@@ -418,14 +451,12 @@ export function autoMergeArgs(ref: PrRef, method: MergeMethodView | null, headSh
 
 /**
  * The footer's Auto-merge (a method: GitHub merges it once its requirements pass; the
- * daemon confirms first) and Cancel auto-merge (null). The method becomes the
- * repository's default only once auto-merge is on (not when declined or refused). Both
+ * daemon confirms first, in the success tone) and Cancel auto-merge (null). The method
+ * is the repository's default (stores/mergeDefaults.ts), set when it was picked. Both
  * are buttons in the box that then shows the change: no success toast.
  */
-export async function setAutoMerge(ref: PrRef, method: MergeMethodView | null, headSha: string): Promise<boolean> {
-  const ok = await changePullRequest(ref, method === null ? "cancel-auto-merge" : "auto-merge", "pr.auto-merge", autoMergeArgs(ref, method, headSha), { inView: true });
-  if (ok && method !== null) rememberMergeMethod(ref.slug, method);
-  return ok;
+export function setAutoMerge(ref: PrRef, method: MergeMethodView | null, headSha: string): Promise<boolean> {
+  return changePullRequest(ref, method === null ? "cancel-auto-merge" : "auto-merge", "pr.auto-merge", autoMergeArgs(ref, method, headSha), { inView: true });
 }
 
 /** Menu → Link to this thread: thread.pr.link (a manual link; there is no unlink). */

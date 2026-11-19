@@ -266,6 +266,8 @@ interface CmdDef {
   confirmIf?: (ctx: UiContext | undefined, args: Record<string, string>) => boolean;
   /** Like the daemon's Command.ConfirmLabel: the confirm button's words (a page's question has its own). */
   confirmLabel?: string | ((ctx: UiContext | undefined, args: Record<string, string>) => string);
+  /** Like the daemon's Command.ConfirmTone: "success" asks calmly (a merge), not as a warning. */
+  confirmTone?: "success";
   /** Like the daemon's Command.read_only: it changes nothing (a page's bridge runs it without a click). */
   readOnly?: boolean;
   /** Like the daemon's Command.no_palette: the palette does not list it. */
@@ -483,6 +485,8 @@ export class ConfirmNeeded extends Error {
     readonly confirmLabel = "",
     /** A second stage's args (ConfirmationRequired.args: force), merged into the re-invoke. */
     readonly args: Record<string, string> = {},
+    /** ConfirmationRequired.tone: "success" for a step forward (a merge). */
+    readonly tone = "",
   ) {
     super(message);
   }
@@ -5726,7 +5730,7 @@ export class World {
     }
     if (entry.cmd.confirm && !confirmed && (entry.cmd.confirmIf?.(ctx, full) ?? true)) {
       const label = entry.cmd.confirmLabel;
-      throw new ConfirmNeeded(name, entry.cmd.title, entry.cmd.confirm(ctx, full), typeof label === "function" ? label(ctx, full) : label);
+      throw new ConfirmNeeded(name, entry.cmd.title, entry.cmd.confirm(ctx, full), typeof label === "function" ? label(ctx, full) : label, {}, entry.cmd.confirmTone ?? "");
     }
     return entry.run(ctx, full);
   }
