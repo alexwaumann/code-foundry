@@ -70,6 +70,29 @@ function lower(s: string): string {
   return s.startsWith("The ") ? `the ${s.slice(4)}` : s.startsWith("Tab ") ? `tab ${s.slice(4)}` : s;
 }
 
+/** The sidebar's selection as one dragged thing: "3 threads (Fix login and 2 more)". */
+export function groupText(ids: readonly string[], names: DragNames): string {
+  const first = ids[0] ?? "";
+  return `${String(ids.length)} threads (${names.thread(first)} and ${String(ids.length - 1)} more)`;
+}
+
+/** What a drop on a sidebar header does, as a phrase: over it, and once dropped. */
+export const HEADER_DROP = {
+  archived: { label: "the Archived header", over: (them: string) => `dropping archives ${them}`, done: "archived" },
+  snoozed: { label: "the Snoozed header", over: (them: string) => `dropping saves ${them} for later`, done: "saved for later" },
+} as const;
+
+/** Over a header whose drop acts on `count` of the dragged threads. */
+export function headerOverText(what: string, section: keyof typeof HEADER_DROP, count: number): string {
+  const h = HEADER_DROP[section];
+  return `${what} is over ${h.label}; ${h.over(count === 1 ? "it" : `${String(count)} threads`)}.`;
+}
+
+/** Dropped on a header. */
+export function headerDroppedText(what: string, section: keyof typeof HEADER_DROP): string {
+  return `${what} was dropped on ${HEADER_DROP[section].label} and ${HEADER_DROP[section].done}.`;
+}
+
 /** The instructions a draggable's aria-describedby reads. */
 export const DRAG_INSTRUCTIONS =
-  "To move this tab, drag it to another place in a strip, onto another pane, or onto an edge of a pane or of the whole pane area to split it off. Escape cancels a drag. A whole pane drags by the empty part of its strip.";
+  "To move this tab, drag it to another place in a strip, onto another pane, or onto an edge of a pane or of the whole pane area to split it off. Escape cancels a drag. A whole pane drags by the empty part of its strip. A sidebar thread also drops on a space tab, and on the Archived or Snoozed header to archive it or save it for later; a selected thread drags the whole selection.";

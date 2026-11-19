@@ -2,7 +2,8 @@ import { useState, type ComponentType, type ReactNode } from "react";
 import { snoozePresets } from "@/lib/snooze";
 import { saveThreadForLater, snoozeThread } from "@/stores/threadActions";
 import { useThreadsStore } from "@/stores/threads";
-import { openSnoozeDialog } from "@/stores/snoozeDialog";
+import { openSnoozeDialog, openSnoozeDialogFor } from "@/stores/snoozeDialog";
+import { saveThreadsForLater, snoozeThreads } from "@/stores/bulkThreadActions";
 
 /** A menu item as the snooze items need it: a context menu's or a dropdown's. */
 type MenuItem = ComponentType<{ onSelect: () => void; children?: ReactNode; "data-testid"?: string; "data-preset"?: string }>;
@@ -16,11 +17,15 @@ type MenuItem = ComponentType<{ onSelect: () => void; children?: ReactNode; "dat
  * snooze (it leaves for Snoozed), so no success toast from the row's button and menu
  * (`inView`, the default); the thread header's menu passes false: the snooze closes the
  * thread's tab and the sidebar may be hidden, so it toasts (docs/notes/toast-success-rule.md).
+ * `ids`: the sidebar's selection (its bulk menu): every item is one thread.snooze --ids for all
+ * of them, and Save for later is left out once one of them is saved.
  */
-export function SnoozePresetItems({ id, Item, Separator, onPreset, inView = true }: { id: string; Item: MenuItem; Separator: ComponentType; onPreset?: () => void; inView?: boolean }) {
+export function SnoozePresetItems({ id, ids, Item, Separator, onPreset, inView = true }: { id: string; ids?: readonly string[]; Item: MenuItem; Separator: ComponentType; onPreset?: () => void; inView?: boolean }) {
   // Mounted when the menu opens: the times are as of then.
   const [now] = useState(() => Date.now());
-  const saved = useThreadsStore((s) => (s.byId[id]?.savedAtMs ?? null) !== null);
+  const list = ids ?? [id];
+  const many = list.length > 1;
+  const saved = useThreadsStore((s) => list.some((t) => (s.byId[t]?.savedAtMs ?? null) !== null));
   return (
     <>
       {snoozePresets(now).map((p) => (
@@ -30,7 +35,7 @@ export function SnoozePresetItems({ id, Item, Separator, onPreset, inView = true
           data-preset={p.id}
           onSelect={() => {
             onPreset?.();
-            void snoozeThread(id, p.untilMs, { inView });
+            void (many ? snoozeThreads(list, p.untilMs) : snoozeThread(id, p.untilMs, { inView }));
           }}
         >
           {p.label}
@@ -43,7 +48,8 @@ export function SnoozePresetItems({ id, Item, Separator, onPreset, inView = true
       <Item
         data-testid="snooze-pick"
         onSelect={() => {
-          openSnoozeDialog(id);
+          if (many) openSnoozeDialogFor(list);
+          else openSnoozeDialog(id);
         }}
       >
         Pick a date and time
@@ -53,7 +59,7 @@ export function SnoozePresetItems({ id, Item, Separator, onPreset, inView = true
           data-testid="snooze-save"
           onSelect={() => {
             onPreset?.();
-            void saveThreadForLater(id, { inView });
+            void (many ? saveThreadsForLater(list) : saveThreadForLater(id, { inView }));
           }}
         >
           Save for later

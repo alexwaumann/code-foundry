@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cancelledText, droppedText, overText, pickedUpText, type DragNames } from "./announce";
+import { cancelledText, droppedText, groupText, headerDroppedText, headerOverText, overText, pickedUpText, type DragNames } from "./announce";
 import type { DragSource } from "./targets";
 
 const names: DragNames = {
@@ -39,5 +39,13 @@ describe("drag announcements", () => {
     expect(overText(thread, { kind: "strip", pane: "p-2", index: 1 }, names)).toBe("Thread Plan the trip is over position 2 of 2 in the pane of Diff.");
     expect(droppedText(thread, { kind: "outer", edge: "right" }, names)).toBe("Thread Plan the trip was dropped on the right edge of the whole pane area.");
     expect(droppedText(thread, null, names)).toBe("Thread Plan the trip was not opened.");
+  });
+
+  it("name a dragged selection by its count, and what a header does with it (docs/notes/sidebar-bulk-select.md)", () => {
+    const what = groupText(["th-1", "th-2", "th-3"], names);
+    expect(what).toBe("3 threads (Plan the trip and 2 more)");
+    expect(headerOverText(what, "archived", 3)).toBe("3 threads (Plan the trip and 2 more) is over the Archived header; dropping archives 3 threads.");
+    expect(headerOverText("Thread Plan the trip", "snoozed", 1)).toBe("Thread Plan the trip is over the Snoozed header; dropping saves it for later.");
+    expect(headerDroppedText(what, "snoozed")).toBe("3 threads (Plan the trip and 2 more) was dropped on the Snoozed header and saved for later.");
   });
 });

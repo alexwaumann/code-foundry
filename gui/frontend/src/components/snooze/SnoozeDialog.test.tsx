@@ -5,10 +5,13 @@ import type { ThreadView } from "@/api/threads";
 const snoozeThread = vi.hoisted(() => vi.fn(() => Promise.resolve(true)));
 const saveThreadForLater = vi.hoisted(() => vi.fn(() => Promise.resolve(true)));
 vi.mock("@/stores/threadActions", async (orig) => ({ ...(await orig<typeof import("@/stores/threadActions")>()), snoozeThread, saveThreadForLater }));
+const snoozeThreads = vi.hoisted(() => vi.fn(() => Promise.resolve(true)));
+const saveThreadsForLater = vi.hoisted(() => vi.fn(() => Promise.resolve(true)));
+vi.mock("@/stores/bulkThreadActions", () => ({ snoozeThreads, saveThreadsForLater }));
 
 const { SnoozeDialog } = await import("./SnoozeDialog");
 const { useThreadsStore } = await import("@/stores/threads");
-const { openSnoozeDialog, useSnoozeDialogStore } = await import("@/stores/snoozeDialog");
+const { openSnoozeDialog, openSnoozeDialogFor, useSnoozeDialogStore } = await import("@/stores/snoozeDialog");
 
 // Wed Oct 14 2026, 1:12 PM local.
 const NOW = new Date(2026, 9, 14, 13, 12).getTime();
@@ -16,7 +19,7 @@ const NOW = new Date(2026, 9, 14, 13, 12).getTime();
 beforeEach(() => {
   vi.useFakeTimers({ now: NOW, toFake: ["Date", "setInterval", "clearInterval", "setTimeout", "clearTimeout", "queueMicrotask"] });
   useThreadsStore.setState({ byId: { "s-1": { id: "s-1", name: "Bump wails to v3.1" } as ThreadView }, order: ["s-1"] });
-  useSnoozeDialogStore.setState({ open: false, threadId: "", seq: 0 });
+  useSnoozeDialogStore.setState({ open: false, threadId: "", ids: [], seq: 0 });
 });
 
 afterEach(() => {
@@ -105,5 +108,41 @@ describe("SnoozeDialog", () => {
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
     expect(useSnoozeDialogStore.getState().open).toBe(false);
     expect(snoozeThread).not.toHaveBeenCalled();
+  });
+
+  it("for several threads (the sidebar's selection): titled by the count, one snooze or save for all of them", () => {
+    useThreadsStore.setState({
+      byId: { "s-1": { id: "s-1", name: "A", savedAtMs: null } as ThreadView, "s-2": { id: "s-2", name: "B", savedAtMs: null } as ThreadView },
+      order: ["s-1", "s-2"],
+    });
+    render(<SnoozeDialog />);
+    act(() => {
+      openSnoozeDialogFor(["s-1", "s-2"]);
+      vi.runAllTicks();
+    });
+    expect(screen.getByRole("dialog").textContent).toContain("Snooze 2 threads");
+    fireEvent.click(screen.getByTestId("snooze-submit"));
+    expect(snoozeThreads).toHaveBeenCalledWith(["s-1", "s-2"], new Date(2026, 9, 15, 9, 0).getTime());
+    expect(snoozeThread).not.toHaveBeenCalled();
+    act(() => {
+      openSnoozeDialogFor(["s-1", "s-2"]);
+      vi.runAllTicks();
+    });
+    fireEvent.click(screen.getByTestId("snooze-dialog-save"));
+    expect(saveThreadsForLater).toHaveBeenCalledWith(["s-1", "s-2"]);
+  });
+
+  it("for several threads, one already saved: no Save for later", () => {
+    useThreadsStore.setState({
+      byId: { "s-1": { id: "s-1", name: "A", savedAtMs: 5 } as ThreadView, "s-2": { id: "s-2", name: "B", savedAtMs: null } as ThreadView },
+      order: ["s-1", "s-2"],
+    });
+    render(<SnoozeDialog />);
+    act(() => {
+      openSnoozeDialogFor(["s-1", "s-2"]);
+      vi.runAllTicks();
+    });
+    expect(screen.queryByTestId("snooze-dialog-save")).toBeNull();
+    expect(screen.queryByTestId("snooze-dialog-saved")).toBeNull();
   });
 });

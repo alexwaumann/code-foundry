@@ -4,10 +4,11 @@ import { DndContext, PointerSensor, useSensor, useSensors, type Announcements, t
 import { PANE_HEADER_HEIGHT } from "@/components/window/titleBand";
 import { cn } from "@/lib/utils";
 import { zoomFactor } from "@/lib/zoom";
-import { cancelledText, DRAG_INSTRUCTIONS, droppedText, overText, pickedUpText, sourceText, type DragNames } from "@/shell/drag/announce";
+import { cancelledText, DRAG_INSTRUCTIONS, droppedText, groupText, headerDroppedText, headerOverText, overText, pickedUpText, sourceText, targetText, type DragNames } from "@/shell/drag/announce";
 import { sourceOf } from "@/shell/drag/draggable";
 import { dropPreview, shellDropLayout, type DropLayout } from "@/shell/drag/drop";
-import { dropPlan } from "@/shell/drag/dropPlan";
+import { dropPlan, groupDropPlan } from "@/shell/drag/dropPlan";
+import { groupDropsInGrid, groupSpaceCommands, headerDropIds, rowDragGroup, type HeaderSection } from "@/shell/drag/groupDrop";
 import { fullscreenOn } from "@/shell/fullscreen";
 import { resetShellDrag, useShellDragStore } from "@/shell/drag/state";
 import { dropTarget, insertionBar, sameTarget, type DragScene, type DragSource, type DropTarget, type StripTab } from "@/shell/drag/targets";
@@ -20,6 +21,8 @@ import { shellSurfaceOf } from "@/shell/surfaces/registry";
 import { geoTree, useCurrentSpaceId, useLayoutStore, type TabEntry } from "@/stores/layout";
 import { useThreadsStore } from "@/stores/threads";
 import { useShellViewStore } from "@/stores/shellView";
+import { archiveThreads, saveThreadsForLater } from "@/stores/bulkThreadActions";
+import { clearSidebarSelection, selectedSidebarThreads, useSidebarSelectionStore } from "@/stores/sidebarSelection";
 
 /** A box in viewport px. */
 interface ClientBox {
@@ -44,6 +47,22 @@ function measureTopBar(): TopBarBoxes {
 
 const within = (b: ClientBox, p: { x: number; y: number }) => p.x >= b.left && p.x < b.right && p.y >= b.top && p.y < b.bottom;
 
+/** The sidebar's Archived and Snoozed headers as drawn (viewport px): drop targets for a row's drag (docs/notes/sidebar-bulk-select.md). */
+function measureHeaders(): { section: HeaderSection; box: ClientBox }[] {
+  return Array.from(document.querySelectorAll<HTMLElement>("[data-drop-section]")).flatMap((el) => {
+    const section = el.dataset.dropSection;
+    return section === "archived" || section === "snoozed" ? [{ section, box: el.getBoundingClientRect() }] : [];
+  });
+}
+
+/** Whether the thread is archived (it lives in no space: shell/drag/threadSource.ts). */
+const isArchived = (id: string) => (useThreadsStore.getState().byId[id]?.archivedAtMs ?? null) !== null;
+
+/** The threads a row's drag carries: the dragged selection, else the row's own thread. */
+function draggedThreads(st: { rowThread: string; group: readonly string[] }): readonly string[] {
+  return st.group.length > 0 ? st.group : st.rowThread ? [st.rowThread] : [];
+}
+
 /** What a drag reads at its start (and again when the grid redraws under it). */
 interface Snapshot {
   /** The grid's top left in the viewport, in layout px (where the preview's coordinates start). */
@@ -53,6 +72,8 @@ interface Snapshot {
   /** How the grid lays out a tree: with its rails, the dropped pane holding the focus. */
   lay: DropLayout;
   names: DragNames;
+  /** No pane grid to drop in (a space with no pane): only a space tab or a sidebar header takes the drag. */
+  noGrid?: boolean;
 }
 
 /** The strips as drawn: each pane's tabs with their extents in the grid's layout px, and their names. */
@@ -76,9 +97,22 @@ function measureStrips(grid: HTMLElement): Record<string, StripTab[]> {
   return out;
 }
 
-function snapshot(grid: HTMLElement | null, spaceId: string): Snapshot | null {
+/** The snapshot of a space with no pane grid: a sidebar row still drags to a space tab or a header. */
+function gridless(spaceId: string): Snapshot {
+  const layout = useLayoutStore.getState();
+  return {
+    origin: { x: 0, y: 0 },
+    scene: { frame: { w: 0, h: 0, rects: {}, gutters: [] }, strips: {}, stripHeight: PANE_HEADER_HEIGHT, tree: null },
+    tree: null,
+    lay: shellDropLayout(layout.spaces[spaceId]?.mru),
+    names: { tab: () => "untitled", pane: () => "untitled", tabCount: () => 0, thread: (id) => useThreadsStore.getState().byId[id]?.name || "untitled" },
+    noGrid: true,
+  };
+}
+
+function snapshot(grid: HTMLElement | null, spaceId: string, row = false): Snapshot | null {
   const frame = useShellViewStore.getState().frame;
-  if (!grid || !frame) return null;
+  if (!grid || !frame) return row ? gridless(spaceId) : null;
   const strips = measureStrips(grid);
   const layout = useLayoutStore.getState();
   const titles = new Map(Object.values(strips).flatMap((tabs) => tabs.map((t) => [t.id, t.title] as const)));
@@ -182,6 +216,8 @@ function DragGhost() {
     return s.tabs[source.kind === "tab" ? source.tab : (s.panes[source.pane]?.active ?? "")];
   });
   const more = useLayoutStore((s) => (source?.kind === "pane" ? (s.panes[source.pane]?.tabIds.length ?? 1) - 1 : 0));
+  // The dragged selection: the grabbed row with how many go.
+  const count = useShellDragStore((s) => s.group.length);
   if (!source || !client || !tab) return null;
   const surface = shellSurfaceOf(tab.kind);
   const Icon = surface.icon;
@@ -191,12 +227,18 @@ function DragGhost() {
       aria-hidden
       data-testid="shell-drag-ghost"
       data-kind={source.kind}
+      data-count={count > 1 ? count : undefined}
       className="pointer-events-none fixed z-[60] flex h-7 max-w-64 items-center gap-1.5 rounded-md bg-cf-surface-overlay pr-3 pl-2 text-body-sm text-cf-text shadow-md ring-1 ring-cf-border"
       style={{ left: client.x / z + 12, top: client.y / z + 10 }}
     >
       <Icon className="size-3.5 shrink-0" aria-hidden />
       <GhostTitle tab={tab} />
       {more > 0 && <span className="shrink-0 text-cf-text-muted">+{more}</span>}
+      {count > 1 && (
+        <span className="ml-0.5 flex h-4 min-w-4 shrink-0 items-center justify-center rounded-full bg-cf-accent px-1 text-caption-sm font-medium text-cf-accent-foreground tabular-nums" data-testid="shell-drag-count">
+          {count}
+        </span>
+      )}
     </div>
   );
 }
@@ -242,9 +284,12 @@ export function ShellDnd({ children }: { children: ReactNode }) {
   const ended = useRef<{
     source: DragSource;
     target: DropTarget | null;
+    group: readonly string[];
+    section: HeaderSection | "";
   } | null>(null);
   const announced = useRef<DropTarget | null>(null);
   const announcedSpace = useRef("");
+  const announcedSection = useRef("");
   const topBar = useRef<TopBarBoxes>({ bar: null, spaces: [] });
   // The drop on a space tab, for the announcement after onDragEnd cleared the state.
   const endedSpace = useRef("");
@@ -254,7 +299,7 @@ export function ShellDnd({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!source) return;
     return useShellViewStore.subscribe((s, prev) => {
-      if (s.frame !== prev.frame) snap.current = snapshot(gridEl(), spaceId);
+      if (s.frame !== prev.frame) snap.current = snapshot(gridEl(), spaceId, useShellDragStore.getState().rowThread !== "");
     });
     // oxlint-disable-next-line react/exhaustive-deps
   }, [source, spaceId]);
@@ -269,19 +314,37 @@ export function ShellDnd({ children }: { children: ReactNode }) {
     const st = useShellDragStore.getState();
     const s = snap.current;
     if (!st.source || !s) return;
+    // The sidebar's Archived and Snoozed headers take a row's drag when the drop would act on one of its threads.
+    if (st.rowThread) {
+      const hit = measureHeaders().find((h) => within(h.box, client));
+      if (hit) {
+        const acts = headerDropIds(hit.section, draggedThreads(st), useThreadsStore.getState().byId).length > 0;
+        useShellDragStore.setState({ client, target: null, preview: null, bar: null, space: "", section: acts ? hit.section : "" });
+        return;
+      }
+      if (st.section) useShellDragStore.setState({ section: "" });
+    }
     // The top bar: a space tab that would take the source is the target; the rest of the bar is
     // none (the grid's outer band above the panes stops at the bar).
     const tb = topBar.current;
     if (tb.bar && within(tb.bar, client)) {
       const hit = tb.spaces.find((x) => within(x.box, client));
-      const space = hit && spaceDropCommands(st.source, hit.id, useLayoutStore.getState()) && fitsInSpace(st.source, hit.id, s) ? hit.id : "";
+      const layout = useLayoutStore.getState();
+      const takes = (id: string) => (st.group.length > 0 ? groupSpaceCommands(st.group, id, layout, isArchived) : spaceDropCommands(st.source as DragSource, id, layout));
+      const space = hit && takes(hit.id) && fitsInSpace(st.source, hit.id, s) ? hit.id : "";
       useShellDragStore.setState({ client, target: null, preview: null, bar: null, space });
       return;
     }
     if (st.space) useShellDragStore.setState({ space: "" });
+    if (s.noGrid) {
+      useShellDragStore.setState({ client, target: null, preview: null, bar: null });
+      return;
+    }
     // A thread of another space has no place in this grid: only a space tab takes it (an archived
     // one with no tab open lives in none, so it does: shell/drag/threadSource.ts).
-    if (st.source.kind === "thread" && !threadDropsInGrid(st.source, useLayoutStore.getState(), spaceId)) {
+    // A dragged selection drops in the grid only when every one of its threads would.
+    const offGrid = st.group.length > 0 ? !groupDropsInGrid(st.group, useLayoutStore.getState(), spaceId, isArchived) : st.source.kind === "thread" && !threadDropsInGrid(st.source, useLayoutStore.getState(), spaceId);
+    if (offGrid) {
       useShellDragStore.setState({ client, target: null, preview: null, bar: null });
       return;
     }
@@ -302,18 +365,38 @@ export function ShellDnd({ children }: { children: ReactNode }) {
   };
 
   const onDragStart = ({ active, activatorEvent }: DragStartEvent) => {
+    const raw = sourceOf(active.data.current);
+    // A selected row while two or more are selected drags the whole selection; any other row
+    // drags alone and drops the selection (docs/notes/sidebar-bulk-select.md).
+    let group: readonly string[] = [];
+    if (raw?.kind === "thread") {
+      const lift = rowDragGroup(raw.thread, useSidebarSelectionStore.getState().ids, selectedSidebarThreads());
+      group = lift.group;
+      if (!lift.keep) clearSidebarSelection();
+    }
     // A sidebar thread whose tab is open in the space drags as that tab (a move, never a second tab).
-    const src = rowDragSource(sourceOf(active.data.current), useLayoutStore.getState(), spaceId);
-    snap.current = snapshot(gridEl(), spaceId);
+    const src = rowDragSource(raw, useLayoutStore.getState(), spaceId);
+    snap.current = snapshot(gridEl(), spaceId, raw?.kind === "thread");
     if (!src || !snap.current) return;
     const p = activatorEvent as PointerEvent;
     origin.current = { x: p.clientX, y: p.clientY };
     ended.current = null;
     announced.current = null;
     announcedSpace.current = "";
+    announcedSection.current = "";
     endedSpace.current = "";
     topBar.current = measureTopBar();
-    useShellDragStore.setState({ source: src, target: null, client: origin.current, origin: snap.current.origin, preview: null, bar: null });
+    useShellDragStore.setState({
+      source: src,
+      target: null,
+      client: origin.current,
+      origin: snap.current.origin,
+      preview: null,
+      bar: null,
+      rowThread: raw?.kind === "thread" ? raw.thread : "",
+      group,
+      section: "",
+    });
   };
   // The pointer as the window sees it. dnd-kit's move delta adds the scroll of the source's scroll
   // containers, so a sidebar row whose list scrolls under the drag (a row re-measured) would aim
@@ -334,10 +417,28 @@ export function ShellDnd({ children }: { children: ReactNode }) {
     retarget(pointer.current ?? { x: origin.current.x + delta.x, y: origin.current.y + delta.y });
   };
   const onDragEnd = () => {
-    const { source: src, target, space } = useShellDragStore.getState();
+    const st = useShellDragStore.getState();
+    const { source: src, target, space, group, section } = st;
     resetShellDrag();
     if (!src) return;
-    ended.current = { source: src, target };
+    ended.current = { source: src, target, group, section };
+    // On the Archived or Snoozed header: one thread.archive or thread.snooze --save with the threads it acts on.
+    if (section) {
+      endedSpace.current = "";
+      const ids = headerDropIds(section, draggedThreads(st), useThreadsStore.getState().byId);
+      if (ids.length > 0) void (section === "archived" ? archiveThreads(ids, true) : saveThreadsForLater(ids));
+      return;
+    }
+    if (group.length > 0) {
+      const plan = groupDropPlan(group, target, space, useLayoutStore.getState(), spaceId, isArchived);
+      endedSpace.current = plan?.space ?? "";
+      if (plan) {
+        void (plan.space ? runSpaceDrop(plan.commands) : runGridDrop(plan.commands)).then((ok) => {
+          if (ok) clearSidebarSelection();
+        });
+      }
+      return;
+    }
     // The layout as it is now: a dragged tab or pane closed mid-drag moves nothing.
     const plan = dropPlan(src, target, space, useLayoutStore.getState());
     endedSpace.current = plan?.space ?? "";
@@ -345,9 +446,9 @@ export function ShellDnd({ children }: { children: ReactNode }) {
     if (plan) void (plan.space ? runSpaceDrop(plan.commands) : runGridDrop(plan.commands));
   };
   const onDragCancel = () => {
-    const { source: src } = useShellDragStore.getState();
+    const { source: src, group } = useShellDragStore.getState();
     resetShellDrag();
-    if (src) ended.current = { source: src, target: null };
+    if (src) ended.current = { source: src, target: null, group, section: "" };
   };
 
   const announcements = useMemo<Announcements>(() => {
@@ -358,26 +459,41 @@ export function ShellDnd({ children }: { children: ReactNode }) {
         tabCount: () => 0,
         thread: () => "untitled",
       };
+    // A dragged selection is named by its count ("3 threads (Fix login and 2 more)").
+    const what = (src: DragSource, group: readonly string[]) => (group.length > 1 ? groupText(group, names()) : sourceText(src, names()));
     return {
       onDragStart: () => {
-        const src = useShellDragStore.getState().source;
-        return src ? pickedUpText(src, names()) : undefined;
+        const { source: src, group } = useShellDragStore.getState();
+        if (!src) return undefined;
+        if (group.length > 1) return `Picked up ${what(src, group)}. Move them over a pane, a strip, an edge, a space tab or the Archived or Snoozed header and release to drop them there, or press Escape to cancel.`;
+        return pickedUpText(src, names());
       },
       onDragMove: () => {
-        const { source: src, target, space } = useShellDragStore.getState();
-        if (!src || (sameTarget(target, announced.current) && space === announcedSpace.current)) return undefined;
+        const st = useShellDragStore.getState();
+        const { source: src, target, space, group, section } = st;
+        if (!src || (sameTarget(target, announced.current) && space === announcedSpace.current && section === announcedSection.current)) return undefined;
         announced.current = target;
         announcedSpace.current = space;
-        if (space) return `${sourceText(src, names())} is over the space ${spaceName(space)}.`;
+        announcedSection.current = section;
+        if (section) return headerOverText(what(src, group), section, headerDropIds(section, draggedThreads(st), useThreadsStore.getState().byId).length);
+        if (space) return `${what(src, group)} is over the space ${spaceName(space)}.`;
+        if (group.length > 1) return target ? `${what(src, group)} is over ${targetText(src, target, names())}.` : `${what(src, group)} is over no place to drop.`;
         return overText(src, target, names());
       },
       onDragOver: () => undefined,
       onDragEnd: () => {
-        if (!ended.current) return undefined;
-        if (endedSpace.current) return `${sourceText(ended.current.source, names())} was moved to the space ${spaceName(endedSpace.current)}.`;
-        return droppedText(ended.current.source, ended.current.target, names());
+        const e = ended.current;
+        if (!e) return undefined;
+        if (e.section) return headerDroppedText(what(e.source, e.group), e.section);
+        if (endedSpace.current) return `${what(e.source, e.group)} was moved to the space ${spaceName(endedSpace.current)}.`;
+        if (e.group.length > 1) return e.target ? `${what(e.source, e.group)} was dropped on ${targetText(e.source, e.target, names())}.` : `${what(e.source, e.group)} was not opened.`;
+        return droppedText(e.source, e.target, names());
       },
-      onDragCancel: () => (ended.current ? cancelledText(ended.current.source, names()) : undefined),
+      onDragCancel: () => {
+        const e = ended.current;
+        if (!e) return undefined;
+        return e.group.length > 1 ? `Moving ${groupText(e.group, names())} was cancelled.` : cancelledText(e.source, names());
+      },
     };
   }, []);
 

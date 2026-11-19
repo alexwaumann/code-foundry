@@ -20,6 +20,15 @@ export interface ShellDragState {
   bar: { x: number; y: number; h: number } | null;
   /** The space whose tab in the top bar is under the pointer, when a drop there moves the source; "" otherwise (`target` is then null). */
   space: string;
+  /** The thread of the sidebar row being dragged (as a thread or as its open tab); "" for a tab or a pane of the grid. */
+  rowThread: string;
+  /**
+   * The sidebar's selection being dragged with it, in display order (two or more, the grabbed row
+   * among them; docs/notes/sidebar-bulk-select.md); [] when the row drags alone.
+   */
+  group: readonly string[];
+  /** The sidebar header under the pointer whose drop would act (Archived archives, Snoozed saves for later); "" otherwise (`target` is then null). */
+  section: "" | "archived" | "snoozed";
 }
 
 const IDLE: ShellDragState = {
@@ -30,6 +39,9 @@ const IDLE: ShellDragState = {
   preview: null,
   bar: null,
   space: "",
+  rowThread: "",
+  group: [],
+  section: "",
 };
 
 export const useShellDragStore = create<ShellDragState>()(() => IDLE);
@@ -53,7 +65,8 @@ export function useSpaceDropTarget(spaceId: string): boolean {
   return useShellDragStore((s) => s.space !== "" && s.space === spaceId);
 }
 
-/** Whether this sidebar thread is being dragged (as its row, or as its open tab). */
+/** Whether this sidebar thread is being dragged (as its row, or as its open tab, alone or in the dragged selection). */
 export function useThreadDragged(threadId: string): boolean {
-  return useShellDragStore((s) => s.source?.kind === "thread" && s.source.thread === threadId);
+  return useShellDragStore((s) => s.source !== null && (s.rowThread === threadId || s.group.includes(threadId) || (s.source.kind === "thread" && s.source.thread === threadId)));
 }
+

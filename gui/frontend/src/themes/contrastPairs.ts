@@ -38,6 +38,8 @@ export const CONTRAST_PAIRS: readonly ContrastPair[] = [
   ...on("--cf-sidebar-foreground", ["--cf-sidebar", "--cf-sidebar-row-selected"], 4.5, "a sidebar row's title"),
   ...on("--cf-sidebar-muted-foreground", ["--cf-sidebar", "--cf-sidebar-row-selected", "--cf-sidebar-row-hover"], 4.5, "a sidebar row's second line"),
   ...on("--cf-sidebar-row-selected", ["--cf-sidebar"], 1.25, "the selected sidebar row stands out from the sidebar"),
+  ...onTint("--cf-sidebar-foreground", "--cf-accent-surface", ["--cf-sidebar"], 4.5, "a sidebar row's title while it is in the multi-selection"),
+  ...onTint("--cf-sidebar-muted-foreground", "--cf-accent-surface", ["--cf-sidebar"], 4.5, "a sidebar row's second line while it is in the multi-selection"),
   ...TONES.flatMap((t) => [
     ...on(`--cf-${t}-text`, ["--cf-surface", "--cf-canvas"], 4.5, `${t} text on a pane or the sheet`),
     ...onTint(`--cf-${t}-text`, `--cf-${t}-surface`, ["--cf-surface", "--cf-canvas"], 4.5, `${t} text on its own tint (chips, banners), on a pane or the sheet`),

@@ -8,6 +8,7 @@ import (
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	core "github.com/alexwaumann/code-foundry/internal/layout"
+	layoutstore "github.com/alexwaumann/code-foundry/internal/store/layout"
 )
 
 // A thread's own tab: opening it (a sidebar click, the CLI), closing it from its space (its
@@ -189,10 +190,14 @@ func (l layout) threadCommands() []Command {
 				"space's focused pane; nothing switches spaces.",
 			Args: []ArgSpec{
 				layoutThreadArg(false),
+				threadIDsArg,
 				{Name: "space", Type: String, ID: SpaceID, Required: true, Description: "The space (an id, a unique id suffix, or its name)"},
 			},
 			NoKeybinding: true,
 			Run: func(ctx context.Context, uctx Context, a Args) (Result, error) {
+				if a.Has("ids") {
+					return l.moveThreadsToSpace(ctx, uctx, splitList(a.String("ids")), a.String("space"))
+				}
 				id, err := l.threadID(ctx, uctx, a)
 				if err != nil {
 					return Result{}, err
@@ -205,4 +210,36 @@ func (l layout) threadCommands() []Command {
 			},
 		},
 	}
+}
+
+// SpaceMoveResult is thread.space.move's answer given ids: the threads moved and those
+// that failed (ThreadsResult), and the layout's rev after the last move, which the window
+// waits for (LayoutResult's rev).
+type SpaceMoveResult struct {
+	ThreadsResult
+	Rev     uint64 `json:"rev"`
+	Changed bool   `json:"changed"`
+}
+
+// moveThreadsToSpace is thread.space.move given ids (the sidebar's bulk Move to space ▸ and
+// a selection dropped on a space tab, docs/notes/sidebar-bulk-select.md): one
+// MoveThreadToSpace per thread, in order, past one that fails (eachThread); a thread that
+// already lives there fails as it does alone. The ids are resolved by Invoke (an IDList arg),
+// so a typo moves none.
+func (l layout) moveThreadsToSpace(ctx context.Context, uctx Context, ids []string, space string) (Result, error) {
+	if len(ids) == 0 {
+		return Result{}, InvalidArg("ids", "name at least one thread")
+	}
+	var last layoutstore.Commit
+	res := eachThread(ctx, ids, "moved", func(ctx context.Context, id string) error {
+		c, err := l.apply(ctx, &core.MoveThreadToSpace{Thread: id, Space: space}, !uctx.FromUser())
+		if err == nil {
+			last = c
+		}
+		return err
+	})
+	res = afterCount(res, "moved", fmt.Sprintf(" to space %s %q", space, spaceName(l, space)))
+	out, _ := res.JSON.(ThreadsResult)
+	res.JSON = SpaceMoveResult{ThreadsResult: out, Rev: last.Rev, Changed: last.Changed}
+	return res, nil
 }

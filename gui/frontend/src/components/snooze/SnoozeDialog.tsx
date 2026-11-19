@@ -7,6 +7,7 @@ import { useNow } from "@/lib/clock";
 import { addDays, compareDays, dayOf, formatDay, monthGrid, monthTitle, parseTimeValue, sameDay, shiftMonth, SNOOZE_HOUR, wallTime, type Day } from "@/lib/snooze";
 import { cn } from "@/lib/utils";
 import { saveThreadForLater, snoozeThread } from "@/stores/threadActions";
+import { saveThreadsForLater, snoozeThreads } from "@/stores/bulkThreadActions";
 import { useThreadsStore } from "@/stores/threads";
 import { closeSnoozeDialog, useSnoozeDialogStore } from "@/stores/snoozeDialog";
 
@@ -108,19 +109,23 @@ function Calendar({ now, selected, onSelect }: { now: number; selected: Day; onS
  * saved says so instead), Cancel and Snooze. Snooze is disabled while the chosen time
  * is not in the future; it invokes thread.snooze with the absolute time (the daemon
  * confirms only mid-turn).
+ *
+ * With `ids` (several threads from the sidebar's selection) each is snoozed or saved by one
+ * thread.snooze --ids; Save for later is left out once one of them is saved already.
  */
-function SnoozeBody({ threadId }: { threadId: string }) {
+function SnoozeBody({ threadId, ids }: { threadId: string; ids: readonly string[] }) {
   const now = useNow(30_000);
   const [day, setDay] = useState<Day>(() => addDays(dayOf(Date.now()), 1));
   const [time, setTime] = useState(DEFAULT_TIME);
-  const saved = useThreadsStore((s) => (s.byId[threadId]?.savedAtMs ?? null) !== null);
+  const many = ids.length > 1;
+  const saved = useThreadsStore((s) => (many ? ids : [threadId]).some((id) => (s.byId[id]?.savedAtMs ?? null) !== null));
   const parsed = parseTimeValue(time);
   const untilMs = parsed ? wallTime(day, parsed.hour, parsed.minute) : null;
   const ready = untilMs !== null && untilMs > now;
   const submit = () => {
     if (!ready) return;
     closeSnoozeDialog();
-    void snoozeThread(threadId, untilMs);
+    void (many ? snoozeThreads(ids, untilMs) : snoozeThread(threadId, untilMs));
   };
   return (
     <form
@@ -150,7 +155,9 @@ function SnoozeBody({ threadId }: { threadId: string }) {
         </span>
       </div>
       <div className="flex items-center gap-2">
-        {saved ? (
+        {saved && many ? (
+          <span className="mr-auto" />
+        ) : saved ? (
           <span className="mr-auto text-caption text-cf-text-muted" data-testid="snooze-dialog-saved">
             Saved for later
           </span>
@@ -163,7 +170,7 @@ function SnoozeBody({ threadId }: { threadId: string }) {
             data-testid="snooze-dialog-save"
             onClick={() => {
               closeSnoozeDialog();
-              void saveThreadForLater(threadId);
+              void (many ? saveThreadsForLater(ids) : saveThreadForLater(threadId));
             }}
           >
             Save for later
@@ -184,6 +191,7 @@ function SnoozeBody({ threadId }: { threadId: string }) {
 export function SnoozeDialog() {
   const open = useSnoozeDialogStore((s) => s.open);
   const threadId = useSnoozeDialogStore((s) => s.threadId);
+  const ids = useSnoozeDialogStore((s) => s.ids);
   const seq = useSnoozeDialogStore((s) => s.seq);
   const name = useThreadsStore((s) => s.byId[threadId]?.name ?? "");
   return (
@@ -194,9 +202,9 @@ export function SnoozeDialog() {
       }}
     >
       <DialogContent className="max-w-[300px] p-4" data-testid="snooze-dialog" data-thread={threadId}>
-        <DialogTitle className="truncate">Snooze “{name || threadId}”</DialogTitle>
-        <DialogDescription className="sr-only">Pick the day and time the thread comes back to the list.</DialogDescription>
-        {open && <SnoozeBody key={seq} threadId={threadId} />}
+        <DialogTitle className="truncate">{ids.length > 1 ? `Snooze ${String(ids.length)} threads` : `Snooze “${name || threadId}”`}</DialogTitle>
+        <DialogDescription className="sr-only">Pick the day and time the {ids.length > 1 ? "threads come" : "thread comes"} back to the list.</DialogDescription>
+        {open && <SnoozeBody key={seq} threadId={threadId} ids={ids} />}
       </DialogContent>
     </Dialog>
   );

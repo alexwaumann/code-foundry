@@ -12,7 +12,8 @@ import { getUiContext } from "@/stores/context";
 import { useLayoutStore } from "@/stores/layout";
 import { requestPaneFocus } from "@/stores/shellView";
 import { afterRev, runLayoutCommand, type LayoutCommandResult } from "./commands";
-import { removeSpaceArgs, spaceAtIndex, type RemoveChoice, type SpaceCommand } from "./spaces";
+import { resolveStep, type DropStep } from "./drag/groupDrop";
+import { removeSpaceArgs, spaceAtIndex, type RemoveChoice } from "./spaces";
 
 /** The keyboard goes into the current space's focused pane. */
 function keyboardIntoFocusedPane(): void {
@@ -111,9 +112,16 @@ export async function removeSpace(id: string, choice: RemoveChoice): Promise<boo
   }
 }
 
-/** Runs a drop on a space tab (spaces.ts spaceDropCommands), one verb after the other; stops at a refusal. Resolves whether every verb ran. */
-export async function runSpaceDrop(cmds: readonly SpaceCommand[]): Promise<boolean> {
-  for (const c of cmds) {
+/**
+ * Runs a drop on a space tab (spaces.ts spaceDropCommands), one verb after the other; stops at a
+ * refusal. A step placed after a thread's tab (a dragged group's next thread, drag/groupDrop.ts)
+ * is placed from the layout the step before committed. Resolves whether every verb ran.
+ */
+export async function runSpaceDrop(cmds: readonly DropStep[]): Promise<boolean> {
+  for (const step of cmds) {
+    const s = useLayoutStore.getState();
+    const c = resolveStep(step, s, s.currentSpaceId);
+    if (!c) return false;
     const res = await runLayoutCommand(c.name, c.args);
     if (!res) return false;
     await afterRev(res.rev);
@@ -125,6 +133,8 @@ export async function runSpaceDrop(cmds: readonly SpaceCommand[]): Promise<boole
  * Runs a drop in the grid (a tab or pane moved, a thread opened), then the keyboard goes into the
  * pane the drop focused: the dragged tab's node, which had it, went with the move.
  */
-export async function runGridDrop(cmds: readonly SpaceCommand[]): Promise<void> {
-  if (await runSpaceDrop(cmds)) keyboardIntoFocusedPane();
+export async function runGridDrop(cmds: readonly DropStep[]): Promise<boolean> {
+  const ok = await runSpaceDrop(cmds);
+  if (ok) keyboardIntoFocusedPane();
+  return ok;
 }

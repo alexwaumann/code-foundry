@@ -1167,7 +1167,10 @@ verb in `settings.toml` is reported and dropped, never fatal.
   tag and counts, a bell and count among them for the shown notifications naming the thread, which
   the row's hover card lists with their buttons (`docs/notes/notifications-4-row-mark.md`). A click opens the thread's tab in the focused pane, or focuses it; a row
   drags into the grid or onto a space tab; its menu has Open ▸ (the thread's surfaces) and
-  Move to space ▸. A Needs-you row's hover card shows the whole ask (a permission's Allow and
+  Move to space ▸. Cmd- and shift-click select several rows (Finder's rules; window state in
+  `stores/sidebarSelection.ts`): a selected row's menu acts on all of them, each item one command
+  given `ids`, and a selected row drags the whole selection; the Archived and Snoozed headers take
+  a dragged row or selection (archive, save for later) (`docs/notes/sidebar-bulk-select.md`). A Needs-you row's hover card shows the whole ask (a permission's Allow and
   Deny once the request is known whole), its title opens a popup with the thread's
   conversation and today's ask card, and a pane too short for the card shows the ask as one
   line above the composer (`components/needs`, `docs/notes/shell-17-needs-you.md`). A thread

@@ -4,12 +4,14 @@ import { type ShellRow } from "@/lib/shellSections";
 import { cn } from "@/lib/utils";
 import { useEventsStore } from "@/stores/events";
 import { useThreadsStore } from "@/stores/threads";
+import { useShellDragStore } from "@/shell/drag/state";
 import { FOOTERS, type FooterSection, type Row } from "@/lib/tree";
 import { HEADER_HEIGHT, ONE_LINE_ROW, ROW_GAP, rowGap } from "../rowSizes";
 import { SidebarRow } from "../SidebarRow";
 import { useShellListRows } from "./listRows";
 import { DraftRowView, MainHeaderView, ShellQuietRowView, ShellThreadRowView } from "./ShellRows";
 import { ThreadListbox } from "./ThreadListbox";
+import type { ClickMods } from "./multiSelect";
 import { useEdges } from "./useEdges";
 import { edgeMask } from "../rail/railLook";
 
@@ -50,7 +52,7 @@ interface RowViewProps {
   row: ShellRow;
   selected: boolean;
   cursor: boolean;
-  onActivate: (row: ShellRow) => void;
+  onActivate: (row: ShellRow, mods?: ClickMods) => void;
 }
 
 function RowView({ row, selected, cursor, onActivate }: RowViewProps) {
@@ -69,7 +71,7 @@ interface PanelRowsProps {
   rows: readonly ShellRow[];
   selectedKey: string | null;
   cursorKey: string | null;
-  onActivate: (row: ShellRow) => void;
+  onActivate: (row: ShellRow, mods?: ClickMods) => void;
   scrollTo: RefObject<ScrollTo | null>;
   maxHeight?: number;
   gap: number;
@@ -143,6 +145,26 @@ export function PanelRows({ rows, selectedKey, cursorKey, onActivate, scrollTo, 
   );
 }
 
+/**
+ * A footer's header box. Archived's and Snoozed's are drop targets for a thread row's drag, alone
+ * or the dragged selection (ShellDnd hit-tests `data-drop-section`; docs/notes/sidebar-bulk-select.md):
+ * Archived archives, Snoozed saves for later. Lit while a drop there would act.
+ */
+function FooterHeaderBox({ section, children }: { section: FooterSection; children: React.ReactNode }) {
+  const target = section === "working" ? null : section;
+  const dropping = useShellDragStore((s) => target !== null && s.section === target);
+  return (
+    <div
+      className={cn("shrink-0 rounded-md border border-transparent", dropping && "border-cf-focus bg-cf-focus/15")}
+      style={{ height: HEADER_HEIGHT }}
+      data-drop-section={target ?? undefined}
+      data-drop-target={dropping || undefined}
+    >
+      {children}
+    </div>
+  );
+}
+
 export function ShellSidebarList({ bodyHeight }: { bodyHeight: number }) {
   const { rows, main, headers, footers } = useShellListRows();
   const scrollMain = useRef<ScrollTo>(null);
@@ -168,7 +190,7 @@ export function ShellSidebarList({ bodyHeight }: { bodyHeight: number }) {
   const loadError = streamError ?? listError;
   const emptyText = loaded ? null : loadError ? `Cannot list threads: ${loadError}. Retrying…` : "Loading…";
   return (
-    <ThreadListbox rows={rows} scrollToRow={scrollToRow} testId="thread-list">
+    <ThreadListbox rows={rows} scrollToRow={scrollToRow} testId="thread-list" multiSelect>
       {({ selectedKey, cursorKey, activate }) => {
         const footer = (section: FooterSection) => {
           const header = headers[section];
@@ -176,9 +198,9 @@ export function ShellSidebarList({ bodyHeight }: { bodyHeight: number }) {
           const cap = bodyHeight > 0 ? Math.max(0, Math.floor(bodyHeight * FOOTER_CAPS[section]) - HEADER_HEIGHT) : Number.POSITIVE_INFINITY;
           return (
             <div key={section} className="flex shrink-0 flex-col" data-testid={`sidebar-${section}`}>
-              <div className="shrink-0" style={{ height: HEADER_HEIGHT }}>
+              <FooterHeaderBox section={section}>
                 <SidebarRow row={header} selected={false} cursor={false} onActivate={activate} />
-              </div>
+              </FooterHeaderBox>
               <PanelRows
                 rows={footers[section]}
                 selectedKey={selectedKey}
