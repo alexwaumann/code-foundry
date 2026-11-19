@@ -65,8 +65,9 @@ and a thread's inline card (`InlineHtml`): `HtmlFrame.tsx`, `frameFiles.ts`, `fi
 - frame.js's test harness (`lib/cfFrameScript.test.ts`) passes its own `window`, `document`,
   `location` and `navigator`; jsdom's document is shared, so the cookie shim is deleted after
   each test.
-- The file mapping knows the `/preview/<grant>/` URL shape. If grants move to origins of their
-  own, `grantFiles` changes with them.
+- The file mapping knows the URL shapes: `/preview/<grant>/` on the path form, and since
+  `page-preview-serving.md` the whole path on a grant's own host (`<32 hex>.localhost`),
+  `/cf/` included (`grantFiles`).
 - No "Open in browser" action exists for a file yet (it would be a daemon verb); the messages
   say "open the file in a browser", which the File tab's Open in Finder reaches.
 

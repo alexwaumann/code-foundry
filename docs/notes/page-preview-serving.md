@@ -171,6 +171,38 @@ before.
 
 The GUI's strip has messages for the two new kinds (`previewGrant.ts` `UNSUPPORTED`).
 
+## With page-frame-states.md (rebased onto it)
+
+`page-frame-states.md` merged first and changed the same code: the frame's nonce moved from the
+fragment to the query (`?cf-nonce=`), and frame.js gained in-memory storage for opaque frames,
+the list of files a page loaded (the app watches them), the theme flag, `cf:reload` and early
+storage reports. How the two fit:
+
+- **The nonce, on both URL forms.** The GUI's `withNonce` puts it in the query of whatever URL
+  the daemon answered, so a grant's host gets `http://<grant>.localhost:<port>/x.html?cf-nonce=…`
+  and the page's fragment stays its own. `bridge.js`'s follow block reads the nonce from the
+  query and knows the page's own files by the grant's host (every path) or by the
+  `/preview/<grant>/` prefix, and carries the nonce on in the query either way. The folder
+  redirect keeps the query, so `./sub/?cf-nonce=…` keeps the bridge too.
+- **Watched files on a grant's host.** frame.js lists paths at its own origin. On a grant's
+  host those are rooted at the grant's folder (`/assets/index.css`), not under
+  `/preview/<grant>/`, so `grantFiles` maps every path there to a file under the scope.
+  `/cf/` paths included: a folder's own `cf/` is served ahead of the daemon's routes, and
+  watching one that does not exist costs a stat (and reloads the page if it appears). Without
+  this, nothing on a grant's host was watched.
+- **Theme detection** reads `/cf/theme.css` or `/cf/bridge.js` in that list; on a grant's
+  host a page asks for the same root-absolute paths, so it holds unchanged (a page's own
+  `cf/theme.css` counts as using the theme, which it most likely does).
+- **The storage shim** depends on the frame's sandbox (no `allow-same-origin`), not its URL:
+  a File tab's page on a grant's host is opaque as before and gets the shim; a thread's page
+  is same-origin on its grant's host and has real storage.
+- **One message listener.** frame.js answers the app's ping and `cf:reload` from its parent and
+  sends on its own frames' `cf:open` and `cf:unsupported`. What a frame inside the page reports
+  before the app's ping waits for the answer, as the page's own storage reports do (the
+  frame's load clears the strip in between); a frame inside the page is never pinged, so its
+  own storage reports go to the page at once.
+- `PageUnsupported` has every kind: `post`, `window` (this note) and `storage`.
+
 ## Not done
 
 - Findings 1, 2, 3, 10, 12 and 13 of the same report belong to the File tab.
@@ -190,7 +222,21 @@ folder redirect on home and temp trees, `contentType` charsets, `pagesHost` agai
 `loopbackHost`, `pagesHandler` on a grant's host, `PreviewFile`'s two URL forms fetched over a
 real listener, keyed grant ids (`TestGrantsWithKey`), `pagesKey` (made 0600, kept, replaced when
 malformed), the Floor guarding `pages.key`, and CORS and the tunnel refusing a grant's origin. Vitest: frame.js targets, `<base target>`, named frames, `window.open`,
-POST to self, the nested relay; bridge.js carrying the nonce on a grant's host.
+POST to self, the nested relay (and a frame's report held until the app's ping); bridge.js
+carrying the nonce in the query on a grant's host (Navigation API and click), none from an old
+fragment; frame.js's file list and theme flag on a grant's host; `grantFiles` and HtmlFrame
+watching a grant host's files. Go: the grant's host serves a request with the nonce in its
+query and keeps it through a folder's redirect.
+
+After the rebase onto `page-frame-states.md`, on a scratch dev daemon (fake `claude`) and the
+GUI in WebKit (drive-app): a hash-routed page in a File tab opened with an empty hash and
+`?cf-nonce=…`, and its `#/about` link showed that route; a Vite-style `dist/` mounted from
+`/assets/index.js` with its `/assets/index.css`, and editing that CSS reloaded it in place; a
+thread's inline card on its grant host answered `cf.run("thread.get")`, followed its link to
+`b.html` and answered there too (`?cf-nonce=…` carried); a File tab page using
+`localStorage` worked and the strip named it; editing a page's relative `style.css` reloaded
+it; a folder link without its slash landed on `sub/`, styled, and editing `sub.css` reloaded
+it.
 
 End to end on a scratch dev daemon and the GUI in WebKit (drive-app): a Vite-style
 `dist/index.html` mounts and is styled, and its `/about.html` link lands; a folder link is

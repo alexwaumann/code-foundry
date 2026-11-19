@@ -90,6 +90,8 @@ func TestHandlerGrantHost(t *testing.T) {
 		{"its root-absolute script", grant, "/assets/index.js", 200, "mount()", ""},
 		{"a folder without its slash", grant, "/sub", http.StatusMovedPermanently, "", "./sub/"},
 		{"the query kept", grant, "/sub?tab=2", http.StatusMovedPermanently, "", "./sub/?tab=2"},
+		{"the frame's nonce in the query", grant, "/assets/index.js?cf-nonce=0a1b", 200, "mount()", ""},
+		{"a folder keeps the frame's nonce", grant, "/sub?cf-page=1&cf-nonce=0a1b", http.StatusMovedPermanently, "", "./sub/?cf-page=1&cf-nonce=0a1b"},
 		{"a folder with its slash", grant, "/sub/", 200, "<h1>sub</h1>", ""},
 		{"its own cf folder wins", grant, "/cf/own.css", 200, "own", ""},
 		{"the daemon's /cf/ for what it lacks", grant, "/cf/theme.css", http.StatusTeapot, "missing", ""},
