@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { previewFile, type FilePreview } from "@/api/files";
 import { errorMessage, isAbort } from "@/api/stream";
 import { useHealthStore } from "@/stores/health";
+import { usePageAnswers } from "@/stores/pageAnswers";
 
 /** A page's height request, `{ type: "cf:resize", height }` (CSS px, positive); null for any other message. */
 export function resizeHeight(data: unknown): number | null {
@@ -121,8 +122,10 @@ export interface PreviewGrant {
  * Asks the daemon once per (baseDir, path) for a URL serving the file and what it may load
  * (FilesystemService.PreviewFile): `path` absolute, or relative to `baseDir`. Again when the
  * daemon restarts (its pid changes): grants die with it, and a frame reloading on a dead one
- * (a theme switch, an edit) would come back blank. The last grant stays until the new one
- * arrives, so a frame that is up does not flash.
+ * (a theme switch, an edit) would come back blank. Again when the user answers whether the
+ * page may use Code Foundry (stores/pageAnswers.ts), in this tab or another: the grant carries
+ * the answer (FilePreview.page). The last grant stays until the new one arrives, so a frame
+ * that is up does not flash.
  */
 export function usePreviewGrant(baseDir: string, path: string): PreviewGrant {
   const key = `${baseDir}\u0000${path}`;
@@ -132,6 +135,16 @@ export function usePreviewGrant(baseDir: string, path: string): PreviewGrant {
   const daemon = useHealthStore((s) => (s.status === "ok" ? (s.health?.pid ?? null) : null));
   const [epoch, setEpoch] = useState({ pid: daemon, n: 0 });
   if (daemon !== null && daemon !== epoch.pid) setEpoch({ pid: daemon, n: epoch.n + 1 });
+  const current = state.key === key ? state : null;
+  // An answer given for this page since its grant came asks again; one given before it does not.
+  const pagePath = current?.preview?.page?.path ?? "";
+  const answers = usePageAnswers((s) => (pagePath ? (s.byPath[pagePath] ?? 0) : 0));
+  const [seen, setSeen] = useState({ path: "", n: 0 });
+  if (pagePath !== seen.path) setSeen({ path: pagePath, n: answers });
+  else if (answers !== seen.n) {
+    setSeen({ path: pagePath, n: answers });
+    setAttempt(attempt + 1);
+  }
   useEffect(() => {
     const c = new AbortController();
     previewFile(baseDir, path, undefined, c.signal).then(
@@ -146,7 +159,6 @@ export function usePreviewGrant(baseDir: string, path: string): PreviewGrant {
       c.abort();
     };
   }, [baseDir, path, key, attempt, epoch.n]);
-  const current = state.key === key ? state : null;
   return {
     preview: current?.preview ?? null,
     error: current?.error ?? null,

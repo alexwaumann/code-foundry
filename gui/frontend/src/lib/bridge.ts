@@ -22,7 +22,10 @@
  * (`cf:resize` and `cf:theme:ack` predate the bridge: components/files/previewGrant.ts.)
  *
  * Host → page:
- * - `{ type: "cf:ready", cf: 1, thread: { id, name } | null, theme, readOnly, sources, storage }`
+ * - `{ type: "cf:ready", cf: 1, thread: { id, name } | null, theme, readOnly, sources, storage, can, refusal }`
+ *   (`can` and `refusal`: what the page may use whether or not it has a thread,
+ *   docs/notes/page-ownership-gui.md)
+ * - `{ type: "cf:asking", cf: 1 }`: the app holds cf:ready while it asks the user about the page
  * - `{ type: "cf:result", id, ok: true, result: { text, json } }`, or
  *   `{ type: "cf:result", id, ok: false, error: { code, message } }`; a fetch's ok result
  *   is `{ status, statusText, headers, body, url }`, whatever the status
@@ -207,6 +210,7 @@ export function fetchCall(url: string): string {
 
 /** Where a page's calls run: its thread, and the checkout that thread works in (its cwd). */
 export interface PagePlace {
+  /** "" for a page no thread owns. */
   threadId: string;
   /** The thread's worktree path ($HOME for a thread without a project); "" when unknown. */
   cwd: string;
@@ -230,8 +234,10 @@ export function fillPageArgs(args: Readonly<Record<string, string>>, specs: read
   const out = { ...args };
   for (const a of specs) {
     if (a.name in out) continue;
-    if (a.defaultToThreadEnv) out[a.name] = place.threadId;
-    else if (a.defaultToCwd && place.cwd) out[a.name] = place.cwd;
+    if (a.defaultToThreadEnv) {
+      // A page no thread owns sends none, as the CLI outside a thread does.
+      if (place.threadId) out[a.name] = place.threadId;
+    } else if (a.defaultToCwd && place.cwd) out[a.name] = place.cwd;
     else if (a.name === FOCUS_ARG && a.type === "bool" && a.defaultValue === "true") out[a.name] = "false";
   }
   return out;
@@ -255,29 +261,53 @@ export function jsonSafe(v: unknown): unknown {
 export interface ReadyMessage {
   type: "cf:ready";
   cf: 1;
+  /** The thread the page acts for; null for a page no thread owns (allowed or not). */
   thread: { id: string; name: string } | null;
   theme: PublishedTheme;
   readOnly: string[];
   sources: string[];
-  /** The thread's page storage: key → the value's JSON text. */
+  /** The page's storage: key → the value's JSON text (its thread's, or its own file's). */
   storage: Record<string, string>;
+  /**
+   * What the page may use, whether or not it has a thread (docs/notes/page-ownership-gui.md):
+   * a page no thread owns that the user allowed has storage and fetch with `thread` null.
+   * A page script from before this field reads storage and fetch as there iff `thread` is.
+   */
+  can: { storage: boolean; fetch: boolean };
+  /** Why the page may use nothing ("" when it may): every call it makes is refused with it. */
+  refusal: string;
 }
 
-export function readyMessage(
-  thread: { id: string; name: string } | null,
-  theme: PublishedTheme,
-  readOnly: readonly string[],
-  storage: Readonly<Record<string, string>> = {},
-): ReadyMessage {
+/**
+ * Whom a frame's bridge acts for: a thread (its own page), the page alone (no thread owns
+ * it and the user allowed it: storage and fetch keyed by its file, app-wide verbs and
+ * sources), or nobody, every call refused with `refusal`.
+ */
+export type ReadyAccess = { kind: "thread"; thread: { id: string; name: string } } | { kind: "page" } | { kind: "none"; refusal: string };
+
+export function readyMessage(access: ReadyAccess, theme: PublishedTheme, readOnly: readonly string[], storage: Readonly<Record<string, string>> = {}): ReadyMessage {
+  const some = access.kind !== "none";
   return {
     type: "cf:ready",
     cf: 1,
-    thread,
+    thread: access.kind === "thread" ? access.thread : null,
     theme,
-    readOnly: thread ? [...readOnly].sort() : [],
-    sources: thread ? [...BRIDGE_SOURCES] : [],
-    storage: thread ? { ...storage } : {},
+    readOnly: some ? [...readOnly].sort() : [],
+    sources: some ? [...BRIDGE_SOURCES] : [],
+    storage: some ? { ...storage } : {},
+    can: { storage: some, fetch: some },
+    refusal: access.kind === "none" ? access.refusal : "",
   };
+}
+
+/**
+ * The app holds `cf:ready` while it asks the user whether the page may use Code Foundry
+ * (docs/notes/page-ownership-gui.md): the page stops the clocks that wait for ready (cf.ready
+ * itself, a run's or a fetch's wait), so nothing times out while the user reads the question.
+ */
+export interface AskingMessage {
+  type: "cf:asking";
+  cf: 1;
 }
 
 /** A run waits on the user: its confirm dialog is open, or queued behind another. */
@@ -335,5 +365,18 @@ export interface EventMessage {
   event: unknown;
 }
 
-/** The refusal of a page with no owning thread (a File tab opened on an arbitrary HTML file). */
+/** The refusal of a page with no owning thread, from a daemon older than page ownership (a File tab opened on an arbitrary HTML file). */
 export const NO_THREAD: BridgeError = { code: "unavailable", message: "this page is not shown in a thread" };
+
+/** The refusal of a page no thread owns that the user did not allow (or has not yet). */
+export const NOT_ALLOWED: BridgeError = { code: "unavailable", message: "the user has not allowed this page to use Code Foundry" };
+
+/** The refusal of a file the daemon never gives a bridge (PageAccess.unavailable_reason). */
+export function pageUnavailable(reason: string): BridgeError {
+  return { code: "unavailable", message: reason ? `Code Foundry gives this page no bridge: ${reason}` : "Code Foundry gives this page no bridge" };
+}
+
+/** The refusal of a call that needs the page's thread, from a page no thread owns. */
+export function needsThread(call: string): BridgeError {
+  return { code: "unavailable", message: `this page has no thread (no thread showed or wrote it), and ${call} needs one` };
+}

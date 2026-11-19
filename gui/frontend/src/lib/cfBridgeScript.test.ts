@@ -414,7 +414,7 @@ describe("bridge.js", () => {
     expect(() => res.json()).toThrow(/a\.example's answer \(502\) is not JSON: <html>/);
   });
 
-  it("refuses a bad fetch as invalid without sending it, and a page with no thread as unavailable", async () => {
+  it("refuses a bad fetch as invalid without sending it, and a page given no fetch as unavailable", async () => {
     const h = load();
     h.ready();
     for (const [url, init] of [
@@ -567,6 +567,75 @@ describe("bridge.js", () => {
     error.mockRestore();
     h.send({ type: "cf:storage", values: { a: "1", c: "3" } });
     expect(s.get("a")).toBe(1);
+  });
+});
+
+describe("bridge.js: a page no thread owns (docs/notes/page-ownership-gui.md)", () => {
+  it("allowed: storage and fetch work with cf.thread null", async () => {
+    const h = load();
+    h.ready({ thread: null, storage: { visits: "2" }, can: { storage: true, fetch: true }, refusal: "" });
+    await h.cf.ready;
+    expect(h.cf.thread).toBeNull();
+    expect(h.cf.storage().get("visits")).toBe(2);
+    void h.cf.storage().set("visits", 3);
+    expect(h.sent("cf:store")).toHaveLength(1);
+    void h.cf.fetch("https://a.example/x");
+    await flush();
+    expect(h.sent("cf:fetch")).toHaveLength(1);
+  });
+
+  it("refused: storage and fetch say why, and never that the page should await cf.ready", async () => {
+    const why = "the user has not allowed this page to use Code Foundry";
+    const h = load();
+    h.ready({ thread: null, readOnly: [], sources: [], storage: {}, can: { storage: false, fetch: false }, refusal: why });
+    await h.cf.ready;
+    expect(() => h.cf.storage()).toThrow(`cf.storage: ${why}`);
+    await expect(h.cf.fetch("https://a.example/")).rejects.toMatchObject({ code: "unavailable", message: `cf.fetch: ${why}` });
+    expect(h.sent("cf:fetch")).toHaveLength(0);
+    // A subscription still goes to the app, which refuses it saying why (no "no source" here).
+    expect(() => h.cf.on("thread-list", () => {})).not.toThrow();
+    expect(h.sent("cf:on")).toHaveLength(1);
+  });
+
+  it("an app from before `can`: storage and fetch only with a thread, refused as not shown in one", async () => {
+    const h = load();
+    h.ready({ thread: null, sources: [] });
+    await h.cf.ready;
+    expect(() => h.cf.storage()).toThrow("cf.storage: this page is not shown in a thread");
+    const t = load();
+    t.ready();
+    await t.cf.ready;
+    expect(() => t.cf.storage()).not.toThrow();
+  });
+
+  it("cf:asking: cf.ready and a run wait for the user's answer however long it takes, then go on", async () => {
+    vi.useFakeTimers();
+    const h = load();
+    const run = h.cf.run("thread.get");
+    let settled = false;
+    void h.cf.ready.then(() => (settled = true));
+    h.send({ type: "cf:asking", cf: 1 });
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(settled).toBe(false);
+    expect(h.sent("cf:run")).toHaveLength(0);
+    // A run made while the user is asked waits too.
+    const later = h.cf.run("thread.get");
+    await vi.advanceTimersByTimeAsync(60_000);
+    h.ready({ thread: null, can: { storage: true, fetch: true }, refusal: "" });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(settled).toBe(true);
+    expect(h.sent("cf:run")).toHaveLength(2);
+    for (const m of h.sent("cf:run")) h.send({ type: "cf:result", id: m.id, ok: true, result: { text: "ok" } });
+    await expect(run).resolves.toMatchObject({ text: "ok" });
+    await expect(later).resolves.toMatchObject({ text: "ok" });
+  });
+
+  it("without cf:asking, cf.ready still gives up after 10 s", async () => {
+    vi.useFakeTimers();
+    const h = load();
+    const check = expect(h.cf.ready).rejects.toMatchObject({ code: "unavailable", message: "Code Foundry did not answer this page" });
+    await vi.advanceTimersByTimeAsync(10_001);
+    await check;
   });
 });
 

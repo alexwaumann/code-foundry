@@ -1,6 +1,7 @@
 import { FilesystemService, type ReadFileResponse } from "@/gen/codefoundry/v1/filesystem_pb";
 import { daemon, type DaemonConnection } from "./endpoint";
 import { orOutdatedDaemon } from "./errors";
+import { toPageAccessView, type PageAccessView } from "./page";
 import { PDF_MIME_TYPE } from "./threads";
 
 /**
@@ -233,6 +234,12 @@ export interface FilePreview {
   singleFile: boolean;
   /** The thread whose pages directory holds the file, so the page is that thread's own; "" for any other file (and from an older daemon). */
   pageThread: string;
+  /**
+   * Who owns the page and whether it may use the bridge (PreviewFileResponse.page,
+   * docs/notes/page-ownership-daemon.md); null from a daemon older than page ownership,
+   * whose frame keeps `pageThread` and the thread's log.
+   */
+  page: PageAccessView | null;
 }
 
 /**
@@ -245,7 +252,7 @@ export async function previewFile(baseDir: string, path: string, conn: DaemonCon
   try {
     const r = await c.previewFile({ baseDir, path }, { signal });
     const { baseUrl } = await conn.resolveEndpoint();
-    return { url: new URL(r.url, baseUrl).toString(), scope: r.scope, singleFile: r.singleFile, pageThread: r.pageThread };
+    return { url: new URL(r.url, baseUrl).toString(), scope: r.scope, singleFile: r.singleFile, pageThread: r.pageThread, page: toPageAccessView(r.page) };
   } catch (err) {
     throw orOutdatedDaemon(err);
   }

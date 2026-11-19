@@ -66,7 +66,9 @@ func TestScriptNamesTheContract(t *testing.T) {
 	want := []string{
 		`"cf:run"`, `"cf:on"`, `"cf:off"`, `"cf:resize"`, `"cf:theme:ack"`, `"cf:hello"`,
 		`"cf:ready"`, `"cf:result"`, `"cf:event"`, `"cf:theme"`,
-		`"cf:store"`, `"cf:storage"`, `"cf:cancel"`, `"cf:pending"`, `"cf:resume"`, `"cf:bye"`, `"cf:fetch"`, `"cf:key"`, "msg.nonce",
+		`"cf:store"`, `"cf:storage"`, `"cf:cancel"`, `"cf:pending"`, `"cf:resume"`, `"cf:bye"`, `"cf:fetch"`, `"cf:key"`, `"cf:asking"`, "msg.nonce",
+		// What cf:ready says a page may use whether or not it has a thread (docs/notes/page-ownership-gui.md).
+		"readyMsg.can", "readyMsg.refusal",
 		"var VERSION = 1;", "navigator.userActivation", "ResizeObserver", `"*"`,
 	}
 	for _, code := range ErrorCodes {
@@ -93,5 +95,28 @@ func TestScriptSources(t *testing.T) {
 	want := "var SOURCES = [" + strings.Join(quoted, ", ") + "];"
 	if !strings.Contains(string(Script()), want) {
 		t.Errorf("bridge.js does not contain %s", want)
+	}
+}
+
+// A page no thread owns: its errors say what is true (docs/notes/page-ownership-gui.md), and
+// "await cf.ready first" is said only before the app answered.
+func TestScriptRefusalsSayWhy(t *testing.T) {
+	src := string(Script())
+	for _, w := range []string{
+		`may("storage")`, `may("fetch")`, `denied("cf.storage")`, `denied("cf.fetch")`,
+		"this page is not shown in a thread",
+		"Code Foundry has not answered this page yet; await cf.ready first",
+	} {
+		if !strings.Contains(src, w) {
+			t.Errorf("bridge.js does not contain %s", w)
+		}
+	}
+	if n := strings.Count(src, "await cf.ready first"); n != 1 {
+		t.Errorf("bridge.js says \"await cf.ready first\" %d times; once, before cf:ready", n)
+	}
+	for _, gone := range []string{"needs the page's thread"} {
+		if strings.Contains(src, gone) {
+			t.Errorf("bridge.js still says %q: storage and fetch work without a thread", gone)
+		}
 	}
 }
