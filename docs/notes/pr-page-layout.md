@@ -10,7 +10,9 @@ the merge, review and diff components are unchanged and only render somewhere el
 - **Header** (`PrHeader.tsx`): the title with the ⋯ menu; one quiet line, `owner/repo #n · base
   ← head` (the branches truncate, tooltip only when cut); then the status section under a
   divider: the state's icon and words in its tone, quiet text after them, and the buttons at
-  the right (Review ▾, then the state's main action). The whole header has a wash of the state's
+  the right (Review ▾, then the state's main action). (Since pr-page-polish.md: `owner/repo #n`
+  with the ⋯ at the right end of the top line, the title, the branches on their own line, then
+  the status with no divider, packed closer.) The whole header has a wash of the state's
   tone (success, warning, the merged tone, error; none for a draft). The bottom border stays the
   divider colour. No state pill, no Open on GitHub button, no author, ages or diffstat.
 - **Words** (`readiness.ts` headline): Ready to merge, Waiting on checks, Not ready to merge,
@@ -70,7 +72,8 @@ the merge, review and diff components are unchanged and only render somewhere el
 - The status line's wrap: the words are `flex: 0 1 auto`, the buttons' box `flex: 1 1 auto`
   with `justify-content: end`. A flex item breaks to a new line by its content width, so the
   buttons move under the words only when they do not fit beside them, and on a line of their
-  own too narrow for both (280px) they wrap among themselves.
+  own too narrow for both (280px) they wrap among themselves. (Since pr-page-polish.md the
+  words grow 9999 times as fast, and wrapped buttons fill their line.)
 - A card's button under its text below 480px is `basis: calc(100% - 24px)` with its 24px
   margin; `basis-full` plus the margin overflowed the card by 24px.
 - Playwright's `toContainText` reads `textContent`, which includes `display: none` text; the

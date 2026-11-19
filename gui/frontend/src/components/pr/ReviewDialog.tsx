@@ -4,7 +4,7 @@ import type { PullRequestDetailView } from "@/api/gh";
 import { DictationMic, DictationNote } from "@/components/compose/DictationMic";
 import { useComposerDictation } from "@/components/compose/useComposerDictation";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { RadioGroup, RadioGroupChoice } from "@/components/ui/radio-group";
 import { Textarea } from "@/components/ui/textarea";
 import { Tip } from "@/components/ui/tooltip";
@@ -16,6 +16,7 @@ import { submitReview, usePrPanelStore } from "@/stores/prPanel";
 import { clearReviewDraft, closeReviewDialog, setReviewDraft, useReviewDialogStore, type ReviewDraft } from "@/stores/reviewDialog";
 import type { PrRef } from "@/surfaces/pullrequestTarget";
 import { composerKeyAction } from "./keys";
+import { PrDialogHeading } from "./PrDialogHeading";
 import { canSubmit, disabledVerdicts, OWN_PULL_REQUEST_NOTE, reviewHint, reviewVisible, VERDICT_SPECS, VERDICTS, type Verdict } from "./review";
 import { verdictIcons } from "./reviewIcons";
 import { statusPill } from "./tones";
@@ -42,10 +43,10 @@ const EMPTY: ReviewDraft = { verdict: "comment", text: "" };
 
 /**
  * The review dialog, one for the window (mounted in App), open for the pull request in
- * stores/reviewDialog.ts: the verdict's icon in its tone, "Review #N" over the pull
- * request's title, a segmented Comment | Approve | Request changes, a comment box, Cancel and
- * a confirm in the verdict's words and tone. On the viewer's own pull request Approve and
- * Request changes are off and one line says why. The comment box has the focus; cmd+Enter
+ * stores/reviewDialog.ts: the verdict's icon in its tone, "Review" over owner/repo #number
+ * and the pull request's title (PrDialogHeading), a segmented Comment | Approve | Request
+ * changes, a comment box, Cancel and a confirm in the verdict's words and tone. On the
+ * viewer's own pull request Approve and Request changes are off and one line says why. The comment box has the focus; cmd+Enter
  * submits, Escape cancels (stopping dictation first). Submitting shuts the dialog and runs
  * pr.review (submitReview), the Review button busy until the detail shows the review; the
  * text lives in the store's draft, so a refusal (toasted) loses nothing. It shuts by itself
@@ -186,19 +187,18 @@ function ReviewDialogBody({ prRef, detail, viewer }: { prRef: PrRef; detail: Pul
       }}
       onKeyDown={onKeyDown}
     >
-      <div className="flex items-center gap-3">
-        <span className={cn("flex size-8 shrink-0 items-center justify-center rounded-full", badge[verdict].className)} data-testid="pr-review-dialog-badge" aria-hidden>
-          <Badge className="size-4" />
-        </span>
-        <div className="flex min-w-0 flex-col">
-          <DialogTitle data-testid="pr-review-dialog-title">Review #{pr.number}</DialogTitle>
-          <Tip label={pr.title} whenTruncated>
-            <DialogDescription className="truncate" data-testid="pr-review-dialog-pr-title">
-              {pr.title}
-            </DialogDescription>
-          </Tip>
-        </div>
-      </div>
+      <PrDialogHeading
+        badge={
+          <span className={cn("flex size-8 shrink-0 items-center justify-center rounded-full", badge[verdict].className)} data-testid="pr-review-dialog-badge" aria-hidden>
+            <Badge className="size-4" />
+          </span>
+        }
+        heading="Review"
+        slug={prRef.slug}
+        number={prRef.number}
+        prTitle={pr.title}
+        testId="pr-review-dialog"
+      />
       <div className="mt-3 flex flex-col gap-1.5">
         <RadioGroup
           variant="segmented"

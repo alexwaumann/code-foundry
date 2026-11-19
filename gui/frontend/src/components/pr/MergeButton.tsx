@@ -121,6 +121,7 @@ export function MergeButton({ prRef, detail, note = null }: { prRef: PrRef; deta
         )}
       </SplitButton>
       <MergeDialog
+        prRef={prRef}
         open={dialogOpen && merging === null}
         onOpenChange={(open) => {
           if (!open) closeMergeDialog(dialogId);

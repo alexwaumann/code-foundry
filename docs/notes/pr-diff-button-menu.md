@@ -37,7 +37,8 @@ Reopen (#802), Copy branch name and a Link to thread submenu. Frontend only.
   an unticked thread runs `thread.pr.link` (`linkPullRequestToThread`); the row spins until the
   thread published by the daemon lists the link, then the menu closes. A failure frees the row.
   With no thread tab in the space the row is muted and the submenu says "No threads open in
-  this space".
+  this space". (Since pr-page-polish.md: the app's shared Radix submenu, its trigger disabled
+  when there is no thread tab; the two decisions below on the inline list are superseded.)
 
 ## Decisions
 

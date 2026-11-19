@@ -13,7 +13,8 @@ result of a user action.
   text colour). Before, a menu item merged at once, and the method became the default only after
   a merge succeeded. "Delete branch after merge" stays in the menu.
 - **The main part opens a merge dialog** (`components/pr/MergeDialog.tsx`), not the generic
-  confirm: the merge icon in a success-tinted circle, "<method label> #N" over the PR title, and
+  confirm: the merge icon in a success-tinted circle, "<method label> #N" over the PR title (since pr-page-polish.md: the method label alone, then
+  `owner/repo #N`, then the title), and
   rows Into (base, with what the method does on the right: `mergeOutcome`, "3 commits become 1"),
   From (head, wraps), Method (a segmented RadioGroup over the methods the repository allows; a
   change there is also the default), Branch (a checkbox, only when the branch can be deleted).

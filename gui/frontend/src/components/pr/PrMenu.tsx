@@ -1,4 +1,4 @@
-import { Check, ChevronRight, Ellipsis, Loader2 } from "lucide-react";
+import { Check, Ellipsis, Loader2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { PullRequestDetailView } from "@/api/gh";
 import {
@@ -8,6 +8,9 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuShortcut,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { FETCH_AGE } from "@/components/prs/format";
@@ -135,14 +138,13 @@ function LinkThreadRow({ threadId, prRef, linking, onLink }: { threadId: string;
 }
 
 /**
- * This pull request → Link to thread: a submenu of the threads open as tabs in the current
- * space, each by name, ticked when it links the pull request already (the readiness cards'
- * "Address in …" menus list exactly those threads, taskRouting.ts). It unfolds under its row
- * inside the menu (the row's chevron turns; ArrowRight unfolds, ArrowLeft folds), not as a
- * flyout: the menu sits in a pane, often at the window's edge, where a flyout has no room.
- * Picking an unticked thread links it (thread.pr.link) and keeps the menu open, its row
- * spinning, until the thread shows the link; then the menu closes (`onDone`). With no thread
- * tabs in the space the row is muted and the submenu says so in one line.
+ * This pull request → Link to thread: the app's shared submenu (DropdownMenuSub, as the
+ * pane's + menu and the thread info card use) listing the threads open as tabs in the
+ * current space, each by name, ticked when it links the pull request already (the readiness
+ * cards' "Address in …" menus list exactly those threads, taskRouting.ts). Picking an
+ * unticked thread links it (thread.pr.link) and keeps the menu open, its row spinning,
+ * until the thread shows the link; then the menu closes (`onDone`). With no thread tabs in
+ * the space the row is disabled and opens nothing. Keys and collisions are Radix's.
  */
 function LinkToThread({ prRef, onDone }: { prRef: PrRef; onDone: () => void }) {
   const threads = useSpaceThreads();
@@ -170,69 +172,26 @@ function LinkToThread({ prRef, onDone }: { prRef: PrRef; onDone: () => void }) {
       });
     });
   };
-  const none = threads.length === 0;
-  const [expanded, setExpanded] = useState(false);
-  const row = useRef<HTMLDivElement | null>(null);
   return (
-    <>
-      <DropdownMenuItem
-        ref={row}
-        data-testid="pr-menu-link"
-        aria-expanded={expanded}
-        aria-disabled={none || undefined}
-        className={cn(none && "text-cf-text-muted")}
-        onSelect={(e) => {
-          e.preventDefault();
-          setExpanded((v) => !v);
-        }}
-        onKeyDown={(e) => {
-          if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
-            e.preventDefault();
-            setExpanded(e.key === "ArrowRight");
-          }
-        }}
-      >
-        <Item title="Link to thread">
-          <ChevronRight className={cn("size-3.5 text-cf-text-muted", expanded && "rotate-90")} aria-hidden />
-        </Item>
-      </DropdownMenuItem>
-      {expanded && (
-        <div
-          role="group"
-          aria-label="Threads open in this space"
-          className="mb-1 ml-3.5 border-l border-cf-divider pl-1"
-          data-testid="pr-menu-link-threads"
-          onKeyDown={(e) => {
-            // ArrowLeft on a thread folds the list back into its row, which takes the focus.
-            if (e.key !== "ArrowLeft") return;
-            e.preventDefault();
-            row.current?.focus();
-            setExpanded(false);
-          }}
-        >
-          {none ? (
-            <p className="px-2 py-1.5 text-caption text-cf-text-muted" data-testid="pr-menu-link-none">
-              No threads open in this space
-            </p>
-          ) : (
-            <>
-              <DropdownMenuLabel>Threads open in this space</DropdownMenuLabel>
-              {threads.map((id) => (
-                <LinkThreadRow
-                  key={id}
-                  threadId={id}
-                  prRef={prRef}
-                  linking={linking === id}
-                  onLink={() => {
-                    link(id);
-                  }}
-                />
-              ))}
-            </>
-          )}
-        </div>
-      )}
-    </>
+    <DropdownMenuSub>
+      <DropdownMenuSubTrigger data-testid="pr-menu-link" disabled={threads.length === 0}>
+        <Item title="Link to thread" />
+      </DropdownMenuSubTrigger>
+      <DropdownMenuSubContent className={cn("w-64", POPUP_FIT)} data-testid="pr-menu-link-threads">
+        <DropdownMenuLabel>Threads open in this space</DropdownMenuLabel>
+        {threads.map((id) => (
+          <LinkThreadRow
+            key={id}
+            threadId={id}
+            prRef={prRef}
+            linking={linking === id}
+            onLink={() => {
+              link(id);
+            }}
+          />
+        ))}
+      </DropdownMenuSubContent>
+    </DropdownMenuSub>
   );
 }
 

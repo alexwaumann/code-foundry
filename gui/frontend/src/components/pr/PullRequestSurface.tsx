@@ -311,10 +311,11 @@ export function PullRequestSurface({ tabId, slug, number }: { tabId: string; slu
   }
   return (
     // @container: the header, tab bar and Overview adapt to the panel's width (group/pr: and
-    // to its height, data-short).
+    // to its height, data-short). grow: at least as tall as its scroll area (Overview's side
+    // column runs to the bottom).
     <div
       ref={shortRef}
-      className="group/pr @container flex min-w-0 flex-col"
+      className="group/pr @container flex min-w-0 grow flex-col"
       data-testid="pr-surface"
       data-pr={`${slug}#${String(number)}`}
       data-seeded={d ? undefined : ""}

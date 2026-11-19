@@ -3,11 +3,12 @@ import { useId } from "react";
 import type { MergeMethodView, PullRequestDetailView } from "@/api/gh";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { RadioGroup, RadioGroupChoice } from "@/components/ui/radio-group";
-import { Tip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import type { PrRef } from "@/surfaces/pullrequestTarget";
 import { MERGE_BUTTON_LABELS, MERGE_SHORT_LABELS, mergeOutcome } from "./merge";
+import { PrDialogHeading } from "./PrDialogHeading";
 
 /** The merge dialog's confirm: the merge button's success fill (SplitButton's tone). */
 const successButton = "bg-cf-success text-cf-success-foreground hover:bg-cf-success/90";
@@ -25,7 +26,8 @@ function Row({ label, children, testId }: { label: string; children: React.React
 /**
  * The merge button's question, asked before pr.merge runs and instead of the command's own
  * (mergePullRequest's `asked`): a calm dialog, the merge icon in the success tone, titled
- * with the method and the number over the pull request's title. Its rows say where it
+ * with the method alone, then owner/repo #number and the pull request's title
+ * (PrDialogHeading). Its rows say where it
  * merges (and what the method does to the commits), from which branch, how (the methods
  * the repository allows; a pick there is the repository's default at once, as in the
  * menu), and whether origin's branch goes (only when it can). `reason`, when set, is why
@@ -33,6 +35,7 @@ function Row({ label, children, testId }: { label: string; children: React.React
  * confirm is off. Confirm has the focus: Enter merges, Escape cancels.
  */
 export function MergeDialog({
+  prRef,
   open,
   onOpenChange,
   detail,
@@ -45,6 +48,7 @@ export function MergeDialog({
   reason,
   onConfirm,
 }: {
+  prRef: PrRef;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   detail: PullRequestDetailView;
@@ -62,21 +66,18 @@ export function MergeDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md p-5" data-testid="pr-merge-dialog">
-        <div className="flex items-center gap-3">
-          <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-cf-success-surface text-cf-success-text" aria-hidden>
-            <GitMerge className="size-4" />
-          </span>
-          <div className="flex min-w-0 flex-col">
-            <DialogTitle data-testid="pr-merge-dialog-title">
-              {MERGE_BUTTON_LABELS[method]} #{pr.number}
-            </DialogTitle>
-            <Tip label={pr.title} whenTruncated>
-              <DialogDescription className="truncate" data-testid="pr-merge-dialog-pr-title">
-                {pr.title}
-              </DialogDescription>
-            </Tip>
-          </div>
-        </div>
+        <PrDialogHeading
+          badge={
+            <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-cf-success-surface text-cf-success-text" aria-hidden>
+              <GitMerge className="size-4" />
+            </span>
+          }
+          heading={MERGE_BUTTON_LABELS[method]}
+          slug={prRef.slug}
+          number={prRef.number}
+          prTitle={pr.title}
+          testId="pr-merge-dialog"
+        />
         <div className="mt-3 divide-y divide-cf-border rounded-lg border border-cf-border" data-testid="pr-merge-dialog-summary">
           <Row label="Into" testId="pr-merge-dialog-into">
             <span className="min-w-0 truncate text-code">{pr.baseRef}</span>
