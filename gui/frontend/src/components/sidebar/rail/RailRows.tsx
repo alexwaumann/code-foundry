@@ -7,6 +7,7 @@ import type { DraftRow, ShellRow, ShellThreadRow } from "@/lib/shellSections";
 import { statusLine } from "@/lib/statusLine";
 import { cn } from "@/lib/utils";
 import { useThreadDrag } from "@/shell/drag/draggable";
+import { useThreadTilt, type Tilt } from "@/stores/arrivals";
 import { useNeedsStore } from "@/stores/needs";
 import { useThreadsStore } from "@/stores/threads";
 import { RowTooltipsEnabled } from "../rowTooltips";
@@ -30,9 +31,9 @@ interface RailRowProps<R> {
   onActivate: (row: ShellRow) => void;
 }
 
-function Glyph({ look }: { look: RailLook }) {
+function Glyph({ look, tilt }: { look: RailLook; tilt?: Tilt }) {
   const Icon = look.icon;
-  return <Icon className={cn("size-4 shrink-0", look.tone)} aria-hidden data-testid="rail-row-icon" data-kind={look.kind} />;
+  return <Icon className={cn("size-4 shrink-0", look.tone, tilt?.className)} ref={tilt?.place} aria-hidden data-testid="rail-row-icon" data-kind={look.kind} />;
 }
 
 /** The small pin on a pinned thread's icon, on its top right corner. */
@@ -55,6 +56,8 @@ const RailThreadRow = memo(function RailThreadRow({ row, selected, cursor, onAct
   const name = useThreadsStore((s) => s.byId[id]?.name ?? "");
   const { setNodeRef, listeners, describedBy, dragging } = useThreadDrag(id);
   const look = railThreadLook(row.section, line);
+  // The icon tilts once when the thread starts calling on the user (lib/arrivals.ts).
+  const tilt = useThreadTilt(id, look.icon);
   const body = (
     <div
       ref={setNodeRef}
@@ -74,7 +77,7 @@ const RailThreadRow = memo(function RailThreadRow({ row, selected, cursor, onAct
         onActivate(row);
       }}
     >
-      <Glyph look={look} />
+      <Glyph look={look} tilt={tilt} />
       <PinMark id={id} />
     </div>
   );

@@ -19,6 +19,7 @@ import { statusBadge, statusTimeAt, statusTimeUnits } from "@/lib/statusRegistry
 import { modelLabel } from "@/lib/threadRow";
 import type { HeaderRow, Row } from "@/lib/tree";
 import { useCreator, useLiveCount, useMadeByThread } from "@/stores/lineage";
+import { useThreadTilt } from "@/stores/arrivals";
 import { useThreadMark } from "@/stores/notifications";
 import { archiveThread, clearSnoozeEnded, renameThread } from "@/stores/threadActions";
 import { useThreadsStore } from "@/stores/threads";
@@ -118,19 +119,21 @@ function Elapsed({ at, className }: { at: number; className?: string }) {
  * for working, waiting and setting up a plain space and the time since the status changed in
  * the same tone; for an idle thread only the time since its last activity, muted. The word
  * is not shown (the hover card says it, docs/notes/sidebar-title-first.md); it stays for
- * screen readers. A woken snooze shows it ("Woke", StatusEntry.rowWord).
+ * screen readers. A woken snooze shows it ("Woke", StatusEntry.rowWord). Only the icon tilts when
+ * the thread starts calling on the user (lib/arrivals.ts), never the word.
  */
 export function RowStatus({ id }: { id: string }) {
   const line = useThreadsStore(useShallow((st) => statusLine(st.byId[id])));
   const at = useThreadsStore((st) => statusTimeAt(line, st.byId[id]));
   const badge = statusBadge(line);
   const Icon = badge.icon;
+  const { className: tiltClass, place: tiltPlace } = useThreadTilt(id, Icon);
   if (Icon === null) {
     return at === null ? null : <Elapsed at={at} className="text-caption-sm text-cf-sidebar-muted-foreground" />;
   }
   return (
     <span className={cn("flex min-w-0 items-center gap-[3px] text-caption-sm font-medium", badge.toneClass)} data-testid="row-status" data-kind={line.kind}>
-      <Icon className="size-3.5 shrink-0" aria-hidden data-testid="row-status-icon" />
+      <Icon className={cn("size-3.5 shrink-0", tiltClass)} ref={tiltPlace} aria-hidden data-testid="row-status-icon" />
       <span className={cn(!badge.rowWord && "sr-only")} data-testid="row-status-word">
         {badge.word}
       </span>

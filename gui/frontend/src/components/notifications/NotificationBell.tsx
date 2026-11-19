@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { useBellTilt } from "@/stores/arrivals";
 import { clearNotifications } from "@/stores/notificationActions";
 import { setBellOpen, useBellCount, useNotificationsStore, useShownNotificationIds } from "@/stores/notifications";
 import { NotificationItem } from "./NotificationCard";
@@ -39,6 +40,8 @@ export function NotificationBell() {
   const { count, urgent } = useBellCount();
   const open = useNotificationsStore((s) => s.open);
   const ids = useShownNotificationIds();
+  // Only the glyph tilts when a notification arrives (lib/arrivals.ts); the count stays still.
+  const { className: tiltClass, place: tiltPlace } = useBellTilt(Bell);
   const label = count === 0 ? "Notifications" : count === 1 ? "1 notification" : `${String(count)} notifications`;
   return (
     <Popover open={open} onOpenChange={setBellOpen}>
@@ -55,7 +58,7 @@ export function NotificationBell() {
             data-count={count}
             data-urgent={urgent || undefined}
           >
-            <Bell className={cn("size-4 shrink-0", urgent && "text-cf-text-secondary")} aria-hidden />
+            <Bell className={cn("size-4 shrink-0", urgent && "text-cf-text-secondary", tiltClass)} ref={tiltPlace} aria-hidden data-testid="notification-bell-icon" />
             {count > 0 && <span data-testid="notification-bell-count">{count}</span>}
           </button>
         </PopoverTrigger>

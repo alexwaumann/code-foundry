@@ -17,6 +17,7 @@ import { discardDraft } from "@/shell/drafts";
 import { runCommandForResult } from "@/stores/commands";
 import { spaceOfThread, useLayoutStore } from "@/stores/layout";
 import { useLiveCount } from "@/stores/lineage";
+import { useThreadTilt } from "@/stores/arrivals";
 import { useThreadMark } from "@/stores/notifications";
 import { useProjectsStore } from "@/stores/projects";
 import { NEEDS_SCOPE_KEY, useNeedsScope } from "@/stores/shellList";
@@ -175,13 +176,15 @@ function ThreadLines({ id, cursor }: { id: string; cursor: boolean }) {
 
 /**
  * What a Needs you thread asks: the status's icon and word in its tone ("Permission", "Question");
- * "N items", muted, when it has several open requests (its lines say which).
+ * "N items", muted, when it has several open requests (its lines say which). Only the icon tilts
+ * when the thread enters Needs you (lib/arrivals.ts), never the word.
  */
 function AskKind({ id }: { id: string }) {
   const line = useThreadsStore(useShallow((s) => statusLine(s.byId[id])));
   const count = useOpenRequests(id).length;
   const badge = statusBadge(line);
   const Icon = badge.icon;
+  const { className: tiltClass, place: tiltPlace } = useThreadTilt(id, Icon);
   if (count > 1) {
     return (
       <span className="ml-auto flex shrink-0 items-center pl-1.5 text-caption-sm text-cf-sidebar-muted-foreground tabular-nums" data-testid="row-ask" data-kind="items" data-count={count}>
@@ -191,7 +194,7 @@ function AskKind({ id }: { id: string }) {
   }
   return (
     <span className={cn("ml-auto flex shrink-0 items-center gap-1 pl-1.5 text-caption-sm font-medium", badge.toneClass)} data-testid="row-ask" data-kind={line.kind}>
-      {Icon && <Icon className="size-3.5 shrink-0" aria-hidden />}
+      {Icon && <Icon className={cn("size-3.5 shrink-0", tiltClass)} ref={tiltPlace} aria-hidden data-testid="row-ask-icon" />}
       {badge.word}
     </span>
   );

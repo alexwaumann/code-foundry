@@ -41,6 +41,7 @@ import { startViewSync } from "@/stores/views";
 import { startFileEditGuards } from "@/stores/fileEditGuards";
 import { startArchiveCleanup } from "@/stores/archiveCleanup";
 import { startWelcomeSync } from "@/stores/welcome";
+import { startArrivals } from "@/stores/arrivals";
 import { startDockAlerts } from "@/stores/dockAlerts";
 import { startUpdateSync } from "@/stores/update";
 import { startRecentFiles } from "@/stores/recentFiles";
@@ -79,6 +80,7 @@ function startApp(): () => void {
     startUpdateSync(),
     startMenuCommands(),
     startDockAlerts(),
+    startArrivals(),
     startRecentFiles(),
     startWindowFocus(),
   ];
