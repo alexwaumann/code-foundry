@@ -96,6 +96,15 @@ service GhService {
   // refuses (a pull request it could merge now is in "clean status": merge it instead).
   // The detail is invalidated and pull_request_detail_updated is sent.
   rpc SetPullRequestAutoMerge(SetPullRequestAutoMergeRequest) returns (SetPullRequestAutoMergeResponse) {}
+  // SetPullRequestClosed closes an open pull request without merging it (closed true,
+  // GitHub's closePullRequest; a draft is open) or reopens a closed, unmerged one
+  // (closed false, reopenPullRequest). FAILED_PRECONDITION when it is not in the state
+  // that allows it (closing one that is closed or merged; reopening one that is open or
+  // merged), after a fresh look; PERMISSION_DENIED when GitHub says the viewer may not
+  // (viewer_can_close / viewer_can_reopen); GitHub's other refusals are
+  // FAILED_PRECONDITION with its message. The detail is invalidated and
+  // pull_request_detail_updated is sent.
+  rpc SetPullRequestClosed(SetPullRequestClosedRequest) returns (SetPullRequestClosedResponse) {}
   // SetPullRequestCheckbox ticks or unticks one task-list item of a pull request's
   // description, any state the viewer may edit it in, merged and closed included
   // (updatePullRequest). The description is read fresh from GitHub first, and only that
@@ -689,6 +698,13 @@ message PullRequestDetail {
   // This is the cached copy, not current, and a fetch from GitHub is on its way;
   // pull_request_detail_updated says when it ended.
   bool refreshing = 29;
+  // GitHub's viewerCanClose: the viewer may close the pull request (its author, or
+  // triage access or more). GitHub reports it whatever the state, merged included;
+  // false when unknown.
+  bool viewer_can_close = 30;
+  // GitHub's viewerCanReopen: the pull request is closed, not merged, and the viewer
+  // may reopen it; false when unknown.
+  bool viewer_can_reopen = 31;
 }
 
 message PullRequestLabel {
@@ -875,6 +891,22 @@ message SetPullRequestDraftResponse {
   // Whether GitHub reports the pull request a draft afterwards.
   bool draft = 1;
   // What happened, for people ("Marked #12 ready for review").
+  string message = 2;
+}
+
+// ---- Close and reopen (SetPullRequestClosed) -----------------------------------------
+
+message SetPullRequestClosedRequest {
+  string repo_slug = 1;
+  int32 number = 2;
+  // true closes the pull request; false reopens it.
+  bool closed = 3;
+}
+
+message SetPullRequestClosedResponse {
+  // The state GitHub reports afterwards.
+  PullRequestState state = 1;
+  // What happened, for people ("Closed #12").
   string message = 2;
 }
 

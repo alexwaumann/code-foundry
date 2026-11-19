@@ -61,8 +61,14 @@ type FullPullRequest struct {
 	DefaultBranch string `json:"defaultBranch,omitempty"`
 	// ViewerPermission is GitHub's RepositoryPermission (ADMIN, MAINTAIN, WRITE, TRIAGE,
 	// READ); empty if unknown.
-	ViewerPermission string    `json:"viewerPermission,omitempty"`
-	FetchedAt        time.Time `json:"fetchedAt"`
+	ViewerPermission string `json:"viewerPermission,omitempty"`
+	// ViewerCanClose and ViewerCanReopen are GitHub's viewerCanClose and viewerCanReopen:
+	// the viewer may close it (the author, or triage access and up; GitHub reports it for
+	// any state, merged included) or reopen it (false unless it is closed and not
+	// merged). False for a row cached before they were fetched.
+	ViewerCanClose  bool      `json:"viewerCanClose,omitempty"`
+	ViewerCanReopen bool      `json:"viewerCanReopen,omitempty"`
+	FetchedAt       time.Time `json:"fetchedAt"`
 	// LastError is set when a refresh failed and this is the cached copy (FetchFailed),
 	// or when a page of checks beyond the first failed (ChecksTruncated).
 	LastError string `json:"-"`

@@ -225,6 +225,8 @@ func (g *fakeGitHub) respond(op, doc string, vars map[string]any) (json.RawMessa
 		g.bodyOp(op, vars, data, &errs) // fakegithub_checkbox_test.go
 	case "MarkReadyForReview", "ConvertToDraft", "EnableAutoMerge", "DisableAutoMerge":
 		g.stateOp(op, vars, data, &errs) // fakegithub_draft_test.go
+	case "ClosePullRequest", "ReopenPullRequest":
+		g.closeOp(op, vars, data, &errs) // fakegithub_close_test.go
 	case "AddPullRequestReview", "AddComment":
 		g.reviewOp(op, vars, data, &errs) // fakegithub_review_test.go
 	case "SearchRepositories", "LookupRepository":

@@ -55,7 +55,7 @@ type Deps struct {
 	// request to the calling thread, as pr.revert does with Thread).
 	GitOps command.GitOpsDeps
 	// Gh backs pr.revert, pr.merge, pr.review.request, pr.refresh, pr.review, pr.comment,
-	// pr.ready, pr.draft, pr.auto-merge and pr.checkbox (the pull request detail panel's
+	// pr.ready, pr.draft, pr.auto-merge, pr.checkbox, pr.close and pr.reopen (the pull request detail panel's
 	// actions), and reads the pull request for pr.ask, pr.explain and pr.fix.findings (which also use Project, Thread, GitOps.Backend and Emitter). Nil
 	// works like Terminal.
 	Gh command.GhBackend

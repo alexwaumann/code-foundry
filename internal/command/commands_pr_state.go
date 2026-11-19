@@ -13,16 +13,19 @@ import (
 
 // stateCommands are the pull request panel's direct state changes
 // (docs/notes/pr-daemon-actions.md): pr.ready and pr.draft (GhService.SetPullRequestDraft),
-// pr.auto-merge (GhService.SetPullRequestAutoMerge) and pr.checkbox
-// (commands_pr_checkbox.go). The daemon refuses what the pull request's state rules out
-// (not open, already so, auto-merge or the method disallowed) and relays GitHub's
-// refusals; these only shape the request.
+// pr.auto-merge (GhService.SetPullRequestAutoMerge), pr.checkbox
+// (commands_pr_checkbox.go), and pr.close and pr.reopen (commands_pr_close.go). The
+// daemon refuses what the pull request's state rules out (not open, already so,
+// auto-merge or the method disallowed) and relays GitHub's refusals; these only shape
+// the request.
 func stateCommands(b GhBackend, slug, number ArgSpec) []Command {
 	return []Command{
 		draftCommand(b, slug, number, false),
 		draftCommand(b, slug, number, true),
 		autoMergeCommand(b, slug, number),
 		checkboxCommand(b, slug, number),
+		closeCommand(b, slug, number, true),
+		closeCommand(b, slug, number, false),
 	}
 }
 

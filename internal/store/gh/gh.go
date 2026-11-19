@@ -94,6 +94,11 @@ type Service interface {
 	// request is not open, auto-merge is already so, the repository disallows it or the
 	// method, or GitHub refuses) (pr_draft.go).
 	SetPullRequestAutoMerge(ctx context.Context, slug string, number int, r AutoMergeChange) (AutoMergeResult, error)
+	// SetPullRequestClosed closes an open pull request (closed true) or reopens a closed,
+	// unmerged one (ErrFailedPrecondition when it is not in the state that allows it,
+	// ErrPermissionDenied when GitHub says the viewer may not; GitHub's refusals
+	// relayed) (pr_close.go).
+	SetPullRequestClosed(ctx context.Context, slug string, number int, closed bool) (ClosedResult, error)
 	// PullRequestDiff returns a pull request's unified diff, at most PullRequestDiffMax,
 	// cached per pull request and head commit (pr_files.go).
 	PullRequestDiff(ctx context.Context, slug string, number int, refresh bool) (PullRequestDiff, error)

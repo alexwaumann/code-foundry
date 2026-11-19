@@ -115,6 +115,8 @@ func fullPullRequestToProto(slug string, d *gh.FullPullRequest) *v1.PullRequestD
 		NodeId:                 d.PullRequest.ID,
 		ViewerCanUpdate:        d.ViewerCanUpdate(),
 		ViewerPermission:       strings.ToLower(d.ViewerPermission),
+		ViewerCanClose:         d.ViewerCanClose,
+		ViewerCanReopen:        d.ViewerCanReopen,
 		FetchedAt:              timestamp(d.FetchedAt),
 		LastError:              d.LastError,
 		FetchFailed:            d.FetchFailed,

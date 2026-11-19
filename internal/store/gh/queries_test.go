@@ -24,6 +24,8 @@ func TestQueriesAssemble(t *testing.T) {
 		queryConvertToDraft:        nil,
 		queryEnableAutoMerge:       nil,
 		queryDisableAutoMerge:      nil,
+		queryClosePullRequest:      nil,
+		queryReopenPullRequest:     nil,
 		queryPullRequestBody:       {"RateLimitFields"},
 		queryUpdatePullRequestBody: nil,
 		querySearchRepositories:    {"RateLimitFields", "RepositoryCard"},

@@ -45,7 +45,8 @@ function seedReviewers(pr: PullRequestView): PullRequestReviewerView[] {
 
 /**
  * A row as a detail with everything else empty, for the header and seedReadiness only. It
- * grants nothing: viewerCanUpdate is false, and no action is ever drawn from it.
+ * grants nothing: viewerCanUpdate, viewerCanClose and viewerCanReopen are false, and no action
+ * is ever drawn from it.
  */
 export function seedDetail(pr: PullRequestView): PullRequestDetailView {
   return {
@@ -74,6 +75,8 @@ export function seedDetail(pr: PullRequestView): PullRequestDetailView {
     autoMergeAllowed: false,
     defaultBranch: "",
     viewerPermission: "",
+    viewerCanClose: false,
+    viewerCanReopen: false,
     fetchedAtMs: null,
     lastError: "",
     fetchFailed: false,

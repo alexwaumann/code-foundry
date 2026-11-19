@@ -184,7 +184,7 @@ export async function refreshPullRequest(ref: PrRef): Promise<boolean> {
  * Resolves once no entry of the keys matching pred is loading (at once when nothing reads
  * them), or after timeoutMs.
  */
-function settled<V>(r: Resource<V>, pred: (key: string) => boolean, timeoutMs = 15_000): Promise<void> {
+export function settled<V>(r: Resource<V>, pred: (key: string) => boolean, timeoutMs = 15_000): Promise<void> {
   const idle = (entries: Readonly<Record<string, { loading: boolean }>>) => !Object.entries(entries).some(([k, e]) => e.loading && pred(k));
   if (idle(r.store.getState().entries)) return Promise.resolve();
   return new Promise((resolve) => {

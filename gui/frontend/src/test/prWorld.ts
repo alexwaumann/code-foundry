@@ -114,6 +114,8 @@ function detailBase(pr: PullRequestView, t0: number): PullRequestDetailView {
     autoMergeAllowed: true,
     defaultBranch: "main",
     viewerPermission: "admin",
+    viewerCanClose: true,
+    viewerCanReopen: pr.state === "closed",
     fetchedAtMs: t0 - 20_000,
     lastError: "",
     fetchFailed: false,
@@ -432,6 +434,8 @@ const titles: Record<string, string> = {
   "pr.draft": "Convert Pull Request to Draft",
   "pr.auto-merge": "Auto-merge Pull Request",
   "pr.checkbox": "Set Pull Request Task",
+  "pr.close": "Close Pull Request",
+  "pr.reopen": "Reopen Pull Request",
   "thread.pr.link": "Link Pull Request to Thread",
   "pr.task": "Hand Pull Request Task to Thread",
 };
@@ -763,6 +767,23 @@ class PrWorld {
       this.details.set(key(slug, n), { ...d, autoMergeEnabled: !off, autoMergeMethod: off ? null : method, fetchedAtMs: Date.now() });
       return { message: off ? `Auto-merge off for #${String(n)}` : `Auto-merge on for #${String(n)}`, resultJson: "" };
     });
+    // pr.close asks first; both refuse like the daemon (the state, then the viewer's permission).
+    for (const name of ["pr.close", "pr.reopen"]) {
+      h.set(name, async (inv) => {
+        const closing = name === "pr.close";
+        const [slug, n, d] = this.target(inv);
+        if (closing && !inv.confirmed) throw needsConfirm({ command: name, title: titles[name], message: `Close #${String(n)} “${d.pullRequest.title}” in ${slug} without merging it? It can be reopened later.` });
+        await this.gate(name);
+        const st = d.pullRequest.state;
+        if (closing && st !== "open") throw this.refuse(`pull request #${String(n)} is ${st}, not open`);
+        if (!closing && st === "merged") throw this.refuse(`pull request #${String(n)} is merged; a merged pull request cannot be reopened`);
+        if (!closing && st !== "closed") throw this.refuse(`pull request #${String(n)} is already open`);
+        if (!(closing ? d.viewerCanClose : d.viewerCanReopen)) throw new ConnectError(`GitHub does not let you ${closing ? "close" : "reopen"} pull request #${String(n)}`, Code.PermissionDenied);
+        const state = closing ? "closed" : "open";
+        this.details.set(key(slug, n), { ...d, pullRequest: { ...d.pullRequest, state }, viewerCanReopen: closing, fetchedAtMs: Date.now() });
+        return { message: `${closing ? "Closed" : "Reopened"} #${String(n)}`, resultJson: "" };
+      });
+    }
     h.set("thread.pr.link", () => OK);
     h.set("view.open.url", () => OK);
   }

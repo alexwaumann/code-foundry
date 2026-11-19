@@ -73,6 +73,9 @@ const (
 	// GhServiceSetPullRequestAutoMergeProcedure is the fully-qualified name of the GhService's
 	// SetPullRequestAutoMerge RPC.
 	GhServiceSetPullRequestAutoMergeProcedure = "/codefoundry.v1.GhService/SetPullRequestAutoMerge"
+	// GhServiceSetPullRequestClosedProcedure is the fully-qualified name of the GhService's
+	// SetPullRequestClosed RPC.
+	GhServiceSetPullRequestClosedProcedure = "/codefoundry.v1.GhService/SetPullRequestClosed"
 	// GhServiceSetPullRequestCheckboxProcedure is the fully-qualified name of the GhService's
 	// SetPullRequestCheckbox RPC.
 	GhServiceSetPullRequestCheckboxProcedure = "/codefoundry.v1.GhService/SetPullRequestCheckbox"
@@ -166,6 +169,15 @@ type GhServiceClient interface {
 	// refuses (a pull request it could merge now is in "clean status": merge it instead).
 	// The detail is invalidated and pull_request_detail_updated is sent.
 	SetPullRequestAutoMerge(context.Context, *connect.Request[v1.SetPullRequestAutoMergeRequest]) (*connect.Response[v1.SetPullRequestAutoMergeResponse], error)
+	// SetPullRequestClosed closes an open pull request without merging it (closed true,
+	// GitHub's closePullRequest; a draft is open) or reopens a closed, unmerged one
+	// (closed false, reopenPullRequest). FAILED_PRECONDITION when it is not in the state
+	// that allows it (closing one that is closed or merged; reopening one that is open or
+	// merged), after a fresh look; PERMISSION_DENIED when GitHub says the viewer may not
+	// (viewer_can_close / viewer_can_reopen); GitHub's other refusals are
+	// FAILED_PRECONDITION with its message. The detail is invalidated and
+	// pull_request_detail_updated is sent.
+	SetPullRequestClosed(context.Context, *connect.Request[v1.SetPullRequestClosedRequest]) (*connect.Response[v1.SetPullRequestClosedResponse], error)
 	// SetPullRequestCheckbox ticks or unticks one task-list item of a pull request's
 	// description, any state the viewer may edit it in, merged and closed included
 	// (updatePullRequest). The description is read fresh from GitHub first, and only that
@@ -287,6 +299,12 @@ func NewGhServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...c
 			connect.WithSchema(ghServiceMethods.ByName("SetPullRequestAutoMerge")),
 			connect.WithClientOptions(opts...),
 		),
+		setPullRequestClosed: connect.NewClient[v1.SetPullRequestClosedRequest, v1.SetPullRequestClosedResponse](
+			httpClient,
+			baseURL+GhServiceSetPullRequestClosedProcedure,
+			connect.WithSchema(ghServiceMethods.ByName("SetPullRequestClosed")),
+			connect.WithClientOptions(opts...),
+		),
 		setPullRequestCheckbox: connect.NewClient[v1.SetPullRequestCheckboxRequest, v1.SetPullRequestCheckboxResponse](
 			httpClient,
 			baseURL+GhServiceSetPullRequestCheckboxProcedure,
@@ -324,6 +342,7 @@ type ghServiceClient struct {
 	addPullRequestComment   *connect.Client[v1.AddPullRequestCommentRequest, v1.AddPullRequestCommentResponse]
 	setPullRequestDraft     *connect.Client[v1.SetPullRequestDraftRequest, v1.SetPullRequestDraftResponse]
 	setPullRequestAutoMerge *connect.Client[v1.SetPullRequestAutoMergeRequest, v1.SetPullRequestAutoMergeResponse]
+	setPullRequestClosed    *connect.Client[v1.SetPullRequestClosedRequest, v1.SetPullRequestClosedResponse]
 	setPullRequestCheckbox  *connect.Client[v1.SetPullRequestCheckboxRequest, v1.SetPullRequestCheckboxResponse]
 	getPullRequestDiff      *connect.Client[v1.GetPullRequestDiffRequest, v1.GetPullRequestDiffResponse]
 	getPullRequestFile      *connect.Client[v1.GetPullRequestFileRequest, v1.GetPullRequestFileResponse]
@@ -397,6 +416,11 @@ func (c *ghServiceClient) SetPullRequestDraft(ctx context.Context, req *connect.
 // SetPullRequestAutoMerge calls codefoundry.v1.GhService.SetPullRequestAutoMerge.
 func (c *ghServiceClient) SetPullRequestAutoMerge(ctx context.Context, req *connect.Request[v1.SetPullRequestAutoMergeRequest]) (*connect.Response[v1.SetPullRequestAutoMergeResponse], error) {
 	return c.setPullRequestAutoMerge.CallUnary(ctx, req)
+}
+
+// SetPullRequestClosed calls codefoundry.v1.GhService.SetPullRequestClosed.
+func (c *ghServiceClient) SetPullRequestClosed(ctx context.Context, req *connect.Request[v1.SetPullRequestClosedRequest]) (*connect.Response[v1.SetPullRequestClosedResponse], error) {
+	return c.setPullRequestClosed.CallUnary(ctx, req)
 }
 
 // SetPullRequestCheckbox calls codefoundry.v1.GhService.SetPullRequestCheckbox.
@@ -496,6 +520,15 @@ type GhServiceHandler interface {
 	// refuses (a pull request it could merge now is in "clean status": merge it instead).
 	// The detail is invalidated and pull_request_detail_updated is sent.
 	SetPullRequestAutoMerge(context.Context, *connect.Request[v1.SetPullRequestAutoMergeRequest]) (*connect.Response[v1.SetPullRequestAutoMergeResponse], error)
+	// SetPullRequestClosed closes an open pull request without merging it (closed true,
+	// GitHub's closePullRequest; a draft is open) or reopens a closed, unmerged one
+	// (closed false, reopenPullRequest). FAILED_PRECONDITION when it is not in the state
+	// that allows it (closing one that is closed or merged; reopening one that is open or
+	// merged), after a fresh look; PERMISSION_DENIED when GitHub says the viewer may not
+	// (viewer_can_close / viewer_can_reopen); GitHub's other refusals are
+	// FAILED_PRECONDITION with its message. The detail is invalidated and
+	// pull_request_detail_updated is sent.
+	SetPullRequestClosed(context.Context, *connect.Request[v1.SetPullRequestClosedRequest]) (*connect.Response[v1.SetPullRequestClosedResponse], error)
 	// SetPullRequestCheckbox ticks or unticks one task-list item of a pull request's
 	// description, any state the viewer may edit it in, merged and closed included
 	// (updatePullRequest). The description is read fresh from GitHub first, and only that
@@ -613,6 +646,12 @@ func NewGhServiceHandler(svc GhServiceHandler, opts ...connect.HandlerOption) (s
 		connect.WithSchema(ghServiceMethods.ByName("SetPullRequestAutoMerge")),
 		connect.WithHandlerOptions(opts...),
 	)
+	ghServiceSetPullRequestClosedHandler := connect.NewUnaryHandler(
+		GhServiceSetPullRequestClosedProcedure,
+		svc.SetPullRequestClosed,
+		connect.WithSchema(ghServiceMethods.ByName("SetPullRequestClosed")),
+		connect.WithHandlerOptions(opts...),
+	)
 	ghServiceSetPullRequestCheckboxHandler := connect.NewUnaryHandler(
 		GhServiceSetPullRequestCheckboxProcedure,
 		svc.SetPullRequestCheckbox,
@@ -661,6 +700,8 @@ func NewGhServiceHandler(svc GhServiceHandler, opts ...connect.HandlerOption) (s
 			ghServiceSetPullRequestDraftHandler.ServeHTTP(w, r)
 		case GhServiceSetPullRequestAutoMergeProcedure:
 			ghServiceSetPullRequestAutoMergeHandler.ServeHTTP(w, r)
+		case GhServiceSetPullRequestClosedProcedure:
+			ghServiceSetPullRequestClosedHandler.ServeHTTP(w, r)
 		case GhServiceSetPullRequestCheckboxProcedure:
 			ghServiceSetPullRequestCheckboxHandler.ServeHTTP(w, r)
 		case GhServiceGetPullRequestDiffProcedure:
@@ -730,6 +771,10 @@ func (UnimplementedGhServiceHandler) SetPullRequestDraft(context.Context, *conne
 
 func (UnimplementedGhServiceHandler) SetPullRequestAutoMerge(context.Context, *connect.Request[v1.SetPullRequestAutoMergeRequest]) (*connect.Response[v1.SetPullRequestAutoMergeResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.GhService.SetPullRequestAutoMerge is not implemented"))
+}
+
+func (UnimplementedGhServiceHandler) SetPullRequestClosed(context.Context, *connect.Request[v1.SetPullRequestClosedRequest]) (*connect.Response[v1.SetPullRequestClosedResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.GhService.SetPullRequestClosed is not implemented"))
 }
 
 func (UnimplementedGhServiceHandler) SetPullRequestCheckbox(context.Context, *connect.Request[v1.SetPullRequestCheckboxRequest]) (*connect.Response[v1.SetPullRequestCheckboxResponse], error) {

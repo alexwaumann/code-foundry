@@ -39,7 +39,8 @@ var pageDrives = []string{
 // pageState is the app's own state: a page runs it freely, or with its own Confirm.
 // settings.set, settings.reset, ember.enable and dictation.download ask a page in Run
 // (pageAsks); plugin.act asks for an event, and a button's command is its own class.
-// pr.ready and pr.draft write to GitHub, but they are reversible and run nothing.
+// pr.ready, pr.draft, pr.close (with its Confirm) and pr.reopen write to GitHub, but they
+// are reversible and run nothing.
 var pageState = []string{
 	"action.remove", "action.stop", "app.relaunch", "app.update", "app.update.check",
 	"composer.history", "composer.stage", "dictation.allow", "dictation.download",
@@ -48,7 +49,7 @@ var pageState = []string{
 	"file.find", "file.find.text", "file.save", "file.search", "file.search.next", "file.search.previous", "memory.clear", "memory.remove", "notifications.test",
 	"notification.clear", "notification.dismiss", "notification.post", "notification.snooze", "notification.withdraw",
 	"plugin.act", "plugin.browse", "plugin.disable", "plugin.reload", "plugin.restart",
-	"plugin.surface", "pr.draft", "pr.open", "pr.ready", "pr.refresh", "project.add",
+	"plugin.surface", "pr.close", "pr.draft", "pr.open", "pr.ready", "pr.refresh", "pr.reopen", "project.add",
 	"project.create", "project.files.include", "project.refresh", "project.rename", "project.unregister", "search.clear",
 	"search.find", "search.forget", "search.open", "search.open-hit", "search.promote",
 	"search.report", "search.seen", "search.stop", "settings.reset", "settings.reveal",

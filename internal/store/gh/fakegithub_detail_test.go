@@ -23,6 +23,8 @@ type fakeDetail struct {
 	state fakeState
 	// bodies is what description reads and writes did (fakegithub_checkbox_test.go).
 	bodies fakeBody
+	// close is who may close and reopen (fakegithub_close_test.go).
+	close fakeClose
 }
 
 func (g *fakeGitHub) refuseReverts(errType string) {
@@ -84,6 +86,7 @@ func (g *fakeGitHub) detailOp(op string, vars map[string]any, data map[string]an
 			repo["defaultBranchRef"] = map[string]any{"name": r.branch}
 		}
 		g.mergeSettings(repo)
+		g.closeSettings(p, repo)
 		data["repository"] = repo
 	case "ReviewerCandidates":
 		owner, name, number := vars["owner"].(string), vars["name"].(string), vars["number"].(int)
