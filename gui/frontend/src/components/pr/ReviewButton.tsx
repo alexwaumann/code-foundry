@@ -1,125 +1,75 @@
-import { ChevronDown, Eye, Loader2 } from "lucide-react";
-import { useRef, useState } from "react";
+import { Eye, Loader2 } from "lucide-react";
 import type { PullRequestDetailView } from "@/api/gh";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Tip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { pullRequestKey, useViewerLogin } from "@/stores/gh";
-import { usePrPanelStore } from "@/stores/prPanel";
+import { pullRequestDetailResource, pullRequestKey, useViewerLogin } from "@/stores/gh";
+import { useReviewingVerdict } from "@/stores/prPanel";
+import { draftVerdict, openReviewDialog } from "@/stores/reviewDialog";
 import type { PrRef } from "@/surfaces/pullrequestTarget";
-import { POPUP_COLLISION_PADDING, POPUP_FIT, stopPlainKeys, usePanelBoundary } from "./keys";
-import { Item } from "./PrMenu";
-import { disabledVerdicts, reviewVisible, VERDICT_SPECS, VERDICTS, YOUR_REVIEW_SPECS, yourReview, type Verdict } from "./review";
+import { disabledVerdicts, initialVerdict, reviewRequested, reviewVisible, VERDICT_SPECS, YOUR_REVIEW_SPECS, yourReview } from "./review";
 import { yourReviewIcon } from "./reviewIcons";
 import { toneBadge } from "./tones";
 
+const sizes = {
+  default: "h-7 gap-1 px-2 text-label",
+  sm: "h-6 gap-1 px-1.5 text-body-sm",
+} as const;
 
 /**
- * The readiness box's Review ▾, at its footer's left: a menu of Approve, Request changes and Comment.
- * Choosing one opens the surface's review composer with that verdict (onChoose); focus
- * goes there, not back to this button. On the viewer's own pull request Approve and
- * Request changes are disabled (GitHub refuses them), with the reason as a tooltip.
- * Once the viewer has reviewed, the button is a chip saying so ("You approved"), still
- * opening the menu: GitHub takes another review. `primary` (the viewer's review is
- * requested, again too) makes it the box's primary button, saying Review. Shown only on
- * open pull requests the viewer can write to (like the reviewer picker).
+ * The pull request's Review: pressing it opens the review dialog (ReviewDialog, one for the
+ * window) on the verdict initialVerdict picks. Once the viewer has reviewed, it is a chip
+ * saying so ("You approved"), which opens the dialog again on that verdict: GitHub takes
+ * another review. `primary` (the viewer's review is requested, again too) makes it the
+ * primary button, saying Review. While a review of this pull request is submitted it is
+ * busy in the verdict's words ("Approving…") and opens nothing. Shown only on open pull
+ * requests the viewer can write to or is asked to review (reviewVisible). `size` "sm" is
+ * the Diff tab's bar.
  */
-export function ReviewButton({ prRef, detail, onChoose, primary = false }: { prRef: PrRef; detail: PullRequestDetailView; onChoose: (v: Verdict) => void; primary?: boolean }) {
+export function ReviewButton({ prRef, detail, primary = false, size = "default" }: { prRef: PrRef; detail: PullRequestDetailView; primary?: boolean; size?: keyof typeof sizes }) {
   const viewer = useViewerLogin();
-  const busy = usePrPanelStore((s) => s.reviewing[pullRequestKey(prRef.slug, prRef.number)] ?? false);
-  const [open, setOpen] = useState(false);
-  // A review starting (here or on another surface showing this pull request) shuts the
-  // menu for good: the controlled `open && !busy` alone would leave `open` set, and the
-  // menu would pop back once the review settles. Derived during render (React's
-  // "adjusting state when a prop changes"), as an effect's setState trips the lint.
-  const [wasBusy, setWasBusy] = useState(busy);
-  if (busy !== wasBusy) {
-    setWasBusy(busy);
-    if (busy) setOpen(false);
-  }
-  const { ref, boundary } = usePanelBoundary();
-  // A chosen verdict hands focus to the composer, so the menu must not take it back.
-  const keepFocus = useRef(false);
+  const busy = useReviewingVerdict(prRef);
   if (!reviewVisible(detail, viewer)) return null;
   const mine = primary ? null : yourReview(detail.reviewers, viewer);
-  const disabled = disabledVerdicts(detail.pullRequest.author, viewer);
   const Icon = mine ? yourReviewIcon[mine] : Eye;
   return (
-    <DropdownMenu
-      modal={false}
-      open={open && !busy}
-      onOpenChange={(next) => {
-        // While a review is being submitted the menu stays shut (its composer is busy).
-        if (!next || !busy) setOpen(next);
-        if (next) keepFocus.current = false;
+    <button
+      type="button"
+      data-testid={mine ? "pr-your-review" : "pr-review-button"}
+      data-review={mine ?? undefined}
+      data-primary={primary || undefined}
+      data-size={size}
+      aria-haspopup="dialog"
+      aria-disabled={busy !== null || undefined}
+      aria-busy={busy !== null || undefined}
+      className={cn(
+        "flex shrink-0 items-center rounded-md border shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-cf-focus/60",
+        sizes[size],
+        busy !== null
+          ? "cursor-default bg-cf-canvas text-cf-text-muted dark:border-cf-input dark:bg-cf-input/30"
+          : mine
+            ? cn(toneBadge[YOUR_REVIEW_SPECS[mine].tone], "hover:brightness-110")
+            : primary
+              ? "border-transparent bg-cf-accent text-cf-accent-foreground hover:bg-cf-accent/90"
+              : "bg-cf-canvas hover:bg-cf-control-hover dark:border-cf-input dark:bg-cf-input/30 dark:hover:bg-cf-input/50",
+      )}
+      onClick={(e) => {
+        if (busy !== null) return;
+        openReviewDialog(prRef, initialVerdict(draftVerdict(prRef), mine, disabledVerdicts(detail.pullRequest.author, viewer)), e.currentTarget);
       }}
     >
-      <DropdownMenuTrigger asChild>
-        <button
-          ref={ref}
-          type="button"
-          data-testid={mine ? "pr-your-review" : "pr-review-button"}
-          data-review={mine ?? undefined}
-          data-primary={primary || undefined}
-          aria-disabled={busy || undefined}
-          aria-busy={busy || undefined}
-          className={cn(
-            "flex h-7 shrink-0 items-center gap-1 rounded-md border text-label shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-cf-focus/60",
-            mine
-              ? cn("px-2", toneBadge[YOUR_REVIEW_SPECS[mine].tone], "hover:brightness-110 aria-expanded:brightness-110")
-              : primary
-                ? "border-transparent bg-cf-accent pr-1.5 pl-2 text-cf-accent-foreground hover:bg-cf-accent/90 aria-expanded:bg-cf-accent/90"
-                : "bg-cf-canvas pr-1.5 pl-2 hover:bg-cf-control-hover aria-expanded:bg-cf-control-hover dark:border-cf-input dark:bg-cf-input/30 dark:hover:bg-cf-input/50 dark:aria-expanded:bg-cf-input/50",
-            busy && "cursor-default",
-          )}
-        >
-          {busy ? <Loader2 className="size-3.5 animate-spin" aria-hidden /> : <Icon className="size-3.5" aria-hidden />}
-          <span className="whitespace-nowrap">{mine ? YOUR_REVIEW_SPECS[mine].label : "Review"}</span>
-          {!mine && <ChevronDown className="size-3.5 opacity-70" aria-hidden />}
-        </button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent
-        align="start"
-        collisionBoundary={boundary}
-        collisionPadding={POPUP_COLLISION_PADDING}
-        className={cn("w-80", POPUP_FIT)}
-        data-testid="pr-review-menu"
-        onKeyDown={stopPlainKeys}
-        onCloseAutoFocus={(e) => {
-          if (!keepFocus.current) return;
-          keepFocus.current = false;
-          e.preventDefault();
-        }}
-      >
-        <DropdownMenuLabel>Review #{prRef.number}</DropdownMenuLabel>
-        {VERDICTS.map((v) => {
-          const spec = VERDICT_SPECS[v];
-          const reason = disabled[v];
-          const item = (
-            <DropdownMenuItem
-              key={v}
-              data-testid={`pr-review-${v}`}
-              disabled={reason !== undefined}
-              onSelect={() => {
-                keepFocus.current = true;
-                onChoose(v);
-              }}
-            >
-              <Item title={spec.title} hint={spec.hint} />
-            </DropdownMenuItem>
-          );
-          // Disabled: the reason hangs on a span around it (a disabled item gets no pointer events).
-          return reason === undefined ? (
-            item
-          ) : (
-            <Tip key={v} label={reason} side="left">
-              <span className="grid" data-testid={`pr-review-${v}-reason`}>
-                {item}
-              </span>
-            </Tip>
-          );
-        })}
-      </DropdownMenuContent>
-    </DropdownMenu>
+      {busy !== null ? <Loader2 className="size-3.5 animate-spin" aria-hidden /> : <Icon className="size-3.5" aria-hidden />}
+      <span className="whitespace-nowrap">{busy !== null ? VERDICT_SPECS[busy].busy : mine ? YOUR_REVIEW_SPECS[mine].label : "Review"}</span>
+    </button>
   );
+}
+
+/**
+ * The Diff tab's Review (PrDiffView's review slot): the same button for the pull request,
+ * smaller for the bar, once its detail is here; primary when the viewer's review is
+ * requested, as in the header.
+ */
+export function PrDiffReviewButton({ prRef }: { prRef: PrRef }) {
+  const viewer = useViewerLogin();
+  const detail = pullRequestDetailResource.store((s) => s.entries[pullRequestKey(prRef.slug, prRef.number)]?.data ?? null);
+  if (!detail) return null;
+  return <ReviewButton prRef={prRef} detail={detail} primary={reviewRequested(detail.reviewers, viewer)} size="sm" />;
 }

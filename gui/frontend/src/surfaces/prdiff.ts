@@ -1,6 +1,7 @@
 import { createElement } from "react";
 import { FileDiff } from "lucide-react";
 import { PrDiffView } from "@/components/diff/PrDiffView";
+import { PrDiffReviewButton } from "@/components/pr/ReviewButton";
 import { PR_DIFF_KIND, PR_DIFF_TITLE, prDiffOfTab } from "./prDiffTarget";
 import type { SurfaceSpec } from "./types";
 
@@ -17,7 +18,8 @@ export const prDiffSurface: SurfaceSpec = {
   available: () => "hidden",
   render: (tab) => {
     const target = prDiffOfTab(tab);
-    return target ? createElement(PrDiffView, { tabId: tab.id, target }) : null;
+    // The bar's Review: the pull request's own button, opening the same review dialog.
+    return target ? createElement(PrDiffView, { tabId: tab.id, target, review: createElement(PrDiffReviewButton, { prRef: { slug: target.slug, number: target.number } }) }) : null;
   },
   openDefault: () => null,
 };

@@ -114,7 +114,27 @@ describe("a pull request's diff tab", () => {
     expect(screen.getByTestId("file-diff-stub").getAttribute("data-name")).toBe("docs/notes/welcome-greeting.md");
     expect(diffTab()?.params.path).toBe("docs/notes/welcome-greeting.md");
     expect(diffTab()?.title).toBe("Diff #145");
-    expect(screen.queryByTestId("pr-diff-review-slot")).toBeNull();
+  });
+
+  it("the bar's Review is the pull request's: small, at the right end, opening the same review dialog, whose submit reviews that pull request", async () => {
+    await openDiff(139);
+    const slot = screen.getByTestId("pr-diff-review-slot");
+    const button = within(slot).getByTestId("pr-review-button");
+    expect(button.dataset.size).toBe("sm");
+    // #139 asks for the viewer's review, as the header's Review says.
+    expect(button.dataset.primary).toBe("true");
+    fireEvent.click(button);
+    await settle();
+    expect(screen.getByTestId("pr-review-dialog-title").textContent).toBe("Review #139");
+    expect(screen.getByTestId("pr-review-dialog").dataset.verdict).toBe("approve");
+    const input = screen.getByTestId("pr-review-dialog-input");
+    fireEvent.change(input, { target: { value: "Read the diff." } });
+    fireEvent.keyDown(input, { key: "Enter", metaKey: true });
+    await settle(3);
+    await vi.waitFor(() => {
+      expect(within(screen.getByTestId("pr-diff-review-slot")).getByTestId("pr-your-review").textContent).toBe("You approved");
+    });
+    expect(invocationsOf("pr.review").map((i) => i.args)).toEqual([{ "repo-slug": SLUG, number: "139", verdict: "approve", body: "Read the diff." }]);
   });
 
   it("a file picked in the column shows and is the tab's; a binary says so; Next steps on", async () => {

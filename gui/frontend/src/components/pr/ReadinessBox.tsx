@@ -42,7 +42,6 @@ import { TaskButton } from "./TaskButton";
 import { taskVerb, type TaskRouting } from "./taskRouting";
 import { useReadiness, useSeedReadiness } from "./useReadiness";
 import { useTaskRouting } from "./useTaskRouting";
-import type { Verdict } from "./review";
 import { toneText } from "./tones";
 
 const icons: Record<ReadyIcon, LucideIcon> = {
@@ -163,11 +162,11 @@ function MainActionButton({ f, d, prRef, panelKey }: { f: Readiness["footer"]; d
 }
 
 /**
- * The header's status section: the state in words, then Review ▾ and the state's main action.
+ * The header's status section: the state in words, then Review and the state's main action.
  * While a merge runs the words say "Merging into main…" in the state's tone; the detail
  * showing it merged turns them to Merged.
  */
-export function HeaderStatus({ r, d, prRef, panelKey, onReview }: { r: Readiness; d: PullRequestDetailView; prRef: PrRef; panelKey: string; onReview: (v: Verdict) => void }) {
+export function HeaderStatus({ r, d, prRef, panelKey }: { r: Readiness; d: PullRequestDetailView; prRef: PrRef; panelKey: string }) {
   const f = r.footer;
   const merging = useMergingMethod(prRef) !== null && d.pullRequest.state === "open";
   const headline = merging ? { ...r.headline, title: `Merging into ${d.pullRequest.baseRef || "the base branch"}…`, meta: "" } : r.headline;
@@ -177,7 +176,7 @@ export function HeaderStatus({ r, d, prRef, panelKey, onReview }: { r: Readiness
       buttons={
         (f.review || f.main) && (
           <div className="flex max-w-full min-w-0 flex-[1_1_auto] flex-wrap items-center justify-end gap-1.5" data-testid="pr-ready-footer">
-            {f.review && <ReviewButton prRef={prRef} detail={d} onChoose={onReview} primary={f.reviewPrimary} />}
+            {f.review && <ReviewButton prRef={prRef} detail={d} primary={f.reviewPrimary} />}
             <MainActionButton f={f} d={d} prRef={prRef} panelKey={panelKey} />
           </div>
         )

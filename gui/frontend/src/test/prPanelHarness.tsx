@@ -13,6 +13,7 @@
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { applyLayoutOp } from "@/api/layout";
 import { ConfirmDialog } from "@/components/confirm/ConfirmDialog";
+import { ReviewDialog } from "@/components/pr/ReviewDialog";
 import { Toaster } from "@/components/ui/sonner";
 import { useCommandsStore } from "@/stores/commands";
 import { useConfirmStore } from "@/stores/confirm";
@@ -24,6 +25,7 @@ import { usePrTasksStore } from "@/stores/prTasks";
 import { useReviewerRecentsStore } from "@/stores/reviewerRecents";
 import { useMergeDefaultsStore } from "@/stores/mergeDefaults";
 import { useMergeDialogStore } from "@/stores/mergeDialog";
+import { useReviewDialogStore } from "@/stores/reviewDialog";
 import { useUiStore, type Selection } from "@/stores/ui";
 import { useViewsStore } from "@/stores/views";
 import { layoutSettled, resetFakeLayout, threadSeed, type FakeLayoutState } from "./fakeLayout";
@@ -48,6 +50,7 @@ export async function resetPrStores(selection: Selection = PR_PAGE, seed?: FakeL
   usePrPanelStore.setState({ byTab: {}, refreshing: {}, requesting: {}, confirmed: {}, merging: {}, reviewing: {}, changing: {}, reverting: {}, taskChecks: {} });
   useMergeDefaultsStore.setState({ bySlug: {} });
   useMergeDialogStore.setState({ open: null });
+  useReviewDialogStore.setState({ open: null, drafts: {} });
   usePrThreadsStore.setState({ starting: {} });
   usePrTasksStore.setState({ running: {} });
   useReviewerRecentsStore.setState({ bySlug: {} });
@@ -64,6 +67,7 @@ export function renderPrPanel() {
     <>
       <ShellPanes />
       <ConfirmDialog />
+      <ReviewDialog />
       <Toaster theme="dark" />
     </>,
   );

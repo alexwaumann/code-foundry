@@ -41,8 +41,8 @@ interface PanelComposerTestIds {
 }
 
 /**
- * The inline composer under the PR header, shared by Ask a question (PrAskComposer) and
- * the review (PrReviewComposer): a label, a textarea of 3 rows growing to 6, then a hint,
+ * The inline composer under the PR header, Ask a question's (PrAskComposer; a review is
+ * the review dialog, ReviewDialog): a label, a textarea of 3 rows growing to 6, then a hint,
  * a quiet Cancel and the submit button.
  *
  * Keys (composerKeyAction): `submitKey` "enter" sends on Enter, "cmd-enter" only on

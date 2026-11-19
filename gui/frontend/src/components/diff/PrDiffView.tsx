@@ -82,9 +82,10 @@ function Bar({ base, head, files, review }: { base: string; head: string; files:
       <span className="flex shrink-0 items-center gap-1.5">
         {files}
         <StyleSwitch />
-        {/* The Review slot: a later change puts the pull request's Review button here, at the bar's right end. */}
+        {/* The Review slot: the pull request's Review button (surfaces/prdiff.ts), at the bar's right
+            end; hidden while it draws nothing (no detail yet, read-only, merged), so no gap is left. */}
         {review && (
-          <span className="flex items-center" data-testid="pr-diff-review-slot">
+          <span className="flex items-center empty:hidden" data-testid="pr-diff-review-slot">
             {review}
           </span>
         )}

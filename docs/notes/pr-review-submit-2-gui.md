@@ -1,5 +1,8 @@
 # Pull request reviews and comments, 2: GUI
 
+The menu and inline composer described here were replaced by the review dialog
+(`docs/notes/pr-review-dialog.md`); pr.review, its args and its errors are unchanged.
+
 Status: Review ▾ in the PR panel header, the inline review composer, the "You approved"
 chip, the mock daemon's review and comment writes, unit and e2e tests. `make check` is
 green; `pr-panel.spec.ts` passes in WebKit and Chromium (31 each). Stacked on
