@@ -1,7 +1,8 @@
 /**
- * The PR Code tab's model (docs/notes/file-viewer-5-pr-code-tab.md): GitHub's unified diff
- * parsed into the library's per-file metadata, the file list's rows, and the old side of a
- * file rebuilt from its head copy for hunk expansion.
+ * A pull request diff's model (the diff tab's, docs/notes/pr-diff-tab.md; first the Code
+ * tab's, docs/notes/file-viewer-5-pr-code-tab.md): GitHub's unified diff parsed into the
+ * library's per-file metadata, the file list's rows, and the old side of a file rebuilt from
+ * its head copy for hunk expansion.
  */
 import { parsePatchFiles, SPLIT_WITH_NEWLINES, type FileDiffContentsLoader, type FileDiffLoadedFiles, type FileDiffMetadata } from "@pierre/diffs";
 import type { PullRequestFileView } from "@/api/prDiff";

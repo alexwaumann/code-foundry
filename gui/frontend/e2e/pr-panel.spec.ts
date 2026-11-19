@@ -142,9 +142,8 @@ test("the header and the cards fit from 320 to 1000px in every state: nothing ov
   }
 });
 
-test("the status line: the buttons share it when they fit and wrap to their own line, still at the right, when not; the Code tab keeps the header", async ({ page }) => {
+test("the status line: the buttons share it when they fit and wrap to their own line, still at the right, when not", async ({ page }) => {
   await openPrBesideThread(page, "s-3", 142);
-  await page.getByTestId("pr-tab-code").click();
   for (const [width, oneLine] of [
     [560, true],
     [320, false],
@@ -154,9 +153,6 @@ test("the status line: the buttons share it when they fit and wrap to their own 
     const words = await boxOf(page, "pr-ready-headline");
     const foot = await boxOf(page, "pr-ready-footer");
     expect(foot.y < words.y + words.height).toBe(oneLine);
-    // The diff (the strip down to the pane's foot) keeps most of the pane.
-    const pane = await boxOf(page, PANE);
-    expect(pane.y + pane.height - (await boxOf(page, "pr-code-strip")).y).toBeGreaterThan(pane.height / 2);
   }
 });
 
@@ -188,15 +184,18 @@ test("a pane under 480px tall tightens the header", async ({ page }) => {
 });
 
 // Timeline's entries, order, commit links and inner tabs per panel tab: src/components/pr/PullRequestSurface.test.tsx ("Timeline").
-test("Timeline at the default 420px: the counts end before the order toggle; the rail stops at the last entry's icon", async ({ page }) => {
-  await openPrBesidePage(page, 145, 420);
+test("Timeline: from 640px the counts end before the order toggle, which ends before the Diff button; the rail stops at the last entry's icon", async ({ page }) => {
+  await openPrBesidePage(page, 145, 660);
   await page.getByTestId("pr-tab-activity").click();
   const entries = page.getByTestId("pr-timeline-entry");
   await expect(entries).toHaveCount(10);
-  // The counts' text fits their box, and that box ends before the toggle (its icon).
+  // The counts' text fits their box, and that box ends before the toggle, which ends before Diff.
   expect(await overflowX(page, "pr-timeline-counts")).toBeLessThanOrEqual(0);
   const counts = await boxOf(page, "pr-timeline-counts");
-  expect(counts.x + counts.width).toBeLessThanOrEqual((await boxOf(page, "pr-timeline-order")).x);
+  const order = await boxOf(page, "pr-timeline-order");
+  expect(counts.x + counts.width).toBeLessThanOrEqual(order.x);
+  expect(order.x + order.width).toBeLessThanOrEqual((await boxOf(page, "pr-diff-button")).x);
+  expect(await overflowX(page, "pr-inner-bar")).toBeLessThanOrEqual(0);
   const lastBox = await entries.last().boundingBox();
   const railBox = await entries.last().getByTestId("pr-timeline-rail").boundingBox();
   expect(railBox && lastBox && railBox.y + railBox.height).toBeLessThanOrEqual((lastBox?.y ?? 0) + 25);
@@ -241,12 +240,38 @@ test("reviewer picker (screenshots)", async ({ page }) => {
   await shot(page, "reviewer-search-tokens-requested");
 });
 
-test("an unlinked pull request tab keeps its Code tab across a resize of its pane", async ({ page }) => {
+test("an unlinked pull request tab keeps its inner tab across a resize of its pane", async ({ page }) => {
   await openPrBesidePage(page, 145);
-  await page.getByTestId("pr-tab-code").click();
-  await expect(page.getByTestId("pr-tab-code")).toHaveAttribute("aria-selected", "true");
+  await page.getByTestId("pr-tab-activity").click();
+  await expect(page.getByTestId("pr-tab-activity")).toHaveAttribute("aria-selected", "true");
   await sizePane(page, PR_PANE, 500);
-  await expect(page.getByTestId("pr-tab-code")).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByTestId("pr-tab-activity")).toHaveAttribute("aria-selected", "true");
+});
+
+// What the button reads and which function it calls: src/components/pr/DiffButton.test.tsx.
+test("the Diff button gives way: its file count goes under 480px of surface, its counts under 360px; the bar never overflows", async ({ page }) => {
+  await openPrBesidePage(page, 145, 760);
+  const files = page.getByTestId("pr-diff-button-files");
+  const lines = page.getByTestId("pr-diff-button-lines");
+  for (const [width, showFiles, showLines] of [
+    [760, true, true],
+    [482, true, true],
+    [478, false, true],
+    [362, false, true],
+    [358, false, false],
+    [280, false, false],
+  ] as const) {
+    await sizePane(page, PR_PANE, width);
+    const surface = await boxOf(page, "pr-surface");
+    expect(Math.abs(surface.width - width)).toBeLessThanOrEqual(2);
+    await expect(files).toBeVisible({ visible: showFiles });
+    await expect(lines).toBeVisible({ visible: showLines });
+    for (const tab of ["pr-tab-activity", "pr-tab-overview"]) {
+      await page.getByTestId(tab).click();
+      expect(await overflowX(page, "pr-inner-bar")).toBeLessThanOrEqual(0);
+      expect(inside(await boxOf(page, "pr-diff-button"), await boxOf(page, "pr-inner-bar"))).toBe(true);
+    }
+  }
 });
 
 // The menu's items, Refresh (and a failed one), Open on GitHub and Copy link: src/components/pr/PullRequestSurface.test.tsx ("the ⋯ menu").
@@ -674,3 +699,51 @@ test("Review on #139 sits left of Auto-merge in the header; its menu stays insid
 // review composer closes when the pull request stops taking reviews (merged meanwhile)": src/components/pr/PullRequestSurface.test.tsx
 // ("Review ▾"). The same text getting the same answer for 2 minutes is the daemon's
 // (internal/store/gh/pr_review_test.go).
+
+/** A screenshot of the pull request's pane only (SHOTS), once popovers have faded in. */
+async function paneShot(page: Page, name: string): Promise<void> {
+  if (!shots) return;
+  await page.waitForFunction(() => document.getAnimations().every((a) => a.playState !== "running" || a.effect?.getTiming().iterations === Infinity));
+  const b = await paneOf(page, PR_PANE).boundingBox();
+  if (!b) throw new Error("no pane");
+  await page.screenshot({ path: `${shots}/${name}.png`, clip: { x: b.x, y: b.y, width: b.width, height: Math.min(b.height, 620) } });
+}
+
+// The rows, ticks and command of Link to thread: src/components/pr/PullRequestSurface.test.tsx ("draft and links").
+for (const scheme of ["dark", "light"] as const) {
+  test(`the tab row's Diff button, the ⋯ menu and Link to thread (screenshots, ${scheme})`, async ({ page }) => {
+    test.skip(!shots, "SHOTS=<dir> only: the screenshots are all it adds");
+    await page.emulateMedia({ colorScheme: scheme });
+    await page.setViewportSize({ width: 1400, height: 900 });
+    // Two thread tabs in this space, beside #142's tab.
+    await openLayout(page, rowNode([paneNode("p-1", [threadTab("s-1"), threadTab("s-3")]), paneNode(PR_PANE, [prTab(142)])], [0.45, 0.55]), PR_PANE);
+    await expect(page.getByTestId("pr-surface")).toHaveAttribute("data-pr", `${SLUG}#142`);
+    for (const [name, width] of [
+      ["wide", 760],
+      ["narrow", 420],
+      ["narrowest", 340],
+    ] as const) {
+      await sizePane(page, PR_PANE, width);
+      await paneShot(page, `after-tabrow-${name}-${scheme}`);
+    }
+    await sizePane(page, PR_PANE, 480);
+    await page.getByTestId("pr-menu-button").click();
+    await expect(page.getByTestId("pr-menu")).toBeVisible();
+    await paneShot(page, `after-menu-open-${scheme}`);
+    await page.getByTestId("pr-menu-link").click();
+    await expect(page.getByTestId("pr-menu-link-threads")).toBeVisible();
+    await paneShot(page, `after-link-submenu-${scheme}`);
+    // Linking s-1 closes the menu once the thread shows the link; reopened, it is ticked.
+    await page.getByTestId("pr-menu-link-thread").first().click();
+    await expect(page.getByTestId("pr-menu")).toBeHidden();
+    await page.getByTestId("pr-menu-button").click();
+    await page.getByTestId("pr-menu-link").click();
+    await expect(page.getByTestId("pr-menu-link-thread").first()).toHaveAttribute("data-linked", "true");
+    await paneShot(page, `after-link-submenu-linked-${scheme}`);
+    await page.keyboard.press("Escape");
+    await showPr(page, 131);
+    await page.getByTestId("pr-menu-button").click();
+    await expect(page.getByTestId("pr-menu-reopen")).toBeVisible();
+    await paneShot(page, `after-menu-closed-${scheme}`);
+  });
+}

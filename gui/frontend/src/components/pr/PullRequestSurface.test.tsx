@@ -2,6 +2,7 @@ import { act, cleanup, fireEvent, screen, within } from "@testing-library/react"
 import { dismissNotice } from "@/lib/notify";
 import { afterEach, beforeEach, describe, expect, vi } from "vitest";
 import { bodyDone, it, trackTests } from "@/test/isolate";
+import type { PullRequestDetailView } from "@/api/gh";
 import type { Selection } from "@/stores/ui";
 
 vi.mock("@/api/command", async (orig) => ({ ...(await orig<typeof import("@/api/command")>()), ...(await import("@/test/daemonFakes")).commandFakes }));
@@ -10,7 +11,7 @@ const copyText = vi.hoisted(() => vi.fn(() => Promise.resolve()));
 vi.mock("@/lib/clipboard", () => ({ copyText }));
 vi.mock("@/api/layout", async (orig) => (await import("@/test/fakeLayout")).fakeLayoutApi(await orig()));
 
-const { invocationsOf, resetDaemon } = await import("@/test/daemonFakes");
+const { daemon, invocationsOf, refuse, resetDaemon } = await import("@/test/daemonFakes");
 const { HEAD_142, seedPrWorld, SLUG } = await import("@/test/prWorld");
 const { closePrTab, openPr, pick, press, prTabs, renderPrPanel, resetPrStores, selectPrTab, settle, texts, toastTexts, PR_PAGE } = await import("@/test/prPanelHarness");
 const { seedWorld, CF } = await import("@/test/projectsWorld");
@@ -190,6 +191,47 @@ describe("Overview", () => {
   });
 });
 
+describe("the inner tab row", () => {
+  it("Overview | Activity, then the Diff button alone at the right end with the files and lines; it opens the diff beside the pull request's tab, and again shows that one", async () => {
+    renderPrPanel();
+    await openPr(142);
+    const bar = byTestId("pr-inner-bar");
+    expect(within(bar).getAllByRole("tab").map((t) => t.textContent)).toEqual(["Overview", "Activity"]);
+    const pr = world.detail(142)?.pullRequest;
+    if (!pr) throw new Error("no #142");
+    const button = byTestId("pr-diff-button");
+    expect(button.textContent).toBe(`Diff${String(pr.changedFiles)} files+${pr.additions.toLocaleString()} −${pr.deletions.toLocaleString()}`);
+    expect(children("pr-inner-bar-end")).toEqual([button]);
+    // The page's one diffstat.
+    expect(byTestId("pr-surface").textContent.match(/ files/g)).toHaveLength(1);
+
+    fireEvent.click(button);
+    await act(async () => {
+      await layoutSettled();
+    });
+    const strip = () => screen.queryAllByTestId("shell-tab").map((t) => t.dataset.kind);
+    expect(strip()).toEqual(["pullrequest", "prdiff"]);
+    await selectPrTab("#142");
+    fireEvent.click(byTestId("pr-diff-button"));
+    await act(async () => {
+      await layoutSettled();
+    });
+    expect(strip()).toEqual(["pullrequest", "prdiff"]);
+  });
+
+  it("a tab left on the Code tab (gone) shows Overview", async () => {
+    renderPrPanel();
+    await openPr(142);
+    const tab = screen.getAllByTestId("shell-tab").find((t) => t.dataset.kind === "pullrequest")?.dataset.tabId ?? "";
+    expect(tab).not.toBe("");
+    act(() => {
+      usePrPanelStore.setState((s) => ({ byTab: { ...s.byTab, [tab]: { inner: "code" as never, commentOrder: "newest", timelineOrder: "newest", open: {} } } }));
+    });
+    expect(byTestId("pr-tab-overview").getAttribute("aria-selected")).toBe("true");
+    expect(screen.getAllByTestId("pr-ready-row").length).toBeGreaterThan(0);
+  });
+});
+
 describe("Activity", () => {
   it("lists commits, reviews and the end state; the order toggles; a commit opens on GitHub; another tab starts on Overview", async () => {
     renderPrPanel();
@@ -225,7 +267,7 @@ describe("Activity", () => {
     fireEvent.click(byTestId("pr-tab-overview"));
     await selectPrTab("#145");
     await settle();
-    expect((byTestId("pr-tab-code") as HTMLButtonElement).disabled).toBe(false);
+    expect(byTestId("pr-tab-activity").getAttribute("aria-selected")).toBe("true");
   });
 
   it("inner tabs stay per tab: coming back to a thread's tab finds Activity still selected", async () => {
@@ -423,15 +465,14 @@ describe("the reviewer picker", () => {
 });
 
 describe("the ⋯ menu", () => {
-  it("Start a thread, then Open on GitHub and Copy link, then Refresh (and a failed one)", async () => {
+  it("Start a thread, This pull request, then Open on GitHub, Copy link and Copy branch name, then Refresh (and a failed one)", async () => {
     renderPrPanel();
     await openPr(145);
     let menu = openMenu();
-    // A draft: nothing under "This pull request" (no Convert to draft, no thread selected to link), so no heading.
-    expect(within(menu).getByText("Start a thread")).toBeTruthy();
-    expect(within(menu).queryByText("This pull request")).toBeNull();
+    expect([...menu.querySelectorAll('[data-slot="dropdown-menu-label"]')].map((l) => l.textContent)).toEqual(["Start a thread", "This pull request"]);
+    // A draft: no Convert to draft.
     const items = menuItems(menu);
-    expect(items).toEqual(["Ask a question", "Explain this PR", "Fix findings", "Open on GitHub", "Copy link⇧⌘C", expect.stringMatching(/^RefreshUpdated \d+s ago$/) as string]);
+    expect(items).toEqual(["Ask a question", "Explain this PR", "Fix findings", "Close pull request", "Link to thread", "Open on GitHub", "Copy link⇧⌘C", "Copy branch name", expect.stringMatching(/^RefreshUpdated \d+s ago$/) as string]);
     for (const id of ["pr-menu-ask", "pr-menu-explain", "pr-menu-fix"]) {
       expect(byTestId(id).hasAttribute("data-disabled")).toBe(false);
       expect(byTestId(id).hasAttribute("title")).toBe(false);
@@ -464,12 +505,74 @@ describe("the ⋯ menu", () => {
     expect(urlsOpened().at(-1)).toBe(`https://github.com/${SLUG}/pull/145`);
   });
 
-  it("#142 (open, not a draft): This pull request heads Convert to draft", async () => {
+  const START = ["Ask a question", "Explain this PR", "Fix findings"];
+  const END = ["Link to thread", "Open on GitHub", "Copy link⇧⌘C", "Copy branch name", expect.stringMatching(/^Refresh/) as string];
+  for (const { name, number, change, mine } of [
+    { name: "open", number: 142, mine: ["Convert to draft", "Close pull request"] },
+    { name: "draft", number: 145, mine: ["Close pull request"] },
+    { name: "merged", number: 138, mine: [] },
+    { name: "closed", number: 131, mine: ["Reopen pull request"] },
+    { name: "no permission (read access, not the author)", number: 140, change: (d: PullRequestDetailView) => ({ ...d, viewerCanClose: false }), mine: [] },
+    { name: "closed, no permission", number: 131, change: (d: PullRequestDetailView) => ({ ...d, viewerCanReopen: false }), mine: [] },
+  ] as { name: string; number: number; change?: (d: PullRequestDetailView) => PullRequestDetailView; mine: string[] }[]) {
+    it(`${name} (#${String(number)}): This pull request has ${mine.join(", ") || "only Link to thread"}`, async () => {
+      if (change) world.update(number, change);
+      renderPrPanel();
+      await openPr(number);
+      expect(menuItems(openMenu())).toEqual([...START, ...mine, ...END]);
+    });
+  }
+
+  it("Copy branch name copies the head branch", async () => {
     renderPrPanel();
     await openPr(142);
-    const menu = openMenu();
-    expect(within(menu).getByText("This pull request")).toBeTruthy();
-    expect(menuItems(menu)).toEqual(["Ask a question", "Explain this PR", "Fix findings", "Convert to draft", "Open on GitHub", "Copy link⇧⌘C", expect.stringMatching(/^Refresh/) as string]);
+    openMenu();
+    await pick(byTestId("pr-menu-copy-branch"));
+    expect(queryTestId("pr-menu")).toBeNull();
+    expect(copyText).toHaveBeenCalledExactlyOnceWith(world.detail(142)?.pullRequest.headRef);
+    await expectToast("Branch name copied");
+  });
+
+  it("Close pull request: pr.close asks; a spinner and Closing… until the detail shows it closed, then the menu closes and offers Reopen", async () => {
+    renderPrPanel();
+    await openPr(142);
+    openMenu();
+    await pick(byTestId("pr-menu-close"));
+    expect(byTestId("confirm-dialog").textContent).toContain("without merging it?");
+    const release = world.hold("pr.close");
+    fireEvent.click(byTestId("confirm-ok"));
+    await settle();
+    expect(invocationsOf("pr.close").map((i) => i.args)).toEqual([{ "repo-slug": SLUG, number: "142" }, { "repo-slug": SLUG, number: "142" }]);
+    expect(byTestId("pr-menu-button-busy")).toBeTruthy();
+    release();
+    await vi.waitFor(() => {
+      expect(byTestId("pr-header").dataset.state).toBe("closed");
+    });
+    await vi.waitFor(() => {
+      expect(queryTestId("pr-menu-button-busy")).toBeNull();
+    });
+    await expectToast("Closed #142");
+    expect(menuItems(openMenu())).toEqual([...START, "Reopen pull request", ...END]);
+  });
+
+  it("Reopen pull request: no question; spins in the open menu until the detail shows it open", async () => {
+    renderPrPanel();
+    await openPr(131);
+    const release = world.hold("pr.reopen");
+    openMenu();
+    await pick(byTestId("pr-menu-reopen"));
+    expect(queryTestId("confirm-dialog")).toBeNull();
+    const item = byTestId("pr-menu-reopen");
+    expect(item.textContent).toContain("Reopening…");
+    expect(within(item).getByTestId("pr-menu-busy")).toBeTruthy();
+    expect(item.getAttribute("aria-disabled")).toBe("true");
+    await pick(item);
+    expect(invocationsOf("pr.reopen")).toHaveLength(1);
+    release();
+    await vi.waitFor(() => {
+      expect(queryTestId("pr-menu")).toBeNull();
+    });
+    expect(byTestId("pr-header").dataset.state).toBe("open");
   });
 
   it("the pane dispatches the surface's own key: shift+cmd+c copies the link, not from a text field", async () => {
@@ -836,10 +939,10 @@ describe("the header's status and the Overview's cards", () => {
     }
   });
 
-  it("the header is the same on every tab: the state and its buttons on Code and Activity too; the cards are Overview's only", async () => {
+  it("the header is the same on every tab: the state and its buttons on Activity too; the cards are Overview's only", async () => {
     renderPrPanel();
     await openPr(142);
-    for (const tab of ["pr-tab-code", "pr-tab-activity", "pr-tab-overview"]) {
+    for (const tab of ["pr-tab-activity", "pr-tab-overview"]) {
       fireEvent.click(byTestId(tab));
       await settle();
       expect(byTestId("pr-ready-headline").textContent).toBe("Ready to merge");
@@ -848,7 +951,7 @@ describe("the header's status and the Overview's cards", () => {
       expect(screen.queryAllByTestId("pr-ready-row").length > 0).toBe(tab === "pr-tab-overview");
     }
     // Review ▾ opens its composer under the header, from any tab.
-    fireEvent.click(byTestId("pr-tab-code"));
+    fireEvent.click(byTestId("pr-tab-activity"));
     press(byTestId("pr-review-button"));
     await pick(byTestId("pr-review-comment"));
     expect(byTestId("pr-review-composer").dataset.verdict).toBe("comment");
@@ -1301,10 +1404,8 @@ describe("a stale copy refreshing behind the panel", () => {
     expect(byTestId("pr-stale-text").tabIndex).toBe(0);
     expect(queryTestId("pr-error")).toBeNull();
     expect(queryTestId("pr-updating")).toBeNull();
-    for (const tab of ["pr-tab-activity", "pr-tab-code"]) {
-      fireEvent.click(byTestId(tab));
-      expect(byTestId("pr-stale")).toBeTruthy();
-    }
+    fireEvent.click(byTestId("pr-tab-activity"));
+    expect(byTestId("pr-stale")).toBeTruthy();
     fireEvent.click(byTestId("pr-stale-retry"));
     await settle();
     expect(invocationsOf("pr.refresh").map((i) => i.args)).toEqual([{ "repo-slug": SLUG, number: "145" }]);
@@ -1365,38 +1466,101 @@ describe("draft and links", () => {
     expect(queryTestId("pr-menu-draft")).toBeNull();
   });
 
-  it("Link to this thread: only from a thread that does not list it (any case); thread.pr.link with the thread and the pull request; gone once linked", async () => {
-    // From the Pull Requests page: no thread, no item.
-    renderPrPanel();
-    await openPr(142);
-    openMenu();
-    expect(queryTestId("pr-menu-link")).toBeNull();
-    cleanup();
-
-    seedWorld();
-    await resetPrStores({ kind: "thread", id: "s-1" });
-    const setLinks = (links: { slug: string; number: number }[]) => {
-      act(() => {
-        useThreadsStore.setState((s) => {
-          const t = s.byId["s-1"];
-          if (!t) throw new Error("no s-1");
-          return { byId: { ...s.byId, "s-1": { ...t, linkedPullRequests: links.map((l) => ({ ...l, url: `https://github.com/${l.slug}/pull/${String(l.number)}`, linkedAt: null })) } } };
-        });
+  const setLinks = (thread: string, links: { slug: string; number: number }[]) => {
+    act(() => {
+      useThreadsStore.setState((s) => {
+        const t = s.byId[thread];
+        if (!t) throw new Error(`no ${thread}`);
+        return { byId: { ...s.byId, [thread]: { ...t, linkedPullRequests: links.map((l) => ({ ...l, url: `https://github.com/${l.slug}/pull/${String(l.number)}`, linkedAt: null })) } } };
       });
-    };
-    setLinks([{ slug: SLUG, number: 145 }]);
+    });
+  };
+  /** Opens ⋯ → Link to thread: its row unfolds the threads under it. */
+  const openLinkMenu = () => {
+    openMenu();
+    const row = byTestId("pr-menu-link");
+    expect(row.getAttribute("aria-expanded")).toBe("false");
+    fireEvent.click(row);
+    expect(row.getAttribute("aria-expanded")).toBe("true");
+    return byTestId("pr-menu-link-threads");
+  };
+  const linkRows = () => screen.getAllByTestId("pr-menu-link-thread").map((r) => ({ thread: r.dataset.thread, name: r.textContent.replace(/Linked$/, ""), linked: r.dataset.linked === "true" }));
+
+  it("Link to thread lists the thread tabs open in this space by name, ticked when they link the pull request (any case); a pick runs thread.pr.link and spins until the tick", async () => {
+    seedWorld();
+    // s-1 and s-3 have tabs in this space (s-1's pane also holds the Pull Requests page's tab).
+    await resetPrStores({ kind: "thread", id: "s-1" }, "grid");
+    setLinks("s-3", [{ slug: SLUG.toUpperCase(), number: 142 }]);
     renderPrPanel();
     await openPr(142);
-    openMenu();
-    await pick(byTestId("pr-menu-link"));
-    expect(invocationsOf("thread.pr.link").map((i) => i.args)).toEqual([{ id: "s-1", pr: `${SLUG}#142` }]);
-    // The daemon publishes the thread with the link (in GitHub's case or another): the item goes.
-    setLinks([
-      { slug: SLUG, number: 145 },
-      { slug: SLUG.toUpperCase(), number: 142 },
+    const sub = openLinkMenu();
+    expect(within(sub).getByText("Threads open in this space")).toBeTruthy();
+    expect(linkRows()).toEqual([
+      { thread: "s-1", name: "Refactor sidebar tree", linked: false },
+      { thread: "s-3", name: "Fix resize race", linked: true },
     ]);
-    openMenu();
-    expect(queryTestId("pr-menu-link")).toBeNull();
+    expect(byTestId("pr-menu-link").hasAttribute("aria-disabled")).toBe(false);
+    // Folds and unfolds from the keyboard too, inside the menu.
+    fireEvent.keyDown(screen.getAllByTestId("pr-menu-link-thread")[0] as HTMLElement, { key: "ArrowLeft" });
+    expect(queryTestId("pr-menu-link-threads")).toBeNull();
+    expect(document.activeElement).toBe(byTestId("pr-menu-link"));
+    fireEvent.keyDown(byTestId("pr-menu-link"), { key: "ArrowRight" });
+    expect(byTestId("pr-menu-link-threads")).toBe(byTestId("pr-menu").querySelector('[data-testid="pr-menu-link-threads"]'));
+
+    // A ticked row is inert: there is no unlink.
+    const ticked = screen.getAllByTestId("pr-menu-link-thread")[1] as HTMLElement;
+    expect(ticked.getAttribute("aria-disabled")).toBe("true");
+    await pick(ticked);
+    expect(invocationsOf("thread.pr.link")).toEqual([]);
+    expect(byTestId("pr-menu")).toBeTruthy();
+
+    // An unticked one links: its row spins and the menu stays until the thread lists the link.
+    const row = screen.getAllByTestId("pr-menu-link-thread")[0] as HTMLElement;
+    await pick(row);
+    expect(invocationsOf("thread.pr.link").map((i) => i.args)).toEqual([{ id: "s-1", pr: `${SLUG}#142` }]);
+    expect(row.getAttribute("aria-busy")).toBe("true");
+    expect(within(row).getByTestId("pr-menu-busy")).toBeTruthy();
+    expect(byTestId("pr-menu")).toBeTruthy();
+    // A second pick meanwhile sends nothing.
+    await pick(row);
+    expect(invocationsOf("thread.pr.link")).toHaveLength(1);
+    // The daemon publishes the thread with the link: the menu closes; reopened, both are ticked.
+    setLinks("s-1", [{ slug: SLUG, number: 142 }]);
+    await vi.waitFor(() => {
+      expect(queryTestId("pr-menu")).toBeNull();
+    });
+    openLinkMenu();
+    expect(linkRows().map((r) => r.linked)).toEqual([true, true]);
+  });
+
+  it("Link to thread lists only this space's thread tabs; a failed link frees its row", async () => {
+    seedWorld();
+    // s-3's tab is in the Review space.
+    await resetPrStores({ kind: "thread", id: "s-1" }, "spaces");
+    renderPrPanel();
+    await openPr(142);
+    openLinkMenu();
+    expect(linkRows().map((r) => r.thread)).toEqual(["s-1"]);
+    daemon.handlers.set("thread.pr.link", () => {
+      throw refuse("thread s-1 is archived");
+    });
+    const row = byTestId("pr-menu-link-thread");
+    await pick(row);
+    await settle(2);
+    expect(invocationsOf("thread.pr.link")).toHaveLength(1);
+    expect(row.hasAttribute("aria-busy")).toBe(false);
+    expect(byTestId("pr-menu")).toBeTruthy();
+  });
+
+  it("Link to thread with no thread tab in this space: the row is muted and its submenu says so", async () => {
+    seedWorld();
+    await resetPrStores();
+    renderPrPanel();
+    await openPr(142);
+    const sub = openLinkMenu();
+    expect(byTestId("pr-menu-link").getAttribute("aria-disabled")).toBe("true");
+    expect(sub.textContent).toBe("No threads open in this space");
+    expect(queryTestId("pr-menu-link-thread")).toBeNull();
   });
 });
 

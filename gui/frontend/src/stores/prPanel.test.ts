@@ -375,8 +375,8 @@ describe("inner state per tab", () => {
     await openIn({ slug: SLUG, number: 7 }, "view:pullrequests");
     const page = Object.values(useLayoutStore.getState().tabs).find((t) => t.kind === "pullrequest" && !t.thread)?.id ?? "";
     expect(page).not.toBe("");
-    setInnerTab(page, "code");
+    setInnerTab(page, "activity");
     await openIn({ slug: SLUG, number: 8 });
-    expect(usePrPanelStore.getState().byTab[page]?.inner).toBe("code");
+    expect(usePrPanelStore.getState().byTab[page]?.inner).toBe("activity");
   });
 });

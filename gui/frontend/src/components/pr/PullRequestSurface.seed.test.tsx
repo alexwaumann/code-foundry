@@ -6,7 +6,7 @@ import type { PullRequestDetailView, PullRequestView } from "@/api/gh";
  * The Pull request surface while a detail with nothing cached is on its way
  * (docs/notes/pr-open-instant.md). Detail reads wait at a gate here, as a daemon's would at
  * GitHub; the rest of the world is src/test/prWorld.ts. seed.test.ts has which rows a dashboard
- * row can fill; this is what the surface does with them, and when the Code tab's diff is read.
+ * row can fill; this is what the surface does with them, and when the diff is read ahead of the Diff button.
  */
 
 const gate = vi.hoisted(() => ({
@@ -41,7 +41,6 @@ vi.mock("@/api/gh", async (orig) => {
   };
 });
 vi.mock("@/api/prDiff", async (orig) => ({ ...(await orig<typeof import("@/api/prDiff")>()), getPullRequestDiff }));
-vi.mock("@pierre/diffs/react", () => ({ CodeView: () => <div data-testid="code-view-stub" /> }));
 vi.mock("@/api/layout", async (orig) => (await import("@/test/fakeLayout")).fakeLayoutApi(await orig()));
 
 const { resetDaemon } = await import("@/test/daemonFakes");
@@ -242,14 +241,12 @@ describe("seeded from the dashboard's row", () => {
     expect(byTestId("pr-seed-body")).toBeTruthy();
     expect(queryTestId("pr-timeline-counts")).toBeNull();
     expect(queryTestId("pr-ready-row")).toBeNull();
-    fireEvent.click(byTestId("pr-tab-code"));
-    expect(queryTestId("pr-ready-row")).toBeNull();
-    expect(byTestId("pr-ready-pending")).toBeTruthy();
-    expect(byTestId("pr-seed-body")).toBeTruthy();
+    // The Diff button is there without counts: they come with the detail.
+    expect(byTestId("pr-diff-button").textContent).toBe("Diff");
     expect(getPullRequestDiff).not.toHaveBeenCalled(); // no head to read it for yet
     await land(142);
-    expect(byTestId("pr-tab-code").getAttribute("aria-selected")).toBe("true");
-    expect(byTestId("pr-code")).toBeTruthy();
+    expect(byTestId("pr-tab-activity").getAttribute("aria-selected")).toBe("true");
+    expect(byTestId("pr-diff-button").textContent).toMatch(/^Diff3 files\+/);
   });
 });
 
@@ -324,7 +321,7 @@ describe("switching between pull requests", () => {
   });
 });
 
-describe("the Code tab's diff", () => {
+describe("the diff, read ahead of the Diff button", () => {
   const reads = () => getPullRequestDiff.mock.calls.length;
   const wait = async (ms = DIFF_WARM_AFTER_MS) => {
     await act(async () => {
@@ -346,13 +343,10 @@ describe("the Code tab's diff", () => {
     await wait();
     expect(reads()).toBe(1);
     await settle();
-    fireEvent.click(byTestId("pr-tab-code"));
-    await settle();
-    fireEvent.click(byTestId("pr-tab-overview"));
-    await settle();
-    await wait();
+    await wait(DIFF_WARM_AFTER_MS * 3);
+    // Read for this head: the diff tab the Diff button opens finds it, and nothing reads it again.
     expect(pullRequestDiffResource.store.getState().entries[pullRequestKey(SLUG, 142)]?.data?.headSha).toBe(world.detail(142)?.pullRequest.headSha);
-    expect(reads()).toBe(2); // the tab's own read: the daemon's memory, not GitHub
+    expect(reads()).toBe(1);
   });
 
   it("waits while a detail read is in flight: someone is waiting for that", async () => {

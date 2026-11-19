@@ -383,7 +383,7 @@ Services (v1):
   SubmitPullRequestReview and
   AddPullRequestComment (GitHub's refusals relayed as FAILED_PRECONDITION;
   `docs/notes/pr-review-submit-1-daemon.md`), and GetPullRequestDiff and GetPullRequestFile
-  for its Code tab (§7).
+  for its diff tab (§7).
 * `GitOpsService` — Fetch, Pull, Push, CreatePullRequest, OpenPullRequest, OpenEditor,
   Reveal, OpenUrl. One operation at a time per worktree; a failed operation
   is a result (state FAILED, output), not an RPC error. The GUI reaches it only through
@@ -933,9 +933,10 @@ Pull request commands: the pull request tab's actions (`pr.merge`, `pr.revert`,
 docs/notes/pr-review-submit-1-daemon.md, with the tab's Review menu in
 docs/notes/pr-review-submit-2-gui.md) and the thread starters `pr.ask`,
 `pr.explain`, `pr.fix.findings`, which pick or create a worktree and type a prompt built
-from the pull request (docs/notes/pr-thread-commands.md). Its Code tab is read-only
-and has no commands: it reads `GhService.GetPullRequestDiff` and renders it in one
-virtualized `@pierre/diffs` CodeView (docs/notes/file-viewer-5-pr-code-tab.md).
+from the pull request (docs/notes/pr-thread-commands.md). Its diff is a tab of its own
+(kind `prdiff`), which the page's Diff button opens beside it; it is read-only and has no
+commands: it reads `GhService.GetPullRequestDiff` and renders it in the Diff tab's viewer
+(docs/notes/pr-diff-tab.md, docs/notes/pr-diff-button-menu.md).
 
 The window shell's commands (§14) are families in the same registry, so a key, the palette,
 the CLI and a thread's model reach the same op:
