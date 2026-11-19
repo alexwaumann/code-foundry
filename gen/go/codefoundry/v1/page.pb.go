@@ -688,6 +688,76 @@ func (x *PageProxyFetchResponse) GetStatusText() string {
 	return ""
 }
 
+// PageEvent says which pages the daemon may now answer otherwise for (an owner, the user's
+// answer), so a client showing one reads its answer again (FilesystemService.PreviewFile or
+// GetPage) and every frame on it follows: a page refused in one window or from the CLI stops
+// in every window, and a page whose owning thread is removed is asked about again. It is
+// EventService's page source (EVENT_SOURCE_PAGE). It names pages, never their answer, and
+// may name one whose answer did not change.
+type PageEvent struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The resolved paths (PageAccess.path) whose owner or answer changed.
+	Paths []string `protobuf:"bytes,1,rep,name=paths,proto3" json:"paths,omitempty"`
+	// A thread that was removed: every page it owned (owner_thread) has no owner now.
+	RemovedThread string `protobuf:"bytes,2,opt,name=removed_thread,json=removedThread,proto3" json:"removed_thread,omitempty"`
+	// Any page may have changed: the source's snapshot (on connect, and after the client
+	// missed events). Read every page shown again.
+	All           bool `protobuf:"varint,3,opt,name=all,proto3" json:"all,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PageEvent) Reset() {
+	*x = PageEvent{}
+	mi := &file_codefoundry_v1_page_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PageEvent) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PageEvent) ProtoMessage() {}
+
+func (x *PageEvent) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_page_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PageEvent.ProtoReflect.Descriptor instead.
+func (*PageEvent) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_page_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *PageEvent) GetPaths() []string {
+	if x != nil {
+		return x.Paths
+	}
+	return nil
+}
+
+func (x *PageEvent) GetRemovedThread() string {
+	if x != nil {
+		return x.RemovedThread
+	}
+	return ""
+}
+
+func (x *PageEvent) GetAll() bool {
+	if x != nil {
+		return x.All
+	}
+	return false
+}
+
 var File_codefoundry_v1_page_proto protoreflect.FileDescriptor
 
 const file_codefoundry_v1_page_proto_rawDesc = "" +
@@ -742,7 +812,11 @@ const file_codefoundry_v1_page_proto_rawDesc = "" +
 	"statusText\x1a:\n" +
 	"\fHeadersEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01*\xb1\x01\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"Z\n" +
+	"\tPageEvent\x12\x14\n" +
+	"\x05paths\x18\x01 \x03(\tR\x05paths\x12%\n" +
+	"\x0eremoved_thread\x18\x02 \x01(\tR\rremovedThread\x12\x10\n" +
+	"\x03all\x18\x03 \x01(\bR\x03all*\xb1\x01\n" +
 	"\vPageConsent\x12\x1c\n" +
 	"\x18PAGE_CONSENT_UNSPECIFIED\x10\x00\x12\x16\n" +
 	"\x12PAGE_CONSENT_OWNED\x10\x01\x12\x18\n" +
@@ -776,7 +850,7 @@ func file_codefoundry_v1_page_proto_rawDescGZIP() []byte {
 }
 
 var file_codefoundry_v1_page_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_codefoundry_v1_page_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
+var file_codefoundry_v1_page_proto_msgTypes = make([]protoimpl.MessageInfo, 14)
 var file_codefoundry_v1_page_proto_goTypes = []any{
 	(PageConsent)(0),                   // 0: codefoundry.v1.PageConsent
 	(PageOwnerSource)(0),               // 1: codefoundry.v1.PageOwnerSource
@@ -789,20 +863,21 @@ var file_codefoundry_v1_page_proto_goTypes = []any{
 	(*SetPageFileStorageResponse)(nil), // 8: codefoundry.v1.SetPageFileStorageResponse
 	(*PageProxyFetchRequest)(nil),      // 9: codefoundry.v1.PageProxyFetchRequest
 	(*PageProxyFetchResponse)(nil),     // 10: codefoundry.v1.PageProxyFetchResponse
-	nil,                                // 11: codefoundry.v1.PageFileStorageResponse.ValuesEntry
-	nil,                                // 12: codefoundry.v1.SetPageFileStorageResponse.ValuesEntry
-	nil,                                // 13: codefoundry.v1.PageProxyFetchRequest.HeadersEntry
-	nil,                                // 14: codefoundry.v1.PageProxyFetchResponse.HeadersEntry
+	(*PageEvent)(nil),                  // 11: codefoundry.v1.PageEvent
+	nil,                                // 12: codefoundry.v1.PageFileStorageResponse.ValuesEntry
+	nil,                                // 13: codefoundry.v1.SetPageFileStorageResponse.ValuesEntry
+	nil,                                // 14: codefoundry.v1.PageProxyFetchRequest.HeadersEntry
+	nil,                                // 15: codefoundry.v1.PageProxyFetchResponse.HeadersEntry
 }
 var file_codefoundry_v1_page_proto_depIdxs = []int32{
 	1,  // 0: codefoundry.v1.PageAccess.owner_source:type_name -> codefoundry.v1.PageOwnerSource
 	0,  // 1: codefoundry.v1.PageAccess.consent:type_name -> codefoundry.v1.PageConsent
 	0,  // 2: codefoundry.v1.PageAccess.answer:type_name -> codefoundry.v1.PageConsent
 	2,  // 3: codefoundry.v1.GetPageResponse.page:type_name -> codefoundry.v1.PageAccess
-	11, // 4: codefoundry.v1.PageFileStorageResponse.values:type_name -> codefoundry.v1.PageFileStorageResponse.ValuesEntry
-	12, // 5: codefoundry.v1.SetPageFileStorageResponse.values:type_name -> codefoundry.v1.SetPageFileStorageResponse.ValuesEntry
-	13, // 6: codefoundry.v1.PageProxyFetchRequest.headers:type_name -> codefoundry.v1.PageProxyFetchRequest.HeadersEntry
-	14, // 7: codefoundry.v1.PageProxyFetchResponse.headers:type_name -> codefoundry.v1.PageProxyFetchResponse.HeadersEntry
+	12, // 4: codefoundry.v1.PageFileStorageResponse.values:type_name -> codefoundry.v1.PageFileStorageResponse.ValuesEntry
+	13, // 5: codefoundry.v1.SetPageFileStorageResponse.values:type_name -> codefoundry.v1.SetPageFileStorageResponse.ValuesEntry
+	14, // 6: codefoundry.v1.PageProxyFetchRequest.headers:type_name -> codefoundry.v1.PageProxyFetchRequest.HeadersEntry
+	15, // 7: codefoundry.v1.PageProxyFetchResponse.headers:type_name -> codefoundry.v1.PageProxyFetchResponse.HeadersEntry
 	3,  // 8: codefoundry.v1.PageService.GetPage:input_type -> codefoundry.v1.GetPageRequest
 	5,  // 9: codefoundry.v1.PageService.PageStorage:input_type -> codefoundry.v1.PageFileStorageRequest
 	7,  // 10: codefoundry.v1.PageService.SetPageStorage:input_type -> codefoundry.v1.SetPageFileStorageRequest
@@ -830,7 +905,7 @@ func file_codefoundry_v1_page_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_codefoundry_v1_page_proto_rawDesc), len(file_codefoundry_v1_page_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   13,
+			NumMessages:   14,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

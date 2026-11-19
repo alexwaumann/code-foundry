@@ -121,6 +121,10 @@ const (
 	// then the whole of them again per change, with the ids that arrived or were updated
 	// (NotificationService, notification.proto).
 	EventSource_EVENT_SOURCE_NOTIFICATION EventSource = 20
+	// Pages' owners and the user's answers for them (PageService, page.proto): a PageEvent
+	// with `all` (after notification), then one per change. It names the pages to read again,
+	// never their answer (docs/notes/page-access-live.md).
+	EventSource_EVENT_SOURCE_PAGE EventSource = 21
 )
 
 // Enum value maps for EventSource.
@@ -145,6 +149,7 @@ var (
 		18: "EVENT_SOURCE_SEARCH",
 		19: "EVENT_SOURCE_LAYOUT",
 		20: "EVENT_SOURCE_NOTIFICATION",
+		21: "EVENT_SOURCE_PAGE",
 	}
 	EventSource_value = map[string]int32{
 		"EVENT_SOURCE_UNSPECIFIED":  0,
@@ -166,6 +171,7 @@ var (
 		"EVENT_SOURCE_SEARCH":       18,
 		"EVENT_SOURCE_LAYOUT":       19,
 		"EVENT_SOURCE_NOTIFICATION": 20,
+		"EVENT_SOURCE_PAGE":         21,
 	}
 )
 
@@ -432,6 +438,7 @@ type Event struct {
 	//	*Event_Search
 	//	*Event_Layout
 	//	*Event_Notification
+	//	*Event_Page
 	Event isEvent_Event `protobuf_oneof:"event"`
 	// Position of a live event in the daemon's one event sequence: 1, 2, 3, ... per
 	// daemon lifetime, shared by every client and source (the same event has the same
@@ -656,6 +663,15 @@ func (x *Event) GetNotification() *NotificationEvent {
 	return nil
 }
 
+func (x *Event) GetPage() *PageEvent {
+	if x != nil {
+		if x, ok := x.Event.(*Event_Page); ok {
+			return x.Page
+		}
+	}
+	return nil
+}
+
 func (x *Event) GetSeq() uint64 {
 	if x != nil {
 		return x.Seq
@@ -764,6 +780,11 @@ type Event_Notification struct {
 	Notification *NotificationEvent `protobuf:"bytes,23,opt,name=notification,proto3,oneof"`
 }
 
+type Event_Page struct {
+	// Pages whose owner or answer changed: read them again (PageEvent).
+	Page *PageEvent `protobuf:"bytes,24,opt,name=page,proto3,oneof"`
+}
+
 func (*Event_Project) isEvent_Event() {}
 
 func (*Event_Terminal) isEvent_Event() {}
@@ -802,11 +823,13 @@ func (*Event_Layout) isEvent_Event() {}
 
 func (*Event_Notification) isEvent_Event() {}
 
+func (*Event_Page) isEvent_Event() {}
+
 var File_codefoundry_v1_events_proto protoreflect.FileDescriptor
 
 const file_codefoundry_v1_events_proto_rawDesc = "" +
 	"\n" +
-	"\x1bcodefoundry/v1/events.proto\x12\x0ecodefoundry.v1\x1a\x1bcodefoundry/v1/action.proto\x1a\x17codefoundry/v1/gh.proto\x1a\x1bcodefoundry/v1/gitops.proto\x1a\x1ecodefoundry/v1/heartbeat.proto\x1a\x1bcodefoundry/v1/layout.proto\x1a\x1bcodefoundry/v1/memory.proto\x1a!codefoundry/v1/notification.proto\x1a\x1acodefoundry/v1/theme.proto\x1a\x1bcodefoundry/v1/plugin.proto\x1a\x1ccodefoundry/v1/project.proto\x1a\x1bcodefoundry/v1/search.proto\x1a\x1dcodefoundry/v1/settings.proto\x1a\x1acodefoundry/v1/skill.proto\x1a\x1dcodefoundry/v1/terminal.proto\x1a\x1bcodefoundry/v1/thread.proto\x1a%codefoundry/v1/thread_lifecycle.proto\x1a\x17codefoundry/v1/ui.proto\x1a\x1bcodefoundry/v1/update.proto\x1a\x1ecodefoundry/v1/workspace.proto\"\x97\x02\n" +
+	"\x1bcodefoundry/v1/events.proto\x12\x0ecodefoundry.v1\x1a\x1bcodefoundry/v1/action.proto\x1a\x17codefoundry/v1/gh.proto\x1a\x1bcodefoundry/v1/gitops.proto\x1a\x1ecodefoundry/v1/heartbeat.proto\x1a\x1bcodefoundry/v1/layout.proto\x1a\x1bcodefoundry/v1/memory.proto\x1a!codefoundry/v1/notification.proto\x1a\x19codefoundry/v1/page.proto\x1a\x1acodefoundry/v1/theme.proto\x1a\x1bcodefoundry/v1/plugin.proto\x1a\x1ccodefoundry/v1/project.proto\x1a\x1bcodefoundry/v1/search.proto\x1a\x1dcodefoundry/v1/settings.proto\x1a\x1acodefoundry/v1/skill.proto\x1a\x1dcodefoundry/v1/terminal.proto\x1a\x1bcodefoundry/v1/thread.proto\x1a%codefoundry/v1/thread_lifecycle.proto\x1a\x17codefoundry/v1/ui.proto\x1a\x1bcodefoundry/v1/update.proto\x1a\x1ecodefoundry/v1/workspace.proto\"\x97\x02\n" +
 	"\x12WatchEventsRequest\x125\n" +
 	"\asources\x18\x01 \x03(\x0e2\x1b.codefoundry.v1.EventSourceR\asources\x12\x1b\n" +
 	"\tsince_seq\x18\x02 \x01(\x04R\bsinceSeq\x12\x1f\n" +
@@ -821,7 +844,7 @@ const file_codefoundry_v1_events_proto_rawDesc = "" +
 	"\tclient_id\x18\x01 \x01(\tR\bclientId\x12\x18\n" +
 	"\avisible\x18\x02 \x01(\bR\avisible\x12\x18\n" +
 	"\afocused\x18\x03 \x01(\bR\afocused\"\x18\n" +
-	"\x16SetClientStateResponse\"\xf4\b\n" +
+	"\x16SetClientStateResponse\"\xa5\t\n" +
 	"\x05Event\x128\n" +
 	"\aproject\x18\x01 \x01(\v2\x1c.codefoundry.v1.ProjectEventH\x00R\aproject\x12;\n" +
 	"\bterminal\x18\x02 \x01(\v2\x1d.codefoundry.v1.TerminalEventH\x00R\bterminal\x12B\n" +
@@ -843,7 +866,8 @@ const file_codefoundry_v1_events_proto_rawDesc = "" +
 	"\x05theme\x18\x12 \x01(\v2\x1a.codefoundry.v1.ThemeEventH\x00R\x05theme\x128\n" +
 	"\x06search\x18\x13 \x01(\v2\x1e.codefoundry.v1.SearchActivityH\x00R\x06search\x125\n" +
 	"\x06layout\x18\x16 \x01(\v2\x1b.codefoundry.v1.LayoutEventH\x00R\x06layout\x12G\n" +
-	"\fnotification\x18\x17 \x01(\v2!.codefoundry.v1.NotificationEventH\x00R\fnotification\x12\x10\n" +
+	"\fnotification\x18\x17 \x01(\v2!.codefoundry.v1.NotificationEventH\x00R\fnotification\x12/\n" +
+	"\x04page\x18\x18 \x01(\v2\x19.codefoundry.v1.PageEventH\x00R\x04page\x12\x10\n" +
 	"\x03seq\x18\x14 \x01(\x04R\x03seq\x12\x14\n" +
 	"\x05epoch\x18\x15 \x01(\tR\x05epochB\a\n" +
 	"\x05event*S\n" +
@@ -851,7 +875,7 @@ const file_codefoundry_v1_events_proto_rawDesc = "" +
 	"ClientKind\x12\x1b\n" +
 	"\x17CLIENT_KIND_UNSPECIFIED\x10\x00\x12\x13\n" +
 	"\x0fCLIENT_KIND_GUI\x10\x01\x12\x13\n" +
-	"\x0fCLIENT_KIND_CLI\x10\x02*\xf6\x03\n" +
+	"\x0fCLIENT_KIND_CLI\x10\x02*\x8d\x04\n" +
 	"\vEventSource\x12\x1c\n" +
 	"\x18EVENT_SOURCE_UNSPECIFIED\x10\x00\x12\x18\n" +
 	"\x14EVENT_SOURCE_PROJECT\x10\x01\x12\x19\n" +
@@ -872,7 +896,8 @@ const file_codefoundry_v1_events_proto_rawDesc = "" +
 	"\x12EVENT_SOURCE_THEME\x10\x11\x12\x17\n" +
 	"\x13EVENT_SOURCE_SEARCH\x10\x12\x12\x17\n" +
 	"\x13EVENT_SOURCE_LAYOUT\x10\x13\x12\x1d\n" +
-	"\x19EVENT_SOURCE_NOTIFICATION\x10\x142\xb9\x01\n" +
+	"\x19EVENT_SOURCE_NOTIFICATION\x10\x14\x12\x15\n" +
+	"\x11EVENT_SOURCE_PAGE\x10\x152\xb9\x01\n" +
 	"\fEventService\x12F\n" +
 	"\x05Watch\x12\".codefoundry.v1.WatchEventsRequest\x1a\x15.codefoundry.v1.Event\"\x000\x01\x12a\n" +
 	"\x0eSetClientState\x12%.codefoundry.v1.SetClientStateRequest\x1a&.codefoundry.v1.SetClientStateResponse\"\x00B\xc3\x01\n" +
@@ -918,6 +943,7 @@ var file_codefoundry_v1_events_proto_goTypes = []any{
 	(*SearchActivity)(nil),         // 22: codefoundry.v1.SearchActivity
 	(*LayoutEvent)(nil),            // 23: codefoundry.v1.LayoutEvent
 	(*NotificationEvent)(nil),      // 24: codefoundry.v1.NotificationEvent
+	(*PageEvent)(nil),              // 25: codefoundry.v1.PageEvent
 }
 var file_codefoundry_v1_events_proto_depIdxs = []int32{
 	1,  // 0: codefoundry.v1.WatchEventsRequest.sources:type_name -> codefoundry.v1.EventSource
@@ -941,15 +967,16 @@ var file_codefoundry_v1_events_proto_depIdxs = []int32{
 	22, // 18: codefoundry.v1.Event.search:type_name -> codefoundry.v1.SearchActivity
 	23, // 19: codefoundry.v1.Event.layout:type_name -> codefoundry.v1.LayoutEvent
 	24, // 20: codefoundry.v1.Event.notification:type_name -> codefoundry.v1.NotificationEvent
-	2,  // 21: codefoundry.v1.EventService.Watch:input_type -> codefoundry.v1.WatchEventsRequest
-	3,  // 22: codefoundry.v1.EventService.SetClientState:input_type -> codefoundry.v1.SetClientStateRequest
-	5,  // 23: codefoundry.v1.EventService.Watch:output_type -> codefoundry.v1.Event
-	4,  // 24: codefoundry.v1.EventService.SetClientState:output_type -> codefoundry.v1.SetClientStateResponse
-	23, // [23:25] is the sub-list for method output_type
-	21, // [21:23] is the sub-list for method input_type
-	21, // [21:21] is the sub-list for extension type_name
-	21, // [21:21] is the sub-list for extension extendee
-	0,  // [0:21] is the sub-list for field type_name
+	25, // 21: codefoundry.v1.Event.page:type_name -> codefoundry.v1.PageEvent
+	2,  // 22: codefoundry.v1.EventService.Watch:input_type -> codefoundry.v1.WatchEventsRequest
+	3,  // 23: codefoundry.v1.EventService.SetClientState:input_type -> codefoundry.v1.SetClientStateRequest
+	5,  // 24: codefoundry.v1.EventService.Watch:output_type -> codefoundry.v1.Event
+	4,  // 25: codefoundry.v1.EventService.SetClientState:output_type -> codefoundry.v1.SetClientStateResponse
+	24, // [24:26] is the sub-list for method output_type
+	22, // [22:24] is the sub-list for method input_type
+	22, // [22:22] is the sub-list for extension type_name
+	22, // [22:22] is the sub-list for extension extendee
+	0,  // [0:22] is the sub-list for field type_name
 }
 
 func init() { file_codefoundry_v1_events_proto_init() }
@@ -964,6 +991,7 @@ func file_codefoundry_v1_events_proto_init() {
 	file_codefoundry_v1_layout_proto_init()
 	file_codefoundry_v1_memory_proto_init()
 	file_codefoundry_v1_notification_proto_init()
+	file_codefoundry_v1_page_proto_init()
 	file_codefoundry_v1_theme_proto_init()
 	file_codefoundry_v1_plugin_proto_init()
 	file_codefoundry_v1_project_proto_init()
@@ -996,6 +1024,7 @@ func file_codefoundry_v1_events_proto_init() {
 		(*Event_Search)(nil),
 		(*Event_Layout)(nil),
 		(*Event_Notification)(nil),
+		(*Event_Page)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{

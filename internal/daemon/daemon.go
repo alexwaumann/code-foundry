@@ -230,7 +230,7 @@ func Run(ctx context.Context, opts Options) (retErr error) {
 	pages, err := page.New(ctx, page.Options{
 		DB: st.db, Home: st.home, PagesRoot: p.Pages(), StorageRoot: p.PageFileStorage(), Guarded: grants.Guarded,
 		ThreadExists: func(id string) bool { _, ok := st.thread.Snapshot().Thread(id); return ok },
-		Log:          log.With("store", "page"),
+		Log:          log.With("store", "page"), Bus: events,
 	})
 	if err != nil {
 		return err
@@ -270,7 +270,7 @@ func Run(ctx context.Context, opts Options) (retErr error) {
 	// and tell the plugins as they come and go (plugin_wakes.go).
 	st.thread.SetPluginWakes(threadPluginWakes{plugins: plugins})
 	st.terminal.SetSpawnExtras(pluginShellExtras(plugins, st.thread))
-	eventsAPI := api.NewEvents(api.EventsDeps{Bus: events, Project: st.project, Terminal: st.terminal, Thread: st.thread, Gh: st.gh, GitOps: st.gitops, Settings: st.settings, Update: st.update, Workspace: st.workspace, Action: st.action, Plugin: plugins, Skill: st.skills, Memory: st.memory, Themes: st.themes, Search: st.search, Layout: st.layout, Notification: st.notification, Done: ctx.Done(), Clients: clients})
+	eventsAPI := api.NewEvents(api.EventsDeps{Bus: events, Project: st.project, Terminal: st.terminal, Thread: st.thread, Gh: st.gh, GitOps: st.gitops, Settings: st.settings, Update: st.update, Workspace: st.workspace, Action: st.action, Plugin: plugins, Skill: st.skills, Memory: st.memory, Themes: st.themes, Search: st.search, Layout: st.layout, Notification: st.notification, Pages: pages, Done: ctx.Done(), Clients: clients})
 	// Plugins subscribe to the same events (events/subscribe).
 	plugins.SetEvents(api.NewPluginFeed(eventsAPI, log.With("component", "plugins")))
 	if err := all.Register(commands, all.Deps{
@@ -385,7 +385,7 @@ func Run(ctx context.Context, opts Options) (retErr error) {
 		},
 		Day: devTidyDay(log, opts.Dev),
 	})()
-	commandAPI := api.NewCommand(commands)
+	commandAPI := api.NewCommand(commands).WithPages(pages, st.home)
 	installSkills(ctx, log.With("component", "skills"), p.Claude(), p.Pages(), opts.Version, commandAPI, settingsAPI, st.settings)
 	placeWelcome(log.With("component", "skills"), p.Pages())
 	routes := []api.Route{

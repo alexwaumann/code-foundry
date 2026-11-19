@@ -9,16 +9,20 @@
  * rest with POST /__mock/page (mock/server.ts): an owner (`owner=s-1&how=written`), an answer
  * (`consent=allowed|refused|not-asked`), a file that is no page (`unavailable=<reason>`).
  * Paths are resolved through the mock's links (POST /__mock/fs/link), as the daemon follows
- * symlinks. Consent is enforced here as there: storage and fetch for a page not allowed are
- * refused whatever the GUI sends.
+ * symlinks. Consent is enforced here as there: storage, fetch and a command naming a page
+ * (UiContext.page_path) for a page not allowed are refused whatever the GUI sends. A new
+ * owner or answer is published on the page source (docs/notes/page-access-live.md); world.ts
+ * publishes a removed thread there too.
  */
 import { Code, ConnectError } from "@connectrpc/connect";
 import type { MessageInitShape } from "@bufbuild/protobuf";
 import { ArgType, CallOrigin, type UiContext } from "../src/gen/codefoundry/v1/command_pb";
-import { PageConsent, PageOwnerSource, type PageAccessSchema } from "../src/gen/codefoundry/v1/page_pb";
+import { create } from "@bufbuild/protobuf";
+import { PageAccessSchema, PageConsent, PageOwnerSource, type PageEventSchema } from "../src/gen/codefoundry/v1/page_pb";
 import { HOME } from "./filesystem";
 
 type PageAccessInit = MessageInitShape<typeof PageAccessSchema>;
+type PageEventInit = MessageInitShape<typeof PageEventSchema>;
 
 /** The pages root: each thread's pages directory is under it, the welcome page directly in it. */
 export const PAGES_ROOT = `${HOME}/.code-foundry/pages`;
@@ -46,6 +50,8 @@ export class MockPages {
   private storage = new Map<string, Record<string, string>>();
   /** page.allow / page.disallow calls, for tests: "allow /path". */
   calls: string[] = [];
+  /** The EventService page source (world.ts sets it). */
+  publish: (e: PageEventInit) => void = () => undefined;
 
   reset(): void {
     this.owners.clear();
@@ -135,6 +141,22 @@ export class MockPages {
     return { values: { ...vals } };
   }
 
+  /**
+   * Throws unless a command from the page at `path` (UiContext.page_path) may run, as the
+   * daemon's Invoke: PermissionDenied with the page's access as a detail for a page refused or
+   * not asked about.
+   */
+  checkInvoke(path: string): void {
+    if (!path) return;
+    try {
+      this.allowed(path);
+    } catch (err) {
+      if (!(err instanceof ConnectError) || (err.code !== Code.PermissionDenied && err.code !== Code.FailedPrecondition)) throw err;
+      const access = create(PageAccessSchema, this.getPage(path).page);
+      throw new ConnectError(err.rawMessage, Code.PermissionDenied, undefined, [{ desc: PageAccessSchema, value: access }]);
+    }
+  }
+
   /** Throws unless the page may fetch (PageService.ProxyFetch's consent errors). */
   checkFetch(path: string): void {
     this.allowed(path);
@@ -143,7 +165,10 @@ export class MockPages {
   /** view.open.page from a thread: it showed the page. */
   shown(path: string, thread: string): void {
     try {
-      this.owners.set(this.resolved(path), { thread, how: "shown", at: Date.now() });
+      const abs = this.resolved(path);
+      const before = this.owner(abs)?.thread;
+      this.owners.set(abs, { thread, how: "shown", at: Date.now() });
+      if (before !== thread) this.publish({ paths: [abs] });
     } catch {
       // Not a page: nothing to record, as the daemon.
     }
@@ -162,6 +187,7 @@ export class MockPages {
     else if (q.owner) this.owners.set(real, { thread: q.owner, how: q.how === "written" ? "written" : "shown", at: Date.now() });
     if (q.consent === "allowed" || q.consent === "refused") this.answers.set(real, q.consent);
     else if (q.consent === "not-asked") this.answers.delete(real);
+    this.publish({ paths: [real] });
     return this.previewPage(abs);
   }
 
@@ -178,7 +204,9 @@ export class MockPages {
       // The answer is the user's about the page's script: never the page's own call.
       if (ctx?.origin === CallOrigin.PAGE) throw new ConnectError(`a page cannot answer for itself; the user ${a === "allowed" ? "allows" : "stops allowing"} it`, Code.PermissionDenied);
       const abs = this.resolved(args.path ?? "");
+      const before = this.answers.get(abs);
       this.answers.set(abs, a);
+      if (before !== a) this.publish({ paths: [abs] });
       this.calls.push(`${a === "allowed" ? "allow" : "disallow"} ${abs}`);
       return Promise.resolve({ message: `${a === "allowed" ? "allowed" : "not allowed"}: ${abs}`, resultJson: view(abs) });
     };

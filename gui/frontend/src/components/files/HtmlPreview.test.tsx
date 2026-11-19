@@ -36,25 +36,34 @@ describe("HtmlPreview", () => {
     expect(screen.getByTestId("file-html-footer").textContent).toBe("Sandboxed from Code Foundry · scripts and network on · loads files under ~/proj");
   });
 
-  it("remounts the frame when the text changes, without asking for a new grant", async () => {
+  // The frame loads again at once under the grant it has (no waiting, no flash), and the grant is
+  // read again, so the page comes back under what the daemon says of it now
+  // (docs/notes/page-access-live.md); the same answer reloads nothing more.
+  it("remounts the frame when the text changes, and reads the grant again", async () => {
     previewFile.mockResolvedValue({ url: "http://127.0.0.1:1/preview/g/a.html", scope: "/Users/me/a.html", singleFile: true });
     const { rerender } = render(<HtmlPreview path="/Users/me/a.html" text="one" name="a.html" />);
     const first = await screen.findByTestId("file-html-frame");
     expect(screen.getByTestId("file-html-footer").textContent).toContain("loads this file only");
     rerender(<HtmlPreview path="/Users/me/a.html" text="two" name="a.html" />);
+    const second = screen.getByTestId("file-html-frame");
+    expect(second).not.toBe(first);
     await waitFor(() => {
-      expect(screen.getByTestId("file-html-frame")).not.toBe(first);
+      expect(previewFile).toHaveBeenCalledTimes(2);
     });
-    expect(previewFile).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId("file-html-frame")).toBe(second);
   });
 
-  it("loads the page again on each Refresh press, though the text did not change", async () => {
+  it("loads the page again on each Refresh press, though the text did not change, and reads the grant again", async () => {
     previewFile.mockResolvedValue({ url: "http://127.0.0.1:1/preview/g/a.html", scope: "/Users/me", singleFile: false });
     const { rerender } = render(<HtmlPreview path="/Users/me/a.html" text="one" name="a.html" reloads={0} />);
     const first = await screen.findByTestId("file-html-frame");
     rerender(<HtmlPreview path="/Users/me/a.html" text="one" name="a.html" reloads={1} />);
-    expect(screen.getByTestId("file-html-frame")).not.toBe(first);
-    expect(previewFile).toHaveBeenCalledTimes(1);
+    const second = screen.getByTestId("file-html-frame");
+    expect(second).not.toBe(first);
+    await waitFor(() => {
+      expect(previewFile).toHaveBeenCalledTimes(2);
+    });
+    expect(screen.getByTestId("file-html-frame")).toBe(second);
   });
 
   it("posts the theme to the frame on load and on every theme change", async () => {

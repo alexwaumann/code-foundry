@@ -1,4 +1,5 @@
 import { Code, ConnectError } from "@connectrpc/connect";
+import { PageAccessSchema, PageConsent } from "@/gen/codefoundry/v1/page_pb";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CommandView, ConfirmationView } from "@/api/command";
 import type { ThreadView } from "@/api/threads";
@@ -19,9 +20,9 @@ vi.mock("@/api/command", async (orig) => ({
   confirmationOf: (err: unknown) => (err instanceof NeedsConfirm ? err.confirm : null),
 }));
 // The daemon's page storage, in memory; full past 3 keys.
-const pageStore = vi.hoisted(() => ({ values: new Map<string, Record<string, string>>(), sets: [] as string[] }));
+const pageStore = vi.hoisted(() => ({ values: new Map<string, Record<string, string>>(), sets: [] as string[], refuse: null as Error | null }));
 vi.mock("@/api/pageStorage", () => ({
-  getPageStorage: (threadId: string) => Promise.resolve({ ...pageStore.values.get(threadId) }),
+  getPageStorage: (threadId: string) => (pageStore.refuse ? Promise.reject(pageStore.refuse) : Promise.resolve({ ...pageStore.values.get(threadId) })),
   setPageStorage: (threadId: string, key: string, value: string | null) => {
     pageStore.sets.push(`${threadId} ${key}`);
     const vals = Object.fromEntries(Object.entries({ ...pageStore.values.get(threadId) }).filter(([k]) => k !== key));
@@ -37,7 +38,8 @@ vi.mock("@/api/proxyFetch", () => ({ proxyFetch }));
 // PageService for a page no thread owns: storage per path in memory, fetch answered by the test.
 const fileStore = vi.hoisted(() => ({ values: new Map<string, Record<string, string>>(), sets: [] as string[], refuse: null as Error | null }));
 const proxyPageFetch = vi.hoisted(() => vi.fn());
-vi.mock("@/api/page", () => ({
+vi.mock("@/api/page", async (importOriginal) => ({
+  refusedPageOf: (await importOriginal<typeof import("@/api/page")>()).refusedPageOf,
   getPageFileStorage: (path: string) => (fileStore.refuse ? Promise.reject(fileStore.refuse) : Promise.resolve({ ...fileStore.values.get(path) })),
   setPageFileStorage: (path: string, key: string, value: string | null) => {
     if (fileStore.refuse) return Promise.reject(fileStore.refuse);
@@ -77,6 +79,7 @@ function host(threadId: string | null = "t-1", page?: PageBridge) {
   const errors: { call: string; code: string; message: string }[] = [];
   const attention = { present: true };
   const asked = { n: 0 };
+  const stale = { n: 0 };
   const h = createBridgeHost({
     threadId,
     ...(page ? { page } : {}),
@@ -86,8 +89,9 @@ function host(threadId: string | null = "t-1", page?: PageBridge) {
     post: (m) => posts.push(m as unknown as Record<string, unknown>),
     onError: (e) => errors.push(e),
     onAsk: () => asked.n++,
+    onStale: () => stale.n++,
   });
-  return { h, posts, errors, attention, asked };
+  return { h, posts, errors, attention, asked, stale };
 }
 
 const run = (id: string, verb: string, args: Record<string, string> = {}) => ({ cf: 1, type: "cf:run", id, verb, args });
@@ -121,6 +125,7 @@ beforeEach(() => {
   listCommands.mockResolvedValue(commands);
   pageStore.values.clear();
   pageStore.sets = [];
+  pageStore.refuse = null;
   fileStore.values.clear();
   fileStore.sets = [];
   fileStore.refuse = null;
@@ -983,5 +988,88 @@ describe("bridge host: a page no thread owns", () => {
     const { h } = host("t-1");
     h.receive(hello);
     expect(h.setPage({ kind: "ask" })).toBe(false);
+  });
+});
+
+/**
+ * The page's access changed where this frame did not see it (another window, the CLI, its
+ * thread removed): the daemon refuses, the page is told the truth, and the frame is asked
+ * once to read its grant again (docs/notes/page-access-live.md).
+ */
+describe("bridge host: the page's access changed elsewhere", () => {
+  const refusedByDaemon = () =>
+    new ConnectError("x.list: the user did not allow /Users/me/p/page.html to use Code Foundry", Code.PermissionDenied, undefined, [
+      { desc: PageAccessSchema, value: { path: PAGE, consent: PageConsent.REFUSED, answer: PageConsent.REFUSED } },
+    ]);
+
+  it("a run names the page it comes from, so the daemon can refuse it; a thread's page names none", async () => {
+    invokeCommand.mockResolvedValue({ message: "", resultJson: "" });
+    const alone = host(null, ALLOWED);
+    alone.h.receive(run("r", "thread.list"));
+    await vi.waitFor(() => {
+      expect(invokeCommand).toHaveBeenCalledWith("thread.list", expect.objectContaining({ activeThreadId: "", origin: "page", pagePath: PAGE }), {}, ...signalled);
+    });
+    invokeCommand.mockClear();
+    const owned = host("t-1");
+    owned.h.receive(run("r", "thread.list"));
+    await vi.waitFor(() => {
+      expect(invokeCommand).toHaveBeenCalled();
+    });
+    expect(invokeCommand.mock.calls[0]?.[1]).not.toHaveProperty("pagePath");
+  });
+
+  it("a run the daemon refuses for the page's answer says the user has not allowed it, quietly, and asks for the grant once", async () => {
+    invokeCommand.mockRejectedValue(refusedByDaemon());
+    const { h, posts, errors, stale } = host(null, ALLOWED);
+    h.receive(run("a", "thread.list"));
+    h.receive(run("b", "thread.list"));
+    await vi.waitFor(() => {
+      expect(posts.filter((p) => p.type === "cf:result")).toHaveLength(2);
+    });
+    expect(posts).toContainEqual({ type: "cf:result", id: "a", ok: false, error: { code: "unavailable", message: NOT_ALLOWED_MSG } });
+    expect(errors).toEqual([]);
+    expect(stale.n).toBe(1);
+    // A new access (the grant came back) may ask again when it, too, goes stale.
+    h.setPage({ kind: "allowed", path: "/Users/me/p/moved.html" });
+    h.receive(run("c", "thread.list"));
+    await vi.waitFor(() => {
+      expect(stale.n).toBe(2);
+    });
+  });
+
+  it("another refusal is the command's own: no grant read", async () => {
+    invokeCommand.mockRejectedValue(new ConnectError("a page cannot answer for itself", Code.PermissionDenied));
+    const { h, posts, stale } = host(null, ALLOWED);
+    h.receive(run("a", "thread.list"));
+    await vi.waitFor(() => {
+      expect(posts).toContainEqual(expect.objectContaining({ type: "cf:result", id: "a", ok: false }));
+    });
+    expect(posts).not.toContainEqual(expect.objectContaining({ error: { code: "unavailable", message: NOT_ALLOWED_MSG } }));
+    expect(stale.n).toBe(0);
+  });
+
+  it("storage or fetch refused for consent asks for the grant", async () => {
+    fileStore.refuse = new ConnectError("not allowed", Code.PermissionDenied);
+    const a = host(null, ALLOWED);
+    a.h.receive({ cf: 1, type: "cf:store", id: "w", key: "k", value: "1" });
+    await vi.waitFor(() => {
+      expect(a.stale.n).toBe(1);
+    });
+    proxyPageFetch.mockRejectedValue(new ConnectError("not asked", Code.FailedPrecondition));
+    const b = host(null, ALLOWED);
+    b.h.receive({ cf: 1, type: "cf:fetch", id: "f", url: "https://api.example.com/x", method: "GET", headers: {}, body: "", timeout: 1000 });
+    await vi.waitFor(() => {
+      expect(b.stale.n).toBe(1);
+    });
+  });
+
+  it("a ready whose storage cannot be read (its thread was removed) still goes out, and asks for the grant", async () => {
+    const { h, posts, stale } = host("t-gone");
+    pageStore.refuse = new ConnectError('thread "t-gone" was removed', Code.FailedPrecondition);
+    h.receive(hello);
+    await vi.waitFor(() => {
+      expect(posts).toContainEqual(expect.objectContaining({ type: "cf:ready" }));
+    });
+    expect(stale.n).toBe(1);
   });
 });

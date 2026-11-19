@@ -62,6 +62,8 @@ type EventsDeps struct {
 	Layout layout.Store
 	// Notification is the bell's notifications.
 	Notification NotificationStore
+	// Pages is the page store: its source says which pages to read again (api/page_events.go).
+	Pages PageStore
 	// Done ends every stream when closed (daemon shutdown). May be nil.
 	Done <-chan struct{}
 	// Epoch is Event.epoch, the daemon instance; empty draws a random one (NewEvents).
@@ -145,7 +147,7 @@ type eventResumer interface{ resume(ctx context.Context) }
 
 // sources lists the stream's sources in the order their snapshots are sent (see
 // events.proto: project, workspace, terminal, thread, thread, gh, gitops, theme, settings,
-// update, action, plugin, skill, memory, search, layout, notification),
+// update, action, plugin, skill, memory, search, layout, notification, page),
 // followed by UI intents.
 func (h *Events) sources() []eventSource {
 	d := h.deps
@@ -198,6 +200,9 @@ func (h *Events) sources() []eventSource {
 	}
 	if d.Notification != nil {
 		out = append(out, notificationSource{store: d.Notification, bus: d.Bus}) // api/notification.go
+	}
+	if d.Pages != nil {
+		out = append(out, pageSource{bus: d.Bus}) // api/page_events.go
 	}
 	out = append(out, uiSource{bus: d.Bus})
 	return out

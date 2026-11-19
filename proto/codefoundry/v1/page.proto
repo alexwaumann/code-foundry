@@ -135,3 +135,19 @@ message PageProxyFetchResponse {
   // The status's text ("Not Found"), without the code.
   string status_text = 5;
 }
+
+// PageEvent says which pages the daemon may now answer otherwise for (an owner, the user's
+// answer), so a client showing one reads its answer again (FilesystemService.PreviewFile or
+// GetPage) and every frame on it follows: a page refused in one window or from the CLI stops
+// in every window, and a page whose owning thread is removed is asked about again. It is
+// EventService's page source (EVENT_SOURCE_PAGE). It names pages, never their answer, and
+// may name one whose answer did not change.
+message PageEvent {
+  // The resolved paths (PageAccess.path) whose owner or answer changed.
+  repeated string paths = 1;
+  // A thread that was removed: every page it owned (owner_thread) has no owner now.
+  string removed_thread = 2;
+  // Any page may have changed: the source's snapshot (on connect, and after the client
+  // missed events). Read every page shown again.
+  bool all = 3;
+}

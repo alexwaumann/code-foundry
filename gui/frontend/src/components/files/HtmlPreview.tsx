@@ -28,7 +28,11 @@ import { FileEmptyState, FileLoading } from "./states";
  * its owning thread's bridge, named in the footer when that is not the tab's thread; for a
  * page no thread owns, the user's answer. A page not asked about yet that loads the bridge
  * gets the band (PageConsentBand) above it; the footer shows the answer and changes it
- * (Stop allowing, Allow Code Foundry). An answer reads the grant again (stores/pageAnswers.ts).
+ * (Stop allowing, Allow Code Foundry). The tab follows the daemon's word about the page
+ * whenever it changes (docs/notes/page-access-live.md): an answer given anywhere or a new or
+ * removed owner (the page event, stores/pageAnswers.ts), a Refresh, an edit, and a call the
+ * daemon refused because the page may not use Code Foundry any more (`onStale`) read the grant
+ * again; the frame follows the new grant (HtmlFrame).
  */
 export function HtmlPreview({ path, text, name, page: own, reloads = 0 }: { path: string; text: string; name: string; page?: { title: string } | undefined; /** The user's Refresh presses: each loads the page again, as written. */ reloads?: number }) {
   const grant = usePreviewGrant("", path);
@@ -42,9 +46,18 @@ export function HtmlPreview({ path, text, name, page: own, reloads = 0 }: { path
   const [askedBy, setAskedBy] = useState("");
   const [answering, setAnswering] = useState(false);
   const ownerName = useThreadsStore((s) => (page.actsFor ? s.byId[page.actsFor]?.name || page.actsFor : ""));
+  // The user's Refresh presses, last seen: each reads the grant again too.
+  const [prevReloads, setPrevReloads] = useState(reloads);
+  // An edit or a Refresh loads the page again: under what the daemon says of it now (its owner
+  // may be gone, its answer changed), not what it said when the tab opened.
   if (text !== prevText) {
     setPrevText(text);
     setVersion(version + 1);
+    grant.retry();
+  }
+  if (reloads !== prevReloads) {
+    setPrevReloads(reloads);
+    grant.retry();
   }
 
   if (grant.loading)
@@ -88,6 +101,7 @@ export function HtmlPreview({ path, text, name, page: own, reloads = 0 }: { path
         onAsk={() => {
           if (access?.consent === "not-asked") setAskedBy(access.path);
         }}
+        onStale={grant.retry}
         className="min-h-0 flex-1"
         onPageErrors={setErrors}
         testId="file-html-frame"

@@ -44,6 +44,12 @@ message UiContext {
   reserved 7;
   reserved "active_session_rendered";
   CallOrigin origin = 8;
+  // The page a call from a page with no thread comes from (PageAccess.path; the GUI's bridge
+  // host sets it, never the page): Invoke refuses the call PermissionDenied, with a
+  // PageAccess detail saying the page's answer now, unless a thread owns the page or the
+  // user allowed it (docs/notes/page-access-live.md). Empty (a thread's page, a GUI older
+  // than the field): not checked.
+  string page_path = 9;
 }
 
 enum ArgType {

@@ -6,7 +6,8 @@
  * answer changes only through the page.allow and page.disallow commands; nothing here
  * changes it. A page's own reads and writes, not user actions: no command.
  */
-import { PageConsent, PageOwnerSource, PageService, type PageAccess } from "@/gen/codefoundry/v1/page_pb";
+import { PageAccessSchema, PageConsent, PageOwnerSource, PageService, type PageAccess, type PageEvent } from "@/gen/codefoundry/v1/page_pb";
+import { ConnectError } from "@connectrpc/connect";
 import { daemon, type DaemonConnection } from "./endpoint";
 import type { PageStorageValues } from "./pageStorage";
 import type { ProxyFetchAnswer, ProxyFetchCall } from "./proxyFetch";
@@ -60,6 +61,32 @@ export function toPageAccessView(p: PageAccess | undefined): PageAccessView | nu
     answer: answer === null || answer === "owned" ? "not-asked" : answer,
     unavailableReason: p.unavailableReason,
   };
+}
+
+/**
+ * EventService's page source (docs/notes/page-access-live.md): which pages to read again,
+ * never their answer. `paths` changed owner or answer; `removedThread`'s pages lost their
+ * owner; `all`: any page may have (on connect, after missed events).
+ */
+export interface PageEventView {
+  paths: readonly string[];
+  removedThread: string;
+  all: boolean;
+}
+
+export function toPageEventView(e: PageEvent): PageEventView {
+  return { paths: [...e.paths], removedThread: e.removedThread, all: e.all };
+}
+
+/**
+ * The daemon's refusal of a command from a page no thread owns that may not use Code Foundry
+ * now (Invoke's PermissionDenied with a PageAccess detail): the page's access then; null for
+ * any other error.
+ */
+export function refusedPageOf(err: unknown): PageAccessView | null {
+  if (!(err instanceof ConnectError)) return null;
+  const [d] = err.findDetails(PageAccessSchema);
+  return d ? toPageAccessView(d) : null;
 }
 
 const CONSENTS: readonly string[] = ["owned", "allowed", "refused", "not-asked", "unavailable"];

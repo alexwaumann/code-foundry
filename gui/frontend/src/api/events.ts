@@ -7,6 +7,7 @@ import { toGitOpsEventView, type GitOpsEventView } from "./gitops";
 import { toLayoutEventView, type LayoutEventView } from "./layout";
 import { toMemoryEventView, type MemoryEventView } from "./memory";
 import { toNotificationEventView, type NotificationEventView } from "./notifications";
+import { toPageEventView, type PageEventView } from "./page";
 import { toSearchActivityView, type SearchActivityView } from "./search";
 import { toPluginEventView, type PluginEventView } from "./plugin";
 import { toProjectEventView, type ProjectEventView } from "./project";
@@ -44,7 +45,8 @@ export type EventView =
   | { source: "search"; event: SearchActivityView }
   | { source: "theme"; event: ThemesSnapshotView }
   | { source: "layout"; event: LayoutEventView }
-  | { source: "notification"; event: NotificationEventView };
+  | { source: "notification"; event: NotificationEventView }
+  | { source: "page"; event: PageEventView };
 
 export function toEventView(ev: Event): EventView | null {
   const e = ev.event;
@@ -111,6 +113,8 @@ export function toEventView(ev: Event): EventView | null {
     }
     case "notification":
       return { source: "notification", event: toNotificationEventView(e.value) };
+    case "page":
+      return { source: "page", event: toPageEventView(e.value) };
     default:
       return null;
   }

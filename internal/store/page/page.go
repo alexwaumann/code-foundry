@@ -37,6 +37,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/alexwaumann/code-foundry/internal/bus"
 	"github.com/alexwaumann/code-foundry/internal/fsx"
 	"github.com/alexwaumann/code-foundry/internal/pagestorage"
 )
@@ -102,6 +103,15 @@ type Access struct {
 	Consent Consent
 }
 
+// Changed is published on the bus (bus.Publish[page.Changed]) when the page at Path got
+// another owner (Record) or the user another answer (SetConsent), so every frame showing it
+// reads its access again (docs/notes/page-access-live.md). A removed thread's pages lose
+// their owner without one: the API's page source tells clients from thread.Removed.
+type Changed struct {
+	// Path is the page's resolved path (Access.Path).
+	Path string
+}
+
 // Allowed reports whether the page may use the bridge: a thread owns it, or the user
 // allowed it.
 func (a Access) Allowed() bool { return a.Owner != "" || a.Consent == Allowed }
@@ -123,6 +133,8 @@ type Options struct {
 	// thread that does not is no one's. Nil: every one does.
 	ThreadExists func(id string) bool
 	Log          *slog.Logger
+	// Bus hears Changed. Nil: nothing is published.
+	Bus *bus.Bus
 	// Now is the clock; nil is time.Now.
 	Now func() time.Time
 }
@@ -252,6 +264,10 @@ func (s *Store) Record(ctx context.Context, id, path, how string) error {
 	if id == "" {
 		return fmt.Errorf("%w: no thread", ErrInvalidArgument)
 	}
+	before, err := s.access(ctx, real)
+	if err != nil {
+		return err
+	}
 	now := s.o.Now().UnixMilli()
 	if err := s.write(ctx, "page_owners", real, func(tx *sql.Tx, key string) error {
 		_, err := tx.ExecContext(ctx, `INSERT INTO page_owners (path, thread_id, how, updated_at) VALUES (?, ?, ?, ?)
@@ -261,7 +277,17 @@ func (s *Store) Record(ctx context.Context, id, path, how string) error {
 	}); err != nil {
 		return fmt.Errorf("page: record %s as %s's: %w", real, id, err)
 	}
+	// Only a new owner changes what a frame gets: a thread writing its own page again is no news.
+	if before.Owner != id {
+		s.publish(real)
+	}
 	return nil
+}
+
+func (s *Store) publish(real string) {
+	if s.o.Bus != nil {
+		bus.Publish(s.o.Bus, Changed{Path: real})
+	}
 }
 
 // keys are the keys table (page_owners or page_consent) has rows of the page at real
@@ -380,6 +406,10 @@ func (s *Store) SetConsent(ctx context.Context, path string, allowed bool) (Acce
 	if err != nil {
 		return Access{}, err
 	}
+	before, err := s.access(ctx, real)
+	if err != nil {
+		return Access{}, err
+	}
 	now := s.o.Now().UnixMilli()
 	if err := s.write(ctx, "page_consent", real, func(tx *sql.Tx, key string) error {
 		_, err := tx.ExecContext(ctx, `INSERT INTO page_consent (path, allowed, updated_at) VALUES (?, ?, ?)
@@ -389,7 +419,11 @@ func (s *Store) SetConsent(ctx context.Context, path string, allowed bool) (Acce
 	}); err != nil {
 		return Access{}, fmt.Errorf("page: consent of %s: %w", real, err)
 	}
-	return s.access(ctx, real)
+	after, err := s.access(ctx, real)
+	if err == nil && after.Consent != before.Consent {
+		s.publish(real)
+	}
+	return after, err
 }
 
 // Allow returns the page's access when it may use the bridge without a thread: a thread

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { previewFile, type FilePreview } from "@/api/files";
 import { errorMessage, isAbort } from "@/api/stream";
 import { useHealthStore } from "@/stores/health";
-import { usePageAnswers } from "@/stores/pageAnswers";
+import { pageChanges, usePageAnswers } from "@/stores/pageAnswers";
 
 /** A page's height request, `{ type: "cf:resize", height }` (CSS px, positive); null for any other message. */
 export function resizeHeight(data: unknown): number | null {
@@ -122,10 +122,13 @@ export interface PreviewGrant {
  * Asks the daemon once per (baseDir, path) for a URL serving the file and what it may load
  * (FilesystemService.PreviewFile): `path` absolute, or relative to `baseDir`. Again when the
  * daemon restarts (its pid changes): grants die with it, and a frame reloading on a dead one
- * (a theme switch, an edit) would come back blank. Again when the user answers whether the
- * page may use Code Foundry (stores/pageAnswers.ts), in this tab or another: the grant carries
- * the answer (FilePreview.page). The last grant stays until the new one arrives, so a frame
- * that is up does not flash.
+ * (a theme switch, an edit) would come back blank. Again when the daemon's word about the page
+ * changed (stores/pageAnswers.ts: its owner or the user's answer, from any window or the CLI,
+ * its owner removed, or the event stream connected again): the grant carries it
+ * (FilePreview.page; docs/notes/page-access-live.md). Again on `retry` (Retry, the tab's
+ * Refresh, an edit of the file, a call the daemon refused as the page's access changed). The
+ * grant's URL is the daemon's one per file, so reading it again reloads nothing by itself; the
+ * last grant stays until the new one arrives, so a frame that is up does not flash.
  */
 export function usePreviewGrant(baseDir: string, path: string): PreviewGrant {
   const key = `${baseDir}\u0000${path}`;
@@ -136,13 +139,16 @@ export function usePreviewGrant(baseDir: string, path: string): PreviewGrant {
   const [epoch, setEpoch] = useState({ pid: daemon, n: 0 });
   if (daemon !== null && daemon !== epoch.pid) setEpoch({ pid: daemon, n: epoch.n + 1 });
   const current = state.key === key ? state : null;
-  // An answer given for this page since its grant came asks again; one given before it does not.
-  const pagePath = current?.preview?.page?.path ?? "";
-  const answers = usePageAnswers((s) => (pagePath ? (s.byPath[pagePath] ?? 0) : 0));
-  const [seen, setSeen] = useState({ path: "", n: 0 });
-  if (pagePath !== seen.path) setSeen({ path: pagePath, n: answers });
-  else if (answers !== seen.n) {
-    setSeen({ path: pagePath, n: answers });
+  // A change to this page since its grant came asks again; one before it does not.
+  const page = current?.preview?.page;
+  const pagePath = page?.path ?? "";
+  const owner = page?.consent === "owned" ? page.ownerThread : "";
+  const changes = usePageAnswers((s) => pageChanges(s, pagePath, owner));
+  const followed = `${pagePath}\u0000${owner}`;
+  const [seen, setSeen] = useState({ followed: "", n: 0 });
+  if (followed !== seen.followed) setSeen({ followed, n: changes });
+  else if (changes !== seen.n) {
+    setSeen({ followed, n: changes });
     setAttempt(attempt + 1);
   }
   useEffect(() => {
