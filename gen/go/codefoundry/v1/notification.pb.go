@@ -501,7 +501,11 @@ type Notification struct {
 	// while scheduled.
 	ArrivedAt *timestamppb.Timestamp `protobuf:"bytes,14,opt,name=arrived_at,json=arrivedAt,proto3" json:"arrived_at,omitempty"`
 	// When a snoozed one comes back; unset when not snoozed.
-	SnoozedUntil  *timestamppb.Timestamp `protobuf:"bytes,15,opt,name=snoozed_until,json=snoozedUntil,proto3" json:"snoozed_until,omitempty"`
+	SnoozedUntil *timestamppb.Timestamp `protobuf:"bytes,15,opt,name=snoozed_until,json=snoozedUntil,proto3" json:"snoozed_until,omitempty"`
+	// The user has seen it since it last arrived: the bell's panel showed it
+	// (notification.seen), or they acted on it. Every arrival makes it unseen; an in-place
+	// update does not. Notifications from before the daemon kept this are seen.
+	Seen          bool `protobuf:"varint,16,opt,name=seen,proto3" json:"seen,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -641,6 +645,13 @@ func (x *Notification) GetSnoozedUntil() *timestamppb.Timestamp {
 	return nil
 }
 
+func (x *Notification) GetSeen() bool {
+	if x != nil {
+		return x.Seen
+	}
+	return false
+}
+
 // NotificationSnapshot is every active notification: the shown ones first (time-sensitive
 // first, then the newest arrival first), then the snoozed and scheduled ones by when they
 // come back.
@@ -650,7 +661,10 @@ type NotificationSnapshot struct {
 	// The shown time-sensitive notifications: the dock badge's share.
 	TimeSensitive int32 `protobuf:"varint,2,opt,name=time_sensitive,json=timeSensitive,proto3" json:"time_sensitive,omitempty"`
 	// Grows by one per change in this daemon's lifetime.
-	Version       uint64 `protobuf:"varint,3,opt,name=version,proto3" json:"version,omitempty"`
+	Version uint64 `protobuf:"varint,3,opt,name=version,proto3" json:"version,omitempty"`
+	// The shown notifications the user has not seen: the bell's corner badge shows while
+	// there are any.
+	Unseen        int32 `protobuf:"varint,4,opt,name=unseen,proto3" json:"unseen,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -702,6 +716,13 @@ func (x *NotificationSnapshot) GetTimeSensitive() int32 {
 func (x *NotificationSnapshot) GetVersion() uint64 {
 	if x != nil {
 		return x.Version
+	}
+	return 0
+}
+
+func (x *NotificationSnapshot) GetUnseen() int32 {
+	if x != nil {
+		return x.Unseen
 	}
 	return 0
 }
@@ -894,7 +915,7 @@ const file_codefoundry_v1_notification_proto_rawDesc = "" +
 	"\n" +
 	"project_id\x18\x02 \x01(\tR\tprojectId\"*\n" +
 	"\x16NotificationOpenAction\x12\x10\n" +
-	"\x03url\x18\x01 \x01(\tR\x03url\"\x90\x05\n" +
+	"\x03url\x18\x01 \x01(\tR\x03url\"\xa4\x05\n" +
 	"\fNotification\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x16\n" +
 	"\x06source\x18\x02 \x01(\tR\x06source\x12\x10\n" +
@@ -914,11 +935,13 @@ const file_codefoundry_v1_notification_proto_rawDesc = "" +
 	"updated_at\x18\r \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x129\n" +
 	"\n" +
 	"arrived_at\x18\x0e \x01(\v2\x1a.google.protobuf.TimestampR\tarrivedAt\x12?\n" +
-	"\rsnoozed_until\x18\x0f \x01(\v2\x1a.google.protobuf.TimestampR\fsnoozedUntil\"\x9b\x01\n" +
+	"\rsnoozed_until\x18\x0f \x01(\v2\x1a.google.protobuf.TimestampR\fsnoozedUntil\x12\x12\n" +
+	"\x04seen\x18\x10 \x01(\bR\x04seen\"\xb3\x01\n" +
 	"\x14NotificationSnapshot\x12B\n" +
 	"\rnotifications\x18\x01 \x03(\v2\x1c.codefoundry.v1.NotificationR\rnotifications\x12%\n" +
 	"\x0etime_sensitive\x18\x02 \x01(\x05R\rtimeSensitive\x12\x18\n" +
-	"\aversion\x18\x03 \x01(\x04R\aversion\"A\n" +
+	"\aversion\x18\x03 \x01(\x04R\aversion\x12\x16\n" +
+	"\x06unseen\x18\x04 \x01(\x05R\x06unseen\"A\n" +
 	"\x18ListNotificationsRequest\x12%\n" +
 	"\x0einclude_closed\x18\x01 \x01(\bR\rincludeClosed\"\x93\x01\n" +
 	"\x19ListNotificationsResponse\x12@\n" +

@@ -41,7 +41,7 @@ var noIndex = []string{
 	"action.last", "composer.draft.clear", "composer.draft.discard", "composer.draft.label", "composer.draft.open",
 	"composer.draft.start", "composer.history", "composer.new", "file.export",
 	"notification.act", "notification.clear", "notification.dismiss", "notification.list", "notification.post",
-	"notification.snooze", "notification.withdraw",
+	"notification.seen", "notification.snooze", "notification.withdraw",
 	"pane.focus", "pane.focus.down", "pane.focus.left", "pane.focus.right", "pane.focus.up", "pane.fullscreen", "pane.move.down",
 	"pane.move.left", "pane.move.right", "pane.move.up", "pane.split", "space.move", "tab.auto-name", "tab.next", "tab.previous", "tab.rename", "tab.reopen",
 	"terminal.cycle", "terminal.quick", "thread.look",

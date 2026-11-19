@@ -15,12 +15,13 @@
 -- 0062 (projects' include patterns for file search) loses each project's own patterns, and a
 -- later update makes the empty table again (docs/notes/file-search-1-includes.md); 0063 (the
 -- bell's notifications) loses every notification and the dismissed keys, so a source's
--- re-post shows again (docs/notes/notifications-1-store.md).
+-- re-post shows again (docs/notes/notifications-1-store.md); 0064 (whether each notification
+-- was seen) goes with that table.
 BEGIN;
 DROP TABLE IF EXISTS layout_spaces;
 DROP TABLE IF EXISTS layout_threads;
 DROP TABLE IF EXISTS layout_meta;
 DROP TABLE IF EXISTS project_include_ignored;
 DROP TABLE IF EXISTS notifications;
-DELETE FROM schema_migrations WHERE version IN (61, 62, 63);
+DELETE FROM schema_migrations WHERE version IN (61, 62, 63, 64);
 COMMIT;
