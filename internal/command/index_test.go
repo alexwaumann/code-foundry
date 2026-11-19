@@ -39,7 +39,7 @@ import (
 //     it put the guide over its budget.
 var noIndex = []string{
 	"action.last", "composer.draft.clear", "composer.draft.discard", "composer.draft.label", "composer.draft.open",
-	"composer.draft.start", "composer.history", "composer.new", "file.export",
+	"composer.draft.start", "composer.history", "composer.new", "file.export", "layout.threads-open-as.preview",
 	"notification.act", "notification.clear", "notification.dismiss", "notification.list", "notification.post",
 	"notification.snooze", "notification.withdraw",
 	"pane.focus", "pane.focus.down", "pane.focus.left", "pane.focus.right", "pane.focus.up", "pane.fullscreen", "pane.move.down",

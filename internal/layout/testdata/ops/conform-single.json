@@ -1,0 +1,101 @@
+{
+  "doc": "Converting to Single: the space keeps its focused thread pane; th-a's pane closes with its thread, and its diff joins its remembered set.",
+  "state": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Space A",
+        "root": {
+          "t": "split",
+          "id": "s-r",
+          "dir": "row",
+          "kids": [
+            {
+              "t": "pane",
+              "id": "p-a",
+              "tabs": [{"id":"t-a","kind":"thread","thread":"th-a"}],
+              "active": "t-a"
+            },
+            {
+              "t": "pane",
+              "id": "p-b",
+              "tabs": [{"id":"t-b","kind":"thread","thread":"th-b"}],
+              "active": "t-b"
+            },
+            {
+              "t": "pane",
+              "id": "p-c",
+              "tabs": [
+                {"id":"t-da","kind":"diff","thread":"th-a","params":{"project":"pj","worktree":"w"}},
+                {"id":"t-pr","kind":"prs"}
+              ],
+              "active": "t-da"
+            }
+          ],
+          "sizes": [0.3,0.4,0.3]
+        },
+        "focus": "p-b",
+        "mru": ["t-b","t-a","t-da"]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "op": {"op":"conform"},
+  "options": {"mode":"single"},
+  "want": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Space A",
+        "root": {
+          "t": "split",
+          "id": "s-r",
+          "dir": "row",
+          "kids": [
+            {
+              "t": "pane",
+              "id": "p-b",
+              "tabs": [{"id":"t-b","kind":"thread","thread":"th-b"}],
+              "active": "t-b"
+            },
+            {"t":"pane","id":"p-c","tabs":[{"id":"t-pr","kind":"prs"}],"active":"t-pr"}
+          ],
+          "sizes": [0.7,0.3]
+        },
+        "focus": "p-b",
+        "mru": ["t-b"]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a",
+    "threads": {
+      "th-a": {
+        "space": "sp-a",
+        "remembered": {
+          "pane": "p-a",
+          "tabs": [
+            {
+              "tab": {
+                "id": "t-da",
+                "kind": "diff",
+                "thread": "th-a",
+                "params": {"project":"pj","worktree":"w"}
+              },
+              "pane": "p-c",
+              "index": 0,
+              "active": true
+            }
+          ]
+        }
+      }
+    }
+  },
+  "result": {
+    "closed": ["t-a"],
+    "kept": ["t-da"],
+    "conformed": {"thread_tabs":1,"composers":0,"panes":1,"moved":0,"spaces":1}
+  }
+}

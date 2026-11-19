@@ -79,6 +79,30 @@ func (l layout) isChild(ctx context.Context, th *v1.Thread) (bool, error) {
 	}
 }
 
+// parentOf is from when from created th, directly or further up its creator chain (the user
+// opened a child from its lead), else "".
+func (l layout) parentOf(ctx context.Context, th *v1.Thread, from string) (string, error) {
+	if l.thread == nil {
+		return "", nil
+	}
+	seen := map[string]bool{}
+	for by := th.GetCreatedBy(); by != "" && !seen[by]; {
+		if by == from {
+			return from, nil
+		}
+		seen[by] = true
+		res, err := l.thread.Get(ctx, connect.NewRequest(&v1.GetThreadRequest{Id: by}))
+		switch {
+		case connect.CodeOf(err) == connect.CodeNotFound:
+			return "", nil
+		case err != nil:
+			return "", err
+		}
+		by = res.Msg.GetThread().GetCreatedBy()
+	}
+	return "", nil
+}
+
 func (l layout) threadCommands() []Command {
 	return []Command{
 		{
@@ -90,7 +114,12 @@ func (l layout) threadCommands() []Command {
 				"archived thread lives in no space: it opens in the current space (or --pane's). The linked tabs it had open " +
 				"when it closed come back (a snoozed thread's when it wakes). From inside a thread it opens without taking the " +
 				"user's focus unless --focus. --preview (the user only, without a place) opens an archived or snoozed thread, " +
-				"or a child (a thread another thread created, while that creator exists), as the space's preview tab, replacing the last one, until tab.keep or a move, a send or its surfaces keep it.",
+				"or a child (a thread another thread created, while that creator exists), as the space's preview tab, replacing the last one, until tab.keep or a move, a send or its surfaces keep it. " +
+				"The setting layout.threads_open_as changes where it opens: under panes a pane shows one thread, and the thread " +
+				"replaces the one in the focused thread pane (else the pane focused last that shows a thread; else it opens in a new " +
+				"pane on the left), which closes as thread.close closes it, its linked tabs switching with it; it opens in a pane of its " +
+				"own only with --split, --outer, --beside, or --pane naming a pane without a thread (a new pane on that pane's left). " +
+				"Under single every open replaces the space's one thread pane, and --beside is refused. Under tabs (the default) it opens as a tab as above.",
 			Args: []ArgSpec{
 				layoutThreadArg(true),
 				paneIDArg("pane", "The pane its tab opens in (a pane of the thread's space)"),
@@ -100,6 +129,10 @@ func (l layout) threadCommands() []Command {
 				edgeArg("outer", "In a new pane on this edge of the whole pane area of the thread's space"),
 				focusArg,
 				{Name: "preview", Type: Bool, Description: "As the space's preview tab when the thread is archived, snoozed or a child (otherwise a kept tab)"},
+				{Name: "beside", Type: String, Description: "In a new pane on the right of this pane, or of this thread's pane (a pane id or a thread id, " +
+					"in the thread's space); refused when layout.threads_open_as is single"},
+				{Name: "from", Type: String, ID: ThreadID, Description: "The thread the user opened it from: when that thread created it, under " +
+					"layout.threads_open_as panes it opens beside that thread's pane instead of replacing a thread" + IDHelp},
 			},
 			NoPalette: true, NoKeybinding: true,
 			Run: func(ctx context.Context, uctx Context, a Args) (Result, error) {
@@ -119,8 +152,10 @@ func (l layout) threadCommands() []Command {
 				switch {
 				case op.Preview && !uctx.FromUser():
 					return Result{}, InvalidArg("preview", "only the user opens a preview; a thread or a page opens a kept tab")
-				case op.Preview && (a.String("pane") != "" || a.String("split") != "" || a.String("outer") != ""):
-					return Result{}, InvalidArg("preview", "a preview opens where a thread's tab opens: no --pane, --split or --outer")
+				case op.Preview && (a.String("pane") != "" || a.String("split") != "" || a.String("outer") != "" || a.String("beside") != ""):
+					return Result{}, InvalidArg("preview", "a preview opens where a thread's tab opens: no --pane, --split, --outer or --beside")
+				case a.String("beside") != "" && (a.String("pane") != "" || a.String("split") != "" || a.String("outer") != "" || a.Has("index")):
+					return Result{}, InvalidArg("beside", "--beside is a place of its own: no --pane, --split, --outer or --index")
 				case a.String("pane") != "" && (a.String("split") != "" || a.String("outer") != ""),
 					a.String("split") != "" && a.String("outer") != "":
 					return Result{}, InvalidArg("pane", "give one of --pane, --split (with --edge) or --outer")
@@ -140,6 +175,12 @@ func (l layout) threadCommands() []Command {
 					i := a.Int("index")
 					op.Index = &i
 				}
+				op.Beside = a.String("beside")
+				if from := a.String("from"); from != "" && from != id {
+					if op.Parent, err = l.parentOf(ctx, th, from); err != nil {
+						return Result{}, err
+					}
+				}
 				focus := wantsFocus(uctx, a)
 				op.Focus = focus
 				c, err := l.apply(ctx, op, !focus)
@@ -155,6 +196,14 @@ func (l layout) threadCommands() []Command {
 				msg := fmt.Sprintf("opened thread %s as %s %s in pane %s of space %s", id, what, c.Result.Tab, c.Result.Pane, c.Result.Space)
 				if c.Result.Existing {
 					msg = fmt.Sprintf("thread %s is open as %s %s in pane %s of space %s", id, what, c.Result.Tab, c.Result.Pane, c.Result.Space)
+				}
+				for _, tb := range c.Result.Closed {
+					if tb.Kind == "thread" && !c.Result.Existing {
+						msg += fmt.Sprintf("; thread %s's tab closed", tb.Thread)
+					}
+				}
+				if c.Result.Collapsed {
+					msg += " (folded: no room for another open pane)"
 				}
 				if n := len(c.Result.Back) + len(c.Result.Placed); n > 0 {
 					msg += fmt.Sprintf("; %s came back", plural(n, "linked tab"))

@@ -91,7 +91,7 @@ func TestAllRegistersEveryDomain(t *testing.T) {
 		"notification.post", "notification.list", "notification.dismiss", "notification.snooze", "notification.act", "notification.clear", "notification.withdraw",
 		"dictation.toggle", "dictation.hold", "dictation.allow", "dictation.start", "dictation.stop", "dictation.download", "dictation.download.cancel", "dictation.remove", "dictation.status",
 		"daemon.capabilities",
-		"layout.show", "space.list", "tab.list", "space.new", "space.rename", "space.remove", "space.switch", "space.move",
+		"layout.show", "layout.threads-open-as.preview", "space.list", "tab.list", "space.new", "space.rename", "space.remove", "space.switch", "space.move",
 		"pane.focus", "pane.move", "pane.split", "pane.close", "pane.resize", "pane.collapse",
 		"pane.focus.left", "pane.focus.down", "pane.focus.up", "pane.focus.right",
 		"pane.move.left", "pane.move.down", "pane.move.up", "pane.move.right",

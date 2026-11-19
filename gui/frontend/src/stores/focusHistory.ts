@@ -14,18 +14,39 @@
  * Going back or forward focuses the entry's tab where it is now (it may have moved), switching
  * space when needed, and skips entries whose tab is gone or that show what is already focused.
  * See docs/notes/shell-15-spaces.md.
+ *
+ * Under layout.threads_open_as panes or single a thread opened replaces the one its pane showed,
+ * so back and forward are the thread history of the pane: an entry of a thread whose tab is gone
+ * opens the thread again (thread.open, which replaces in turn), and an entry is that thread's
+ * whatever tab id it has now (docs/notes/threads-open-as-1-rules.md).
  */
 import { create } from "zustand";
 import { runLayoutCommand, focusTabNow } from "@/shell/commands";
 import { focusedTab } from "@/stores/selectionBridge";
 import { useLayoutStore, type LayoutState } from "@/stores/layout";
+import { useSettingsStore } from "@/stores/settings";
 import { requestPaneFocus } from "@/stores/shellView";
+
+/** The setting that makes an open replace a thread pane's thread (internal/layout modes.go). */
+export const THREADS_OPEN_AS_KEY = "layout.threads_open_as";
+
+/** Whether a value of layout.threads_open_as replaces: panes and single. */
+export function threadsReplace(value: string | undefined): boolean {
+  return value === "panes" || value === "single";
+}
+
+/** Whether the setting replaces now. */
+function replacesNow(): boolean {
+  return threadsReplace(useSettingsStore.getState().snapshot?.values[THREADS_OPEN_AS_KEY]);
+}
 
 /** One focused place. `tab` is "" for a space with no pane (its home composer). */
 export interface FocusEntry {
   space: string;
   pane: string;
   tab: string;
+  /** The thread when the tab is a thread's own tab: under panes and single the entry is the thread's. */
+  thread?: string;
 }
 
 export interface FocusHistoryState {
@@ -47,11 +68,14 @@ type LayoutView = Pick<LayoutState, "currentSpaceId" | "spaces" | "panes" | "tab
 export function focusedEntry(s: LayoutView): FocusEntry | null {
   if (!s.currentSpaceId || !s.spaces[s.currentSpaceId]) return null;
   const tab = focusedTab(s);
-  return { space: s.currentSpaceId, pane: tab?.paneId ?? "", tab: tab?.id ?? "" };
+  const e: FocusEntry = { space: s.currentSpaceId, pane: tab?.paneId ?? "", tab: tab?.id ?? "" };
+  if (tab?.kind === "thread" && tab.thread) e.thread = tab.thread;
+  return e;
 }
 
+/** One place: the same tab, or the same thread's tab (a thread replaced and opened again has a new tab id). */
 function sameEntry(a: FocusEntry | null | undefined, b: FocusEntry | null | undefined): boolean {
-  return !!a && !!b && a.space === b.space && a.tab === b.tab;
+  return !!a && !!b && a.space === b.space && (a.tab === b.tab || (!!a.thread && a.thread === b.thread));
 }
 
 /** The history with `e` pushed (pure): the entries after the current one dropped, unless `e` is the current one. */
@@ -63,38 +87,51 @@ export function pushEntry(h: FocusHistoryState, e: FocusEntry): FocusHistoryStat
 
 /**
  * Where an entry's place is now: its tab's space and pane (a tab keeps its id when it moves), or
- * for a space without a tab, that space. Null when the tab or the space is gone.
+ * for a space without a tab, that space. Null when the tab or the space is gone. With `reopen`
+ * (threads open as panes or single), a thread's entry whose tab is gone is its thread's tab open
+ * now, else the thread to open again (tab "").
  */
-export function liveEntry(e: FocusEntry, s: Pick<LayoutState, "spaces" | "panes" | "tabs">): FocusEntry | null {
-  if (!e.tab) return s.spaces[e.space] ? e : null;
-  const tab = s.tabs[e.tab];
+export function liveEntry(e: FocusEntry, s: Pick<LayoutState, "spaces" | "panes" | "tabs">, reopen = false): FocusEntry | null {
+  if (!e.tab && !e.thread) return s.spaces[e.space] ? e : null;
+  const tab = e.tab ? s.tabs[e.tab] : undefined;
   const space = tab ? s.panes[tab.paneId]?.spaceId : undefined;
-  return tab && space ? { space, pane: tab.paneId, tab: tab.id } : null;
+  if (tab && space) return { space, pane: tab.paneId, tab: tab.id, ...(e.thread ? { thread: e.thread } : {}) };
+  if (!reopen || !e.thread) return null;
+  const open = Object.values(s.tabs).find((t) => t.kind === "thread" && t.thread === e.thread);
+  const at = open ? s.panes[open.paneId]?.spaceId : undefined;
+  if (open && at) return { space: at, pane: open.paneId, tab: open.id, thread: e.thread };
+  return { space: e.space, pane: "", tab: "", thread: e.thread };
 }
 
 /**
  * The index back (-1) or forward (1) would go to: the nearest entry that way that is live and is
  * not what is focused now. Null when there is none.
  */
-export function stepIndex(h: FocusHistoryState, s: LayoutView, by: 1 | -1): number | null {
+export function stepIndex(h: FocusHistoryState, s: LayoutView, by: 1 | -1, reopen = false): number | null {
   const now = focusedEntry(s);
   for (let i = h.index + by; i >= 0 && i < h.entries.length; i += by) {
     const e = h.entries[i];
-    const live = e ? liveEntry(e, s) : null;
+    const live = e ? liveEntry(e, s, reopen) : null;
     if (live && !sameEntry(live, now)) return i;
   }
   return null;
 }
 
-/** Whether back (-1) or forward (1) would go anywhere; it only reads, so a selector may call it. */
-export function canStepFocus(h: FocusHistoryState, s: LayoutView, by: 1 | -1): boolean {
-  return stepIndex(h, s, by) !== null;
+/** Whether back (-1) or forward (1) would go anywhere; it only reads, so a selector may call it. `reopen`: liveEntry's. */
+export function canStepFocus(h: FocusHistoryState, s: LayoutView, by: 1 | -1, reopen = false): boolean {
+  return stepIndex(h, s, by, reopen) !== null;
 }
 
-/** Whether back (-1) or forward (1) would go anywhere, following both the history and the layout. */
+/** Whether back (-1) or forward (1) would go anywhere now, under the setting as it is. */
+export function canStepFocusNow(by: 1 | -1): boolean {
+  return canStepFocus(useFocusHistoryStore.getState(), useLayoutStore.getState(), by, replacesNow());
+}
+
+/** Whether back (-1) or forward (1) would go anywhere, following the history, the layout and the setting. */
 export function useCanStepFocus(by: 1 | -1): boolean {
   const h = useFocusHistoryStore((x) => x);
-  return useLayoutStore((s) => canStepFocus(h, s, by));
+  const reopen = useSettingsStore((x) => threadsReplace(x.snapshot?.values[THREADS_OPEN_AS_KEY]));
+  return useLayoutStore((s) => canStepFocus(h, s, by, reopen));
 }
 
 /** Records what the layout has focused now. */
@@ -114,9 +151,10 @@ export function recordFocus(): void {
 export async function stepFocus(by: 1 | -1): Promise<boolean> {
   const s = useLayoutStore.getState();
   const h = useFocusHistoryStore.getState();
-  const i = stepIndex(h, s, by);
+  const reopen = replacesNow();
+  const i = stepIndex(h, s, by, reopen);
   const e = i === null ? undefined : h.entries[i];
-  const live = e ? liveEntry(e, s) : null;
+  const live = e ? liveEntry(e, s, reopen) : null;
   if (i === null || !live) return false;
   // The index moves first: the focus the step causes is then the current entry, and is not pushed.
   useFocusHistoryStore.setState({ index: i });
@@ -124,6 +162,10 @@ export async function stepFocus(by: 1 | -1): Promise<boolean> {
     const ok = await focusTabNow(live.tab);
     if (ok) requestPaneFocus(live.pane);
     return ok;
+  }
+  if (live.thread) {
+    // Panes and single: the thread opens again, replacing the one its pane shows now.
+    return (await runLayoutCommand("thread.open", { id: live.thread, focus: "true" })) !== null;
   }
   return (await runLayoutCommand("space.switch", { space: live.space, focus: "true" })) !== null;
 }

@@ -1604,7 +1604,14 @@ what depends on the drawn frame (rails, full screen, tab fitting, drag targets, 
   `layout.smart_placement`): a thread's own tab or a composer opened with no pane chosen goes
   to the focused pane only when it holds a thread or composer tab, else to the nearest pane
   that does (`rank`'s centre distance), else to the focused pane (`hostPane`); the same
-  setting turns the kind rules of placement off.
+  setting turns the kind rules of placement off. **Threads open as** (`modes.go`, setting
+  `layout.threads_open_as`, `Options.Mode`): under `panes` a pane that shows a thread holds
+  only that thread's tab (or a composer), `open_thread` replaces the target thread pane's
+  thread (the old one closes as `close_thread` closes it) unless a place asks for a new pane,
+  and placement keeps other tabs out of thread panes; `single` allows one thread pane per space.
+  Under both, every op ends with `conform`, which is also the conversion (the `conform` op,
+  applied by the daemon when the setting changes and by the store at load), and smart swap is
+  forced on (`docs/notes/threads-open-as-1-rules.md`).
 * **Focus from a thread**: `Options.KeepFocus` runs any op and puts back the user's current
   space, focused tabs and MRU, so a model's tab waits behind the user's focused tab. The
   commands use it for every call not made by the user in person (§7).

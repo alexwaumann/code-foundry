@@ -125,7 +125,17 @@ func (o *OpenSurface) apply(t *tx) (Result, error) {
 }
 
 // place opens tab tb in space sp by the rules above; chosen is the caller's pane or nil.
+//
+// Under Panes and Single (modes.go) a composer goes where a thread opens (placeComposer), and
+// no other tab joins a pane that holds a thread: such a chosen pane is passed over (the rules
+// place the tab), the rules skip those panes (admits), and where a rule would put it in one
+// (the focused pane, rule 6) it goes to the most recently focused pane of other tabs, else to a
+// new pane on that pane's right (surfacePane).
 func (t *tx) place(sp *Space, chosen *Node, tb *Tab, focus bool, w, h float64) (Result, error) {
+	panes := t.opts.Mode.Panes()
+	if panes && chosen != nil && tb.Kind != "compose" && holdsThread(chosen) {
+		chosen = nil
+	}
 	same, err := t.prepare(sp, tb)
 	if err != nil {
 		return Result{}, err
@@ -135,9 +145,26 @@ func (t *tx) place(sp *Space, chosen *Node, tb *Tab, focus bool, w, h float64) (
 		t.keepThread(tb.Thread) // one of its thread's surfaces opened (preview.go)
 	}
 	if same != nil {
+		if panes && same.Kind == "compose" {
+			chosen = nil // a composer is focused where it is: it never joins another pane
+		}
 		return t.placeExisting(sp, chosen, same, tb, focus), nil
 	}
+	if panes && tb.Kind == "compose" {
+		return t.placeComposer(sp, chosen, tb, focus, w, h)
+	}
 	put := func(p *Node, at int, rule string) (Result, error) {
+		if panes && holdsThread(p) {
+			np, fold, err := t.surfacePane(sp, p, tb, w, h)
+			if err != nil {
+				return Result{}, err
+			}
+			t.show(sp, np, tb.ID, focus)
+			if fold {
+				t.refold(np.ID)
+			}
+			return Result{Space: sp.ID, Pane: np.ID, Tab: tb.ID, Rule: rule, Collapsed: fold}, nil
+		}
 		p.Tabs = slices.Insert(p.Tabs, clampIndex(at, len(p.Tabs)), tb)
 		t.show(sp, p, tb.ID, focus)
 		return Result{Space: sp.ID, Pane: p.ID, Tab: tb.ID, Rule: rule}, nil
@@ -177,7 +204,7 @@ func (t *tx) place(sp *Space, chosen *Node, tb *Tab, focus bool, w, h float64) (
 	// Rule 2: a pane holding this thread's linked tabs, after the last of them.
 	var mine []*Node
 	for _, p := range Panes(sp.Root) {
-		if lastLinkedOf(p, tb.Thread) >= 0 && canTake(sp, p, w, h, tb) {
+		if lastLinkedOf(p, tb.Thread) >= 0 && canTake(sp, p, w, h, tb) && t.admits(p, tb) {
 			mine = append(mine, p)
 		}
 	}
@@ -190,7 +217,7 @@ func (t *tx) place(sp *Space, chosen *Node, tb *Tab, focus bool, w, h float64) (
 	var next []*Node
 	for _, side := range sideOrder {
 		for _, id := range L.SideNeighbours(tp.ID, side) {
-			if _, p := t.st.FindPane(id); p != nil && holdsLinked(p) && !slices.Contains(next, p) && canTake(sp, p, w, h, tb) {
+			if _, p := t.st.FindPane(id); p != nil && holdsLinked(p) && !slices.Contains(next, p) && canTake(sp, p, w, h, tb) && t.admits(p, tb) {
 				next = append(next, p)
 			}
 		}
@@ -203,7 +230,7 @@ func (t *tx) place(sp *Space, chosen *Node, tb *Tab, focus bool, w, h float64) (
 	// Rule 4: any pane of the space holding linked surfaces.
 	var holding []*Node
 	for _, p := range Panes(sp.Root) {
-		if holdsLinked(p) && canTake(sp, p, w, h, tb) {
+		if holdsLinked(p) && canTake(sp, p, w, h, tb) && t.admits(p, tb) {
 			holding = append(holding, p)
 		}
 	}
@@ -267,7 +294,7 @@ func (t *tx) kindHost(sp *Space, tp *Node, tb *Tab, w, h float64) (*Node, int, s
 	holding := func(match func(*Tab) bool) []*Node {
 		var out []*Node
 		for _, p := range Panes(sp.Root) {
-			if !p.Collapsed && slices.ContainsFunc(p.Tabs, match) && canTake(sp, p, w, h, tb) {
+			if !p.Collapsed && slices.ContainsFunc(p.Tabs, match) && canTake(sp, p, w, h, tb) && t.admits(p, tb) {
 				out = append(out, p)
 			}
 		}

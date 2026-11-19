@@ -204,9 +204,11 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, threadEnv 
 	}
 	if s.layout, err = layout.New(ctx, layout.Options{DB: s.db, Bus: s.bus, Log: log.With("store", "layout"),
 		SmartSwap:      func() bool { return s.settings.Settings().Layout.SmartSwap },
-		SmartPlacement: func() bool { return s.settings.Settings().Layout.SmartPlacement }}); err != nil {
+		SmartPlacement: func() bool { return s.settings.Settings().Layout.SmartPlacement },
+		ThreadsOpenAs:  func() string { return s.settings.Settings().Layout.ThreadsOpenAs }}); err != nil {
 		return nil, err
 	}
+	convertLayoutOnModeChange(s.settings, s.layout, log.With("store", "layout"))
 	if s.project, err = project.Start(ctx, project.Options{
 		DB: s.db, Bus: s.bus, Log: log, WorktreeRoot: p.Worktrees(), AllowedRoot: s.home, FetchInterval: cfg.FetchInterval(),
 	}); err != nil {

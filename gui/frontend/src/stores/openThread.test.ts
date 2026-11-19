@@ -76,7 +76,7 @@ describe("openThread and the call sites that route through it", () => {
     expect(select.mock.calls).toEqual([
       [{ kind: "thread", id: "child" }, { focusPrompt: true, preview: true }],
       [{ kind: "thread", id: "lead" }, { focusPrompt: true }],
-      [{ kind: "thread", id: "child" }, { focusPrompt: true }],
+      [{ kind: "thread", id: "child" }, { focusPrompt: true, from: "grand" }],
       [{ kind: "thread", id: "child" }, { focusPrompt: false, preview: true }],
       [{ kind: "thread", id: "archived" }, { focusPrompt: true }],
     ]);

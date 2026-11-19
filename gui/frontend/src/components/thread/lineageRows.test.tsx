@@ -144,9 +144,9 @@ describe("Created by note", () => {
     const el = show([wake("w1", "c"), wake("w2", "p")]);
     const [child, lead] = el.querySelectorAll<HTMLElement>('[data-testid="thread-wake-note-link"]');
     fireEvent.click(child as HTMLElement);
-    expect(select).toHaveBeenLastCalledWith({ kind: "thread", id: "c" }, { focusPrompt: true, preview: true });
+    expect(select).toHaveBeenLastCalledWith({ kind: "thread", id: "c" }, { focusPrompt: true, preview: true, from: "s" });
     fireEvent.click(lead as HTMLElement);
-    expect(select).toHaveBeenLastCalledWith({ kind: "thread", id: "p" }, { focusPrompt: true });
+    expect(select).toHaveBeenLastCalledWith({ kind: "thread", id: "p" }, { focusPrompt: true, from: "s" });
   });
 
   it("a wake for an action run: a red cross, the action's name as plain text", () => {

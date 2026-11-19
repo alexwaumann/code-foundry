@@ -60,8 +60,12 @@ type Result struct {
 	// the caller deletes its stored text.
 	Draft string `json:"draft,omitempty"`
 	// Collapsed: the pane the op put back (reopen_closed) came back collapsed, since it
-	// would not fit the pane area open (fit.go).
+	// would not fit the pane area open (fit.go), or the new pane a thread or a surface opened in
+	// under Panes or Single (modes.go) opened folded for want of room.
 	Collapsed bool `json:"collapsed,omitempty"`
+	// Conformed counts what conforming the layout to Options.Mode changed (modes.go conform):
+	// set only when it changed something.
+	Conformed *Conformed `json:"conformed,omitempty"`
 }
 
 // Options are the user settings an op runs with.
@@ -75,6 +79,13 @@ type Options struct {
 	// KeepFocus puts the user's focus back as it was after the op (keep_focus.go): a call
 	// from inside a thread, which never moves the user's focus.
 	KeepFocus bool `json:"keep_focus,omitempty"`
+	// Mode is the setting layout.threads_open_as (modes.go); "" is Tabs. Under Panes and
+	// Single every op ends by conforming the layout, and smart swap is on whatever NoSmartSwap
+	// says.
+	Mode Mode `json:"mode,omitempty"`
+	// W and H are the pane area conform measures in (default DefaultW x DefaultH).
+	W float64 `json:"w,omitempty"`
+	H float64 `json:"h,omitempty"`
 }
 
 var registry = map[string]func() Op{}
@@ -198,12 +209,17 @@ func ApplyWith(st *State, op Op, ids IDs, opts Options) (*State, Result, error) 
 	if err != nil {
 		return st, Result{}, fmt.Errorf("layout %s: %w", op.OpName(), err)
 	}
+	if t.opts.Mode.Panes() {
+		t.finish()
+		t.conform(&res)
+	}
 	t.finish()
 	if opts.KeepFocus {
 		keepFocus(st, t.st)
 		keepCollapsed(t.st, t.revealed)
 	}
-	if after := focusedThreadTab(t.st); !opts.NoSmartSwap && after.thread != "" && after != before {
+	swap := !opts.NoSmartSwap || opts.Mode.Panes() // Panes and Single force smart swap on
+	if after := focusedThreadTab(t.st); swap && after.thread != "" && after != before {
 		res.Swapped = smartSwap(t.st, after.space, after.thread)
 	}
 	if err := Check(t.st); err != nil {

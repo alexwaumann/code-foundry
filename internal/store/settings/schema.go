@@ -252,6 +252,7 @@ const (
 	KeySmartSwap                 = "layout.smart_swap"
 	KeySmartPlacement            = "layout.smart_placement"
 	KeyThreadInfo                = "layout.thread_info"
+	KeyThreadsOpenAs             = "layout.threads_open_as"
 	KeyNeedsScope                = "sidebar.needs_scope"
 	KeyDockBadge                 = "notifications.dock_badge"
 	KeyBounce                    = "notifications.bounce"
@@ -340,6 +341,14 @@ const (
 const (
 	NeedsScopeAll   = "all"
 	NeedsScopeSpace = "space"
+)
+
+// layout.threads_open_as values (internal/layout modes.go): a thread opens as a tab beside the
+// others, in place of the thread of its pane, or in place of the space's one thread pane.
+const (
+	ThreadsOpenAsTabs   = "tabs"
+	ThreadsOpenAsPanes  = "panes"
+	ThreadsOpenAsSingle = "single"
 )
 
 // threads.default_worktree values: a new worktree, or the project's main checkout.
@@ -581,6 +590,15 @@ var staticFields = []Field{
 		Description: "A thread you open or start goes to the focused pane only if it already has a thread open, otherwise to the nearest pane that has one. Another tab goes to a pane that already shows tabs of its kind (a terminal only to its own thread's terminals). Choosing a pane yourself still wins.",
 		Default:     "true",
 		bind:        func(s *Settings) any { return &s.Layout.SmartPlacement },
+	},
+	{
+		Key: KeyThreadsOpenAs, Group: GroupLayout, Page: PageAppearance, Section: "panes", Type: Enum, Title: "Threads open as",
+		Description: "Tabs: a thread opens as a tab beside the others. Panes: a pane shows one thread, and opening another thread replaces it, " +
+			"its diff, files, pull requests and terminals switching with it; a thread opens beside another only when you put it there. " +
+			"Single: as Panes, with one thread pane per space. Switching to Panes or Single closes the extra thread tabs (they stay in the sidebar).",
+		Enum: []string{ThreadsOpenAsTabs, ThreadsOpenAsPanes, ThreadsOpenAsSingle}, EnumLabels: []string{"Tabs", "Panes", "Single"},
+		Default: ThreadsOpenAsTabs,
+		bind:    func(s *Settings) any { return &s.Layout.ThreadsOpenAs },
 	},
 	{
 		Key: KeyThreadInfo, Group: GroupLayout, Page: PageAppearance, Section: "panes", Type: Bool, Title: "Thread info by default",
