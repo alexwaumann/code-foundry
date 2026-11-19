@@ -1,5 +1,9 @@
 # Thread fold 5: the fold hides work only, never text or pages (2026-10-23)
 
+> Changed by turn-gutter.md (2026-11-19): a folded turn now shows only its reply (its final
+> text, else its last text); the text before it folds with the work and comes back in
+> order when the fold opens. Pages, theme cards, notes and steers still never fold.
+
 Two rules from a user: "HTML pages should never fold under the turn's fold", and Claude's
 text must never be hidden by the fold either. Until now a folded turn showed its message,
 header, final answer (the trailing text), notes, steers and the inline pages' rows, but

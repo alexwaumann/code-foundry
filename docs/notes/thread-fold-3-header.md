@@ -1,5 +1,9 @@
 # Thread fold 3: the turn header at the top, copy on the answer
 
+> Changed by turn-gutter.md (2026-11-19): a finished header now says only how long the turn
+> took ("Worked for 4m 8s"); its steps, cost and model, and the Copy that sat on the
+> answer, moved to a fixed-height gutter row under the turn. The rest of this note holds.
+
 A finished turn ended with a footer ("Worked for 4m 08s · 12 steps · $1.12 · Opus") whose
 chevron folded the work above it, and a running turn ended with a separate "Working 3m 52s"
 row. Alex: the control sat below what it opened, it moved away from the click, and

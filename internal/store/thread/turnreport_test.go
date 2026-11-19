@@ -150,10 +150,12 @@ func TestOwnAppend(t *testing.T) {
 		s    Thread
 		want string
 	}{
-		{"a user's thread", Thread{}, ""},
-		{"a user's thread with its own", Thread{SystemPromptAppend: "own"}, "own"},
-		{"a created thread", Thread{CreatedBy: "s-1"}, CreatedThreadPrompt},
-		{"a created thread with its own", Thread{CreatedBy: "s-1", SystemPromptAppend: "own"}, CreatedThreadPrompt + "\n\nown"},
+		{"a user's thread", Thread{}, ReplyPrompt},
+		{"a user's thread with its own", Thread{SystemPromptAppend: "own"}, ReplyPrompt + "\n\nown"},
+		{"a created thread", Thread{CreatedBy: "s-1"}, ReplyPrompt + "\n\n" + CreatedThreadPrompt},
+		{"a created thread with its own", Thread{CreatedBy: "s-1", SystemPromptAppend: "own"}, ReplyPrompt + "\n\n" + CreatedThreadPrompt + "\n\nown"},
+		// A resident has its own rules for its replies (Ember's rules.md).
+		{"a resident", Thread{Kind: KindResident, SystemPromptAppend: "You are Ember."}, "You are Ember."},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

@@ -60,7 +60,7 @@ func TestSpawnReadsMemory(t *testing.T) {
 		}
 	})
 	s := e.connected(CreateOptions{})
-	if got, want := argOf(e.spec(s.ID).Argv, "--append-system-prompt"), ThreadPrompt+"\n\n"+MemoryHeading+"\n- Always open PRs as drafts"; got != want {
+	if got, want := argOf(e.spec(s.ID).Argv, "--append-system-prompt"), ThreadPrompt+"\n\n"+MemoryHeading+"\n- Always open PRs as drafts\n\n"+ReplyPrompt; got != want {
 		t.Errorf("first spawn prompt = %q\nwant %q", got, want)
 	}
 
@@ -73,7 +73,7 @@ func TestSpawnReadsMemory(t *testing.T) {
 	if _, err := e.m.reconnect(e.ctx(), s.ID); err != nil {
 		t.Fatal(err)
 	}
-	if got := argOf(e.spec(s.ID).Argv, "--append-system-prompt"); !strings.HasSuffix(got, "\n- Always open PRs as drafts\n- Never open the side panel on your own") {
+	if got := argOf(e.spec(s.ID).Argv, "--append-system-prompt"); !strings.HasSuffix(got, "\n- Always open PRs as drafts\n- Never open the side panel on your own\n\n"+ReplyPrompt) {
 		t.Errorf("restart prompt = %q", got)
 	}
 	mu.Lock()
@@ -84,7 +84,7 @@ func TestSpawnReadsMemory(t *testing.T) {
 	mu.Unlock()
 
 	p := e.connected(CreateOptions{})
-	if got := argOf(e.spec(p.ID).Argv, "--append-system-prompt"); got != ThreadPrompt {
+	if got := argOf(e.spec(p.ID).Argv, "--append-system-prompt"); got != ThreadPrompt+"\n\n"+ReplyPrompt {
 		t.Errorf("unreadable memory: prompt = %q", got)
 	}
 }

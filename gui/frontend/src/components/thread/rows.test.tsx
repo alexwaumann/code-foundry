@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ThreadItemView } from "@/api/thread";
 import type { ThreadView } from "@/api/threads";
@@ -7,6 +7,7 @@ import { structOf, useThreadStore } from "@/stores/thread";
 import { useThreadsStore } from "@/stores/threads";
 import { ThreadContext } from "./context";
 import { TimelineRowView } from "./rows";
+import { createTurnActivity, TurnActivityContext, type TurnActivity } from "./turnActivity";
 
 const { openFileInPanel } = vi.hoisted(() => ({ openFileInPanel: vi.fn<(target: string, file: object) => boolean>(() => true) }));
 vi.mock("@/stores/filePanel", () => ({ openFileInPanel }));
@@ -25,18 +26,25 @@ afterEach(() => {
 
 const base = { parentToolUseId: "", createdAtMs: 1, updatedAtMs: 1, streaming: false };
 
-function show(items: ThreadItemView[], opts: { working?: boolean; fold?: (turnKey: string) => boolean | undefined } = {}) {
+function show(items: ThreadItemView[], opts: { working?: boolean; fold?: (turnKey: string) => boolean | undefined; activity?: TurnActivity } = {}) {
   const byId = Object.fromEntries(items.map((it) => [it.id, it]));
   useThreadStore.setState({ logs: { s: { seq: 1, byId, order: items.map((it) => it.id), pending: [], mcp: null, commands: [], agents: [] } } });
   const rows = buildRows(buildTurns(items.map((it) => decodeTimelineKey(timelineKey(structOf(it))))), { fold: opts.fold ?? (() => undefined), working: opts.working ?? false });
   return render(
     <ThreadContext.Provider value={{ threadId: "s", cwd: "/w" }}>
-      {rows.map((r) => (
-        <TimelineRowView key={r.key} row={r} />
-      ))}
+      <TurnActivityContext.Provider value={opts.activity ?? null}>
+        {rows.map((r) => (
+          <TimelineRowView key={r.key} row={r} />
+        ))}
+      </TurnActivityContext.Provider>
     </ThreadContext.Provider>,
   ).container;
 }
+
+/** The turns' gutters, in order. */
+const gutters = (c: HTMLElement) => [...c.querySelectorAll<HTMLElement>('[data-testid="thread-turn-gutter"]')];
+/** A gutter's info line ("1 step·<$0.01·14:02"). */
+const info = (g: HTMLElement | undefined) => g?.querySelector(".info")?.textContent ?? "";
 
 function editWaiting(name: string, input: object): ThreadItemView[] {
   return [
@@ -176,9 +184,9 @@ describe("the latest turn", () => {
     expect(working?.querySelector(".shimmer")?.textContent).toBe("Working");
     expect(working?.querySelector('svg[data-status-circle="working"]')?.getAttribute("class")).toContain("animate-status-working");
     expect(working?.querySelector("svg.animate-spin")).toBeNull();
-    // Always open: nothing to click, and no copy while the answer may still grow.
+    // Always open: nothing to click, and no gutter (no copy) while the answer may still grow.
     expect(header?.querySelector("button")).toBeNull();
-    expect(c.querySelector('[aria-label="Copy answer"]')).toBeNull();
+    expect(gutters(c)).toHaveLength(0);
   });
 
   it("has no header while it runs with a request waiting (not working)", () => {
@@ -198,9 +206,11 @@ describe("the latest turn", () => {
     const fold = header?.querySelector("button.fold");
     expect(fold?.getAttribute("aria-expanded")).toBe("false");
     expect(fold?.querySelector(".ico svg")).not.toBeNull();
-    expect(fold?.textContent).toBe("Worked for 1.0s·1 step");
-    // The copy moved to the answer.
-    expect(header?.querySelector('[aria-label="Copy answer"]')).toBeNull();
+    // Only how long it took: the steps, cost and model are in the gutter.
+    expect(fold?.textContent).toBe("Worked for 1.0s");
+    expect(header?.querySelector("button[aria-label='Copy reply']")).toBeNull();
+    // The gutter is the turn's last row, under the answer.
+    expect(c.lastElementChild).toBe(gutters(c)[0]);
     fireEvent.click(fold as HTMLButtonElement);
     expect(useThreadStore.getState().folds.s?.u).toBe(false);
   });
@@ -214,32 +224,99 @@ describe("the latest turn", () => {
     expect(header?.nextElementSibling?.textContent).toContain("ls");
   });
 
-  it("the answer copies all of the turn's final text, joined by blank lines", async () => {
+  it("the gutter's Copy copies all of the turn's final text, joined by blank lines; no text row has a copy of its own", async () => {
     const writeText = vi.fn(() => Promise.resolve());
     Object.defineProperty(window, "isSecureContext", { value: true, configurable: true });
     Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
-    const c = show([...turn, { ...base, id: "th", ordinal: 4, kind: "thinking", text: "" }, { ...base, id: "a2", ordinal: 5, kind: "text", text: "and more" }, { ...end, ordinal: 6 }]);
-    const finals = c.querySelectorAll('[data-testid="thread-text"][data-final]');
-    expect(finals).toHaveLength(2);
-    // One copy action, on the answer's first row.
-    expect(finals[0]?.querySelectorAll('[aria-label="Copy answer"]')).toHaveLength(1);
-    expect(finals[1]?.querySelector('[aria-label="Copy answer"]')).toBeNull();
-    const btn = finals[0]?.querySelector('[aria-label="Copy answer"]') as HTMLButtonElement;
-    fireEvent.click(btn);
+    const activity = createTurnActivity();
+    const c = show([turn[0] as ThreadItemView, { ...base, id: "u2", ordinal: 1, kind: "user", text: "and?", attachments: [], composerText: "" }, ...turn.slice(1), { ...base, id: "th", ordinal: 4, kind: "thinking", text: "" }, { ...base, id: "a2", ordinal: 5, kind: "text", text: "and more" }, { ...end, ordinal: 6 }], { activity });
+    expect(c.querySelectorAll('[data-testid="thread-text"][data-final]')).toHaveLength(2);
+    expect(c.querySelector('[data-testid="thread-text"] button')).toBeNull();
+    const btn = gutters(c)[0]?.querySelector<HTMLButtonElement>('[data-testid="thread-copy-reply"]');
+    expect(btn?.getAttribute("aria-label")).toBe("Copy reply");
+    fireEvent.click(btn as HTMLButtonElement);
     await Promise.resolve();
     expect(writeText).toHaveBeenCalledWith("done\n\nand more");
-    // A check and "Copied" for a moment, held visible by data-copied (thread.css).
+    // A check and "Copied" for a moment, the gutter held shown meanwhile.
     await waitFor(() => {
-      expect(btn.getAttribute("aria-label")).toBe("Copied");
+      expect(btn?.getAttribute("aria-label")).toBe("Copied");
     });
-    expect(btn.hasAttribute("data-copied")).toBe(true);
+    expect(btn?.hasAttribute("data-copied")).toBe(true);
     await waitFor(
       () => {
-        expect(btn.getAttribute("aria-label")).toBe("Copy answer");
+        expect(btn?.getAttribute("aria-label")).toBe("Copy reply");
       },
       { timeout: 3000 },
     );
-    expect(btn.hasAttribute("data-copied")).toBe(false);
+    expect(btn?.hasAttribute("data-copied")).toBe(false);
+  });
+});
+
+describe("a finished turn's gutter (turn-gutter)", () => {
+  // Today at 14:02: the time a turn ended shows bare for today's.
+  const at = new Date(new Date().setHours(14, 2, 0, 0)).getTime();
+  const msg = (id: string, ordinal: number): ThreadItemView => ({ ...base, id, ordinal, kind: "user", text: "go", attachments: [], composerText: "" });
+  const bash = (id: string, ordinal: number): ThreadItemView => ({ ...base, id, ordinal, kind: "tool", toolUseId: id, name: "Bash", inputJson: '{"command":"ls"}', status: "done", output: "", isError: false, resultJson: "" });
+  const say = (id: string, ordinal: number, text: string): ThreadItemView => ({ ...base, id, ordinal, kind: "text", text });
+  const ended = (id: string, ordinal: number, over: Partial<Extract<ThreadItemView, { kind: "turnEnd" }>> = {}) => turnEndItem({ id, ordinal, createdAtMs: at, turnCostUsd: 0.04, model: "claude-opus-4-8", ...over });
+  const twoTurns = [msg("u1", 1), bash("t1", 2), say("a1", 3, "first"), ended("e1", 4), msg("u2", 5), say("mid", 6, "checking"), bash("t2", 7), say("a2", 8, "second"), ended("e2", 9)];
+
+  it("Copy, then steps · cost · model · the time the turn ended, in the caption style", () => {
+    const c = show(twoTurns);
+    const g = gutters(c);
+    expect(g).toHaveLength(2);
+    expect(g[1]?.className).toContain("text-caption");
+    const kids = [...(g[1]?.querySelector(".in")?.children ?? [])];
+    expect(kids.map((k) => k.getAttribute("data-testid") ?? k.className)).toEqual(["thread-copy-reply", "info"]);
+    expect(kids[0]?.querySelector("svg")).not.toBeNull();
+    expect(info(g[1])).toMatch(/^1 step·\$0\.04·Opus 4\.8·\d\d:02/);
+  });
+
+  it("shows at rest on the latest turn only; an older one shows while the pointer is over its turn or its control has the keyboard", () => {
+    const activity = createTurnActivity();
+    const c = show(twoTurns, { activity });
+    const shown = () => gutters(c).map((g) => g.hasAttribute("data-shown"));
+    expect(shown()).toEqual([false, true]);
+    act(() => {
+      activity.setHovered("u1");
+    });
+    expect(shown()).toEqual([true, true]);
+    act(() => {
+      activity.setHovered("u2");
+    });
+    expect(shown()).toEqual([false, true]);
+    act(() => {
+      activity.setFocused("u1");
+    });
+    expect(shown()).toEqual([true, true]);
+    act(() => {
+      activity.setFocused("");
+      activity.setHovered("");
+    });
+    expect(shown()).toEqual([false, true]);
+  });
+
+  it("a folded turn shows its header, its final reply and its gutter; the text before the reply opens with the work", () => {
+    const c = show(twoTurns);
+    const texts = () => [...c.querySelectorAll('[data-testid="thread-text"]')].map((t) => t.textContent);
+    expect(texts()).toEqual(["first", "second"]);
+    cleanup();
+    const open = show(twoTurns, { fold: () => false });
+    expect([...open.querySelectorAll('[data-testid="thread-text"]')].map((t) => t.textContent)).toEqual(["first", "checking", "second"]);
+  });
+
+  it.each([
+    ["a reply", [say("a", 3, "done")], {}, true, "Worked for 2.1s"],
+    ["no reply", [], {}, false, "Worked for 2.1s"],
+    ["interrupted, its last text kept", [say("a", 3, "looking"), bash("t9", 4)], { subtype: "error_during_execution", isError: true, interrupted: true }, true, "Interrupted after 2.1s"],
+    ["failed with no text", [], { subtype: "error_max_turns", isError: true }, false, "Failed (error max turns) after 2.1s"],
+  ] as const)("%s: Copy only when there is text to copy, the info always", (_, body, over, copy, head) => {
+    const c = show([msg("u1", 1), bash("t1", 2), ...body, ended("e1", 9, over)]);
+    expect(c.querySelector('[data-testid="thread-turn-header"]')?.textContent).toBe(head);
+    const g = gutters(c)[0];
+    expect(g?.querySelector('[data-testid="thread-copy-reply"]') !== null).toBe(copy);
+    expect(info(g)).toMatch(/^\d steps?·\$0\.04·Opus 4\.8·\d\d:02/);
+    expect(g?.hasAttribute("data-shown")).toBe(true);
   });
 });
 
@@ -307,7 +384,7 @@ describe("a message sent mid-turn (a steer)", () => {
     expect(c.textContent).not.toContain("sleep");
     expect(c.querySelector('[data-testid="thread-text"]')?.textContent).toContain("hi");
     expect(c.querySelectorAll('[data-testid="thread-turn-header"]')).toHaveLength(1);
-    expect(c.querySelector('[data-testid="thread-turn-header"]')?.textContent).toContain("2 steps");
+    expect(info(gutters(c)[0])).toContain("2 steps");
     expect(c.querySelector('[data-testid="thread-turn-header"]')?.nextElementSibling).toBe(steer);
   });
 
@@ -326,14 +403,15 @@ describe("a message sent mid-turn (a steer)", () => {
     expect(names).toEqual(["Tests", "Docs"]);
   });
 
-  it("an interrupted turn after a steer with no final text: one header that folds it, its first part red, nothing to copy", () => {
+  it("an interrupted turn after a steer with no text: one header that folds it, in red, and a gutter with its info but nothing to copy", () => {
     const c = show([...steered, turnEndItem(interrupted)]);
     const header = c.querySelector('[data-testid="thread-turn-header"]');
     expect(c.querySelectorAll('[data-testid="thread-turn-header"]')).toHaveLength(1);
-    expect(header?.textContent).toBe("Interrupted after 2.1s·2 steps·<$0.01");
+    expect(header?.textContent).toBe("Interrupted after 2.1s");
     expect(header?.querySelector(".t-red")?.textContent).toBe("Interrupted after 2.1s");
     expect(header?.querySelector("button.fold")).not.toBeNull();
-    expect(c.querySelector('[aria-label="Copy answer"]')).toBeNull();
+    expect(gutters(c)[0]?.querySelector("button")).toBeNull();
+    expect(info(gutters(c)[0])).toMatch(/^2 steps·<\$0\.01·/);
     expect(c.querySelector('[data-testid="thread-steer"]')).not.toBeNull();
   });
 });
@@ -341,15 +419,16 @@ describe("a message sent mid-turn (a steer)", () => {
 describe("a finished turn with nothing to fold", () => {
   const hi: ThreadItemView = { ...base, id: "u", ordinal: 1, kind: "user", text: "hi", attachments: [], composerText: "" };
 
-  it("shows its header as plain text: no chevron, no button, not focusable; the answer still copies", () => {
+  it("shows its header as plain text: no chevron, no button, not focusable; the reply still copies", () => {
     const c = show([hi, { ...base, id: "a", ordinal: 2, kind: "text", text: "hello" }, turnEndItem()]);
     const header = c.querySelector('[data-testid="thread-turn-header"]');
     const line = header?.querySelector('[data-testid="thread-turn-header-line"]');
-    expect(line?.textContent).toBe("Worked for 2.1s·<$0.01");
+    expect(line?.textContent).toBe("Worked for 2.1s");
     expect(line?.querySelector("svg")).toBeNull();
     expect(header?.querySelector("button")).toBeNull();
     expect(header?.querySelector("[aria-expanded]")).toBeNull();
-    expect(c.querySelector('[data-testid="thread-text"] [aria-label="Copy answer"]')).not.toBeNull();
+    expect(gutters(c)[0]?.querySelector('[data-testid="thread-copy-reply"]')).not.toBeNull();
+    expect(info(gutters(c)[0])).toMatch(/^<\$0\.01·/);
   });
 
   it("an interrupted turn with no work and no answer keeps its wording and has nothing to copy", () => {
@@ -357,7 +436,7 @@ describe("a finished turn with nothing to fold", () => {
     const header = c.querySelector('[data-testid="thread-turn-header"]');
     expect(header?.textContent).toContain("Interrupted after 2.1s");
     expect(header?.querySelector("button")).toBeNull();
-    expect(c.querySelector('[aria-label="Copy answer"]')).toBeNull();
+    expect(gutters(c)[0]?.querySelector("button")).toBeNull();
   });
 
   it("a failed turn keeps its wording in red", () => {
@@ -644,7 +723,7 @@ describe("Claude Code's API-error text", () => {
     expect(row?.textContent).toBe("Invalid API key · Fix external API key");
     expect(row?.className).toMatch(/border-cf-error/);
     expect(c.querySelector('[data-testid="thread-text"]')).toBeNull();
-    expect(c.querySelector('[data-testid="thread-copy-answer"]')).toBeNull();
+    expect(gutters(c)[0]?.querySelector("button")).toBeNull();
   });
 
   it("its turn's header says Failed, without the result's success subtype", () => {
@@ -652,10 +731,11 @@ describe("Claude Code's API-error text", () => {
     expect(c.querySelector('[data-testid="thread-turn-header"] .t-red')?.textContent).toBe("Failed after 0.1s");
   });
 
-  it("does not take the answer from a reply before it", () => {
+  it("does not make the text before it final; that text is the failed turn's reply, shown folded and copied", () => {
     const c = show([hi, { ...base, id: "a", ordinal: 2, kind: "text", text: "Looking." }, { ...apiError, ordinal: 3 }, turnEndItem({ isError: true })]);
     expect(c.querySelector('[data-testid="thread-text"]')?.getAttribute("data-final")).toBeNull();
-    expect(c.querySelector('[data-testid="thread-copy-answer"]')).toBeNull();
+    expect(c.querySelector('[data-testid="thread-text"]')?.textContent).toBe("Looking.");
+    expect(gutters(c)[0]?.querySelector('[data-testid="thread-copy-reply"]')).not.toBeNull();
     expect(c.querySelector('[data-testid="thread-error"]')).not.toBeNull();
   });
 });

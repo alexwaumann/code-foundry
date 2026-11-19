@@ -29,13 +29,18 @@ function fakeTimeline() {
 const view = () => ({ folds: useThreadStore.getState().folds[T] ?? {}, expanded: useThreadStore.getState().expanded[T] ?? {} });
 const opened = () => useThreadFindStore.getState().byThread[T]?.opened ?? null;
 let question = "";
+/** Turn 1's first text: between its tool calls, so its fold hides it. */
 let text = "";
+/** Turn 1's reply: its last text, which its fold leaves. */
+let reply = "";
 
 beforeEach(() => {
   const w = fixStalePrBadge("idle");
   publishThread(T, w);
   question = w.items.find((it) => it.kind === "question")?.id ?? "";
   text = w.items.find((it) => it.kind === "text")?.id ?? "";
+  const end = w.items.findIndex((it) => it.kind === "turnEnd");
+  reply = w.items.slice(0, end).filter((it) => it.kind === "text").at(-1)?.id ?? "";
   fakeTimeline();
   openThreadFind(T, "head sha");
 });
@@ -102,9 +107,18 @@ describe("opening what hides a match, and putting it back", () => {
     expect(opened()).toBeNull();
   });
 
-  it("a text needs nothing opened (a fold never hides Claude's text)", () => {
+  it("a text before the turn's reply: its turn unfolds; put back, folded again", () => {
+    expect(text).not.toBe(reply);
     openThreadFindItem(T, text);
-    expect(opened()).toEqual({ itemId: text, folds: {}, expanded: {} });
+    expect(opened()).toEqual({ itemId: text, folds: { i1: { before: undefined, set: false } }, expanded: {} });
+    expect(view()).toEqual({ folds: { i1: false }, expanded: {} });
+    putBackThreadFind(T);
+    expect(view()).toEqual({ folds: {}, expanded: {} });
+  });
+
+  it("the turn's reply needs nothing opened (the fold leaves it)", () => {
+    openThreadFindItem(T, reply);
+    expect(opened()).toEqual({ itemId: reply, folds: {}, expanded: {} });
     expect(view()).toEqual({ folds: {}, expanded: {} });
   });
 
@@ -119,9 +133,9 @@ describe("opening what hides a match, and putting it back", () => {
 
   it("moving on to another item puts the last one back in the same step", () => {
     openThreadFindItem(T, question);
-    openThreadFindItem(T, text);
+    openThreadFindItem(T, reply);
     expect(view()).toEqual({ folds: {}, expanded: {} });
-    expect(opened()).toEqual({ itemId: text, folds: {}, expanded: {} });
+    expect(opened()).toEqual({ itemId: reply, folds: {}, expanded: {} });
   });
 
   it("the same item again opens nothing more", () => {

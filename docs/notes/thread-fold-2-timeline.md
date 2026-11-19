@@ -1,5 +1,8 @@
 # Thread fold 2: a message sent mid-turn stays inside its turn
 
+> Changed by turn-gutter.md (2026-11-19): the footer is long gone (thread-fold-3); a
+> folded turn now shows only its reply, and its gutter carries Copy and the turn's info.
+
 A message sent while Claude works is a steer: the daemon writes its `user` item at once,
 so it lands inside the running turn between tool calls, Claude picks it up at its next
 step, and the turn ends with a single `turn_end`. `buildTurns` started a new turn at every

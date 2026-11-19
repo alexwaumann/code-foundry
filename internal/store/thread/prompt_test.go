@@ -74,3 +74,22 @@ func placementClause(t *testing.T) string {
 	t.Fatalf("ThreadPrompt has no thread new clause: %q", ThreadPrompt)
 	return ""
 }
+
+// The GUI folds a turn down to its last message (docs/notes/turn-gutter.md), so every
+// thread but a resident is told to put everything in it; one static line like the rest.
+func TestReplyPrompt(t *testing.T) {
+	for _, want := range []string{"The user sees only the last message of each turn; everything before it is folded away with your work.",
+		"Put everything they need in that last message: results, decisions, caveats, and the answer to anything they asked or sent mid-turn",
+		"restated even if you already said it earlier in the turn."} {
+		if !strings.Contains(ReplyPrompt, want) {
+			t.Errorf("ReplyPrompt does not say %q: %q", want, ReplyPrompt)
+		}
+	}
+	if strings.ContainsAny(ReplyPrompt, "\n$`") {
+		t.Errorf("ReplyPrompt is one static line: %q", ReplyPrompt)
+	}
+	// After ThreadPrompt (and the workspace's and memory's blocks), as the thread's own part.
+	if got, want := systemPrompt("", nil, ownAppend(Thread{})), ThreadPrompt+"\n\n"+ReplyPrompt; got != want {
+		t.Errorf("a user's thread: %q", got)
+	}
+}

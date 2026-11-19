@@ -72,16 +72,30 @@ const CreatedThreadPrompt = "Another thread created this one. The last message o
 	"`code-foundry thread ask \"question\" --assuming \"what you do until an answer comes\"`, then keep working; " +
 	"its answer arrives as a message at your next tool call. Do not ask about what you can settle yourself."
 
-// ownAppend is the part of s's system prompt that is its own: CreatedThreadPrompt for a
-// created thread, then Thread.SystemPromptAppend.
+// ReplyPrompt is what every thread but a resident gets after ThreadPrompt: the GUI shows
+// only a turn's last message at rest and folds the text before it away with the work
+// (docs/notes/turn-gutter.md), so that message has to stand alone. Kept apart from
+// ThreadPrompt, whose bytes route skills and are budgeted for that; this has its own row
+// in internal/skills/budget_test.go. A resident (Ember) has its own rules for its replies
+// (internal/store/ember/files/rules.md), which already say this.
+const ReplyPrompt = "The user sees only the last message of each turn; everything before it is folded away with your work. " +
+	"Put everything they need in that last message: results, decisions, caveats, and the answer to anything they asked or sent mid-turn, " +
+	"restated even if you already said it earlier in the turn."
+
+// ownAppend is the part of s's system prompt that is its own: ReplyPrompt unless s is a
+// resident, CreatedThreadPrompt for a created thread, then Thread.SystemPromptAppend.
 func ownAppend(s Thread) string {
-	if s.CreatedBy == "" {
-		return s.SystemPromptAppend
+	var parts []string
+	if s.Kind != KindResident {
+		parts = append(parts, ReplyPrompt)
 	}
-	if s.SystemPromptAppend == "" {
-		return CreatedThreadPrompt
+	if s.CreatedBy != "" {
+		parts = append(parts, CreatedThreadPrompt)
 	}
-	return CreatedThreadPrompt + "\n\n" + s.SystemPromptAppend
+	if s.SystemPromptAppend != "" {
+		parts = append(parts, s.SystemPromptAppend)
+	}
+	return strings.Join(parts, "\n\n")
 }
 
 // systemPrompt is --append-system-prompt: ThreadPrompt, then a referenced workspace's

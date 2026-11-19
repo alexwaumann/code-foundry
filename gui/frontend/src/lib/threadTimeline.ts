@@ -12,14 +12,17 @@
  * - AskUserQuestion's tool call is hidden (the question item stands for it), and a
  *   permission request annotates its tool call (pending: "waiting for you");
  * - every finished turn has a header under its user message, at the top of its work
- *   (duration, steps, its cost, model) that folds it; every finished turn, the latest
- *   included, folds by default: only the user message, the header, Claude's text (every
- *   text row in its place, the final answer included), notes, steers and inline pages
- *   show; the fold hides the work (tools, groups, Agent rows, thinking). A turn that ends while the
+ *   (how long it took) that folds it, and a gutter under its last row (Copy, then steps,
+ *   cost, model and the time it ended); every finished turn, the latest included, folds by
+ *   default: only the user message, the header, the turn's reply (its final text, else its
+ *   last text), notes, steers, inline pages and the gutter show; the fold hides the work
+ *   (tools, groups, Agent rows, thinking) and the text before the reply
+ *   (docs/notes/turn-gutter.md). A turn that ends while the
  *   user reads scrolled up stays open until the list is at the bottom again (`deferred`,
  *   docs/notes/thread-fold-4-pinned-fold.md). The running turn has the same
  *   header in its live form ("Working · 3 steps · 1m 12s"), under the same row key, so it
- *   turns into the finished one in place (docs/notes/thread-fold-3-header.md);
+ *   turns into the finished one in place (docs/notes/thread-fold-3-header.md); it has no
+ *   gutter until it ends;
  * - a system note (the daemon's, e.g. a fork's "Forked from …" where the copied history
  *   ends) stands alone between turns: it closes the turn before it and never folds;
  * - while the thread is on a turn, each run of work between two texts (steers, notes,
@@ -63,9 +66,9 @@ export type WorkNode =
   | { type: "group"; key: string; ids: string[]; names: string[] }
   | { type: "thinking"; key: string; ids: string[] }
   /**
-   * Claude's text. `answer` is set on the first final text row of a finished turn: the
-   * turn's final text ids joined by "\n" (what its copy action copies; a string, so a
-   * memoized row stays equal across rebuilds); "" otherwise.
+   * Claude's text. `final`: one of the turn's trailing texts (its answer). `answer`, when
+   * set, gives the row its own copy action copying those ids (joined by "\n"): Ember's
+   * reply only (lib/ember); a thread's turn copies from its gutter, so "" here.
    */
   | { type: "text"; key: string; id: string; final: boolean; answer: string }
   | { type: "question"; key: string; id: string }
@@ -114,9 +117,9 @@ export type TimelineRow =
   | {
       /**
        * A turn's header, under its user message(s) and above its work. Finished: "Worked
-       * for 4m 8s · 12 steps · $1.12 · Opus", the turn's fold toggle. Live (no turn_end
-       * yet, the thread works): "Working · 3 steps · 1m 12s", always open. Its key is
-       * `h:<turn key>` in both forms, so the live row becomes the finished one in place.
+       * for 4m 8s", the turn's fold toggle. Live (no turn_end yet, the thread works):
+       * "Working · 3 steps · 1m 12s", always open. Its key is `h:<turn key>` in both forms,
+       * so the live row becomes the finished one in place.
        */
       type: "header";
       key: string;
@@ -125,12 +128,33 @@ export type TimelineRow =
       /** The turn the header folds (TimelineTurn.key); "" for a live header with no turn yet. */
       turn: string;
       folded: boolean;
-      /** The turn's work rows (what the fold hides; a group or Agent row counts as one). */
+      /** The turn's work rows (a group or Agent row counts as one; text is none). */
       steps: number;
+      /** Folding the turn hides something (work, or text before its reply): the header is a toggle. */
+      foldable: boolean;
       /** The turn's final text items. */
       finals: string[];
       /** Live: the item the elapsed time counts from (the turn's last opening message, else its first item); "" when none. */
       since: string;
+    }
+  | {
+      /**
+       * A finished turn's gutter, under its last row (docs/notes/turn-gutter.md): Copy (the
+       * reply), then steps · cost · model · the time it ended. One row of fixed height that
+       * is always laid out, so showing its contents moves nothing. Its key is `f:<turn key>`.
+       */
+      type: "gutter";
+      key: string;
+      /** The turn_end item. */
+      id: string;
+      /** The turn (TimelineTurn.key). */
+      turn: string;
+      /** As the header's. */
+      steps: number;
+      /** The reply's text ids joined by "\n" (what Copy copies; a string, so the memoized row stays equal); "" with no reply: no Copy. */
+      reply: string;
+      /** The thread's latest turn: its contents show at rest; an older turn's only while it is hovered or has the keyboard. */
+      latest: boolean;
     };
 
 /** A turn: from a user message (or the thread's start) to its turn_end, inclusive. */
@@ -232,35 +256,49 @@ export function workNodes(list: readonly TimelineItem[], children: ReadonlyMap<s
   return out;
 }
 
-/**
- * Marks the trailing text rows of a turn's body as final (thinking may sit between them);
- * in a finished turn they carry the answer their copy action copies.
- */
-function markFinal(body: WorkNode[], ended: boolean): void {
+/** Marks the trailing text rows of a turn's body as final, its answer (thinking may sit between them). */
+function markFinal(body: WorkNode[]): void {
   let from = body.length;
   for (let i = body.length - 1; i >= 0; i--) {
     const n = body[i];
     if (n?.type === "text") from = i;
     else if (n?.type !== "thinking" && n?.type !== "system") break; // a note after the answer, mid-turn
   }
-  const ids = body.slice(from).flatMap((n) => (n.type === "text" ? [n.id] : []));
-  const answer = ended ? ids.join("\n") : "";
   for (let i = from; i < body.length; i++) {
     const n = body[i];
-    // The copy action sits at the top right of the answer: on its first row.
-    if (n?.type === "text") body[i] = { ...n, final: true, answer: i === from ? answer : "" };
+    if (n?.type === "text") body[i] = { ...n, final: true };
   }
 }
 
 /**
- * What a folded turn hides: its work (tool, group, Agent and thinking rows, questions and
- * permission requests). Claude's text (every text row, not only the final answer), notes
- * (errors, compactions, command output, system notes), steers, inline pages (row and card,
- * untouched by the fold) and theme cards stay visible in their place
- * (docs/notes/thread-fold-5-text-and-html.md).
+ * A finished turn's reply: its final texts, else (interrupted, failed, or a steer after its
+ * last text) its last text; none without text. What its fold leaves of Claude's text and
+ * what its gutter's Copy copies. null for a running turn: none of its text folds.
  */
-function foldsAway(n: WorkNode): boolean {
+export function turnReply(t: TimelineTurn): string[] | null {
+  if (t.end === "") return null;
+  const finals = t.body.flatMap((n) => (n.type === "text" && n.final ? [n.id] : []));
+  if (finals.length > 0) return finals;
+  for (let i = t.body.length - 1; i >= 0; i--) {
+    const n = t.body[i];
+    if (n?.type === "text") return [n.id];
+  }
+  return [];
+}
+
+/** Work: tool, group, Agent and thinking rows, questions and permission requests. What a turn's steps count. */
+function isWork(n: WorkNode): boolean {
   return n.type !== "text" && n.type !== "note" && n.type !== "system" && n.type !== "steer" && n.type !== "html" && n.type !== "theme";
+}
+
+/**
+ * What a folded turn hides: its work and, of a finished turn's text, all but the reply
+ * (`reply`: turnReply's ids; null, a running turn's: no text). Notes (errors, compactions, command output, system notes), steers,
+ * inline pages (row and card, untouched by the fold) and theme cards stay visible in their
+ * place (docs/notes/turn-gutter.md, thread-fold-5-text-and-html.md).
+ */
+function foldsAway(n: WorkNode, reply: readonly string[] | null): boolean {
+  return n.type === "text" ? reply !== null && !reply.includes(n.id) : isWork(n);
 }
 
 /**
@@ -318,7 +356,7 @@ export function buildTurns(items: readonly TimelineItem[]): TimelineTurn[] {
   const close = () => {
     if (!cur) return;
     const body = workNodes(cur.items, children, permissions);
-    markFinal(body, cur.end !== "");
+    markFinal(body);
     turns.push({ key: cur.key, user: cur.user, body, end: cur.end });
     cur = null;
   };
@@ -372,17 +410,21 @@ export function buildTurns(items: readonly TimelineItem[]): TimelineTurn[] {
   return turns;
 }
 
-/** A turn's work rows: what folding it hides (a group or Agent row counts as one; text, steers, notes and pages are not steps). */
+/** A turn's work rows (a group or Agent row counts as one; text, steers, notes and pages are not steps). */
 function stepCount(body: readonly WorkNode[]): number {
-  return body.filter(foldsAway).length;
+  return body.filter(isWork).length;
 }
 
 /**
- * The turn whose fold hides an item's row (a question or tool row of its top-level work),
- * by turn key; "" when no fold hides it (Claude's text, a steer, a page show).
+ * The turn whose fold hides an item's row (a question or tool row of its top-level work, a
+ * finished turn's text before its reply), by turn key; "" when no fold hides it (the reply,
+ * a running turn's text, a steer, a page show). The find bar and the cite layer unfold it.
  */
 export function foldingTurn(turns: readonly TimelineTurn[], itemId: string): string {
-  for (const t of turns) if (t.body.some((n) => foldsAway(n) && "id" in n && n.id === itemId)) return t.key;
+  for (const t of turns) {
+    const reply = turnReply(t);
+    if (t.body.some((n) => foldsAway(n, reply) && "id" in n && n.id === itemId)) return t.key;
+  }
   return "";
 }
 
@@ -438,16 +480,24 @@ export function buildRows(turns: readonly TimelineTurn[], opts: TimelineOptions)
   const live = working && last && last.end === "" && !isNoteTurn(last) ? last : undefined;
   // The open turn the thread is on (also while a request waits): its work runs as strips.
   const stripped = opts.strips && last && last.end === "" && !isNoteTurn(last) ? last : undefined;
+  // A turn end with no Claude behind it is a setup's that stopped, in a retry's first moments too.
+  const finished = (t: TimelineTurn) => t.end !== "" && !noClaude;
+  // The thread's latest turn: the last one with a header. Its gutter shows at rest, unless it still runs (it has none then).
+  let latest: TimelineTurn | undefined;
+  for (const t of turns) if (finished(t) || t === live) latest = t;
   turns.forEach((t) => {
     const folded = t.end !== "" && (opts.fold(t.key) ?? (opts.deferred?.(t.end) ? false : defaultFolded(t)));
+    const reply = turnReply(t);
     for (const u of t.user) rows.push({ type: "user", key: u, id: u });
-    // A turn end with no Claude behind it is a setup's that stopped, in a retry's first moments too.
-    if ((t.end && !noClaude) || t === live) {
+    const steps = stepCount(t.body);
+    if (finished(t) || t === live) {
       const finals = t.body.flatMap((n) => (n.type === "text" && n.final ? [n.id] : []));
-      rows.push({ type: "header", key: `h:${t.key}`, id: t.end, turn: t.key, folded, steps: stepCount(t.body), finals, since: t.user[t.user.length - 1] ?? t.key });
+      const foldable = t.body.some((n) => foldsAway(n, reply));
+      rows.push({ type: "header", key: `h:${t.key}`, id: t.end, turn: t.key, folded, steps, foldable, finals, since: t.user[t.user.length - 1] ?? t.key });
     }
     if (t === stripped) rows.push(...stripRuns(t.body));
-    else for (const n of t.body) if (!folded || !foldsAway(n)) rows.push(n);
+    else for (const n of t.body) if (!folded || !foldsAway(n, reply)) rows.push(n);
+    if (finished(t)) rows.push({ type: "gutter", key: `f:${t.key}`, id: t.end, turn: t.key, steps, reply: (reply ?? []).join("\n"), latest: t === latest });
   });
   // Under the first message, or at the end for a thread without one (made with no prompt).
   if (setup !== "") {
@@ -455,8 +505,24 @@ export function buildRows(turns: readonly TimelineTurn[], opts: TimelineOptions)
     rows.splice(first < 0 ? rows.length : first + 1, 0, { type: "setup", key: SETUP_FOLD_KEY, folded: opts.fold(SETUP_FOLD_KEY) ?? true });
   }
   // Working with no turn to head (an empty thread starting, a fork's note): a live header alone.
-  if (working && (!last || isNoteTurn(last))) rows.push({ type: "header", key: "h:", id: "", turn: "", folded: false, steps: 0, finals: [], since: "" });
+  if (working && (!last || isNoteTurn(last))) rows.push({ type: "header", key: "h:", id: "", turn: "", folded: false, steps: 0, foldable: false, finals: [], since: "" });
   return linkRepeatShows(rows);
+}
+
+/**
+ * The turn each row belongs to for the gutter's hover (by index; "" for none): a turn's
+ * rows from its header to its gutter. Its user message(s), a system note between turns
+ * and the setup row belong to none.
+ */
+export function rowTurns(rows: readonly TimelineRow[]): string[] {
+  let cur = "";
+  return rows.map((r) => {
+    if (r.type === "header") cur = r.turn;
+    else if (r.type === "user" || r.type === "setup") cur = "";
+    const t = cur;
+    if (r.type === "gutter") cur = "";
+    return t;
+  });
 }
 
 /**

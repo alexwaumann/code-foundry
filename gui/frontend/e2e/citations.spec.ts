@@ -200,12 +200,15 @@ test("Escape and a click outside cancel; an empty comment is fine", async ({ pag
   await expect.poll(async () => (await invocations()).find((i) => i.name === "thread.send")?.args.text ?? "").toMatch(/^\[Assistant quote\]\(cf-cite:\/\/v1\/s-r1\/[^?]+\?text=412%20tests%20pass&start=\d+&end=\d+&prefix=[^&)]*&suffix=[^&)]*\) ok$/);
 });
 
-test("a chip whose answer is in a folded turn goes to it, the turn left folded; a quote no longer in the thread cannot go to its source", async ({ page }) => {
+test("a chip whose quote is in a folded turn's text before its reply opens the turn and goes to it; a quote no longer in the thread cannot go to its source", async ({ page }) => {
   await openThread(page);
-  // Turn 1's intermediate text shows while the turn is folded (thread-fold-5-text-and-html).
+  // Turn 1's text between its tool calls folds with its work (turn-gutter): the header opens it.
   const header = page.getByTestId("thread-turn-header").first();
   await expect(header).toHaveAttribute("data-folded", "true");
   const mid = pane(page).locator('[data-testid="thread-text"]').filter({ hasText: "Now the fingerprint itself." });
+  await expect(mid).toHaveCount(0);
+  const toggle = () => header.evaluate((el) => (el.querySelector("button") ?? el).dispatchEvent(new MouseEvent("click", { bubbles: true })));
+  await toggle();
   await expect(mid).toBeVisible();
   // Away from the list's edges (a drag near one autoscrolls it), by the user's wheel: the
   // list is pinned at the bottom and follows it back after a scroll nobody asked for.
@@ -221,7 +224,9 @@ test("a chip whose answer is in a folded turn goes to it, the turn left folded; 
   await citeButton(page).click();
   await page.keyboard.press("Enter");
   await expect(chips(page)).toHaveText(["fingerprint itself"]);
-  // Scrolled away to the bottom, the chip brings the folded turn's text back into view.
+  // Folded again and scrolled away to the bottom, the chip opens the turn and brings the text into view.
+  await toggle();
+  await expect(mid).toHaveCount(0);
   await page.getByTestId("thread-timeline").evaluate((el) => {
     el.scrollTop = el.scrollHeight;
   });
@@ -229,9 +234,11 @@ test("a chip whose answer is in a folded turn goes to it, the turn left folded; 
   await expect(popover(page)).toBeVisible();
   await expect(mid).toBeInViewport();
   expect(await hasHighlight(page, "cf-cite-mark")).toBe(true);
-  await expect(header).toHaveAttribute("data-folded", "true");
   await page.keyboard.press("Escape");
   await expect(popover(page)).toHaveCount(0);
+  // The opened turn left the list far from its bottom: back there, so the next reply is in view.
+  await page.getByTestId("thread-jump-bottom").click();
+  await expect(page.getByTestId("thread-timeline")).toHaveAttribute("data-at-bottom", "true");
 
   // A link to an item this thread does not have (pasted text sends as is; the bubble reads it).
   await page.getByTestId("thread-composer").locator('[contenteditable="true"]').click();

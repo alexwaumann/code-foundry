@@ -7,11 +7,11 @@ import (
 )
 
 // CreateOptions.SystemPromptAppend is the thread's own append from its first spawn on
-// (theme.ask's context): after ThreadPrompt, kept on the row, and out of the first message.
+// (theme.ask's context): after ThreadPrompt and ReplyPrompt, kept on the row, and out of the first message.
 func TestCreateSystemPromptAppend(t *testing.T) {
 	e := newEnv(t)
 	s := e.connected(CreateOptions{SystemPromptAppend: "The user asked on the Themes page.", InitialPrompt: "a warm dark theme"})
-	if got, want := argOf(e.spec(s.ID).Argv, "--append-system-prompt"), ThreadPrompt+"\n\nThe user asked on the Themes page."; got != want {
+	if got, want := argOf(e.spec(s.ID).Argv, "--append-system-prompt"), ThreadPrompt+"\n\n"+ReplyPrompt+"\n\nThe user asked on the Themes page."; got != want {
 		t.Errorf("prompt = %q\nwant %q", got, want)
 	}
 	got, err := e.m.Get(e.ctx(), s.ID)

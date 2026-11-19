@@ -54,6 +54,7 @@ const pane = () => screen.getByTestId("thread-pane");
 const headers = () => [...pane().querySelectorAll<HTMLElement>('[data-testid="thread-turn-header"]:not([data-live])')];
 const tools = (name: string) => [...pane().querySelectorAll<HTMLElement>(`[data-tool="${name}"]`)];
 const finals = () => [...pane().querySelectorAll<HTMLElement>('[data-testid="thread-text"][data-final]')];
+const gutters = () => [...pane().querySelectorAll<HTMLElement>('[data-testid="thread-turn-gutter"]')];
 
 let clipboard: string[] = [];
 beforeEach(() => {
@@ -83,13 +84,16 @@ describe("a thread waiting on a permission (s-r1, permission)", () => {
     expect(bubble.textContent).toContain("with /tdd. Keep the fingerprint check-count based in /tmp.");
   });
 
-  it("turn 1 is folded to its message, header and texts; the latest is open, its tool waiting for you", () => {
+  it("turn 1 is folded to its message, header, reply and gutter; the latest is open, its tool waiting for you", () => {
     mount(fixStalePrBadge("permission").items, false);
     expect(headers()).toHaveLength(1);
     const first = headers()[0] as HTMLElement;
     expect(first.getAttribute("data-folded")).toBe("true");
-    expect(first.textContent).toContain("Worked for 4m 8s");
-    expect(first.textContent).toContain("9 steps");
+    expect(first.textContent).toBe("Worked for 4m 8s");
+    expect(gutters()[0]?.textContent).toContain("9 steps");
+    // Only the reply of turn 1's texts shows (the ones between its tool calls fold with the work); the gutter follows it.
+    const turn1 = [...pane().children].slice(0, [...pane().children].findIndex((r) => r.getAttribute("data-row-type") === "gutter") + 1);
+    expect(turn1.map((r) => r.getAttribute("data-row-type"))).toEqual(["user", "header", "text", "gutter"]);
     expect(screen.queryAllByTestId("thread-group")).toHaveLength(0);
     expect(finals()[0]?.textContent).toContain("Fixed: stale badge after a force-push");
     expect(tools("Bash")[0]?.textContent).toContain("go test ./...");
@@ -183,16 +187,19 @@ describe("a pending question (s-r1, question)", () => {
   });
 });
 
-describe("headers (s-r1, idle)", () => {
+describe("gutters (s-r1, idle)", () => {
   it("the daemon's turn cost and model; a turn without them shows neither", () => {
     mount(fixStalePrBadge("idle").items, false);
-    // Turn 2's own cost ($1.50, not the totals' $0.38 difference) and the model that answered.
-    expect(headers().at(-1)?.textContent).toMatch(/·\$1\.50·Sonnet 5$/);
+    const info = (g: HTMLElement | undefined) => g?.querySelector(".info")?.textContent ?? "";
+    // Turn 2's own cost ($1.50, not the totals' $0.38 difference) and the model that answered, then when it ended.
+    expect(info(gutters().at(-1))).toMatch(/·\$1\.50·Sonnet 5·[^·]+$/);
     // Turn 1 has neither: no guess from the running total, no model from the thread's current one.
-    const first = headers()[0] as HTMLElement;
-    expect(first.textContent).toMatch(/steps$/);
-    expect(first.textContent).not.toContain("$");
-    expect(first.textContent).not.toContain("Opus");
+    const first = info(gutters()[0]);
+    expect(first).toMatch(/^9 steps·[^·]+$/);
+    expect(first).not.toContain("$");
+    expect(first).not.toContain("Opus");
+    // The latest turn's shows at rest, the older one's does not.
+    expect(gutters().map((g) => g.hasAttribute("data-shown"))).toEqual([false, true]);
   });
 });
 
@@ -239,11 +246,12 @@ describe("streaming (s-r1, streaming)", () => {
     // The same element: the line changed in place, nothing remounted.
     expect(headers()[0]).toBe(live);
     expect(live?.getAttribute("data-folded")).toBe("true");
-    expect(live?.textContent).toMatch(/·9 steps·\$0\.04·Opus 4\.8$/);
+    expect(live?.textContent).toBe("Worked for 30s");
+    expect(gutters().at(-1)?.textContent).toMatch(/^9 steps·\$0\.04·Opus 4\.8·/);
     const answer = finals().at(-1) as HTMLElement;
     expect(answer.textContent).toContain("I have not pushed.");
-    expect(within(live as HTMLElement).queryByRole("button", { name: "Copy answer" })).toBeNull();
-    expect(within(answer).getByRole("button", { name: "Copy answer" })).toBeTruthy();
+    expect(within(answer).queryByRole("button", { name: /^Copy (answer|reply)$/ })).toBeNull();
+    expect(within(gutters().at(-1) as HTMLElement).getByRole("button", { name: "Copy reply" })).toBeTruthy();
   });
 });
 
