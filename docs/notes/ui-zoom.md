@@ -31,6 +31,8 @@ the whole window like T3 Code (Electron's `webContents.setZoomLevel`, ±0.5 step
 - A press count mistake: three cmd+= presses reach 150%, not four.
 - **Floating surfaces** (Radix poppers) position in viewport px; their wrapper undoes
   the zoom and the content zooms back (`zoom-popovers.md`).
+- **Toasts** (sonner) use their measured heights (viewport px) as CSS lengths; index.css
+  divides each by `--cf-zoom` (`toast-zoom.md`).
 
 ## Traffic lights
 

@@ -10,7 +10,8 @@
  * outside the page: the Wails host re-centres them on the zoomed band (api/app.ts
  * setHostZoom, gui/trafficlights_darwin.go). Radix floating surfaces position themselves in
  * viewport px: their wrapper undoes the zoom and their content zooms back (index.css,
- * docs/notes/zoom-popovers.md).
+ * docs/notes/zoom-popovers.md). sonner's toasts use their measured heights as CSS lengths:
+ * index.css divides them by --cf-zoom (docs/notes/toast-zoom.md).
  */
 import { setHostZoom } from "@/api/app";
 import { useUiStore } from "@/stores/ui";
