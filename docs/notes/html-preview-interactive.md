@@ -22,7 +22,8 @@ image, no network.
   (hex), one per scope, kept until the daemon stops (`internal/preview.Grants`). NotFound
   for a missing file, InvalidArgument for a directory, a path outside home, or a relative
   path without an absolute base.
-* **`GET /preview/<grant>/<path>`** (`internal/preview.Handler`) is mounted on the loopback
+* **`GET /preview/<grant>/<path>`** (`internal/preview.Handler`; since
+  `page-preview-serving.md` the GUI loads `http://<grant>.localhost:<pages port>/<path>`) is mounted on the loopback
   listener *outside* `requireBearer` (`daemon.loopbackHandler`): an `<iframe src>` cannot
   send a header, so the grant in the URL is the credential. It serves regular files under
   the grant's directory only: `..` is cleaned away, a symlink that leaves the home directory

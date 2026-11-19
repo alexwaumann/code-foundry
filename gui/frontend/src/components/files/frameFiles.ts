@@ -24,17 +24,25 @@ export function frameReport(data: unknown): FrameReport | null {
   return { files, theme: m.theme === true };
 }
 
-/** The grant's part of a preview URL's path (`/preview/<grant>/`); null when it has none. */
-function grantPrefix(pathname: string): string | null {
-  return /^\/preview\/[^/]+\//.exec(pathname)?.[0] ?? null;
+/**
+ * The grant's part of a preview URL's path: `/` on a grant's own host
+ * (`<32 hex>.localhost`, internal/preview host.go), where every path is the grant's;
+ * `/preview/<grant>/` on the path form; null when it has neither.
+ */
+function grantPrefix(page: URL): string | null {
+  if (/^[0-9a-f]{32}\.localhost$/.test(page.hostname)) return "/";
+  return /^\/preview\/[^/]+\//.exec(page.pathname)?.[0] ?? null;
 }
 
 /**
  * The files on disk behind the paths a page's document loaded, for a frame at `pageUrl` (its
  * grant's URL) whose grant serves the directory `scope`: each path under the page's own grant,
  * as a file under scope (a folder's path is its index.html), never the page's own file (its
- * host reloads it already). Other grants, the app's `/cf/` routes and a path that does not
- * decode are left out. Sorted, without repeats.
+ * host reloads it already). Other grants, the app's `/cf/` routes on the path form and a path
+ * that does not decode are left out. On a grant's own host every path is the grant's, `/cf/`
+ * too: the daemon serves its own `/cf/` routes there only where the folder has no such file,
+ * and watching one that is not there costs a stat, and reloads the page when it appears.
+ * Sorted, without repeats.
  */
 export function grantFiles(pageUrl: string, scope: string, paths: readonly string[]): string[] {
   let page: URL;
@@ -43,7 +51,7 @@ export function grantFiles(pageUrl: string, scope: string, paths: readonly strin
   } catch {
     return [];
   }
-  const prefix = grantPrefix(page.pathname);
+  const prefix = grantPrefix(page);
   if (!prefix || !scope) return [];
   const root = scope.endsWith("/") ? scope.slice(0, -1) : scope;
   const fileOf = (path: string): string | null => {

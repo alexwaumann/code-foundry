@@ -93,7 +93,7 @@ func newTunnelRig(t *testing.T, level slog.Level, devOrigins func(pagesPort int)
 	dev := devOrigins(pagesPort)
 	tunnel := newTunnel(log, tunnelToken, caps, pagesPort, dev, mux)
 	serveOn(t, apiLn, logRequests(log, "loopback", loopbackHost(apiPort, loopbackHandler(tunnelToken, caps, prefixes, pagesPort, dev, mux, tunnel))))
-	serveOn(t, pagesLn, logRequests(log, "pages", loopbackHost(pagesPort, pagesHandler(routes))))
+	serveOn(t, pagesLn, logRequests(log, "pages", pagesHost(pagesPort, pagesHandler(routes, nil))))
 
 	dir, err := os.MkdirTemp("/tmp", "cf-ws-")
 	if err != nil {

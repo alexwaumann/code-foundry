@@ -196,8 +196,8 @@ describe("HtmlFrame", () => {
 
   describe("the files its document loaded", () => {
     const SCOPE = "/Users/me/site";
-    function withScope(scope: string | null) {
-      render(<HtmlFrame url={URL_} scope={scope} name="page.html" thread={null} testId="frame" />);
+    function withScope(scope: string | null, url = URL_) {
+      render(<HtmlFrame url={url} scope={scope} name="page.html" thread={null} testId="frame" />);
       const frame = screen.getByTestId<HTMLIFrameElement>("frame");
       const win = frame.contentWindow;
       if (!win) throw new Error("no frame window");
@@ -237,6 +237,13 @@ describe("HtmlFrame", () => {
       } finally {
         vi.useRealTimers();
       }
+    });
+
+    it("on its grant's own host, watches the paths there as files under the scope", () => {
+      const f = withScope(SCOPE, "http://0123456789abcdef0123456789abcdef.localhost:9246/dist/index.html");
+      fireEvent.load(f.frame);
+      f.says({ type: "cf:here", seq: 1, files: ["/dist/index.html", "/assets/index.js", "/cf/theme.css"], theme: true });
+      expect([...watched.keys()].sort()).toEqual(["/Users/me/site/assets/index.js", "/Users/me/site/cf/theme.css"]);
     });
 
     it("watches nothing for a one-file grant (no scope)", () => {

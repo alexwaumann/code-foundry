@@ -40,7 +40,9 @@ tasks:
       # Production builds link build/darwin/Info.embedded.plist, stamped with VERSION, into
       # the executable's __TEXT,__info_plist section: bundle metadata (name, bundle id,
       # version) for a bare executable. Go does not relink when only the plist changed,
-      # so the old output is removed first.
+      # so the old output is removed first. Dev builds link build/darwin/Info.dev.plist as
+      # it is: without a plist, App Transport Security refuses the pages' frames at
+      # http://<grant>.localhost (internal/preview/host.go).
       - |
         {{if ne .DEV "true"}}
         v="{{.VERSION}}"; short="${v#v}"; short="${short%%-*}"
@@ -56,7 +58,7 @@ tasks:
       # Relative to gui/, where go build (and so the external linker) runs. No quotes or
       # spaces: BUILD_FLAGS is also passed single-quoted to `wails3 generate bindings -f`.
       INFO_PLIST: '{{.BIN_DIR}}/Info.embedded.plist'
-      BUILD_FLAGS: '{{if eq .DEV "true"}}{{if or .EXTRA_TAGS (eq .OBFUSCATED "true")}}-tags {{if eq .OBFUSCATED "true"}}wails_obfuscated{{if .EXTRA_TAGS}},{{end}}{{end}}{{.EXTRA_TAGS}} {{end}}-buildvcs=false -gcflags=all="-l"{{else}}-tags production{{if eq .OBFUSCATED "true"}},wails_obfuscated{{end}}{{if .EXTRA_TAGS}},{{.EXTRA_TAGS}}{{end}} -trimpath -buildvcs=false -ldflags="-w -s {{.EXTRA_LDFLAGS}} -extldflags=-Wl,-sectcreate,__TEXT,__info_plist,{{.INFO_PLIST}}"{{end}}'
+      BUILD_FLAGS: '{{if eq .DEV "true"}}{{if or .EXTRA_TAGS (eq .OBFUSCATED "true")}}-tags {{if eq .OBFUSCATED "true"}}wails_obfuscated{{if .EXTRA_TAGS}},{{end}}{{end}}{{.EXTRA_TAGS}} {{end}}-buildvcs=false -gcflags=all="-l" -ldflags="-extldflags=-Wl,-sectcreate,__TEXT,__info_plist,build/darwin/Info.dev.plist"{{else}}-tags production{{if eq .OBFUSCATED "true"}},wails_obfuscated{{end}}{{if .EXTRA_TAGS}},{{.EXTRA_TAGS}}{{end}} -trimpath -buildvcs=false -ldflags="-w -s {{.EXTRA_LDFLAGS}} -extldflags=-Wl,-sectcreate,__TEXT,__info_plist,{{.INFO_PLIST}}"{{end}}'
       DEFAULT_OUTPUT: '{{.BIN_DIR}}/{{.APP_NAME}}'
       OUTPUT: '{{ .OUTPUT | default .DEFAULT_OUTPUT }}'
     env:

@@ -31,11 +31,23 @@
 	<!-- The TCC prompt's text when dictation first opens the microphone (gui/mic_darwin.go). -->
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Code Foundry transcribes your voice on this Mac to dictate into a composer. Audio never leaves your Mac.</string>
-	<!-- The frontend calls the daemon at http://127.0.0.1:<port>. -->
+	<!-- The frontend calls the daemon at http://127.0.0.1:<port>, and frames each page at
+	     http://<grant>.localhost:<pages port> (internal/preview/host.go). Local networking
+	     covers loopback addresses and bare names, not *.localhost, hence the exception. -->
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
+		<key>NSExceptionDomains</key>
+		<dict>
+			<key>localhost</key>
+			<dict>
+				<key>NSIncludesSubdomains</key>
+				<true/>
+				<key>NSExceptionAllowsInsecureHTTPLoads</key>
+				<true/>
+			</dict>
+		</dict>
 	</dict>
 </dict>
 </plist>

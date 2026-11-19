@@ -1227,8 +1227,8 @@ the new command goes without it, reported on its row.
 * The panel surfaces, each a tab placed beside its thread by the daemon's rules
   (`view.open.*`; `src/surfaces`, `docs/notes/side-panel.md` for their history): File (one
   file read from disk as code, rendered markdown or live HTML in a sandboxed frame served by
-  the daemon's `/preview/<grant>/` route (`internal/preview`,
-  `docs/notes/html-preview-interactive.md`), or an image; opened from the Diff tab's Open file,
+  the daemon on the grant's own origin (`internal/preview`,
+  `docs/notes/html-preview-interactive.md`, `docs/notes/page-preview-serving.md`), or an image; opened from the Diff tab's Open file,
   path chips in Claude's markdown and file tool rows (`docs/notes/file-viewer-4-chips.md`) and
   the file finder, one tab per path; `docs/notes/file-viewer-3-tabs.md`), Diff (two sources of
   one checkout, file by file, with the file list as a rail or on top by the tab's width; one
@@ -1507,11 +1507,16 @@ tab's preview) run in sandboxed frames that never touch the API
 (`docs/notes/bridge-1-daemon.md`).
 
 * **The pages listener** (`internal/daemon/pages.go`): a third loopback listener, its port
-  kept in `pages.port` so a page's origin survives restarts. It serves only what a page loads
-  without a credential: `/preview/<grant>/` (`internal/preview`: a grant from
+  kept in `pages.port` and tried again on the next start. It serves only what a page loads
+  without a credential: each grant's files on the grant's own host,
+  `http://<grant>.localhost:<pages port>/` (`internal/preview`: a grant from
   `FilesystemService.PreviewFile`, bound to one directory tree or one file, is the URL's
-  credential) and `/cf/`. Nothing behind the token is served there, and the API listener's
-  CORS refuses the pages origin, so a page holding a leaked token still cannot call the API.
+  credential; `/` is its directory, so a build's root-absolute `/assets/…` loads its own files,
+  `docs/notes/page-preview-serving.md`), the same at `/preview/<grant>/` on a loopback name,
+  and `/cf/`. Nothing behind the token is served there, and the API listener's CORS refuses
+  every origin on the pages port, so a page holding a leaked token still cannot call the API.
+  The app's App Transport Security lets the webview load plain HTTP from `*.localhost` (the
+  `localhost` exception in `gui/build/darwin/Info.*.plist`).
 * **`/cf/bridge.js`** (`internal/bridge`) gives a page `window.cf`: run the registry verbs its
   thread may run, subscribe to daemon events, read the theme, `cf.storage` and `cf.fetch`.
   A page reads no terminal's command lines: the read verbs and the `terminal` source leave
@@ -1530,9 +1535,11 @@ tab's preview) run in sandboxed frames that never touch the API
 * **What a frame cannot do**: the frame has no window to open, no dialog and no download, and
   a site loaded in it cannot sign in. The daemon writes `internal/preview/frame.js` into every
   HTML document a frame navigates to: a clicked link to another site, `window.open` and a GET
-  form go to the browser (`view.open.url`); `alert`, `confirm`, `prompt`, downloads, a POST form
-  and a script's `location` to another site are reported in the page's error badge
-  (`docs/notes/page-frame-links.md`). A frame that went to another site anyway is covered with
+  form go to the browser (`view.open.url`); a link or form whose target would open a window
+  loads the page's own file in the frame; `alert`, `confirm`, `prompt`, downloads, a POST form,
+  `window.open` with nothing to load and a script's `location` to another site are reported in
+  the page's error badge, a frame inside the page's through the page
+  (`docs/notes/page-frame-links.md`, `docs/notes/page-preview-serving.md`). A frame that went to another site anyway is covered with
   Reload, and the bridge follows a page to its own other files (`docs/notes/leftovers-pages.md`). A page saves a file with `file.export`
   instead, into its thread's checkout, after the user allows it (`docs/notes/page-save.md`).
 * **Who owns a page** (`internal/store/page`, `docs/notes/page-ownership-daemon.md`): the

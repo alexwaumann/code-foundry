@@ -236,7 +236,7 @@ func Run(ctx context.Context, opts Options) (retErr error) {
 		return err
 	}
 	st.thread.SetPageRecorder(pages)
-	filesystemAPI := api.NewFilesystem(st.home, st.project, grants).WithTemp(tempRoots).WithPagesOrigin(pagesOrigin(pagesPort)).WithPagesRoot(p.Pages()).
+	filesystemAPI := api.NewFilesystem(st.home, st.project, grants).WithTemp(tempRoots).WithPagesPort(pagesPort).WithPagesRoot(p.Pages()).
 		WithIncludeIgnored(includeIgnored(st.settings)).WithRipgrep(st.ripgrep).WithPages(pages)
 	commands := command.NewRegistry()
 	facts := pluginFacts{thread: st.thread, project: st.project, gh: st.gh}
@@ -459,7 +459,7 @@ func Run(ctx context.Context, opts Options) (retErr error) {
 	tcpSrv := newServer(reqCtx, log, "loopback", logRequests(log, "loopback",
 		loopbackHost(port, withMedia(preview.MediaHandler(grants, log.With("component", "media")),
 			loopbackHandler(token, caps, slices.Collect(maps.Keys(pageRoutes)), pagesPort, opts.DevOrigins, mux, tunnel)))))
-	pagesSrv := newServer(reqCtx, log, "pages", logRequests(log, "pages", loopbackHost(pagesPort, pagesHandler(pageRoutes))))
+	pagesSrv := newServer(reqCtx, log, "pages", logRequests(log, "pages", pagesHost(pagesPort, pagesHandler(pageRoutes, grantHost(grants, liveTheme, log)))))
 
 	errc := make(chan error, 3)
 	go func() { errc <- serve(unixSrv, unixLn) }()

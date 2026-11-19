@@ -6,8 +6,12 @@
 // through the app ({ type: "cf:open", url }), and alert, confirm, prompt and downloads
 // tell the app they did nothing ({ type: "cf:unsupported", what, text }), which the
 // page's strip shows. A form sent to another site goes the same ways: a GET to the browser
-// after a press, a POST reported. Where the browser has the Navigation API, a script's own
-// location = … (or a refresh) to another site is caught too. Every document answers the
+// after a press, a POST reported; a POST to the page's own files, which nothing answers, is
+// reported too. A link or form whose target would open a window (_blank, <base target>, a
+// name no frame has, _top) loads in the frame instead. Where the browser has the Navigation
+// API, a script's own location = … (or a refresh) to another site is caught too. A frame
+// inside the page posts to the page, not the app, so the page's script sends on what its
+// own frames report. Every document answers the
 // app's { type: "cf:ping", seq } after a load with { type: "cf:here", seq }, and says when it
 // goes on to a document at its own origin ({ type: "cf:going" }): a frame whose document
 // answers nothing went to another site, and the app offers to load the page again
@@ -66,6 +70,48 @@
     return null;
   }
 
+  // Whether this document is the page itself, in the app's frame, rather than a frame inside it.
+  var pageTop = parent === window.top;
+  // The target a link or form names: its own, else the document's <base target>.
+  function targetOf(el, own) {
+    var t = own;
+    if (t === null || t === undefined) t = el.getAttribute("target");
+    if (t === null) {
+      var base = document.querySelector("base[target]");
+      t = base ? base.getAttribute("target") : "";
+    }
+    return String(t || "");
+  }
+  // A frame of the page named name, from this document up to the page; null for none. A
+  // window's named property may be an element with that id, which is not a frame.
+  function namedFrame(name) {
+    var w = window;
+    for (var depth = 0; depth < 16; depth++) {
+      try {
+        var f = w[name];
+        if (f && f.window === f && f !== w) return f;
+      } catch (_) {
+        // Not reachable from here.
+      }
+      if (w.parent === window.top || w.parent === w) return null;
+      w = w.parent;
+    }
+    return null;
+  }
+  // Whether target is this document's own (a keyword's case does not count; a name's does).
+  function ownTarget(t) {
+    return t === "" || t.toLowerCase() === "_self";
+  }
+  // Whether going to target would open a window, which the app has none of for a frame, or
+  // replace the app's own: then the page's own file loads in this frame instead.
+  function opensWindow(t) {
+    var k = t.toLowerCase();
+    if (ownTarget(t)) return false;
+    if (k === "_parent") return pageTop;
+    if (k === "_blank" || k === "_top") return true;
+    return t !== String(window.name || "") && !namedFrame(t);
+  }
+
   ["pointerdown", "keydown"].forEach(function (t) {
     window.addEventListener(
       t,
@@ -99,11 +145,14 @@
       open(u);
       return;
     }
-    going();
-    if ((a.getAttribute("target") || "").toLowerCase() === "_blank") {
+    var t = targetOf(a);
+    if (opensWindow(t)) {
       // No window to open: the page's own other file shows in the frame.
       e.preventDefault();
+      going();
       location.href = u.href;
+    } else if (ownTarget(t)) {
+      going();
     }
   }
   window.addEventListener("click", onClick);
@@ -123,17 +172,22 @@
   };
 
   // A form to another site: a GET is a link with the form's fields, to the browser after a
-  // press; a POST cannot be taken there. True when it was taken care of here.
+  // press; a POST cannot be taken there. A POST to the page's own files: nothing there
+  // answers one. A GET to its own file in a window: it loads in the frame. True when it was
+  // taken care of here.
   function sentElsewhere(form, submitter, trusted) {
     var s = submitter && typeof submitter.hasAttribute === "function" ? submitter : null;
     var method = String((s && s.getAttribute("formmethod")) || form.method || "get").toLowerCase();
     if (method === "dialog") return false;
     var u = resolve((s && s.getAttribute("formaction")) || form.action || location.href);
-    if (!u || !elsewhere(u)) return false;
+    if (!u) return false;
+    var away = elsewhere(u);
     if (method !== "get") {
-      unsupported("form", u.host);
+      unsupported(away ? "form" : "post", away ? u.host : u.pathname);
       return true;
     }
+    var inFrame = !away && opensWindow(targetOf(form, s && s.getAttribute("formtarget")));
+    if (!away && !inFrame) return false;
     var data;
     try {
       data = s ? new FormData(form, s) : new FormData(form);
@@ -141,7 +195,10 @@
       data = new FormData(form);
     }
     u.search = new URLSearchParams(data).toString();
-    if (trusted || pressed()) open(u);
+    if (inFrame) {
+      going();
+      location.href = u.href;
+    } else if (trusted || pressed()) open(u);
     else unsupported("form", u.host);
     return true;
   }
@@ -166,6 +223,11 @@
       var u = resolve(e.destination.url);
       if (!u) return;
       if (!elsewhere(u)) {
+        if (e.formData) {
+          e.preventDefault();
+          unsupported("post", u.pathname);
+          return;
+        }
         going();
         return;
       }
@@ -176,12 +238,22 @@
     });
   }
 
-  window.open = function (href) {
+  // A window to fill in script (window.open() or "about:blank", then document.write) has
+  // nowhere to open, and the page is told it got none.
+  var realOpen = window.open;
+  window.open = function (href, name) {
     var u = href === undefined || href === null || href === "" ? null : resolve(href);
+    var t = String(name === undefined || name === null ? "" : name);
     if (u && elsewhere(u)) {
       if (pressed()) open(u);
+    } else if (u && !ownTarget(t) && !opensWindow(t) && typeof realOpen === "function") {
+      // A frame of the page by its name, or this one's parent in the page.
+      return realOpen.apply(window, arguments);
     } else if (u) {
+      going();
       location.href = u.href;
+    } else {
+      unsupported("window", href);
     }
     return null;
   };
@@ -205,9 +277,14 @@
   // the data is not kept. indexedDB.open still throws, told first. A service worker and the
   // Cache API are taken away, so a page that looks for them goes on without. A use before the
   // app's ping (the page's first script) is told after the answer: the frame's load, which
-  // comes between, clears what the page's strip had.
+  // comes between, clears what the page's strip had. So is one a frame inside the page sends
+  // on before then. A frame inside the page is never pinged: it tells the page at once.
   var answered = false;
   var early = [];
+  function report(what, text) {
+    if (answered || !pageTop) unsupported(what, text);
+    else early.push([what, text]);
+  }
   var opaque = false;
   try {
     void window.localStorage;
@@ -219,8 +296,7 @@
     var tell = function (name) {
       if (told[name]) return;
       told[name] = true;
-      if (answered) unsupported("storage", name);
-      else early.push(name);
+      report("storage", name);
     };
     var memoryStorage = function (name) {
       var data = Object.create(null);
@@ -411,19 +487,37 @@
     }
   }
 
+  // Whether source is the window of one of this document's own frames.
+  function child(source) {
+    var frames = window.frames;
+    if (!source || !frames) return false;
+    for (var i = 0; i < frames.length; i++) if (frames[i] === source) return true;
+    return false;
+  }
   window.addEventListener("message", function (e) {
     var m = e.data;
-    if (e.source !== parent || !m) return;
-    if (m.type === "cf:reload") {
-      location.reload();
+    if (!m || typeof m !== "object") return;
+    if (e.source === parent) {
+      if (m.type === "cf:reload") {
+        location.reload();
+        return;
+      }
+      if (m.type !== "cf:ping" || typeof m.seq !== "number") return;
+      noteLoaded();
+      answered = true;
+      post({ type: "cf:here", seq: m.seq, files: files.slice(), theme: themed() });
+      early.splice(0).forEach(function (r) {
+        unsupported(r[0], r[1]);
+      });
       return;
     }
-    if (m.type !== "cf:ping" || typeof m.seq !== "number") return;
-    noteLoaded();
-    answered = true;
-    post({ type: "cf:here", seq: m.seq, files: files.slice(), theme: themed() });
-    early.splice(0).forEach(function (name) {
-      unsupported("storage", name);
-    });
+    // What a frame inside the page asked of the app, sent on to it from here.
+    if (!child(e.source)) return;
+    if (m.type === "cf:open" && typeof m.url === "string") {
+      var u = resolve(m.url);
+      if (u) open(u);
+    } else if (m.type === "cf:unsupported" && typeof m.what === "string") {
+      report(m.what, m.text);
+    }
   });
 })();

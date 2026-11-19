@@ -98,6 +98,7 @@ function load(opts: { userActivation?: { isActive: boolean } | null; embedded?: 
     ? {
         href: where.href,
         origin: where.origin,
+        hostname: where.hostname,
         pathname: where.pathname,
         search: where.search,
         hash: where.hash,
@@ -771,6 +772,37 @@ describe("bridge.js: a page's own next document", () => {
     const h = load({ url: PAGE, navigation: n.api });
     expect(n.navigate(url, over)).toBe(false);
     expect(h.went).toEqual([]);
+  });
+
+  it("on its grant's own host, carries the nonce in the query to any file at that origin, and nowhere else", () => {
+    const G = "0123456789abcdef0123456789abcdef";
+    const own = `http://${G}.localhost:9246`;
+    const n = navigation();
+    const h = load({ url: `${own}/dist/index.html?cf-nonce=${N}#/about`, navigation: n.api });
+    expect(h.posted[0]?.m).toEqual({ type: "cf:hello", cf: 1, nonce: N });
+    expect(n.navigate(`${own}/about.html#team`)).toBe(true);
+    expect(n.navigate(`${own}/assets/`)).toBe(true);
+    expect(n.navigate(`http://fedcba9876543210fedcba9876543210.localhost:9246/about.html`)).toBe(false);
+    expect(n.navigate("http://127.0.0.1:9246/preview/g1/about.html")).toBe(false);
+    expect(n.navigate(`${own}/about.html?cf-nonce=${N}`)).toBe(false);
+    expect(h.went).toEqual([`assign ${own}/about.html?cf-nonce=${N}#team`, `assign ${own}/assets/?cf-nonce=${N}`]);
+  });
+
+  it("on its grant's own host without the Navigation API, follows a plain click to another file of its own with the nonce", () => {
+    const G = "0123456789abcdef0123456789abcdef";
+    const own = `http://${G}.localhost:9246`;
+    const h = load({ url: `${own}/index.html?cf-nonce=${N}` });
+    const e = click(`${own}/sub/page.html?x=1#top`);
+    h.fire("click", e);
+    expect(e.prevented).toBe(true);
+    expect(h.went).toEqual([`assign ${own}/sub/page.html?x=1&cf-nonce=${N}#top`]);
+  });
+
+  it("on its grant's own host, has no bridge from a nonce in the fragment, as the app once put it", async () => {
+    const n = navigation();
+    const h = load({ url: `http://0123456789abcdef0123456789abcdef.localhost:9246/index.html#cf=${N}`, navigation: n.api });
+    expect(n.fns).toHaveLength(0);
+    await expect(h.cf.ready).rejects.toMatchObject({ code: "unavailable" });
   });
 
   it.each([

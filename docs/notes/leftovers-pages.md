@@ -31,7 +31,8 @@ there; the fragment is the page's own.)
 **Decision: carry it in the URL, at navigation time, only to a known destination.** A
 navigation the page makes is re-made with `#cf=<nonce>` added (after the destination's own
 fragment, as `withNonce` does) when the destination is at the page's origin and under its
-own grant's `/preview/<grant>/` prefix, and has no nonce yet. With the Navigation API (the
+own grant's `/preview/<grant>/` prefix (on a grant's own host, since `page-preview-serving.md`,
+anything at its origin), and has no nonce yet. With the Navigation API (the
 WebKit of this machine's macOS 27, and Playwright's) the `navigate` event gives every push or replace with
 its destination (a link, `location = …`, `assign`, `replace`, a `_blank` link the frame
 script loads in the frame); the script cancels it and navigates again with the nonce.

@@ -29,7 +29,8 @@ did not work there, each silently.
 - The script, in the bubble phase so a page's own handler wins: a trusted click on a link to
   another host posts `{ type: "cf:open", url }` and is cancelled; `window.open` to another
   host posts the same after a press; a `_blank` link or `window.open` to the page's own host
-  loads in the frame. `alert`, `confirm`, `prompt`, a `download` link and a detached
+  loads in the frame (since `page-preview-serving.md`: any target that would open a window,
+  `<base target>` included, and a frame inside the page sends its messages on through the page). `alert`, `confirm`, `prompt`, a `download` link and a detached
   `a[download].click()` post `{ type: "cf:unsupported", what, text }`.
 - `HtmlFrame` opens a `cf:open` URL with `view.open.url` only from its own frame's window at
   the page's origin, only http(s), only while the user is in the frame (lib/frameAttention),

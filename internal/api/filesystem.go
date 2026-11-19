@@ -34,9 +34,9 @@ type Filesystem struct {
 	text     *textsearch.Searcher
 	grants   *preview.Grants
 	writer   *fsx.Writer
-	// pagesOrigin is where the preview route is served (the daemon's pages listener);
-	// PreviewFile's URLs are on it. Empty: root-relative URLs.
-	pagesOrigin string
+	// pagesPort is the daemon's pages listener's port; PreviewFile's URLs are on the grant's
+	// own origin there (preview.GrantURL). Zero: root-relative URLs on the preview route.
+	pagesPort int
 	// pagesRoot is the directory the threads' pages directories are made under
 	// (WithPagesRoot); PreviewFile names the thread a file under it belongs to. Empty: none.
 	pagesRoot string
@@ -74,10 +74,10 @@ func (h *Filesystem) WithRipgrep(engine *ripgrep.Engine) *Filesystem {
 	return h
 }
 
-// WithPagesOrigin makes PreviewFile's URLs absolute on origin
-// ("http://127.0.0.1:<port>"), the listener that serves the preview route.
-func (h *Filesystem) WithPagesOrigin(origin string) *Filesystem {
-	h.pagesOrigin = origin
+// WithPagesPort makes PreviewFile's URLs absolute on the grant's own origin on the pages
+// listener at port, http://<grant>.localhost:<port> (preview.GrantOrigin).
+func (h *Filesystem) WithPagesPort(port int) *Filesystem {
+	h.pagesPort = port
 	return h
 }
 
@@ -454,7 +454,10 @@ func (h *Filesystem) PreviewFile(ctx context.Context, req *connect.Request[v1.Pr
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("preview %s: %w", f.Path, err))
 	}
-	url := h.pagesOrigin + preview.URL(grant, filepath.ToSlash(rel))
+	url := preview.URL(grant, filepath.ToSlash(rel))
+	if h.pagesPort != 0 {
+		url = preview.GrantURL(grant, filepath.ToSlash(rel), h.pagesPort)
+	}
 	return connect.NewResponse(&v1.PreviewFileResponse{Url: url, Scope: scope, SingleFile: single, PageThread: h.pageThread(f.RealPath),
 		Page: h.pageAccess(ctx, f.Path)}), nil
 }

@@ -11,14 +11,16 @@
 // grant reads: anyone can plant a link there, or swap a file for one mid-read (open.go).
 //
 // The route is served on the daemon's pages listener, not the API's
-// (docs/notes/bridge-1-daemon.md). Its CSP sandbox keeps scripts and forms on and allows
-// same-origin, so a page in a frame (whose sandbox allows it too) has the pages origin,
-// http://127.0.0.1:<pages port>, and its storage, across reloads and restarts. That origin
-// is never the API's: the API listens on another port and its CORS refuses the pages
-// origin, so a page cannot call it even holding a token.
+// (docs/notes/bridge-1-daemon.md), and the GUI loads a grant on its own origin there,
+// http://<grant>.localhost:<pages port>, where / is the grant's directory (host.go). Its CSP
+// sandbox keeps scripts and forms on and allows same-origin, so a page in a frame (whose
+// sandbox allows it too) has that origin and its storage while the grant lasts. That origin
+// is never the API's: the API listens on another port and its CORS refuses every origin on
+// the pages port, so a page cannot call it even holding a token.
 package preview
 
 import (
+	"bytes"
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
@@ -30,6 +32,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 
@@ -118,13 +121,19 @@ func (g *Grants) lookup(id string) (entry, bool) {
 const CSP = "sandbox allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals allow-downloads"
 
 // URL is the root-relative URL of rel (slash-separated, relative to the grant's
-// directory) under grant.
+// directory) under grant on the preview route, for a server with no pages listener; the
+// daemon's are on the grant's own origin (GrantURL).
 func URL(grant, rel string) string {
+	return Prefix + grant + "/" + escapePath(rel)
+}
+
+// escapePath escapes each segment of the slash-separated path rel.
+func escapePath(rel string) string {
 	segs := strings.Split(rel, "/")
 	for i, s := range segs {
 		segs[i] = escapeSegment(s)
 	}
-	return Prefix + grant + "/" + strings.Join(segs, "/")
+	return strings.Join(segs, "/")
 }
 
 // escapeSegment percent-encodes one path segment the way a URL path needs ("#", "?",
@@ -145,18 +154,27 @@ func escapeSegment(s string) string {
 	return b.String()
 }
 
-// Handler serves GET /preview/<grant>/<path> from the grant's directory (only its file,
-// for a one-file grant). A file whose symlinks lead out of home for a home grant, out of the
+// Handler serves GET /<path> on a grant's own host (HostGrant) and GET
+// /preview/<grant>/<path> on any other from the grant's directory (only its file, for a
+// one-file grant). A file whose symlinks lead out of home for a home grant, out of the
 // tree for a temp grant (open) or into a guarded folder (the Floor: the config home's token and
 // database, ~/.ssh, compared by file identity, so a folded spelling or a hard link is no way
 // around it), or a path above the grant's directory, is 404 like a missing one. A directory serves its
-// index.html. Responses are never cached (the thread edits these files), carry no
+// index.html, once its URL ends in a slash: without one it redirects there, as a static server
+// does, so the index's relative links resolve inside the directory. Responses are never cached (the thread edits these files), carry no
 // referrer, so the grant does not leak to the sites a page loads from, and allow any
 // origin: a page reads its own files with fetch(), and a frame that is not same-origin
 // (an older sandbox, a page opened elsewhere) must still be able to. An HTML document asked
 // for with ThemedParam is painted in paint's theme (paint.go); a nil paint paints nothing.
 // One a frame navigates to gets frame.js (frame.go).
 func Handler(g *Grants, paint Paint, log *slog.Logger) http.Handler {
+	return HandlerMissing(g, paint, nil, log)
+}
+
+// HandlerMissing is Handler where, on a grant's own host, a path the grant has no file at
+// goes to missing when it is not nil: the pages listener's /cf/ routes, which a page's own
+// cf/ folder thus wins over.
+func HandlerMissing(g *Grants, paint Paint, missing http.Handler, log *slog.Logger) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Any origin, on errors too, so a page's fetch() sees a 404 rather than a CORS failure.
 		w.Header().Set("Access-Control-Allow-Origin", "*")
@@ -165,10 +183,13 @@ func Handler(g *Grants, paint Paint, log *slog.Logger) http.Handler {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 			return
 		}
-		grant, rel, ok := strings.Cut(strings.TrimPrefix(r.URL.Path, Prefix), "/")
-		if !ok || grant == "" {
+		grant, rel, own := requestGrant(r)
+		if grant == "" {
 			http.NotFound(w, r)
 			return
+		}
+		if !own {
+			missing = nil
 		}
 		e, ok := g.lookup(grant)
 		if !ok || e.media {
@@ -176,18 +197,21 @@ func Handler(g *Grants, paint Paint, log *slog.Logger) http.Handler {
 			return
 		}
 		if e.file != "" && filepath.Join(e.dir, filepath.FromSlash(path.Clean("/"+rel))) != e.file {
-			http.NotFound(w, r)
+			notFound(w, r, missing)
 			return
 		}
-		f, p, err := open(g.floor, e, rel)
+		f, p, dir, err := open(g.floor, e, rel)
 		if err != nil {
 			if !errors.Is(err, fs.ErrNotExist) {
 				log.Warn("preview read failed", "path", rel, "err", err)
 			}
-			http.NotFound(w, r)
+			notFound(w, r, missing)
 			return
 		}
 		defer func() { _ = f.Close() }()
+		if dir && toSlash(w, r) {
+			return
+		}
 		var tag []byte
 		if paint != nil && r.URL.Query().Get(ThemedParam) == "1" {
 			tag = paintTag(paint())
@@ -197,6 +221,51 @@ func Handler(g *Grants, paint Paint, log *slog.Logger) http.Handler {
 		}
 		serve(w, r, f, p, tag)
 	})
+}
+
+// requestGrant is the grant a request names and the path under it: by its host on the
+// grant's own origin (own), else by its path on the preview route; no grant for neither.
+func requestGrant(r *http.Request) (grant, rel string, own bool) {
+	if g, _, ok := HostGrant(r.Host); ok {
+		return g, strings.TrimPrefix(r.URL.Path, "/"), true
+	}
+	grant, rel, ok := strings.Cut(strings.TrimPrefix(r.URL.Path, Prefix), "/")
+	if !ok || !strings.HasPrefix(r.URL.Path, Prefix) {
+		return "", "", false
+	}
+	return grant, rel, false
+}
+
+// notFound answers a path the grant has no file at: missing's answer when there is one,
+// else 404.
+func notFound(w http.ResponseWriter, r *http.Request, missing http.Handler) {
+	if missing != nil {
+		w.Header().Del("Access-Control-Allow-Origin")
+		missing.ServeHTTP(w, r)
+		return
+	}
+	http.NotFound(w, r)
+}
+
+// toSlash redirects a directory's URL without its trailing slash to the one with it (the
+// query kept) and reports whether it did. The Location is relative, its last segment and a
+// slash, so it stays on the path asked for.
+func toSlash(w http.ResponseWriter, r *http.Request) bool {
+	raw := r.URL.EscapedPath()
+	last := raw[strings.LastIndex(raw, "/")+1:]
+	if last == "" {
+		return false
+	}
+	loc := "./" + last + "/" // "./": a segment like "a:b" is not a scheme
+	if r.URL.RawQuery != "" {
+		loc += "?" + r.URL.RawQuery
+	}
+	h := w.Header()
+	h.Set("Location", loc)
+	h.Set("Cache-Control", "no-store")
+	h.Set("Referrer-Policy", "no-referrer")
+	w.WriteHeader(http.StatusMovedPermanently)
+	return true
 }
 
 // serve writes the open file f, whose real path is p; an HTML document gets tag (paint.go,
@@ -230,12 +299,53 @@ func serve(w http.ResponseWriter, r *http.Request, f *os.File, p string, tag []b
 	http.ServeContent(w, r, fi.Name(), fi.ModTime(), f)
 }
 
-// contentType is fsx.DetectMIME with a UTF-8 charset on text types that name none, so
-// the page's text is not read as Latin-1 when it has no <meta charset>.
+// contentType is fsx.DetectMIME with a charset on text types that name none: for HTML the
+// one htmlCharset finds, else UTF-8, so a page with no <meta charset> is not read as Latin-1.
 func contentType(name string, head []byte) string {
 	t := fsx.DetectMIME(name, head)
-	if strings.HasPrefix(t, "text/") && !strings.Contains(t, "charset") {
-		t += "; charset=utf-8"
+	if !strings.HasPrefix(t, "text/") || strings.Contains(t, "charset") {
+		return t
 	}
-	return t
+	cs := "utf-8"
+	if strings.HasPrefix(t, "text/html") {
+		cs = htmlCharset(head)
+	}
+	if cs == "" {
+		return t
+	}
+	return t + "; charset=" + cs
+}
+
+// metaCharsetRe finds a charset in a <meta> tag: <meta charset="…"> or the content of
+// <meta http-equiv="Content-Type" content="text/html; charset=…">.
+var metaCharsetRe = regexp.MustCompile(`(?i)<meta\s[^>]*?charset\s*=\s*["']?\s*([a-z0-9][a-z0-9._:-]*)`)
+
+// htmlCharset is the charset an HTML document is sent with: the one its first 1024 bytes
+// declare (where a browser looks for it), lower case, else UTF-8. The header's charset wins
+// over the document's, and frame.js written ahead of the document's own <meta charset>
+// would push it past those 1024 bytes, so a declared one is carried in the header. A
+// byte-order mark decides first: UTF-8's is utf-8, and a UTF-16 one is left to the browser
+// (""), which reads it.
+func htmlCharset(head []byte) string {
+	switch {
+	case bytes.HasPrefix(head, []byte("\xef\xbb\xbf")):
+		return "utf-8"
+	case bytes.HasPrefix(head, []byte("\xfe\xff")), bytes.HasPrefix(head, []byte("\xff\xfe")):
+		return ""
+	}
+	if len(head) > 1024 {
+		head = head[:1024]
+	}
+	m := metaCharsetRe.FindSubmatch(head)
+	if m == nil {
+		return "utf-8"
+	}
+	switch cs := strings.ToLower(string(m[1])); {
+	case strings.HasPrefix(cs, "utf-16"), strings.HasPrefix(cs, "unicode"):
+		return "utf-8" // a document whose own meta the browser can read is not UTF-16: it reads it as UTF-8
+	case cs == "x-user-defined":
+		return "windows-1252"
+	default:
+		return cs
+	}
 }

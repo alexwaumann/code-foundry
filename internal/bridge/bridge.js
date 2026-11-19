@@ -744,16 +744,17 @@
 })();
 
 // A page's own next document keeps the bridge (docs/notes/leftovers-pages.md). A navigation
-// the page makes to another file of its own (at this origin, under its own grant's
-// /preview/<grant>/) is sent on with the frame's nonce in its query, so that document's
-// bridge works too. A navigation to another site or another grant goes as it is, without
-// the nonce, so it has no bridge there. With the Navigation API every such navigation (a
-// link, location = …, location.assign or replace) is seen with where it goes; without it,
-// a followed link is. Its own block, apart from the bridge above.
+// the page makes to another file of its own (at this origin, which is its grant's own host,
+// or under its own grant's /preview/<grant>/ on the preview route) is sent on with the
+// frame's nonce in its query, so that document's bridge works too. A navigation to another
+// site or another grant goes as it is, without the nonce, so it has no bridge there. With
+// the Navigation API every such navigation (a link, location = …, location.assign or
+// replace) is seen with where it goes; without it, a followed link is. Its own block, apart
+// from the bridge above.
 (function () {
   "use strict";
   var nonceMatch = /[?&]cf-nonce=([A-Za-z0-9_-]+)/.exec(location.search || "");
-  var grant = /^\/preview\/[^/]+\//.exec(location.pathname || "");
+  var grant = /^[0-9a-f]{32}\.localhost$/.test(location.hostname) ? ["/"] : /^\/preview\/[^/]+\//.exec(location.pathname || "");
   if (window.parent === window || !nonceMatch || !grant || window.__cfFollow) return;
   window.__cfFollow = true;
   var nonce = nonceMatch[1];

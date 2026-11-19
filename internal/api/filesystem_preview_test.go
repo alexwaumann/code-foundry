@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net"
 	"net/http"
 	"net/http/httptest"
+	neturl "net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -161,8 +163,8 @@ func TestFilesystemPreviewFile(t *testing.T) {
 	})
 }
 
-// With a pages origin (the daemon's pages listener), PreviewFile's URL is absolute on it,
-// and serves the file from there.
+// With a pages listener, PreviewFile's URL is absolute on the grant's own origin there,
+// http://<grant>.localhost:<port>/<path>, and serves the file from it.
 func TestFilesystemPreviewFilePagesOrigin(t *testing.T) {
 	root, err := filepath.EvalSymlinks(t.TempDir())
 	if err != nil {
@@ -178,7 +180,8 @@ func TestFilesystemPreviewFilePagesOrigin(t *testing.T) {
 	grants := testGrants(root)
 	pages := httptest.NewServer(preview.Handler(grants, nil, slog.Default()))
 	t.Cleanup(pages.Close)
-	route := NewFilesystem(root, projecttest.New(nil), grants).WithPagesOrigin(pages.URL).Route()
+	port := pages.Listener.Addr().(*net.TCPAddr).Port
+	route := NewFilesystem(root, projecttest.New(nil), grants).WithPagesPort(port).Route()
 	api := httptest.NewServer(route.Handler)
 	t.Cleanup(api.Close)
 	c := codefoundryv1connect.NewFilesystemServiceClient(api.Client(), api.URL)
@@ -187,8 +190,13 @@ func TestFilesystemPreviewFilePagesOrigin(t *testing.T) {
 		t.Fatal(err)
 	}
 	url := res.Msg.GetUrl()
-	if !strings.HasPrefix(url, pages.URL+preview.Prefix) || !strings.HasSuffix(url, "/index.html") {
-		t.Fatalf("url %q, want one under %s%s", url, pages.URL, preview.Prefix)
+	u, err := neturl.Parse(url)
+	if err != nil {
+		t.Fatal(err)
+	}
+	grant, _, ok := preview.HostGrant(u.Host)
+	if !ok || url != preview.GrantOrigin(grant, port)+"/index.html" {
+		t.Fatalf("url %q, want <grant origin>/index.html (the scope is site)", url)
 	}
 	r, err := pages.Client().Get(url)
 	if err != nil {

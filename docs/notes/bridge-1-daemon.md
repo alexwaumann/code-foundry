@@ -25,7 +25,8 @@ GUI host (PR 2) and the skills and system prompt (PR 3) follow.
   `sandbox`, so the GUI adding `allow-same-origin` to the frame does nothing unless the
   route allows it too. A page now has the pages origin and keeps its localStorage and
   IndexedDB across reloads and restarts. Still never `allow-top-navigation`.
-- **`FilesystemService.PreviewFile`** returns an absolute URL on the pages origin
+- **`FilesystemService.PreviewFile`** (since `page-preview-serving.md`: on the grant's own
+  origin, `http://<grant>.localhost:<pages port>/`) returns an absolute URL on the pages origin
   (`Filesystem.WithPagesOrigin`). The GUI already joins with `new URL(url, base)`, which
   keeps an absolute URL as it is; the mock still returns root-relative URLs on its one port.
   `/cf/theme.css` in a page and in `view.inline`'s warning is root-relative, so it resolves

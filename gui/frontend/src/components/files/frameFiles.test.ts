@@ -31,7 +31,20 @@ describe("grantFiles", () => {
     expect(grantFiles(PAGE, "/s", paths)).toEqual(want);
   });
 
+  const HOST_PAGE = "http://0123456789abcdef0123456789abcdef.localhost:9/docs/index.html";
+  it.each([
+    ["a root-absolute stylesheet", ["/assets/index.css"], ["/s/assets/index.css"]],
+    ["a folder, as its index", ["/sub/"], ["/s/sub/index.html"]],
+    ["the page itself, its host's to watch", ["/docs/index.html"], []],
+    ["a cf/ path, which the folder may have", ["/cf/theme.css"], ["/s/cf/theme.css"]],
+    ["a path like another grant's, which is this one's own", ["/preview/g2/x.css"], ["/s/preview/g2/x.css"]],
+    ["a path that does not decode or climbs", ["/%E0%A4%A", "/a/%2F/b", "/..%2Fx"], []],
+  ])("maps on the grant's own host %s", (_name, paths, want) => {
+    expect(grantFiles(HOST_PAGE, "/s", paths)).toEqual(want);
+  });
+
   it("maps nothing for a page URL without a grant, or no scope", () => {
+    expect(grantFiles("http://not-a-grant.localhost:9/page.html", "/s", ["/x.css"])).toEqual([]);
     expect(grantFiles("http://127.0.0.1:9/page.html", "/s", ["/x.css"])).toEqual([]);
     expect(grantFiles(PAGE, "", ["/preview/g1/x.css"])).toEqual([]);
     expect(grantFiles("not a url", "/s", ["/preview/g1/x.css"])).toEqual([]);

@@ -42,7 +42,7 @@ export function pageOpenUrl(data: unknown): string | null {
 }
 
 /** What a frame cannot do for a page (internal/preview/frame.js). */
-export type PageUnsupported = "alert" | "confirm" | "prompt" | "download" | "form" | "navigation" | "storage";
+export type PageUnsupported = "alert" | "confirm" | "prompt" | "download" | "form" | "post" | "navigation" | "window" | "storage";
 
 const UNSUPPORTED: Readonly<Record<PageUnsupported, { call: string; message: string }>> = {
   alert: { call: "alert()", message: "alert() shows nothing in a page here: show the message in the page itself" },
@@ -55,6 +55,14 @@ const UNSUPPORTED: Readonly<Record<PageUnsupported, { call: string; message: str
   form: {
     call: "form",
     message: "a form sent to another site goes nowhere from a page here (a GET opens in the browser only from the user's press): send it with cf.fetch in the submit handler and call preventDefault",
+  },
+  post: {
+    call: "form",
+    message: "a form sent with POST to the page's own files goes nowhere from a page here: they are files, and nothing answers a POST. Handle the submit in script and call preventDefault",
+  },
+  window: {
+    call: "window.open()",
+    message: "window.open() with no page to load opens no window in a page here and answers null: show that view in the page itself",
   },
   navigation: {
     call: "location",
