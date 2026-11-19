@@ -12,7 +12,7 @@ import { useNowSelect } from "@/lib/clock";
 import { formatAge, formatDuration } from "@/lib/duration";
 import { QUIET } from "@/lib/quiet";
 import { cn } from "@/lib/utils";
-import { threadBadge } from "@/lib/thread";
+import { threadBadge, threadGroup } from "@/lib/thread";
 import { shortRemaining } from "@/lib/snooze";
 import { statusLine, statusText, statusToneText, tipStatusTone, type StatusLineKind, type TipStatusTone } from "@/lib/statusLine";
 import { statusBadge, statusTimeAt, statusTimeUnits } from "@/lib/statusRegistry";
@@ -745,9 +745,28 @@ function SnoozeLeft({ id }: { id: string }) {
 }
 
 /**
+ * A snoozed thread that works (a message from another thread started it; the snooze holds,
+ * docs/notes/snooze-holds-archive-refuses.md): its working status (RowStatus: the icon and how
+ * long), before the countdown. Nothing while it does not work.
+ */
+function SnoozedWork({ id }: { id: string }) {
+  const working = useThreadsStore((s) => {
+    const t = s.byId[id];
+    return t !== undefined && threadGroup(t) === "working";
+  });
+  if (!working) return null;
+  return (
+    <span className="ml-auto flex shrink-0 items-center pl-1" data-testid="row-snoozed-working">
+      <RowStatus id={id} />
+    </span>
+  );
+}
+
+/**
  * An archived or snoozed thread's single line: the name, quiet (regular and muted; the id
  * while unnamed) and, on the right, how long ago it was archived or how long until it wakes. No status line,
- * badges or pin (such a thread is unpinned): the whole section is such threads. All of it is
+ * badges or pin (such a thread is unpinned): the whole section is such threads. A snoozed thread
+ * that works says so before its countdown (SnoozedWork). All of it is
  * dimmed (QUIET) but the rename field, which is being typed in.
  */
 export function SingleLineLabel({ id, section }: { id: string; section: "archived" | "snoozed" }) {
@@ -765,7 +784,14 @@ export function SingleLineLabel({ id, section }: { id: string; section: "archive
           <span className={nameClass(name, provisional, true)} data-testid="thread-name" data-provisional={provisional || undefined}>
             {name || id}
           </span>
-          {section === "archived" ? <ArchivedAge id={id} /> : <SnoozeLeft id={id} />}
+          {section === "archived" ? (
+            <ArchivedAge id={id} />
+          ) : (
+            <>
+              <SnoozedWork id={id} />
+              <SnoozeLeft id={id} />
+            </>
+          )}
         </>
       )}
     </span>

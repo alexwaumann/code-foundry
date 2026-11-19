@@ -3,7 +3,7 @@
 {{cf.provenance}}
 
 For the code-foundry-orchestrate skill: the sidebar, when the user should take a child's
-work, and what archiving takes along.
+work, what archiving takes along, and archived and snoozed threads you did not put away.
 
 ## Hidden while you exist
 
@@ -32,7 +32,19 @@ has forked it.
 
 `thread archive` on a thread also archives every thread below it (its children, theirs,
 and so on), first and the same way: their Claude stops, their shells go. Unarchiving
-brings back only the thread named. When a thread below is still working or waiting on an
+brings back only the thread named; a `thread send` to a child you archived unarchives it
+too. When a thread below is still working or waiting on an
 answer, the archive asks first (exit 2 without `--yes`); to keep its work, the user forks
 it before you archive. `thread remove` takes them along the same way. `--descendants-of`
 and `--ids` archive exactly the threads they name.
+
+## Archived and snoozed threads are the user's decision
+
+An archived thread you did not create, directly or through a thread you created, is
+the user's: `thread send`, unarchive, pin and snooze on it are refused (exit 2). Read it
+(`thread read <id>`), or tell the user it is archived and ask them to unarchive it.
+
+The user's snooze holds the same way: your message to a snoozed thread is delivered, it
+works and stays snoozed with its time (it shows under Needs you while it asks the user
+something). Only the user ends a snooze; `thread snooze --clear` and `thread pin` on a
+snoozed thread you did not create are refused.

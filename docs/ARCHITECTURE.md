@@ -245,6 +245,10 @@ Services (v1):
   unarchive; `docs/notes/archive-threads-1-daemon.md`), Snooze (close, remove the
   thread's shells, unpin, unarchive, set `snoozed_until`; the store wakes it on the wall
   clock into NEEDS_ATTENTION "snooze ended"; `docs/notes/snooze-threads-1-daemon.md`;
+  both are the user's to undo: another thread's message or a wake leaves a snooze held
+  while the thread works, and a thread may message, unarchive, pin or unsnooze only a
+  thread it created, by the creator chain (`holds.go`,
+  `docs/notes/snooze-holds-archive-refuses.md`);
   with `save` the same with no wake time, `saved_at` instead of `snoozed_until`;
   `docs/notes/save-for-later-1-daemon.md`), Wait (block until a thread settles, by default: idle or needs attention, a pending prompt included; or until it is idle, needs attention, has an error or is disconnected; `thread.wait`, `docs/notes/agents-1-wait-events.md`, `docs/notes/thread-wait-settled.md`), Label, Report and SetBudget (agent metadata: labels, a report, a spending limit whose budget stop interrupts Claude into NEEDS_ATTENTION "budget reached"; with Create's created_by and brief, `docs/notes/agents-2-metadata.md`), Subscribe, Unsubscribe and ListSubscriptions (wake subscriptions: the daemon sends a thread a wake message, a user message with origin WAKE, when a target thread settles or meets another condition, or an action run finishes; persisted, edge-triggered from the thread store's commit and again on each new pending request, 60 per subscriber per hour; `thread.new --notify`; `docs/notes/agents-4-wake.md`, `docs/notes/wake-detail.md` for what a settled wake says; WatchThread carries the watched thread's list; StopWaiting removes its wakes and stops its background shells: `docs/notes/wait-list-daemon.md`), StageAttachment (images and PDFs a message refers to, as bytes or an absolute path the daemon reads; `docs/notes/pdf-attachments-1-daemon.md`, `docs/notes/attach-by-path.md`) and ReadAttachment (a staged file's bytes).
   Also RegenerateName (a new name from the last three turns, `docs/notes/regenerate-thread-name.md`),

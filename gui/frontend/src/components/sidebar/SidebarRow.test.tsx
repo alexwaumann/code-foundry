@@ -683,6 +683,19 @@ describe("SidebarRow snoozed", () => {
     expect(screen.getByTestId("thread-body").hasAttribute("data-snoozed")).toBe(true);
   });
 
+  it("working (another thread's message started it; the snooze holds): its working status before the countdown", () => {
+    renderSnoozed({ name: "Later work", state: "connected", status: "busy", statusReason: "working", statusChangedAtMs: Date.now() - 5_000, snoozedUntilMs: Date.now() + 2 * 3_600_000 + 60_000 });
+    const work = screen.getByTestId("row-snoozed-working");
+    expect(work.querySelector('[data-testid="row-status"]')?.getAttribute("data-kind")).toBe("working");
+    expect(work.compareDocumentPosition(screen.getByTestId("row-snooze-left")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByTestId("row-snooze-left").textContent).toBe("2h");
+  });
+
+  it("not working: no working status", () => {
+    renderSnoozed({ name: "Later work", snoozedUntilMs: Date.now() + 60 * 60_000 });
+    expect(screen.queryByTestId("row-snoozed-working")).toBeNull();
+  });
+
   it("quiet: regular muted name; the countdown is an alarm clock then the time left, muted", () => {
     renderSnoozed({ name: "Later work", snoozedUntilMs: Date.now() + 2 * 3_600_000 + 60_000 });
     const name = screen.getByTestId("thread-name").className.split(" ");

@@ -47,7 +47,7 @@ func TestGroupMemberArchived(t *testing.T) {
 			}
 			done := make(chan error, 1)
 			go func() {
-				_, err := b.m.Archive(ArchivedBy(context.Background(), tt.by(b.parent.ID)), sleeper.ID, true)
+				_, err := b.m.Archive(AskedBy(context.Background(), tt.by(b.parent.ID)), sleeper.ID, true)
 				done <- err
 			}()
 			items := b.waitItems(b.parent.ID, "the group's wake", func(items []Item) bool { return len(wakes(items)) > 0 })

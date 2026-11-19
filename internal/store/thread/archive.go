@@ -15,8 +15,8 @@ import (
 // (logged, and named in the *CascadeError returned with the thread); then the thread
 // itself, then any hidden thread created below it meanwhile (its creator was still
 // running). Unarchiving only
-// clears ArchivedAt, of this thread alone: the thread stays disconnected until the
-// user reconnects it.
+// clears ArchivedAt, of this thread alone: the thread stays disconnected until a
+// message starts it. A thread (AskedBy) may unarchive only a thread it created (holds.go).
 func (m *Manager) Archive(ctx context.Context, id string, archived bool) (Thread, error) {
 	return m.archive(ctx, id, archived, nil)
 }
@@ -31,6 +31,9 @@ func (m *Manager) archive(ctx context.Context, id string, archived bool, closing
 		defer m.mu.Unlock()
 		rec, err := m.record(id)
 		if err != nil {
+			return Thread{}, err
+		}
+		if err := m.refuseHeldLocked(rec, askedBy(ctx), true, false, "unarchive"); err != nil {
 			return Thread{}, err
 		}
 		m.dropPutAwayLocked(rec, "the thread was unarchived")
@@ -50,7 +53,7 @@ func (m *Manager) archive(ctx context.Context, id string, archived bool, closing
 			return Thread{}, err
 		}
 	}
-	by := archivedBy(ctx)
+	by := askedBy(ctx)
 	tried := map[string]bool{}
 	var failed []CascadeFailure
 	cascaded := 0
@@ -240,7 +243,8 @@ func (m *Manager) interrupted(id string) (bool, error) {
 
 // unarchiveLocked clears rec's ArchivedAt and reports whether it was set, so the
 // caller commits. Pin(true) and Send unarchive implicitly: a thread the user
-// works with again belongs in the main list. Callers hold m.mu.
+// works with again belongs in the main list (a thread may do it only to a thread it
+// created, holds.go). Callers hold m.mu.
 func (m *Manager) unarchiveLocked(rec *record) bool {
 	if rec.s.ArchivedAt.IsZero() {
 		return false
@@ -249,17 +253,16 @@ func (m *Manager) unarchiveLocked(rec *record) bool {
 	return true
 }
 
-// backToList unarchives and unsnoozes (unarchiveLocked, unsnoozeLocked) for a caller
-// without m.mu (Send), committing and publishing when the thread was either.
-func (m *Manager) backToList(id string) {
+// backToList is backToListLocked (holds.go: what a message from rv brings back) for a
+// caller without m.mu (Send), committing and publishing when anything changed.
+func (m *Manager) backToList(id string, rv revive) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	rec, ok := m.recs[id]
 	if !ok {
 		return
 	}
-	unarchived := m.unarchiveLocked(rec)
-	if m.unsnoozeLocked(rec) || unarchived {
+	if m.backToListLocked(rec, rv) {
 		m.commitLocked(rec, true)
 	}
 }

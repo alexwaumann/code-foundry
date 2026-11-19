@@ -1,6 +1,7 @@
 package command
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -136,7 +137,8 @@ func RegisterThread(r *Registry, b ThreadBackend) error {
 			Title:     "Send to Thread",
 			Description: "Send a message to a thread, also while it works: Claude picks it up mid-turn. " +
 				"A thread whose Claude is not running starts with it. During a setup it waits behind the first prompt; " +
-				"after a failed or cancelled setup it tries the setup again.",
+				"after a failed or cancelled setup it tries the setup again. " +
+				"From a thread: a snoozed thread gets it and stays snoozed; an archived thread it did not create refuses it (read it, or ask the user).",
 			Category: "Thread",
 			Args: []ArgSpec{
 				idArg,
@@ -163,9 +165,13 @@ func RegisterThread(r *Registry, b ThreadBackend) error {
 						return Result{}, err
 					}
 				}
+				// A thread's CLI that opts out of by (--by=) still sends as that thread: what
+				// it may do to a snoozed or archived thread hangs on it
+				// (docs/notes/snooze-holds-archive-refuses.md).
+				by := cmp.Or(a.String("by"), askingThread(uctx))
 				res, err := b.Send(ctx, connect.NewRequest(&v1.SendThreadMessageRequest{
 					ThreadId: a.String("id"), Text: a.String("text"), Attachments: splitList(a.String("attachments")),
-					ComposerText: a.String("composer-text"), ByThreadId: a.String("by"),
+					ComposerText: a.String("composer-text"), ByThreadId: by,
 					NoNotify: !a.Bool("notify") || a.Bool("wait"),
 				}))
 				if r, ok := removedFrom(err); ok {
@@ -187,7 +193,7 @@ func RegisterThread(r *Registry, b ThreadBackend) error {
 				}
 				// Past the message's own item: the status of the turn before it (still
 				// "finished" until the new turn's busy is published) does not count.
-				return waitThread(ctx, b, id, "settled", item.GetId(), limit, sent+"; ", a.String("by"))
+				return waitThread(ctx, b, id, "settled", item.GetId(), limit, sent+"; ", by)
 			},
 		},
 		threadCompact(b, idArg),

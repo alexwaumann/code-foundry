@@ -21,7 +21,8 @@ import (
 // thread's agent only runs when a message arrives. A subscription makes the daemon send
 // one: when its target thread meets a condition, or its target action run finishes, the
 // subscriber is sent a wake message (subscriptions_fire.go) through Send, so a busy
-// subscriber queues it, a stopped one starts with it and a snoozed one is unsnoozed.
+// subscriber queues it, a stopped one starts with it and a snoozed one works and stays
+// snoozed (holds.go).
 //
 // Thread targets are edge-triggered: the store's commit hook (observeLocked, called by
 // commitLocked under m.mu for every published change) fires a subscription when its

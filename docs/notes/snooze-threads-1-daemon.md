@@ -1,5 +1,10 @@
 # Snoozed threads, PR 1 of 2: daemon, command, API mapping
 
+Update 2026-11-19 (`snooze-holds-archive-refuses.md`): only the user's message unsnoozes;
+another thread's message or a wake starts the thread and leaves it snoozed with its time,
+so a snoozed thread can be live. A thread may clear or pin away a snooze only on a thread
+it created.
+
 Update 2026-10-15 (`thread-lifecycle.md`): `session.reconnect` and `session.close` are gone; a
 message starts a stopped thread (and unsnoozes it), the daemon stops idle ones, and
 snooze also asks while background agents or shells run.

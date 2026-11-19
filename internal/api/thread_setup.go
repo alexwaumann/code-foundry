@@ -27,7 +27,7 @@ func setupToProto(s *thread.Setup) *v1.ThreadSetup {
 
 // RetrySetup runs a failed or cancelled setup again.
 func (h *Thread) RetrySetup(ctx context.Context, req *connect.Request[v1.RetryThreadSetupRequest]) (*connect.Response[v1.RetryThreadSetupResponse], error) {
-	s, err := h.store.RetrySetup(ctx, req.Msg.GetId())
+	s, err := h.store.RetrySetup(thread.AskedBy(ctx, req.Msg.GetByThreadId()), req.Msg.GetId())
 	if err != nil {
 		return nil, threadError(err)
 	}

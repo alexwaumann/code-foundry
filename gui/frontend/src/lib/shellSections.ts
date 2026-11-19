@@ -113,9 +113,13 @@ function byRecent<T extends ListThread>(list: readonly T[], at: (t: T) => number
   return [...known, ...list.filter((t) => at(t) == null)];
 }
 
-/** Whether a thread waits on the user with an actionable ask and would be listed under Needs you in some scope. */
+/**
+ * Whether a thread waits on the user with an actionable ask and would be listed under Needs you in some scope. A
+ * snoozed one does too: a message from another thread started it and the snooze holds underneath
+ * (docs/notes/snooze-holds-archive-refuses.md); it is listed here and not under Snoozed until the ask is answered.
+ */
 function waitsOnUser(t: ListThread): boolean {
-  return t.hidden !== true && t.archivedAtMs === null && !isSnoozed(t) && t.group === "prompt" && t.nudge !== true;
+  return t.hidden !== true && t.archivedAtMs === null && t.group === "prompt" && t.nudge !== true;
 }
 
 /** Whether a thread that calls without blocking sits at the top of Active: live, shown and unpinned (a pinned one stays with the pinned). */
@@ -142,7 +146,7 @@ export function needsList(threads: readonly ShellListThread[], opts: Pick<ShellL
  * How many threads wait on the user in each space, by space id (no entry for none): the count a
  * space tab shows. The same threads Needs you lists for that space with "This space" in force
  * (needsList with `needsScope: "space"`), so the tab and the section never disagree: a finished
- * turn, a thread another thread started, an archived or snoozed one count in neither.
+ * turn, a thread another thread started, an archived one count in neither (a snoozed one only while it asks).
  */
 export function needsBySpace(threads: readonly ShellListThread[]): Record<string, number> {
   const out: Record<string, number> = {};

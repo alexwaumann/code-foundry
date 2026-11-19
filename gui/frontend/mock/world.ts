@@ -1469,6 +1469,29 @@ export class World {
   }
 
   /**
+   * Scenario: the snooze holds (docs/notes/snooze-holds-archive-refuses.md): another thread's
+   * message started snoozed s-8, which works and stays snoozed; and a snoozed thread asking for
+   * a permission, which is under Needs you. POST /__mock/snooze-holds. Idempotent; returns the
+   * two ids. Not in the default world, whose rows e2e pins.
+   */
+  addSnoozeHolds(): string[] {
+    const ago = (min: number) => new Date(Date.now() - min * 60_000);
+    const s8 = this.threads.get("s-8");
+    if (s8 && s8.status !== ThreadStatus.BUSY) {
+      Object.assign(s8, { state: ThreadState.CONNECTED, disconnectReason: "", status: ThreadStatus.BUSY, statusReason: "working", statusChangedAt: ago(2), lastActivityAt: ago(0) });
+      this.publishThread(s8);
+    }
+    const id = "s-sh-ask";
+    if (!this.threads.has(id)) {
+      const s = this.addThread({ id, projectId: "repo-cf", worktreePath: CF, name: "Check the release script", model: "claude-sonnet-5[1m]", effort: "medium",
+        status: ThreadStatus.NEEDS_ATTENTION, statusReason: "permission: Bash ./scripts/release.sh --dry-run", statusChangedAt: ago(1), createdAt: ago(300), lastActivityAt: ago(1),
+        snoozedUntil: new Date(Date.now() + 3 * 3_600_000) });
+      this.publishThread(s);
+    }
+    return ["s-8", id];
+  }
+
+  /**
    * Scenario: the resident thread "ember" (docs/notes/ember-1-primitives.md): the daemon's
    * own agent, stopped, in its own directory, in its second epoch, with no project. Kept
    * out of the sidebar and the counts like a plugin's thread.
@@ -4951,7 +4974,7 @@ export class World {
           title: "Archive or Unarchive Thread",
           category: "Thread",
           description:
-            "Archive a thread: Claude is closed, its terminals are removed and it is unpinned and listed apart. Unarchive puts it back in the thread list. Without archived, toggles. Pinning or sending a message unarchives a thread too.",
+            "Archive a thread: Claude is closed, its terminals are removed and it is unpinned and listed apart. Unarchive puts it back in the thread list. Without archived, toggles. Pinning or sending a message unarchives a thread too (from a thread: only a thread it created).",
           keybindings: [],
           args: [
             { name: "ids", type: ArgType.STRING, required: false, description: "Comma-separated thread ids, to act on several" },
@@ -4997,7 +5020,7 @@ export class World {
           title: "Snooze or Unsnooze Thread",
           category: "Thread",
           description:
-            "Snooze a thread until a time: Claude is closed, its terminals are removed and it is unpinned and listed apart; when the time comes it returns needing attention (\"snooze ended\"). clear unsnoozes. Pinning, archiving or sending a message unsnoozes a thread too.",
+            "Snooze a thread until a time: Claude is closed, its terminals are removed and it is unpinned and listed apart; when the time comes it returns needing attention (\"snooze ended\"). clear unsnoozes. Pinning, archiving or the user's message unsnoozes a thread too; another thread's message is delivered and leaves it snoozed.",
           keybindings: [],
           args: [
             { name: "until", type: ArgType.STRING, required: false, description: "When the thread wakes: 1h, 90m, tomorrow, next-week, mon..sun, 2026-10-20, 2026-10-20 14:00 or RFC 3339" },

@@ -835,6 +835,10 @@ message ReadAttachmentResponse {
 
 message RetryThreadSetupRequest {
   string id = 1;
+  // The thread that asks for it, as PinThreadRequest.by_thread_id: a retry unarchives
+  // (refused on an archived thread it did not create) and never ends the snooze of a
+  // thread's retry.
+  string by_thread_id = 2;
 }
 
 message RetryThreadSetupResponse {
@@ -1351,6 +1355,11 @@ message ThreadCheckoutsResponse {
 message PinThreadRequest {
   string id = 1;
   bool pinned = 2;
+  // The thread that asks for it (the CLI sends $CODE_FOUNDRY_THREAD); empty for the user.
+  // Pinning unarchives and unsnoozes, so a thread may pin an archived or snoozed thread
+  // only when it created it (FAILED_PRECONDITION otherwise;
+  // docs/notes/snooze-holds-archive-refuses.md).
+  string by_thread_id = 3;
 }
 
 message PinThreadResponse {
@@ -1363,7 +1372,9 @@ message ArchiveThreadRequest {
   bool archived = 2;
   // The thread that asks for it (the CLI sends $CODE_FOUNDRY_THREAD); empty for the
   // user. When it is id, a thread archiving itself: mid-turn that waits for the turn's
-  // end (ArchiveThreadResponse.deferred; docs/notes/self-put-away.md).
+  // end (ArchiveThreadResponse.deferred; docs/notes/self-put-away.md). A thread may
+  // unarchive only a thread it created (FAILED_PRECONDITION otherwise;
+  // docs/notes/snooze-holds-archive-refuses.md).
   string by_thread_id = 3;
 }
 
@@ -1392,7 +1403,8 @@ message SnoozeThreadRequest {
   // until (INVALID_ARGUMENT).
   bool save = 3;
   // The thread that asks for it, as ArchiveThreadRequest.by_thread_id. Unsnoozing is
-  // never deferred.
+  // never deferred. A thread may unsnooze, or snooze an archived thread (which
+  // unarchives it), only when it created that thread (FAILED_PRECONDITION otherwise).
   string by_thread_id = 4;
 }
 

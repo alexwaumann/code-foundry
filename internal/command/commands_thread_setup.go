@@ -36,8 +36,8 @@ func threadSetupRetry(b ThreadBackend, idArg ArgSpec) Command {
 		PageDetail: func(context.Context, Context, Args) (string, error) {
 			return "It runs the actions set to run when a thread's worktree is made.", nil
 		},
-		Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
-			res, err := b.RetrySetup(ctx, connect.NewRequest(&v1.RetryThreadSetupRequest{Id: a.String("id")}))
+		Run: func(ctx context.Context, c Context, a Args) (Result, error) {
+			res, err := b.RetrySetup(ctx, connect.NewRequest(&v1.RetryThreadSetupRequest{Id: a.String("id"), ByThreadId: askingThread(c)}))
 			if err != nil {
 				return Result{}, err
 			}

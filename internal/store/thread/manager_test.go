@@ -564,7 +564,7 @@ func TestFollowsClearViaPidFile(t *testing.T) {
 // reconnect starts a stopped thread without a prompt, unarchived and unsnoozed: without a
 // conversation to resume it starts a new one and says so in LastError.
 func (m *Manager) reconnect(ctx context.Context, id string) (Thread, error) {
-	if _, err := m.startStopped(ctx, id, startOpts{backToList: true}); err != nil {
+	if _, err := m.startStopped(ctx, id, startOpts{revive: &revive{user: true}}); err != nil {
 		if errors.Is(err, errNotStopped) {
 			return Thread{}, fmt.Errorf("%w: thread %s is not stopped; only a stopped thread can be started this way", ErrFailedPrecondition, id)
 		}

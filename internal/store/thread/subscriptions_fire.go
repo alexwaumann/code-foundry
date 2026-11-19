@@ -322,7 +322,8 @@ func (s *subscriptions) delivered(subscriber string) {
 }
 
 // drain delivers subscriber's wakes in order through Send (a busy thread's Claude picks
-// the message up mid-turn, a stopped one starts with it, a snoozed one is unsnoozed),
+// the message up mid-turn, a stopped one starts with it, a snoozed one stays snoozed:
+// holds.go),
 // until its queue is empty.
 func (m *Manager) drain(subscriber string) {
 	defer m.wg.Done()

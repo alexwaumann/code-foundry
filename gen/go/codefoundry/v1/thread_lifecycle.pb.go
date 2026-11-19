@@ -3308,8 +3308,12 @@ func (x *ReadAttachmentResponse) GetMimeType() string {
 }
 
 type RetryThreadSetupRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Id    string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	// The thread that asks for it, as PinThreadRequest.by_thread_id: a retry unarchives
+	// (refused on an archived thread it did not create) and never ends the snooze of a
+	// thread's retry.
+	ByThreadId    string `protobuf:"bytes,2,opt,name=by_thread_id,json=byThreadId,proto3" json:"by_thread_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -3347,6 +3351,13 @@ func (*RetryThreadSetupRequest) Descriptor() ([]byte, []int) {
 func (x *RetryThreadSetupRequest) GetId() string {
 	if x != nil {
 		return x.Id
+	}
+	return ""
+}
+
+func (x *RetryThreadSetupRequest) GetByThreadId() string {
+	if x != nil {
+		return x.ByThreadId
 	}
 	return ""
 }
@@ -6418,9 +6429,14 @@ func (x *ThreadCheckoutsResponse) GetWorkspaceStrays() []string {
 }
 
 type PinThreadRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Pinned        bool                   `protobuf:"varint,2,opt,name=pinned,proto3" json:"pinned,omitempty"`
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	Id     string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Pinned bool                   `protobuf:"varint,2,opt,name=pinned,proto3" json:"pinned,omitempty"`
+	// The thread that asks for it (the CLI sends $CODE_FOUNDRY_THREAD); empty for the user.
+	// Pinning unarchives and unsnoozes, so a thread may pin an archived or snoozed thread
+	// only when it created it (FAILED_PRECONDITION otherwise;
+	// docs/notes/snooze-holds-archive-refuses.md).
+	ByThreadId    string `protobuf:"bytes,3,opt,name=by_thread_id,json=byThreadId,proto3" json:"by_thread_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -6467,6 +6483,13 @@ func (x *PinThreadRequest) GetPinned() bool {
 		return x.Pinned
 	}
 	return false
+}
+
+func (x *PinThreadRequest) GetByThreadId() string {
+	if x != nil {
+		return x.ByThreadId
+	}
+	return ""
 }
 
 type PinThreadResponse struct {
@@ -6520,7 +6543,9 @@ type ArchiveThreadRequest struct {
 	Archived bool `protobuf:"varint,2,opt,name=archived,proto3" json:"archived,omitempty"`
 	// The thread that asks for it (the CLI sends $CODE_FOUNDRY_THREAD); empty for the
 	// user. When it is id, a thread archiving itself: mid-turn that waits for the turn's
-	// end (ArchiveThreadResponse.deferred; docs/notes/self-put-away.md).
+	// end (ArchiveThreadResponse.deferred; docs/notes/self-put-away.md). A thread may
+	// unarchive only a thread it created (FAILED_PRECONDITION otherwise;
+	// docs/notes/snooze-holds-archive-refuses.md).
 	ByThreadId    string `protobuf:"bytes,3,opt,name=by_thread_id,json=byThreadId,proto3" json:"by_thread_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -6737,7 +6762,8 @@ type SnoozeThreadRequest struct {
 	// until (INVALID_ARGUMENT).
 	Save bool `protobuf:"varint,3,opt,name=save,proto3" json:"save,omitempty"`
 	// The thread that asks for it, as ArchiveThreadRequest.by_thread_id. Unsnoozing is
-	// never deferred.
+	// never deferred. A thread may unsnooze, or snooze an archived thread (which
+	// unarchives it), only when it created that thread (FAILED_PRECONDITION otherwise).
 	ByThreadId    string `protobuf:"bytes,4,opt,name=by_thread_id,json=byThreadId,proto3" json:"by_thread_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -7967,9 +7993,11 @@ const file_codefoundry_v1_thread_lifecycle_proto_rawDesc = "" +
 	"\x04path\x18\x01 \x01(\tR\x04path\"I\n" +
 	"\x16ReadAttachmentResponse\x12\x12\n" +
 	"\x04data\x18\x01 \x01(\fR\x04data\x12\x1b\n" +
-	"\tmime_type\x18\x02 \x01(\tR\bmimeType\")\n" +
+	"\tmime_type\x18\x02 \x01(\tR\bmimeType\"K\n" +
 	"\x17RetryThreadSetupRequest\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\"J\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12 \n" +
+	"\fby_thread_id\x18\x02 \x01(\tR\n" +
+	"byThreadId\"J\n" +
 	"\x18RetryThreadSetupResponse\x12.\n" +
 	"\x06thread\x18\x01 \x01(\v2\x16.codefoundry.v1.ThreadR\x06thread\"*\n" +
 	"\x18CancelThreadSetupRequest\x12\x0e\n" +
@@ -8195,10 +8223,12 @@ const file_codefoundry_v1_thread_lifecycle_proto_rawDesc = "" +
 	"\x0eworkspace_name\x18\x04 \x01(\tR\rworkspaceName\x12#\n" +
 	"\rworkspace_dir\x18\x05 \x01(\tR\fworkspaceDir\x122\n" +
 	"\x15workspace_dir_missing\x18\x06 \x01(\bR\x13workspaceDirMissing\x12)\n" +
-	"\x10workspace_strays\x18\a \x03(\tR\x0fworkspaceStrays\":\n" +
+	"\x10workspace_strays\x18\a \x03(\tR\x0fworkspaceStrays\"\\\n" +
 	"\x10PinThreadRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x16\n" +
-	"\x06pinned\x18\x02 \x01(\bR\x06pinned\"C\n" +
+	"\x06pinned\x18\x02 \x01(\bR\x06pinned\x12 \n" +
+	"\fby_thread_id\x18\x03 \x01(\tR\n" +
+	"byThreadId\"C\n" +
 	"\x11PinThreadResponse\x12.\n" +
 	"\x06thread\x18\x01 \x01(\v2\x16.codefoundry.v1.ThreadR\x06thread\"d\n" +
 	"\x14ArchiveThreadRequest\x12\x0e\n" +

@@ -114,7 +114,8 @@ res, err := h.FireWakeNotify(ctx, "checks-done", match, "3 of 12 checks failed",
   `notifications`; `host-api.md`, "Notify"): a normal one is raised only when no
   subscribed thread got the wake; a time-sensitive one is raised either way, and the
   thread still gets its wake.
-- A thread that is stopped or snoozed gets it (the wake starts it); one over its wake
+- A thread that is stopped or snoozed gets it (the wake starts it; a snoozed one stays
+  snoozed: only the user ends a snooze); one over its wake
   limit does not; archiving a thread ends its subscriptions. A fire that reached no thread
   raises the notification.
 - This is the way to report an event. A plugin that fires and also calls `Notify` for the

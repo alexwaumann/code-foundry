@@ -22,7 +22,7 @@ func threadPin(b ThreadBackend, idArg ArgSpec) Command {
 			{Name: "pinned", Type: Bool, Description: "Pin (true) or unpin (false); default: the opposite of now"},
 		},
 		When: hasThread,
-		Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
+		Run: func(ctx context.Context, c Context, a Args) (Result, error) {
 			id := a.String("id")
 			pinned := a.Bool("pinned")
 			if !a.Has("pinned") {
@@ -32,7 +32,7 @@ func threadPin(b ThreadBackend, idArg ArgSpec) Command {
 				}
 				pinned = !cur.Msg.GetThread().GetPinned()
 			}
-			res, err := b.Pin(ctx, connect.NewRequest(&v1.PinThreadRequest{Id: id, Pinned: pinned}))
+			res, err := b.Pin(ctx, connect.NewRequest(&v1.PinThreadRequest{Id: id, Pinned: pinned, ByThreadId: askingThread(c)}))
 			if err != nil {
 				return Result{}, err
 			}

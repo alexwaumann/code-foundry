@@ -1708,7 +1708,10 @@ export type SendThreadMessageRequest = Message<"codefoundry.v1.SendThreadMessage
 
   /**
    * The thread that sends it (the CLI sends $CODE_FOUNDRY_THREAD); empty for the user.
-   * Kept on the item, so prompt history (ListPrompts) leaves the message out.
+   * Kept on the item, so prompt history (ListPrompts) leaves the message out. Only the
+   * user's message (none) ends a snooze; a thread's leaves the thread snoozed, and is
+   * FAILED_PRECONDITION on an archived thread it did not create
+   * (docs/notes/snooze-holds-archive-refuses.md).
    *
    * @generated from field: string by_thread_id = 5;
    */
