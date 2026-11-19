@@ -16,6 +16,9 @@
  * - passup: as live, but W2 still works: it asked whether the body of a collapsed pane drags
  *   too, and the lead passed the question up to the user (mock/passUp.ts), so the lead is in
  *   Needs you with it and W2's line reads "asks you" (docs/notes/pass-up-question.md).
+ * - passup-working: as passup, but the lead works on after passing it up (its turn is still
+ *   running: a reply streaming), so it is in Needs you and working
+ *   (Thread.busy_under_pass_up); thread.interrupt stops it and leaves the question open.
  */
 import type { MessageInitShape } from "@bufbuild/protobuf";
 import { MessageOrigin, ToolCallStatus, type ThreadItemSchema } from "../src/gen/codefoundry/v1/thread_pb";
@@ -24,8 +27,11 @@ import { passUpItem, PASSUP_REQUEST } from "./passUp";
 type ItemInit = MessageInitShape<typeof ThreadItemSchema>;
 type Over = Partial<ItemInit> & { at?: Date; until?: Date };
 
-export type WorkerCardState = "live" | "needs" | "frozen" | "passup";
-export const WORKER_CARD_STATES: readonly WorkerCardState[] = ["live", "needs", "frozen", "passup"];
+export type WorkerCardState = "live" | "needs" | "frozen" | "passup" | "passup-working";
+export const WORKER_CARD_STATES: readonly WorkerCardState[] = ["live", "needs", "frozen", "passup", "passup-working"];
+
+/** The scenarios with W2's question passed up to the user. */
+export const passedUp = (state: WorkerCardState): boolean => state === "passup" || state === "passup-working";
 
 export const LEAD = "s-wl-lead";
 /** The workers in spawn order: id, name. */
@@ -58,7 +64,7 @@ export function workerPlans(state: WorkerCardState): WorkerPlan[] {
   const [w1, w2, w3] = WORKERS;
   return [
     { ...w1, createdMin: START - 0.5, state: "done", atMin: 17 },
-    { ...w2, createdMin: START - 0.5, state: state === "passup" ? "working" : "done", atMin: state === "passup" ? START - 0.5 : 11 },
+    { ...w2, createdMin: START - 0.5, state: passedUp(state) ? "working" : "done", atMin: passedUp(state) ? START - 0.5 : 11 },
     { ...w3, createdMin: START - 0.5, state: state === "frozen" ? "done" : state === "needs" ? "needs" : "working", atMin: state === "frozen" ? 2 : state === "needs" ? 1 : START - 0.5 },
   ];
 }
@@ -123,12 +129,20 @@ export function scriptLead(s: WorkerCardScript, state: WorkerCardState): void {
   s.it({ case: "assistantText", value: { text: "[nothing new]" } }, { at: sec(14, 8) });
   end(s, sec(14, 9), 9, 0.04);
 
-  if (state === "passup") {
+  if (passedUp(state)) {
     // W2 asked; the lead could not say what the user wants, so it passed the question up and works on.
     s.it(wakeItem(askWake(w2, ago(3), "Should the body of a collapsed pane also drag, or only the gutters?", "only the gutters")), { at: ago(3) });
     bash(`code-foundry thread pass-up ${w2.id}`, `passed thread ${w2.name} (${w2.id})'s question up to the user; keep working.`, sec(3, 6));
     // The daemon writes the question into the running turn, after the tool call that passed it up.
     s.it(passUpItem(), { id: `q-${PASSUP_REQUEST}`, at: sec(3, 7) });
+    if (state === "passup-working") {
+      // It works on: W3's PR is ready, so it checks it while the user decides, and is replying now
+      // (POST /__mock/thread/delta?id=s-wl-lead streams more of it).
+      s.it({ case: "assistantText", value: { text: "While you decide on the collapsed panes, I'll check the code block PR." } }, { at: sec(3, 12) });
+      bash("gh pr checks 801", "All checks were successful", sec(1, 0));
+      s.it({ case: "assistantText", value: { text: "#801's checks pass. Reading its diff" } }, { at: sec(0, -5), streaming: true });
+      return;
+    }
     s.it({ case: "assistantText", value: { text: "[nothing new]" } }, { at: sec(3, 9) });
     end(s, sec(3, 10), 10, 0.04);
     return;

@@ -456,7 +456,8 @@ message Thread {
   // summary, the target the live tool strip shows for a step: "Bash make check", "Read
   // src/lib/tree.ts", "Edit internal/api/gh.go" (paths relative to the thread's
   // directory when inside it). With several in flight, the latest started. Empty when
-  // no tool runs, while compacting, and whenever status is not BUSY; a subagent's own
+  // no tool runs, while compacting, and whenever the thread's own status is not BUSY
+  // (BUSY under a passed-up question counts: busy_under_pass_up); a subagent's own
   // calls (parent_tool_use_id set) do not count, its Agent call does. Not persisted: a
   // disconnected thread has none. See docs/notes/sidebar-inbox-1-busy-tool.md.
   string busy_tool = 73;
@@ -487,6 +488,13 @@ message Thread {
   // the turn before it ended (a follow-up or a wake; a message read mid-turn is no new
   // turn). Unset before any. Persisted; rows older than it are filled from their items.
   google.protobuf.Timestamp turn_started_at = 78;
+  // Claude is on a turn under a worker's question the thread passed up to the user
+  // (PassUp): status shows that question (NEEDS_ATTENTION "question: From <worker>: …",
+  // so the thread is listed as asking), while the thread's own status is BUSY. The
+  // question does not block it: it works on, and Interrupt stops it as any working
+  // thread. False otherwise, including under the thread's own question or permission
+  // prompt, which do block it. Not persisted. See docs/notes/pass-up-question.md.
+  bool busy_under_pass_up = 79;
 }
 
 // ThreadMove is a Move under way (Thread.pending_move).

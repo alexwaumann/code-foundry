@@ -252,10 +252,18 @@ export interface ThreadView {
   /**
    * The top-level tool Claude is running now, its name and a short argument ("Bash make
    * check", "Read src/lib/tree.ts"), the latest started when several run. "" when none
-   * runs, while compacting, and whenever status is not "busy"; a subagent's own calls do
-   * not count (docs/notes/sidebar-inbox-1-busy-tool.md).
+   * runs, while compacting, and whenever its own status is not "busy" (busy under a
+   * passed-up question counts); a subagent's own calls do not count
+   * (docs/notes/sidebar-inbox-1-busy-tool.md).
    */
   busyTool: string;
+  /**
+   * Claude is on a turn under a worker's question this thread passed up to the user: status
+   * shows that question (needs attention), which does not block the thread, so it is
+   * working too and can be interrupted (docs/notes/pass-up-question.md). False under its own
+   * question or permission prompt (then absent).
+   */
+  busyUnderPassUp?: true;
   /**
    * Those shells, oldest first, with the TCP ports each one's process group listens on
    * (the daemon probes them; docs/notes/thread-servers.md). [] once the process ended.
@@ -599,6 +607,7 @@ export function toThreadView(s: Thread): ThreadView {
     ...(s.owner ? { owner: s.owner } : {}),
     ...(s.pluginEnvStale ? { pluginEnvStale: true as const, pluginEnvChange: s.pluginEnvChange } : {}),
     ...(s.transcriptMissing ? { transcriptMissing: true as const } : {}),
+    ...(s.busyUnderPassUp ? { busyUnderPassUp: true as const } : {}),
     ...(s.kind === ThreadKind.RESIDENT ? { resident: s.residentName, epoch: s.epoch } : {}),
   };
 }

@@ -275,6 +275,9 @@ func (m *Manager) applyWaitingLocked(rec *record) bool {
 	rec.wait.shown = show
 	rec.wait.passUp = overlay
 	rec.s.PassedUp = m.passUpsOf(rec.s.ID)
+	// A passed-up question does not block the lead (its own would): its own busy is still
+	// reported, so it reads as working and can be interrupted.
+	rec.s.BusyUnderPassUp = overlay && raw.st == StatusBusy
 	return show != before
 }
 

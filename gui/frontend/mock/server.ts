@@ -29,10 +29,11 @@
  *        a question)
  *   POST /__mock/snooze-holds                     (snoozed s-8 working, and a snoozed thread asking for
  *        a permission: docs/notes/snooze-holds-archive-refuses.md)
- *   POST /__mock/workers?state=live|needs|frozen|passup  (a lead with three workers for the worker card: s-wl-lead and
+ *   POST /__mock/workers?state=live|needs|frozen|passup|passup-working  (a lead with three workers for the worker card: s-wl-lead and
  *                                                 s-wl-1..3; mock/workerCard.ts, World.addWorkerCard; passup: s-wl-2's
  *                                                 thread ask passed up to the user, the lead in Needs you with it,
- *                                                 answered through thread.respond: mock/passUp.ts)
+ *                                                 answered through thread.respond: mock/passUp.ts; passup-working: the lead
+ *                                                 works on under it, Interrupt stops it)
  *   POST /__mock/workers/step                     (its working worker finishes now and the lead's turn for it lands)
  *   POST /__mock/peers?state=waiting|replied|asked-back|workers|frozen  (two lead threads talking, both sides:
  *                                                 s-pl-a sender, s-pl-b receiver; mock/peerLines.ts, World.addPeerLines)

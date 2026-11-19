@@ -15,9 +15,9 @@ export interface ThreadActivity {
   watchError: string | null;
   /** The prompts to dock: pending requests minus the ones just answered. */
   open: readonly ThreadPendingView[];
-  /** Claude is on a turn: busy, or waiting on the user mid-turn. */
+  /** Claude is on a turn: busy (also under a worker's question it passed up), or waiting on the user mid-turn. */
   busy: boolean;
-  /** Working: busy, or Claude starting for a message just sent. */
+  /** Working: busy, or Claude starting for a message just sent; not while its own question or permission prompt blocks it. */
   working: boolean;
   /** working, lingering 2 s past a stop so the live turn header turns into the finished one in place. */
   timelineWorking: boolean;
@@ -32,20 +32,25 @@ export interface ThreadActivity {
 export function useThreadActivity(threadId: string): ThreadActivity {
   const state = useThreadsStore((s) => s.byId[threadId]?.state ?? "unknown");
   const status = useThreadsStore((s) => s.byId[threadId]?.status ?? "unknown");
+  // A worker's question it passed up shows as the status, over a turn it does not block (docs/notes/pass-up-question.md).
+  const busyUnder = useThreadsStore((s) => s.byId[threadId]?.busyUnderPassUp === true);
   const pendingList = useThreadPending(threadId);
   const loaded = useThreadLoaded(threadId);
   const empty = useThreadEmpty(threadId);
   const watch = useThreadWatch(threadId);
   const catchingUp = watch.status === "retrying";
   const open = useOpenRequests(threadId);
-  // A worker's question this thread passed up to the user is no turn of its own: it may be idle (docs/notes/pass-up-question.md).
+  // A worker's question this thread passed up to the user is no turn of its own and does not
+  // block one: the lead may be idle, or working on under it (docs/notes/pass-up-question.md).
   const waiting = pendingList.some((p) => !p.fromThreadId);
+  const blocked = open.some((p) => !p.fromThreadId);
   const running = state !== "disconnected" && state !== "closing";
-  const busy = running && (status === "busy" || waiting);
-  const working = running && (status === "busy" || state === "starting") && open.length === 0;
+  const onTurn = status === "busy" || busyUnder;
+  const busy = running && (onTurn || waiting);
+  const working = running && (onTurn || state === "starting") && !blocked;
   // The status can turn idle before the turn_end arrives on the Watch: the header turns
   // into the finished one in place instead of vanishing and coming back.
-  const timelineWorking = useLinger(working, open.length === 0 ? 2000 : 0);
+  const timelineWorking = useLinger(working, blocked ? 0 : 2000);
   return { loaded, empty, catchingUp, watchError: catchingUp ? watch.error : null, open, busy, working, timelineWorking, timelineStrips: timelineWorking || busy };
 }
 

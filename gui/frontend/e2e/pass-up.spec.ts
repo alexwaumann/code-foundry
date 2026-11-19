@@ -9,7 +9,8 @@ import { openRowThread } from "./shell-threads";
  * what shell-needs.spec.ts and worker-card.spec.ts already cover, so this only saves the PR's
  * screenshots with SHOTS=<dir>, dark and light: the Needs you row and its hover card, the popup,
  * the docked card in the lead's pane with the worker card's line, and the pane after the answer;
- * and, for comparison, a lead's own question's card.
+ * and, for comparison, a lead's own question's card. The working shots: a lead that works on
+ * under the passed-up question (its row, the pill's Working and Interrupt), then interrupted.
  */
 
 const shots = process.env.SHOTS;
@@ -71,5 +72,27 @@ for (const scheme of ["dark", "light"] as const) {
     await expect(page.getByTestId("thread-workers")).not.toContainText("asks you");
     await page.mouse.move(1270, 850);
     await shot(page, `pass-up-after-${scheme}`);
+  });
+}
+
+for (const scheme of ["dark", "light"] as const) {
+  test(`pass-up working screenshots (${scheme})`, async ({ page }, info) => {
+    test.skip(!shots || info.project.name !== "webkit", "SHOTS=<dir> with WebKit only");
+    await page.emulateMedia({ colorScheme: scheme });
+    await page.setViewportSize({ width: 1280, height: 860 });
+    await mockPost("workers?state=passup-working");
+    await openApp(page);
+    const lead = rowOf(page, "s-wl-lead");
+    await expect(lead).toHaveAttribute("data-section", "needs");
+    await openRowThread(page, "s-wl-lead");
+    await expect(page.getByTestId("thread-question-passed-up")).toBeVisible();
+    await page.mouse.move(1270, 850);
+    await shot(page, `pass-up-working-${scheme}`);
+    await page.getByTestId("thread-interrupt").click();
+    await expect(page.getByTestId("thread-interrupt")).toHaveCount(0);
+    await expect(lead).toHaveAttribute("data-section", "needs");
+    await expect(page.getByTestId("thread-question-passed-up")).toBeVisible();
+    await page.mouse.move(1270, 850);
+    await shot(page, `pass-up-working-interrupted-${scheme}`);
   });
 }

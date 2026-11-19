@@ -187,15 +187,35 @@ function AskKind({ id }: { id: string }) {
   const { className: tiltClass, place: tiltPlace } = useThreadTilt(id, Icon);
   if (count > 1) {
     return (
-      <span className="ml-auto flex shrink-0 items-center pl-1.5 text-caption-sm text-cf-sidebar-muted-foreground tabular-nums" data-testid="row-ask" data-kind="items" data-count={count}>
+      <span className="flex shrink-0 items-center text-caption-sm text-cf-sidebar-muted-foreground tabular-nums" data-testid="row-ask" data-kind="items" data-count={count}>
         {count} items
       </span>
     );
   }
   return (
-    <span className={cn("ml-auto flex shrink-0 items-center gap-1 pl-1.5 text-caption-sm font-medium", badge.toneClass)} data-testid="row-ask" data-kind={line.kind}>
+    <span className={cn("flex shrink-0 items-center gap-1 text-caption-sm font-medium", badge.toneClass)} data-testid="row-ask" data-kind={line.kind}>
       {Icon && <Icon className={cn("size-3.5 shrink-0", tiltClass)} ref={tiltPlace} aria-hidden data-testid="row-ask-icon" />}
       {badge.word}
+    </span>
+  );
+}
+
+const WORKING = statusBadge({ kind: "working", detail: "", at: null });
+
+/**
+ * A lead that works on under a worker's question it passed up to the user (busyUnderPassUp,
+ * docs/notes/pass-up-question.md): the working circle before what it asks, as a snoozed thread
+ * that works shows it before its countdown. Its word is for screen readers only, as on any row;
+ * nothing while the question is not passed up or the lead is not working.
+ */
+function AskWorking({ id }: { id: string }) {
+  const on = useThreadsStore((s) => s.byId[id]?.busyUnderPassUp === true);
+  const Icon = WORKING.icon;
+  if (!on || Icon === null) return null;
+  return (
+    <span className={cn("flex shrink-0 items-center", WORKING.toneClass)} data-testid="row-ask-working">
+      <Icon className="size-3.5 shrink-0" aria-hidden />
+      <span className="sr-only">{WORKING.word}</span>
     </span>
   );
 }
@@ -290,7 +310,10 @@ function NeedsLines({ id, anchor }: { id: string; anchor: string }) {
     <span className="flex min-w-0 flex-col" data-testid="thread-body" data-needs>
       <span className="flex h-4 min-w-0 items-center text-caption-sm" data-testid="row-line-1">
         <PlaceLabel id={id} />
-        <AskKind id={id} />
+        <span className="ml-auto flex shrink-0 items-center gap-1.5 pl-1.5">
+          <AskWorking id={id} />
+          <AskKind id={id} />
+        </span>
       </span>
       <span
         className="flex min-w-0 cursor-pointer"

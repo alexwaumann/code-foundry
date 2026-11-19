@@ -53,7 +53,7 @@ import { MockSkills } from "./skills";
 import { EMBER_THREAD, emberWorkers, MockEmber } from "./ember";
 import { MockDictation } from "./dictation";
 import { MockSearches } from "./agentSearch";
-import { LEAD as WORKER_LEAD, WORKERS, scriptLead, scriptStep, workerPlans, type WorkerCardState } from "./workerCard";
+import { LEAD as WORKER_LEAD, WORKERS, passedUp, scriptLead, scriptStep, workerPlans, type WorkerCardState } from "./workerCard";
 import { A as PEER_A, B as PEER_B, C as PEER_C, W as PEER_W, scriptReceiver, scriptSender, stepReceiver, stepSender, type PeerLinesState } from "./peerLines";
 import { CRASH_STDERR, MockThreadLogs, type SeedHistory, type ThreadState as ScriptedThreadState } from "./thread";
 import { contextFields, recordCompaction, recordResult, type MockContext } from "./context";
@@ -133,6 +133,11 @@ interface MockThread {
    * thread. POST /__mock/thread/status?…&busyTool=… sets it.
    */
   busyTool: string;
+  /**
+   * Thread.busy_under_pass_up: the status shows a worker's question it passed up
+   * (passUpOverlay) and its own status under it is busy.
+   */
+  busyUnderPassUp?: boolean;
   createdAt: Date;
   lastActivityAt: Date;
   exitCode: number;
@@ -805,8 +810,27 @@ export class World {
       },
       setStatus: (id, status, reason) => {
         const s = this.thread(id);
-        this.setStatus(s, status, reason);
+        const pu = this.passUpOverlay.get(id);
+        if (pu) {
+          pu.raw = { status, reason };
+          this.showPassUp(s, pu);
+        } else this.setStatus(s, status, reason);
         s.lastActivityAt = new Date();
+        this.publishThread(s);
+      },
+      passUp: (id, question) => {
+        const s = this.thread(id);
+        const pu = this.passUpOverlay.get(id);
+        if (question === null) {
+          if (!pu) return;
+          this.passUpOverlay.delete(id);
+          s.busyUnderPassUp = false;
+          this.setStatus(s, pu.raw.status, pu.raw.reason);
+        } else {
+          const next = { question, raw: pu?.raw ?? { status: s.status, reason: s.statusReason } };
+          this.passUpOverlay.set(id, next);
+          this.showPassUp(s, next);
+        }
         this.publishThread(s);
       },
       setModel: (id, model) => {
@@ -825,8 +849,8 @@ export class World {
         s.effortPending = pending;
         this.publishThread(s);
       },
-      statusOf: (id) => this.thread(id).status,
-      reasonOf: (id) => this.thread(id).statusReason,
+      statusOf: (id) => this.passUpOverlay.get(id)?.raw.status ?? this.thread(id).status,
+      reasonOf: (id) => this.passUpOverlay.get(id)?.raw.reason ?? this.thread(id).statusReason,
       refuseTranscriptMissing: (id) => {
         this.refuseTranscriptMissing(id);
       },
@@ -1076,6 +1100,7 @@ export class World {
     this.attachments.clear();
     this.attachmentBytes.clear();
     this.logs.reset();
+    this.passUpOverlay.clear();
     this.worktreeDelayMs = 700;
     this.nextSetup = "";
     this.terminalNewDelayMs = 0;
@@ -1522,12 +1547,17 @@ export class World {
       this.publishThread(s);
     }
     this.threads.delete(WORKER_LEAD);
+    this.passUpOverlay.delete(WORKER_LEAD);
     const lead = this.addThread({ id: WORKER_LEAD, projectId: "repo-cf", worktreePath: CF, name: "Ship the three fixes", model: "claude-sonnet-5-5[1m]", effort: "medium",
       status: ThreadStatus.IDLE, statusReason: "at prompt", statusChangedAt: ago(1), createdAt: ago(27), lastActivityAt: ago(1), held: true });
     this.logs.script(WORKER_LEAD, (sc) => {
       scriptLead(sc, state);
     });
-    if (state === "passup") {
+    if (state === "passup-working") {
+      // It works on after passing the question up: its turn is still running.
+      this.setStatus(lead, ThreadStatus.BUSY, "working");
+    }
+    if (passedUp(state)) {
       // The worker's question, passed up: the lead's ask in Needs you (mock/passUp.ts).
       this.logs.seedPassUp(WORKER_LEAD);
       lead.statusChangedAt = ago(3);
@@ -2581,6 +2611,7 @@ export class World {
       statusReason: s.statusReason,
       // The daemon's process tracks it: a stopped thread has none.
       busyTool: s.state === ThreadState.CONNECTED ? s.busyTool : "",
+      busyUnderPassUp: s.busyUnderPassUp ?? false,
       statusChangedAt: timestampFromDate(s.statusChangedAt),
       createdAt: timestampFromDate(s.createdAt),
       lastActivityAt: timestampFromDate(s.lastActivityAt),
@@ -2883,6 +2914,24 @@ export class World {
     if (busyTool !== undefined) s.busyTool = busyToolFor(s.status, s.statusReason, busyTool);
     s.lastActivityAt = new Date();
     this.publishThread(s);
+  }
+
+  /**
+   * The open passed-up questions' overlay by lead (internal/store/thread/waiting.go shownLocked):
+   * the question shown over the lead's own status (raw), unless that is a request of its own.
+   */
+  private readonly passUpOverlay = new Map<string, { question: string; raw: { status: ThreadStatus; reason: string } }>();
+
+  /** Shows a lead's status under its passed-up question's overlay (applyWaitingLocked). */
+  private showPassUp(s: MockThread, pu: { question: string; raw: { status: ThreadStatus; reason: string } }): void {
+    const own = pu.raw.status === ThreadStatus.NEEDS_ATTENTION && /^(permission|question):/.test(pu.raw.reason);
+    if (own) this.setStatus(s, pu.raw.status, pu.raw.reason);
+    else {
+      this.setStatus(s, ThreadStatus.NEEDS_ATTENTION, pu.question);
+      // The raw tool stays while it is busy (runner.go publishStatus reads the raw status).
+      if (pu.raw.status === ThreadStatus.BUSY) s.busyTool = busyToolFor(pu.raw.status, pu.raw.reason, s.busyTool);
+    }
+    s.busyUnderPassUp = !own && pu.raw.status === ThreadStatus.BUSY;
   }
 
   /** Sets status and reason, stamping statusChangedAt when either changes (Thread.setStatus). */

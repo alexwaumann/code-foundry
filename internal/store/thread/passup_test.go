@@ -384,6 +384,65 @@ func TestPassUpSnoozedLead(t *testing.T) {
 	}
 }
 
+// A passed-up question does not block the lead: while its own status is busy the daemon
+// says so beside the question (BusyUnderPassUp), and not once it is idle or asks
+// something of its own, which blocks it and is shown instead.
+func TestPassUpKeepsTheLeadsBusy(t *testing.T) {
+	e := newEnv(t)
+	lead := e.stopped("lead")
+	w := e.worker("Resize", lead.ID)
+	setRaw := func(st Status, reason string) { // as the lead's runner publishes it (runner.go publishStatus)
+		e.m.update(lead.ID, false, func(rec *record) {
+			rec.s.setStatus(st, reason, e.m.opts.Now())
+			rec.s.PendingRequestID = ""
+			if isRequestReason(reason) {
+				rec.s.PendingRequestID = "own"
+			}
+		})
+	}
+	setRaw(StatusBusy, "working")
+	e.asked(w.ID, "Which?", "a")
+	if _, err := e.m.PassUp(e.ctx(), lead.ID, w.ID, ""); err != nil {
+		t.Fatal(err)
+	}
+	const shown = "question: From Resize: Which?"
+	steps := []struct {
+		name   string
+		st     Status
+		reason string
+		want   Status
+		says   string
+		busy   bool
+	}{
+		{"working", StatusBusy, "working", StatusNeedsAttention, shown, true},
+		{"compacting", StatusBusy, ReasonCompacting, StatusNeedsAttention, shown, true},
+		{"its turn ended", StatusNeedsAttention, "finished", StatusNeedsAttention, shown, false},
+		{"working again", StatusBusy, "working", StatusNeedsAttention, shown, true},
+		{"its own question", StatusNeedsAttention, "question: Mine?", StatusNeedsAttention, "question: Mine?", false},
+		{"its own permission prompt", StatusNeedsAttention, "permission: Write a.txt", StatusNeedsAttention, "permission: Write a.txt", false},
+		{"at its prompt", StatusIdle, "at prompt", StatusNeedsAttention, shown, false},
+	}
+	for _, step := range steps {
+		setRaw(step.st, step.reason)
+		l, _ := e.m.Snapshot().Thread(lead.ID)
+		if l.Status != step.want || l.StatusReason != step.says || l.BusyUnderPassUp != step.busy || l.PassedUp != 1 {
+			t.Errorf("%s: shown %v %q, busy under it %v, passed up %d", step.name, l.Status, l.StatusReason, l.BusyUnderPassUp, l.PassedUp)
+		}
+		if got := midTurn(l); got != (step.busy || step.says != shown) {
+			t.Errorf("%s: midTurn = %v", step.name, got)
+		}
+	}
+	setRaw(StatusBusy, "working")
+	p := e.items(lead.ID).Pending[0]
+	if _, err := e.m.Respond(e.ctx(), lead.ID, p.RequestID, Decision{Allow: true, Answers: map[string]string{"Which?": "b"}}); err != nil {
+		t.Fatal(err)
+	}
+	l := e.waitFor(lead.ID, "answered", func(s Thread) bool { return s.PassedUp == 0 })
+	if l.Status != StatusBusy || l.BusyUnderPassUp {
+		t.Errorf("after the answer: %v %q, busy under a pass-up %v", l.Status, l.StatusReason, l.BusyUnderPassUp)
+	}
+}
+
 // A thread above the worker's lead may pass up its question too (the creator chain).
 func TestPassUpByAGrandLead(t *testing.T) {
 	e := newEnv(t)
