@@ -202,6 +202,17 @@ export function headerAges(d: Pick<PullRequestDetailView, "pullRequest" | "close
   return parts.join(" · ");
 }
 
+/** The ages the details show: Opened, then Updated, or Merged / Closed as the header's ages said. */
+export function detailAges(d: Pick<PullRequestDetailView, "pullRequest" | "closedAtMs">, now: number): { label: string; value: string }[] {
+  const pr = d.pullRequest;
+  const out = [{ label: "Opened", value: ago(pr.createdAtMs, now) || "—" }];
+  if (pr.state === "merged") out.push({ label: "Merged", value: ago(pr.mergedAtMs ?? d.closedAtMs, now) || "—" });
+  else if (pr.state === "closed") {
+    if (d.closedAtMs !== null) out.push({ label: "Closed", value: ago(d.closedAtMs, now) || "—" });
+  } else out.push({ label: "Updated", value: ago(pr.updatedAtMs, now) || "—" });
+  return out;
+}
+
 /** Same pull request: the slug ignoring case (GitHub's names are), and the number. */
 export function samePullRequest(a: { slug: string; number: number }, b: { slug: string; number: number }): boolean {
   return a.number === b.number && a.slug.toLowerCase() === b.slug.toLowerCase();

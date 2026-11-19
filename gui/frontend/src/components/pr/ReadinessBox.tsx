@@ -1,7 +1,6 @@
 import {
   ArrowDownToLine,
   ChevronDown,
-  ChevronRight,
   CircleCheck,
   CircleDashed,
   CircleX,
@@ -10,6 +9,7 @@ import {
   Eye,
   GitMerge,
   GitMergeConflict,
+  GitPullRequest,
   GitPullRequestClosed,
   GitPullRequestDraft,
   Loader2,
@@ -21,27 +21,26 @@ import {
   Zap,
   type LucideIcon,
 } from "lucide-react";
-import { useMemo } from "react";
+import { useMemo, type ReactNode } from "react";
 import type { PullRequestDetailView } from "@/api/gh";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tip } from "@/components/ui/tooltip";
-import { useNow } from "@/lib/clock";
 import { cn } from "@/lib/utils";
 import { openUrl, pullRequestKey, useViewerLogin } from "@/stores/gh";
-import { revertPullRequest, setAutoMerge, setPullRequestDraft, toggleSection, usePrPanelStore, usePullRequestChange } from "@/stores/prPanel";
+import { revertPullRequest, setAutoMerge, setPullRequestDraft, toggleSection, useMergingMethod, usePrPanelStore, usePullRequestChange } from "@/stores/prPanel";
 import type { PrRef } from "@/surfaces/pullrequestTarget";
 import { AutoMergeButton } from "./AutoMergeButton";
 import { Avatar } from "./Avatar";
 import { MergeButton } from "./MergeButton";
-import { checkMeta, checkTone } from "./model";
-import { checkIcon, useChecksClock } from "./checkIcons";
+import { stateBadge } from "./model";
 import { CheckList } from "./PrChecks";
-import { detailFresh, readiness, type ReadinessRow, type ReadyIcon, type ReadyTone, type RowAction, type SubLine } from "./readiness";
+import { cardChecks, readinessCards, statusTone, type Readiness, type ReadinessRow, type ReadyIcon, type ReadyTone, type StatusTone, type SubLine } from "./readiness";
 import { ReviewButton } from "./ReviewButton";
-import { seedReadiness } from "./seed";
+import type { SeedReadiness } from "./seed";
 import { TaskButton } from "./TaskButton";
 import { taskVerb, type TaskRouting } from "./taskRouting";
+import { useReadiness, useSeedReadiness } from "./useReadiness";
 import { useTaskRouting } from "./useTaskRouting";
 import type { Verdict } from "./review";
 import { toneText } from "./tones";
@@ -69,33 +68,163 @@ const tone = (t: ReadyTone): string => (t === "info" ? "text-cf-info-text" : ton
 
 const ring: Partial<Record<ReadyTone, string>> = { success: "ring-cf-success", failure: "ring-cf-error", pending: "ring-cf-warning" };
 
-/** A named check under the checks row: its icon, name, workflow and duration; opens its log. */
-function CheckLine({ c, now }: { c: PullRequestDetailView["checks"][number]; now: number }) {
-  const t = checkTone(c);
-  const Icon = checkIcon[t];
-  const meta = [c.workflow, checkMeta(c, now)].filter(Boolean).join(" · ");
+/** The header's status words and icon per status tone; a neutral status (a draft) keeps the text's own colour and a muted icon. */
+const statusText: Record<StatusTone, string> = {
+  success: toneText.success,
+  warning: toneText.pending,
+  merged: toneText.merged,
+  failure: toneText.failure,
+  neutral: "text-cf-text",
+};
+const statusIcon: Record<StatusTone, string> = { ...statusText, neutral: "text-cf-text-muted" };
+
+/** The pull request's state icon in the status line, by stateBadge's label: open, draft, merged or closed. */
+const stateIcons: Record<string, LucideIcon> = { Open: GitPullRequest, Draft: GitPullRequestDraft, Merged: GitMerge, Closed: GitPullRequestClosed };
+
+/** The state's icon, its words in its tone, and the quiet text after them ("a3f9c21 into main 2h ago"). */
+function StatusWords({ d, headline }: { d: PullRequestDetailView; headline: Readiness["headline"] }) {
+  const t = statusTone(headline.tone);
+  const Icon = stateIcons[stateBadge(d.pullRequest).label] ?? GitPullRequest;
   return (
-    <button
-      type="button"
-      disabled={!c.url}
-      className="flex max-w-full min-w-0 items-center gap-1.5 rounded-sm text-left outline-none enabled:hover:text-cf-text focus-visible:ring-1 focus-visible:ring-cf-focus disabled:cursor-default"
-      data-testid="pr-ready-check"
-      data-tone={t}
-      onClick={() => void openUrl(c.url)}
-    >
-      <Icon className={cn("size-3 shrink-0", toneText[t])} aria-hidden />
-      <span className="min-w-0 truncate text-cf-text-secondary">{c.name}</span>
-      {meta && <span className="shrink-0 tabular-nums">{meta}</span>}
-    </button>
+    <>
+      <Icon className={cn("size-4 shrink-0", statusIcon[t])} aria-hidden />
+      <span className={cn("shrink-0 text-body font-semibold whitespace-nowrap", statusText[t])} data-testid="pr-ready-headline" data-tone={t}>
+        {headline.title}
+      </span>
+      {headline.meta && (
+        <Tip label={headline.meta} whenTruncated>
+          <span className="min-w-0 truncate text-caption text-cf-text-muted" data-testid="pr-ready-meta">
+            {headline.meta}
+          </span>
+        </Tip>
+      )}
+    </>
   );
 }
 
-function Line({ line, now }: { line: SubLine; now: number }) {
+/**
+ * The status line: the state at the left, the buttons at the right. The buttons share the
+ * line while they fit and wrap to their own line, still at the right, when they do not: the
+ * words never grow, the buttons' box takes the rest of the line and starts a new one when
+ * that rest is narrower than they are (a flex item breaks to a new line by its content
+ * width). On a line of their own too narrow for both, they wrap among themselves.
+ */
+function StatusLine({ words, buttons }: { words: ReactNode; buttons: ReactNode }) {
+  return (
+    <div className="flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-2" data-testid="pr-status">
+      <div className="flex min-h-7 max-w-full min-w-0 flex-[0_1_auto] items-center gap-2">{words}</div>
+      {buttons}
+    </div>
+  );
+}
+
+/**
+ * A button whose change runs on GitHub: a spinner and `busyLabel` while `running`. `inert`
+ * (this change or another of the pull request's) dims it and a press sends nothing; it stays
+ * focusable.
+ */
+function ChangeButton({ label, busyLabel, running, inert, onRun, testId, icon: Icon }: { label: string; busyLabel: string; running: boolean; inert: boolean; onRun: () => void; testId: string; icon?: LucideIcon }) {
+  return (
+    <Button
+      variant="outline"
+      size="xs"
+      className="h-7 shrink-0 px-2.5 text-label has-[>svg]:px-2 aria-disabled:pointer-events-none aria-disabled:opacity-70"
+      data-testid={testId}
+      aria-disabled={inert || undefined}
+      aria-busy={running || undefined}
+      onClick={() => {
+        if (!inert) onRun();
+      }}
+    >
+      {running ? <Loader2 className="size-3.5 animate-spin" aria-hidden data-testid={`${testId}-busy`} /> : Icon && <Icon className="size-3.5" aria-hidden />}
+      {running ? busyLabel : label}
+    </Button>
+  );
+}
+
+/** The state's main action: Merge ▾, Auto-merge ▾, Cancel auto-merge, Ready for review or Revert. */
+function MainActionButton({ f, d, prRef, panelKey }: { f: Readiness["footer"]; d: PullRequestDetailView; prRef: PrRef; panelKey: string }) {
+  const change = usePullRequestChange(prRef);
+  const reverting = usePrPanelStore((s) => s.reverting[pullRequestKey(prRef.slug, prRef.number)] ?? false);
+  switch (f.main) {
+    case "merge":
+      return <MergeButton prRef={prRef} detail={d} note={f.mergeNote} />;
+    case "auto-merge":
+      return <AutoMergeButton prRef={prRef} detail={d} />;
+    case "cancel-auto-merge":
+      return <ChangeButton label="Cancel auto-merge" busyLabel="Cancelling…" icon={Zap} running={change === "cancel-auto-merge"} inert={change !== null} onRun={() => void setAutoMerge(prRef, null, "")} testId="pr-cancel-auto-merge" />;
+    case "ready":
+      return <ChangeButton label="Ready for review" busyLabel="Marking ready…" running={change === "ready"} inert={change !== null} onRun={() => void setPullRequestDraft(prRef, false, { inView: true })} testId="pr-ready-for-review" />;
+    case "revert":
+      return <ChangeButton label="Revert" busyLabel="Reverting…" running={reverting} inert={reverting} onRun={() => void revertPullRequest(prRef, panelKey)} testId="pr-revert" />;
+    case null:
+      return null;
+  }
+}
+
+/**
+ * The header's status section: the state in words, then Review ▾ and the state's main action.
+ * While a merge runs the words say "Merging into main…" in the state's tone; the detail
+ * showing it merged turns them to Merged.
+ */
+export function HeaderStatus({ r, d, prRef, panelKey, onReview }: { r: Readiness; d: PullRequestDetailView; prRef: PrRef; panelKey: string; onReview: (v: Verdict) => void }) {
+  const f = r.footer;
+  const merging = useMergingMethod(prRef) !== null && d.pullRequest.state === "open";
+  const headline = merging ? { ...r.headline, title: `Merging into ${d.pullRequest.baseRef || "the base branch"}…`, meta: "" } : r.headline;
+  return (
+    <StatusLine
+      words={<StatusWords d={d} headline={headline} />}
+      buttons={
+        (f.review || f.main) && (
+          <div className="flex max-w-full min-w-0 flex-[1_1_auto] flex-wrap items-center justify-end gap-1.5" data-testid="pr-ready-footer">
+            {f.review && <ReviewButton prRef={prRef} detail={d} onChoose={onReview} primary={f.reviewPrimary} />}
+            <MainActionButton f={f} d={d} prRef={prRef} panelKey={panelKey} />
+          </div>
+        )
+      }
+    />
+  );
+}
+
+/**
+ * The status section while the detail is on its way: a merged or closed state in words, a
+ * bar for an open one's verdict (it hangs on what only the detail has) and bars where its
+ * buttons will be, so nothing here can be pressed. `failed`: nothing is on its way.
+ */
+export function SeededHeaderStatus({ r, d, failed }: { r: SeedReadiness; d: PullRequestDetailView; failed: boolean }) {
+  const pending = r.footerPending && !failed;
+  return (
+    <StatusLine
+      words={
+        r.headline ? (
+          <StatusWords d={d} headline={r.headline} />
+        ) : failed ? (
+          <span className="text-body font-semibold" data-testid="pr-ready-headline" data-tone="neutral">
+            Readiness unknown
+          </span>
+        ) : (
+          <Skeleton className="h-4 w-40" data-testid="pr-ready-pending" />
+        )
+      }
+      buttons={
+        pending && (
+          <div className="flex flex-[1_0_auto] items-center justify-end gap-1.5" data-testid="pr-ready-footer-pending">
+            <Skeleton className="h-7 w-20" />
+            <Skeleton className="h-7 w-32" />
+          </div>
+        )
+      }
+    />
+  );
+}
+
+function Line({ line }: { line: SubLine }) {
   switch (line.kind) {
     case "text":
       return <span className="break-words">{line.text}</span>;
     case "check":
-      return <CheckLine c={line.check} now={now} />;
+      // The checks card lists its checks itself (CheckList).
+      return null;
     case "person":
       return (
         <span className="flex min-w-0 items-center gap-1.5">
@@ -133,218 +262,147 @@ function Line({ line, now }: { line: SubLine; now: number }) {
   }
 }
 
-/**
- * A button whose change runs on GitHub: a spinner and `busyLabel` while `running`. `inert`
- * (this change or another of the pull request's) dims it and a press sends nothing; it stays
- * focusable.
- */
-function ChangeButton({ label, busyLabel, running, inert, onRun, testId, className }: { label: string; busyLabel: string; running: boolean; inert: boolean; onRun: () => void; testId: string; className?: string }) {
+/** All N checks ⌄ / back, or Show / Hide on the passed card: unfolds every check (per panel tab). */
+function ChecksToggle({ tabKey, open, label, back }: { tabKey: string; open: boolean; label: string; back: string }) {
   return (
     <Button
       variant="outline"
       size="xs"
-      className={cn("aria-disabled:pointer-events-none aria-disabled:opacity-70", className)}
-      data-testid={testId}
-      aria-disabled={inert || undefined}
-      aria-busy={running || undefined}
+      className="shrink-0"
+      aria-expanded={open}
+      data-testid="pr-ready-checks-toggle"
       onClick={() => {
-        if (!inert) onRun();
+        toggleSection(tabKey, "checks");
       }}
     >
-      {running && <Loader2 className="animate-spin" aria-hidden data-testid={`${testId}-busy`} />}
-      {running ? busyLabel : label}
+      {open ? back : label}
+      <ChevronDown className={cn("size-3 transition-transform", open && "rotate-180")} aria-hidden />
     </Button>
   );
 }
 
-function ActionButton({ action, prRef, panelKey }: { action: RowAction; prRef: PrRef; panelKey: string }) {
-  const change = usePullRequestChange(prRef);
-  const reverting = usePrPanelStore((s) => s.reverting[pullRequestKey(prRef.slug, prRef.number)] ?? false);
-  switch (action.kind) {
-    case "ready":
-      return <ChangeButton label="Ready for review" busyLabel="Marking ready…" running={change === "ready"} inert={change !== null} onRun={() => void setPullRequestDraft(prRef, false, { inView: true })} testId="pr-ready-for-review" />;
-    case "approve-workflow":
-      return (
-        <Button variant="outline" size="xs" data-testid="pr-approve-workflow" onClick={() => void openUrl(action.url)}>
-          Approve on GitHub
-          <ExternalLink aria-hidden />
-        </Button>
-      );
-    case "revert":
-      return <ChangeButton label="Revert" busyLabel="Reverting…" running={reverting} inert={reverting} onRun={() => void revertPullRequest(prRef, panelKey)} testId="pr-revert" />;
-  }
+function useChecksOpen(tabKey: string): boolean {
+  return usePrPanelStore((s) => s.byTab[tabKey]?.open.checks ?? false);
 }
 
+const rowTitle = (row: ReadinessRow) => (
+  <span className="min-w-0 text-body-sm break-words" data-testid="pr-ready-title">
+    <span className="font-medium text-cf-text">{row.title}</span>
+    {row.meta && <span className="text-cf-text-muted"> · {row.meta}</span>}
+  </span>
+);
+
 /**
- * One requirement: its icon, title (and muted counts), the lines under it, and its button
- * under the text. The checks row's title unfolds the full check list (per panel tab). An
- * issue row carries `data-task` (pr.task's kind) and, when the viewer may hand it to a
- * thread (taskVerb), its TaskButton ("Fix in this thread") under the text.
+ * One requirement that is not passing: its icon, title, the lines under it, and its button
+ * at the right (under the text below 480px): the row's thread task (TaskButton), Approve on
+ * GitHub, or for checks All N checks. A checks card lists its failing or running checks.
  */
-function Row({ row, d, prRef, panelKey, tabKey, now, viewer, routing }: { row: ReadinessRow; d: PullRequestDetailView; prRef: PrRef; panelKey: string; tabKey: string; now: number; viewer: string; routing: TaskRouting }) {
-  const open = usePrPanelStore((s) => s.byTab[tabKey]?.open.checks ?? false) && row.expandable;
+function IssueCard({ row, d, prRef, tabKey, viewer, routing }: { row: ReadinessRow; d: PullRequestDetailView; prRef: PrRef; tabKey: string; viewer: string; routing: TaskRouting }) {
   const Icon = icons[row.icon];
   const verb = taskVerb(row.task, d, viewer);
-  const Chevron = open ? ChevronDown : ChevronRight;
-  const title = (
-    <>
-      <span className="font-medium text-cf-text">{row.title}</span>
-      {row.meta && <span className="text-cf-text-muted"> · {row.meta}</span>}
-    </>
-  );
+  const checks = row.id === "checks" && d.checks.length > 0;
+  const open = useChecksOpen(tabKey) && checks;
+  const listed = useMemo(() => (checks ? cardChecks(row, d.checks) : []), [checks, row, d.checks]);
+  const task = row.task !== null && verb !== null;
+  const approve = row.action?.kind === "approve-workflow" ? row.action.url : null;
+  // A card with a button that takes room (a task, Approve) wraps it under the text when narrow; All N checks stays at the right.
+  const wraps = task || approve !== null;
   return (
-    <div className="flex min-w-0 items-start gap-2.5 border-b border-cf-divider px-3 py-2 last:border-b-0" data-testid="pr-ready-row" data-row={row.id} data-tone={row.tone} data-task={row.task ?? undefined}>
+    <div
+      className={cn("flex min-w-0 items-start gap-2.5 rounded-lg border border-cf-border bg-cf-surface-raised px-3 py-2", row.tone === "failure" && "border-cf-error/35", wraps && "@max-[480px]:flex-wrap")}
+      data-testid="pr-ready-row"
+      data-row={row.id}
+      data-tone={row.tone}
+      data-task={row.task ?? undefined}
+    >
       <Icon className={cn("mt-0.5 size-3.5 shrink-0", tone(row.tone))} aria-hidden />
-      <div className="flex min-w-0 flex-1 flex-col">
-        {row.expandable ? (
-          <button
-            type="button"
-            aria-expanded={open}
-            className="-mx-1 flex min-w-0 items-start gap-1 rounded-sm px-1 text-left text-body-sm outline-none hover:bg-cf-control-hover/60 focus-visible:ring-1 focus-visible:ring-cf-focus"
-            data-testid="pr-ready-checks-toggle"
-            onClick={() => {
-              toggleSection(tabKey, "checks");
-            }}
-          >
-            <span className="min-w-0 flex-1 break-words" data-testid="pr-ready-title">
-              {title}
-            </span>
-            <Chevron className="mt-0.5 size-3.5 shrink-0 text-cf-text-muted" aria-hidden />
-          </button>
-        ) : (
-          <span className="min-w-0 text-body-sm break-words" data-testid="pr-ready-title">
-            {title}
-          </span>
-        )}
-        {open ? (
+      <div className={cn("flex min-w-0 flex-1 flex-col", wraps && "@max-[480px]:basis-[calc(100%-24px)]")}>
+        {rowTitle(row)}
+        {checks ? (
           <div className="pt-1">
-            <CheckList d={d} />
+            <CheckList d={d} checks={open ? undefined : listed} />
           </div>
         ) : (
           row.lines.length > 0 && (
             <div className="flex min-w-0 flex-col items-start gap-0.5 pt-0.5 text-caption text-cf-text-muted" data-testid="pr-ready-lines">
               {row.lines.map((l, i) => (
-                <Line key={i} line={l} now={now} />
+                <Line key={i} line={l} />
               ))}
             </div>
           )
         )}
-        {(row.action || (row.task && verb)) && (
-          <div className="flex min-w-0 flex-wrap items-center gap-1.5 pt-2">
-            {row.action && <ActionButton action={row.action} prRef={prRef} panelKey={panelKey} />}
-            {row.task && verb && <TaskButton kind={row.task} verb={verb} prRef={prRef} routing={routing} />}
+      </div>
+      {(task || approve !== null || checks) && (
+        <div className={cn("ml-auto flex shrink-0 flex-wrap items-center gap-1.5", checks ? "self-start" : "self-center", wraps && "@max-[480px]:ml-6 @max-[480px]:basis-[calc(100%-24px)]")}>
+          {approve !== null && (
+            <Button variant="outline" size="xs" data-testid="pr-approve-workflow" onClick={() => void openUrl(approve)}>
+              Approve on GitHub
+              <ExternalLink aria-hidden />
+            </Button>
+          )}
+          {task && row.task && verb && <TaskButton kind={row.task} verb={verb} prRef={prRef} routing={routing} />}
+          {checks && <ChecksToggle tabKey={tabKey} open={open} label={`All ${String(d.checks.length)} checks`} back={row.tone === "failure" ? "Failing only" : "Running only"} />}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** One line of the passed card; the checks line's Show unfolds every check under it. */
+function PassedRow({ row, d, tabKey }: { row: ReadinessRow; d: PullRequestDetailView; tabKey: string }) {
+  const checks = row.id === "checks" && d.checks.length > 0;
+  const open = useChecksOpen(tabKey) && checks;
+  const Icon = icons[row.icon];
+  return (
+    <div className="flex min-w-0 items-start gap-2.5" data-testid="pr-ready-row" data-row={row.id} data-tone={row.tone}>
+      <Icon className={cn("mt-0.5 size-3.5 shrink-0", tone(row.tone))} aria-hidden />
+      <div className="flex min-w-0 flex-1 flex-col">
+        {rowTitle(row)}
+        {open && (
+          <div className="pt-1">
+            <CheckList d={d} />
           </div>
         )}
       </div>
+      {checks && <ChecksToggle tabKey={tabKey} open={open} label="Show" back="Hide" />}
     </div>
   );
 }
 
-function CancelAutoMerge({ prRef }: { prRef: PrRef }) {
-  const change = usePullRequestChange(prRef);
-  return <ChangeButton label="Cancel auto-merge" busyLabel="Cancelling…" running={change === "cancel-auto-merge"} inert={change !== null} onRun={() => void setAutoMerge(prRef, null, "")} testId="pr-cancel-auto-merge" className="h-7 px-2 has-[>svg]:px-2" />;
-}
-
-/** The rows, with the task buttons' routing read once for all of them (useTaskRouting). */
-function Rows({ rows, d, prRef, panelKey, tabKey, clock, checksNow, viewer }: { rows: readonly ReadinessRow[]; d: PullRequestDetailView; prRef: PrRef; panelKey: string; tabKey: string; clock: number; checksNow: number; viewer: string }) {
+/**
+ * Overview's requirement cards (readinessCards): one card per requirement that is not
+ * passing, then one quiet card for everything that passed. Nothing for a merged or closed
+ * pull request.
+ */
+function Cards({ issues, passed, d, prRef, tabKey }: { issues: readonly ReadinessRow[]; passed: readonly ReadinessRow[]; d: PullRequestDetailView; prRef: PrRef; tabKey: string }) {
+  const viewer = useViewerLogin();
   const routing = useTaskRouting(prRef, d.pullRequest);
-  return rows.map((row) => <Row key={row.id} row={row} d={d} prRef={prRef} panelKey={panelKey} tabKey={tabKey} now={row.id === "checks" ? checksNow : clock} viewer={viewer} routing={routing} />);
-}
-
-/**
- * The readiness box under the header: a headline (ready, waiting, not ready · N left,
- * merged, …), a row per requirement, and the footer: Review ▾ at the left, Merge,
- * Auto-merge or Cancel auto-merge at the right. Built from readiness() (pure). `compact`
- * (the Code tab, whose diff needs the height) drops the rows: the headline and the
- * footer's controls share one line, the controls wrapping under it when the panel is too
- * narrow for both.
- */
-export function ReadinessBox({ d, prRef, panelKey, tabKey, onReview, compact = false }: { d: PullRequestDetailView; prRef: PrRef; panelKey: string; tabKey: string; onReview: (v: Verdict) => void; compact?: boolean }) {
-  const viewer = useViewerLogin();
-  const clock = useNow(30_000);
-  const checksNow = useChecksClock(d.checks);
-  const r = useMemo(() => readiness(d, viewer, detailFresh(d), clock), [d, viewer, clock]);
-  const HeadIcon = icons[r.headline.icon];
-  const f = r.footer;
-  const headline = (
-    <div
-      className={cn("flex min-w-0 items-center gap-2", compact ? "flex-1 basis-40" : "border-b border-cf-divider px-3 py-2")}
-      data-testid="pr-ready-headline"
-      data-tone={r.headline.tone}
-    >
-      <HeadIcon className={cn("size-3.5 shrink-0", tone(r.headline.tone))} aria-hidden />
-      <span className="min-w-0 truncate text-body-sm font-medium text-cf-text">{r.headline.title}</span>
-      {r.headline.meta && (
-        <Tip label={r.headline.meta} whenTruncated>
-          <span className="min-w-0 truncate text-caption text-cf-text-muted" data-testid="pr-ready-meta">
-            {r.headline.meta}
-          </span>
-        </Tip>
-      )}
-    </div>
-  );
-  const controls = f && (f.review || f.merge) && (
-    <>
-      {f.review && <ReviewButton prRef={prRef} detail={d} onChoose={onReview} primary={f.reviewPrimary} />}
-      <span className="ml-auto flex min-w-0 items-center">
-        {f.merge === "merge" && <MergeButton prRef={prRef} detail={d} note={f.mergeNote} />}
-        {f.merge === "auto-merge" && <AutoMergeButton prRef={prRef} detail={d} />}
-        {f.merge === "cancel-auto-merge" && <CancelAutoMerge prRef={prRef} />}
-      </span>
-    </>
-  );
+  if (issues.length === 0 && passed.length === 0) return null;
   return (
-    <section className="mx-4 mt-3 shrink-0 overflow-hidden rounded-lg border border-cf-border bg-cf-surface-raised @max-[340px]:mx-3" data-testid="pr-readiness" data-compact={compact || undefined} aria-label="Merge readiness">
-      {compact ? (
-        <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5 px-3 py-1.5">
-          {headline}
-          {controls && (
-            <div className="ml-auto flex min-w-0 items-center gap-2" data-testid="pr-ready-footer">
-              {controls}
-            </div>
-          )}
+    <section className="flex min-w-0 flex-col gap-2 px-4 pt-3 @max-[340px]:px-3" data-testid="pr-readiness" aria-label="Merge readiness">
+      {issues.map((row) => (
+        <IssueCard key={row.id} row={row} d={d} prRef={prRef} tabKey={tabKey} viewer={viewer} routing={routing} />
+      ))}
+      {passed.length > 0 && (
+        <div className="flex min-w-0 flex-col gap-2 rounded-lg border border-cf-border bg-cf-surface-raised px-3 py-2" data-testid="pr-ready-passed">
+          {passed.map((row) => (
+            <PassedRow key={row.id} row={row} d={d} tabKey={tabKey} />
+          ))}
         </div>
-      ) : (
-        <>
-          {headline}
-          <Rows rows={r.rows} d={d} prRef={prRef} panelKey={panelKey} tabKey={tabKey} clock={clock} checksNow={checksNow} viewer={viewer} />
-          {controls && (
-            <div className="flex min-w-0 flex-wrap items-center gap-2 bg-cf-surface-sunken/60 px-3 py-2" data-testid="pr-ready-footer">
-              {controls}
-            </div>
-          )}
-        </>
       )}
     </section>
   );
 }
 
-/**
- * The box while the detail is on its way, from a dashboard row (seedDetail): the rows the row
- * can fill, with bars where the headline's verdict and the footer's controls will be, so
- * nothing here can be pressed. `failed`: the detail did not come; nothing is on its way.
- */
-export function SeededReadinessBox({ d, prRef, panelKey, tabKey, compact, failed }: { d: PullRequestDetailView; prRef: PrRef; panelKey: string; tabKey: string; compact: boolean; failed: boolean }) {
-  const viewer = useViewerLogin();
-  const clock = useNow(30_000);
-  const r = useMemo(() => seedReadiness(d, viewer, clock), [d, viewer, clock]);
-  const HeadIcon = r.headline ? icons[r.headline.icon] : null;
-  const pending = r.footerPending && !failed;
-  const verdict = r.headline ? r.headline.title : failed ? "Readiness unknown" : null;
-  return (
-    <section className="mx-4 mt-3 shrink-0 overflow-hidden rounded-lg border border-cf-border bg-cf-surface-raised @max-[340px]:mx-3" data-testid="pr-readiness" data-seeded="" data-compact={compact || undefined} aria-label="Merge readiness">
-      <div className={cn("flex min-h-9 min-w-0 items-center gap-2 px-3", compact ? "py-1.5" : "border-b border-cf-divider py-2")} data-testid="pr-ready-headline" data-tone={r.headline?.tone}>
-        {HeadIcon && r.headline && <HeadIcon className={cn("size-3.5 shrink-0", tone(r.headline.tone))} aria-hidden />}
-        {verdict === null ? <Skeleton className="h-3.5 w-40" data-testid="pr-ready-pending" /> : <span className="min-w-0 truncate text-body-sm font-medium text-cf-text">{verdict}</span>}
-        {compact && pending && <Skeleton className="ml-auto h-6 w-32 shrink-0" />}
-      </div>
-      {!compact && <Rows rows={r.rows} d={d} prRef={prRef} panelKey={panelKey} tabKey={tabKey} clock={clock} checksNow={clock} viewer={viewer} />}
-      {!compact && pending && (
-        <div className="flex min-w-0 items-center justify-between gap-2 bg-cf-surface-sunken/60 px-3 py-2" data-testid="pr-ready-footer-pending">
-          <Skeleton className="h-6 w-20" />
-          <Skeleton className="h-6 w-32" />
-        </div>
-      )}
-    </section>
-  );
+export function ReadinessCards({ d, prRef, tabKey }: { d: PullRequestDetailView; prRef: PrRef; tabKey: string }) {
+  const r = useReadiness(d);
+  const { issues, passed } = useMemo(() => readinessCards(r.rows, d.pullRequest.state), [r.rows, d.pullRequest.state]);
+  return <Cards issues={issues} passed={passed} d={d} prRef={prRef} tabKey={tabKey} />;
+}
+
+/** The cards a dashboard row can fill while the detail is on its way: without their buttons (seed.ts takes them off). */
+export function SeededReadinessCards({ d, prRef, tabKey }: { d: PullRequestDetailView; prRef: PrRef; tabKey: string }) {
+  const r = useSeedReadiness(d);
+  const { issues, passed } = useMemo(() => readinessCards(r.rows, d.pullRequest.state), [r.rows, d.pullRequest.state]);
+  return <Cards issues={issues} passed={passed} d={d} prRef={prRef} tabKey={tabKey} />;
 }

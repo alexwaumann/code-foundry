@@ -82,77 +82,109 @@ function copied(page: Page): Promise<string[]> {
 test("overview (screenshot)", async ({ page }) => {
   test.skip(!shots, "SHOTS=<dir> only: the screenshot is all it adds");
   await openPrBesidePage(page, 145);
-  await expect(page.getByTestId("pr-ready-headline")).toHaveText("Not ready to merge4 left");
+  await expect(page.getByTestId("pr-ready-headline")).toHaveText("Draft");
   await shot(page, "chunk3-summary");
 });
 
-/** No element of the readiness box sticks out of it, and no two of a row's or the footer's parts overlap. */
-async function boxFits(page: Page): Promise<void> {
+/**
+ * Nothing in the header, the cards, the tab bar or Overview sticks out of the surface. The
+ * header's buttons sit inside it, right-aligned, overlapping neither each other nor the
+ * state's words; a card's buttons stay inside their card, and below 480px a task or Approve
+ * button sits under its card's text.
+ */
+async function layoutFits(page: Page): Promise<void> {
   const problems = await page.getByTestId("pr-surface").evaluate((surface) => {
     const out: string[] = [];
     const r = (e: Element) => e.getBoundingClientRect();
     const within = (a: DOMRect, b: DOMRect) => a.left >= b.left - 1 && a.right <= b.right + 1;
     const overlap = (a: DOMRect, b: DOMRect) => a.left < b.right - 1 && b.left < a.right - 1 && a.top < b.bottom - 1 && b.top < a.bottom - 1;
     const sr = r(surface);
-    for (const id of ["pr-header", "pr-readiness", "pr-inner-bar", "pr-overview"]) {
+    for (const id of ["pr-header", "pr-readiness", "pr-inner-bar", "pr-overview", "pr-details"]) {
       const el = surface.querySelector(`[data-testid="${id}"]`);
       if (!el) continue;
       if (el.scrollWidth > el.clientWidth) out.push(`${id} overflows by ${String(el.scrollWidth - el.clientWidth)}`);
       if (!within(r(el), sr)) out.push(`${id} outside the surface`);
     }
-    const box = surface.querySelector('[data-testid="pr-readiness"]');
-    if (!box) return ["no box"];
-    const br = r(box);
-    for (const el of box.querySelectorAll("button, [data-testid=pr-ready-title], [data-testid=pr-ready-lines]")) if (!within(r(el), br)) out.push(`${el.textContent} outside the box`);
-    const footer = box.querySelector('[data-testid="pr-ready-footer"]');
-    const parts = footer ? [...footer.querySelectorAll("button")] : [];
-    for (let i = 0; i < parts.length; i++) for (let j = i + 1; j < parts.length; j++) if (overlap(r(parts[i] as Element), r(parts[j] as Element))) out.push(`footer: ${parts[i]?.textContent ?? ""} overlaps ${parts[j]?.textContent ?? ""}`);
-    // A row's button sits under its text, never beside or over it.
-    for (const row of box.querySelectorAll('[data-testid="pr-ready-row"]')) {
-      const title = row.querySelector('[data-testid="pr-ready-title"]');
-      for (const b of row.querySelectorAll("[data-slot=button], [data-testid^=pr-task-]")) if (title && r(b).top < r(title).bottom - 1) out.push(`${b.textContent} is not under its row's text`);
+    const status = surface.querySelector('[data-testid="pr-status"]');
+    const footer = surface.querySelector('[data-testid="pr-ready-footer"]');
+    if (status && footer) {
+      const parts = [...footer.querySelectorAll("button")];
+      for (const b of parts) if (!within(r(b), r(status))) out.push(`${b.textContent} outside the status line`);
+      for (let i = 0; i < parts.length; i++) for (let j = i + 1; j < parts.length; j++) if (overlap(r(parts[i] as Element), r(parts[j] as Element))) out.push(`header: ${parts[i]?.textContent ?? ""} overlaps ${parts[j]?.textContent ?? ""}`);
+      const words = surface.querySelector('[data-testid="pr-ready-headline"]');
+      if (words) for (const b of parts) if (overlap(r(words), r(b))) out.push(`${b.textContent} overlaps the state`);
+      const last = parts.at(-1);
+      if (last && Math.abs(r(last).right - r(status).right) > 1) out.push(`the buttons end ${String(r(status).right - r(last).right)}px short of the right`);
+    }
+    for (const card of surface.querySelectorAll('[data-testid="pr-readiness"] > [data-testid="pr-ready-row"]')) {
+      for (const el of card.querySelectorAll("button")) if (!within(r(el), r(card))) out.push(`${el.textContent} outside its card`);
+      const title = card.querySelector('[data-testid="pr-ready-title"]');
+      if (sr.width < 480 && title) for (const b of card.querySelectorAll("[data-testid^=pr-task-], [data-testid=pr-approve-workflow]")) if (r(b).top < r(title).bottom - 1) out.push(`${b.textContent} is not under its card's text`);
     }
     return out;
   });
   expect(problems).toEqual([]);
 }
 
-// Which rows, headline and footer each state has: src/components/pr/readiness.test.ts; the buttons per
-// state and viewer: src/components/pr/PullRequestSurface.test.tsx ("the readiness box and the Overview", "the merge button", "auto-merge").
-test("the readiness box fits at 360, 420 and 560px in every state: nothing overflows or overlaps, actions under their row's text", async ({ page }) => {
+// Which words, tone, buttons and cards each state has: src/components/pr/readiness.test.ts and
+// src/components/pr/PullRequestSurface.test.tsx ("the header's status and the Overview's cards", "the merge button", "auto-merge").
+test("the header and the cards fit from 320 to 1000px in every state: nothing overflows or overlaps, the buttons right-aligned", async ({ page }) => {
+  // Wide enough for a 1000px pane beside the page's 480px minimum and the sidebar.
+  await page.setViewportSize({ width: 1900, height: 900 });
   await openPrBesidePage(page, 145);
-  for (const width of [360, 420, 560]) {
+  for (const width of [1000, 760, 560, 420, 320]) {
     await sizePane(page, PR_PANE, width);
     for (const n of [145, 160, 161, 162, 163, 164, 142, 139, 140, 131, 138]) {
       await showPr(page, n);
       await expect(page.getByTestId("pr-ready-headline")).toBeVisible();
-      await boxFits(page);
+      await layoutFits(page);
     }
   }
 });
 
-// Which controls the Code tab's compact box keeps: src/components/pr/PullRequestSurface.test.tsx ("the Code tab keeps ...").
-test("the Code tab's compact box: headline and footer on one line when the panel is wide enough, under it when not; the diff keeps the height", async ({ page }) => {
-  // #145 as s-3's linked tab.
-  await openPrBesideThread(page, "s-3", 145);
+test("the status line: the buttons share it when they fit and wrap to their own line, still at the right, when not; the Code tab keeps the header", async ({ page }) => {
+  await openPrBesideThread(page, "s-3", 142);
   await page.getByTestId("pr-tab-code").click();
-  await expect(page.getByTestId("pr-readiness")).toHaveAttribute("data-compact", "true");
   for (const [width, oneLine] of [
     [560, true],
-    [420, false],
-    [360, false],
+    [320, false],
   ] as const) {
     await sizePane(page, PR_PANE, width);
-    await boxFits(page);
-    const head = await boxOf(page, "pr-ready-headline");
+    await layoutFits(page);
+    const words = await boxOf(page, "pr-ready-headline");
     const foot = await boxOf(page, "pr-ready-footer");
-    // One line: the controls sit beside the headline; else under it.
-    expect(foot.y < head.y + head.height).toBe(oneLine);
-    // At the 800px window the box stays small and the diff (the strip down to the pane's foot) has most of the pane.
-    expect((await boxOf(page, "pr-readiness")).height).toBeLessThanOrEqual(oneLine ? 44 : 72);
+    expect(foot.y < words.y + words.height).toBe(oneLine);
+    // The diff (the strip down to the pane's foot) keeps most of the pane.
     const pane = await boxOf(page, PANE);
     expect(pane.y + pane.height - (await boxOf(page, "pr-code-strip")).y).toBeGreaterThan(pane.height / 2);
   }
+});
+
+test("the details are a side column from 680px and a strip over the cards below it", async ({ page }) => {
+  await page.setViewportSize({ width: 1600, height: 900 });
+  await openPrBesidePage(page, 145, 760);
+  const details = await boxOf(page, "pr-details");
+  const cards = await boxOf(page, "pr-readiness");
+  expect(details.x).toBeGreaterThanOrEqual(cards.x + cards.width);
+  expect(Math.round(details.width)).toBe(216);
+  expect(await page.getByTestId("pr-details").evaluate((e) => getComputedStyle(e).borderLeftWidth)).toBe("1px");
+  // The side column names each reviewer; the strip shows their faces only.
+  await expect(page.getByTestId("pr-reviewer").first()).toContainText("teammate-kim", { useInnerText: true });
+  await expect(page.getByTestId("pr-commits-latest")).toBeVisible();
+  await sizePane(page, PR_PANE, 560);
+  const strip = await boxOf(page, "pr-details");
+  expect(strip.y + strip.height).toBeLessThanOrEqual((await boxOf(page, "pr-readiness")).y);
+  await expect(page.getByTestId("pr-commits-latest")).toBeHidden();
+  await expect(page.getByTestId("pr-reviewer").first()).not.toContainText("teammate-kim", { useInnerText: true });
+});
+
+test("a pane under 480px tall tightens the header", async ({ page }) => {
+  await openPrBesidePage(page, 142);
+  const tall = (await boxOf(page, "pr-header")).height;
+  await expect(page.getByTestId("pr-surface")).not.toHaveAttribute("data-short");
+  await page.setViewportSize({ width: 1280, height: 520 });
+  await expect(page.getByTestId("pr-surface")).toHaveAttribute("data-short", "true");
+  expect((await boxOf(page, "pr-header")).height).toBeLessThan(tall - 8);
 });
 
 // Timeline's entries, order, commit links and inner tabs per panel tab: src/components/pr/PullRequestSurface.test.tsx ("Timeline").
@@ -233,7 +265,7 @@ test("merged pull request menu (screenshot)", async ({ page }) => {
   test.skip(!shots, "SHOTS=<dir> only: the screenshot is all it adds");
   await openPrBesidePage(page, 138);
   await page.getByTestId("pr-menu-button").click();
-  await expect(page.getByTestId("pr-menu-revert")).toBeVisible();
+  await expect(page.getByTestId("pr-menu-open")).toBeVisible();
   await shot(page, "chunk3-menu");
 });
 
@@ -303,7 +335,7 @@ test("light scheme", async ({ page }) => {
   test.skip(!shots, "SHOTS=<dir> only: the screenshot is all it adds");
   await page.emulateMedia({ colorScheme: "light" });
   await openPrBesidePage(page, 145);
-  await expect(page.getByTestId("pr-ready-headline")).toHaveText("Not ready to merge4 left");
+  await expect(page.getByTestId("pr-ready-headline")).toHaveText("Draft");
   await shot(page, "chunk3-light-summary");
 });
 
@@ -320,15 +352,15 @@ test("cmd+w from inside the surface closes its tab; the last tab gone, the panel
   await expect.poll(async () => (await layoutState()).spaces[0]?.root?.t).toBe("pane");
 });
 
-test("at 280px nothing overflows: header, readiness box, inner tab bar, logins, popups; the active tab is revealed", async ({ page }) => {
+test("at 280px nothing overflows: header, cards, inner tab bar, logins, popups; the active tab is revealed", async ({ page }) => {
   await openPrBesidePage(page, 145, 280);
   await expect(page.getByTestId("pr-surface")).toBeVisible();
 
-  // Overview: the header, the box (its footer wraps) and the bar fit.
+  // Overview: the header (its buttons wrap), the cards and the bar fit.
   expect(await overflowX(page, "pr-header")).toBeLessThanOrEqual(0);
   expect(await overflowX(page, "pr-inner-bar")).toBeLessThanOrEqual(0);
-  await boxFits(page);
-  expect(inside(await boxOf(page, "pr-diffstat"), await boxOf(page, "pr-header"))).toBe(true);
+  await layoutFits(page);
+  expect(inside(await boxOf(page, "pr-branches"), await boxOf(page, "pr-header"))).toBe(true);
   expect(inside(await boxOf(page, "pr-reviewers"), await boxOf(page, PANE))).toBe(true);
   // Comment authors are not cut before their verdict.
   const cutComments = await page.getByTestId("pr-comment-author").evaluateAll((els) => els.filter((e) => e.scrollWidth > e.clientWidth).map((e) => e.textContent));
@@ -566,18 +598,18 @@ test("#142 merges from the side panel: a pick in the menu, then the merge dialog
   await expect(page.getByTestId("pr-merge-dialog")).toBeVisible();
   // Enter on the focused Merge merges.
   await page.keyboard.press("Enter");
-  await expect(page.getByTestId("pr-state")).toHaveText("Merged");
+  await expect(page.getByTestId("pr-header")).toHaveAttribute("data-state", "merged");
   // The daemon announces the dashboard change: the row moves to recently merged.
   await expect(prRow(page, "merged", 142)).toBeVisible();
   await expect(prRow(page, "authored", 142)).toHaveCount(0);
 });
 
-test("at 280px the merge split button stays inside the box and its dropdown inside the panel", async ({ page }) => {
+test("at 280px the merge split button stays inside the header and its dropdown inside the panel", async ({ page }) => {
   await shotViewport(page);
   await openPrBesidePage(page, 142, 280);
   await expect(page.getByTestId("pr-merge-button")).toBeVisible();
-  await boxFits(page);
-  expect(inside(await boxOf(page, "pr-merge-button-split"), await boxOf(page, "pr-readiness"))).toBe(true);
+  await layoutFits(page);
+  expect(inside(await boxOf(page, "pr-merge-button-split"), await boxOf(page, "pr-header"))).toBe(true);
   await page.getByTestId("pr-merge-button-menu-button").click();
   await expect(page.getByTestId("pr-merge-button-menu")).toBeVisible();
   expect(inside(await boxOf(page, "pr-merge-button-menu"), await boxOf(page, PANE))).toBe(true);
@@ -613,7 +645,7 @@ for (const scheme of ["dark", "light"] as const) {
 
 // The Review menu, the composer's label, hint and keys, pr.review's args, the toast, the chip, the
 // reviewer entry and the review in Comments: src/components/pr/PullRequestSurface.test.tsx ("Review ▾").
-test("Review on #139 sits left of Auto-merge in the box's footer; its menu stays inside the panel", async ({ page }) => {
+test("Review on #139 sits left of Auto-merge in the header; its menu stays inside the panel", async ({ page }) => {
   await shotViewport(page);
   await openPrBesidePage(page, 139);
   await expect(page.getByTestId("pr-review-button")).toHaveText("Review");

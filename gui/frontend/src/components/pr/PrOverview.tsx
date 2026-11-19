@@ -13,7 +13,8 @@ import { Avatar } from "./Avatar";
 import { Markdown, type MarkdownExtras } from "./Markdown";
 import { usePanelMarkdownExtras } from "./prLinks";
 import { TaskBox } from "./TaskBox";
-import { ago, commentCount, conversation, reviewerStatus, reviewVerb, threadLocation, type ConversationItem, type ReviewerStatus } from "./model";
+import { ago, commentCount, conversation, detailAges, reviewerStatus, reviewVerb, threadLocation, type ConversationItem, type ReviewerStatus } from "./model";
+import { ReadinessCards } from "./ReadinessBox";
 import { ReviewerPicker } from "./ReviewerPicker";
 import { toneText } from "./tones";
 import { VirtualStack } from "./VirtualStack";
@@ -55,35 +56,136 @@ const reviewerRing: Partial<Record<ReviewerStatus, string>> = {
   requested: "ring-cf-warning",
 };
 
-/** A reviewer's avatar, ringed by outcome; the tooltip names them and their review (hidden: only the face shows). */
+/** The text colour of a reviewer's state in the side column. */
+const reviewerText: Partial<Record<ReviewerStatus, string>> = {
+  approved: toneText.success,
+  changes_requested: toneText.failure,
+  requested: toneText.pending,
+};
+
+/** A reviewer's state in a word or two for the side column: the label's first part ("Approved", "Review requested"). */
+const reviewerWords = (label: string): string => label.split(" · ")[0] ?? "";
+
+/**
+ * A reviewer: the avatar ringed by outcome. Narrow (the strip), the face alone, with a
+ * tooltip naming them and their review (hidden); in the side column (680px and up) the
+ * login and the state beside it, and no tooltip (it would repeat them). The two faces are
+ * swapped by the container query, so a hidden one is never hovered.
+ */
 function Reviewer({ r }: { r: PullRequestReviewerView }) {
   const { status, label } = reviewerStatus(r);
   // A re-requested reviewer is pending again, whatever they said before.
-  const ring = r.requested ? reviewerRing.requested : reviewerRing[status];
+  const ringed = r.requested ? "requested" : status;
+  const face = (
+    <span className={cn("inline-flex shrink-0 rounded-full ring-[1.5px] ring-offset-1 ring-offset-cf-surface", reviewerRing[ringed] ?? "ring-transparent", r.stale && "opacity-70")}>
+      <Avatar login={r.login} src={r.avatarUrl} size={20} />
+    </span>
+  );
   return (
-    <Tip label={[r.login, r.isBot ? "bot" : "", label].filter(Boolean).join(" · ")}>
-      <span
-        className={cn("inline-flex rounded-full ring-[1.5px] ring-offset-1 ring-offset-cf-surface", ring ?? "ring-transparent", r.stale && "opacity-70")}
-        data-testid="pr-reviewer"
-        data-login={r.login}
-        data-status={status}
-        data-stale={r.stale}
-        aria-label={[r.login, label].filter(Boolean).join(": ")}
-        role="img"
-      >
-        <Avatar login={r.login} src={r.avatarUrl} size={20} />
+    <span className="flex min-w-0 items-center" data-testid="pr-reviewer" data-login={r.login} data-status={status} data-stale={r.stale} aria-label={[r.login, label].filter(Boolean).join(": ")} role="img">
+      <Tip label={[r.login, r.isBot ? "bot" : "", label].filter(Boolean).join(" · ")}>
+        <span className="inline-flex @min-[680px]:hidden">{face}</span>
+      </Tip>
+      <span className="hidden min-w-0 items-center gap-2 @min-[680px]:flex" aria-hidden>
+        {face}
+        <span className="flex min-w-0 flex-col">
+          <Tip label={r.login} whenTruncated>
+            <span className="truncate text-body-sm text-cf-text">{r.login}</span>
+          </Tip>
+          {label && <span className={cn("truncate text-caption", reviewerText[ringed] ?? "text-cf-text-muted")}>{reviewerWords(label)}</span>}
+        </span>
       </span>
-    </Tip>
+    </span>
   );
 }
 
-/** "Reviewers  [faces] +": the label beside the values. */
-function Field({ label, children, testId }: { label: string; children: ReactNode; testId: string }) {
+/**
+ * One block of the details: a small heading and its value. Narrow, heading and value on one
+ * line in a wrapping strip; in the side column (680px and up), the heading over the value.
+ */
+function Field({ label, children, testId, className }: { label: string; children: ReactNode; testId: string; className?: string }) {
   return (
-    <div className="flex min-h-7 min-w-0 items-start gap-3" data-testid={testId}>
-      <span className="flex h-7 w-16 shrink-0 items-center text-caption text-cf-text-muted">{label}</span>
-      <div className="flex min-h-7 min-w-0 flex-1 flex-wrap items-center gap-1.5">{children}</div>
+    <div className={cn("flex min-w-0 items-center gap-2 @min-[680px]:flex-col @min-[680px]:items-stretch @min-[680px]:gap-1.5", className)} data-testid={testId}>
+      <span className="shrink-0 text-caption text-cf-text-muted">{label}</span>
+      <div className="flex min-w-0 flex-wrap items-center gap-1.5">{children}</div>
     </div>
+  );
+}
+
+/** How many of the latest commits the side column lists. */
+const SIDE_COMMITS = 3;
+
+/**
+ * The pull request's details: author, reviewers (with the picker while open), its ages,
+ * labels (when any) and commits. A wrapping strip over Overview when narrow; a side column
+ * from 680px, where the commits also list the latest few.
+ */
+function Details({ d, prRef }: { d: PullRequestDetailView; prRef: PrRef }) {
+  const now = useNow(30_000);
+  const pr = d.pullRequest;
+  const open = pr.state === "open";
+  const latest = useMemo(() => d.commits.slice(-SIDE_COMMITS).reverse(), [d.commits]);
+  return (
+    <aside
+      className="flex min-w-0 flex-wrap items-center gap-x-5 gap-y-2 px-4 pt-3 @max-[340px]:px-3 @min-[680px]:col-start-2 @min-[680px]:row-start-1 @min-[680px]:flex-col @min-[680px]:flex-nowrap @min-[680px]:items-stretch @min-[680px]:gap-4 @min-[680px]:border-l @min-[680px]:border-cf-divider @min-[680px]:px-3.5 @min-[680px]:pt-3.5 @min-[680px]:pb-5"
+      data-testid="pr-details"
+      aria-label="Details"
+    >
+      <Field label="Author" testId="pr-author-field">
+        <span className="flex min-w-0 items-center gap-1.5">
+          <Avatar login={pr.author} size={20} />
+          <Tip label={pr.author || "ghost"} whenTruncated>
+            <span className="min-w-0 truncate text-body-sm text-cf-text" data-testid="pr-author">
+              {pr.author || "ghost"}
+            </span>
+          </Tip>
+        </span>
+      </Field>
+      {(open || d.reviewers.length > 0) && (
+        <Field label="Reviewers" testId="pr-reviewers">
+          <div className="flex min-w-0 flex-wrap items-center gap-1.5 @min-[680px]:flex-col @min-[680px]:items-start @min-[680px]:gap-1.5">
+            {d.reviewers.length === 0 && <span className="text-caption">None</span>}
+            {d.reviewers.map((r) => (
+              <Reviewer key={r.login} r={r} />
+            ))}
+            {d.reviewersTruncated && (
+              <span className="text-caption" data-testid="pr-truncated">
+                and more on GitHub
+              </span>
+            )}
+            {open && <ReviewerPicker prRef={prRef} canUpdate={d.viewerCanUpdate} />}
+          </div>
+        </Field>
+      )}
+      {detailAges(d, now).map((a) => (
+        <Field key={a.label} label={a.label} testId={`pr-age-${a.label.toLowerCase()}`}>
+          <span className="text-body-sm whitespace-nowrap text-cf-text">{a.value}</span>
+        </Field>
+      ))}
+      {d.labels.length > 0 && (
+        <Field label="Labels" testId="pr-labels">
+          {d.labels.map((l) => (
+            <Label key={l.name} l={l} />
+          ))}
+          {d.labelsTruncated && <span className="text-caption">and more on GitHub</span>}
+        </Field>
+      )}
+      <Field label="Commits" testId="pr-commits">
+        <span className="text-body-sm text-cf-text tabular-nums">{d.commitCount}</span>
+        {latest.length > 0 && (
+          <ul className="hidden w-full min-w-0 flex-col gap-1 @min-[680px]:flex" data-testid="pr-commits-latest">
+            {latest.map((c) => (
+              <li key={c.sha} className="flex min-w-0 items-baseline gap-1.5 text-caption">
+                <span className="shrink-0 font-mono">{c.shortSha || c.sha.slice(0, 7)}</span>
+                <Tip label={c.headline} whenTruncated>
+                  <span className="min-w-0 truncate">{c.headline}</span>
+                </Tip>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Field>
+    </aside>
   );
 }
 
@@ -101,8 +203,11 @@ function Label({ l }: { l: PullRequestLabelView }) {
   );
 }
 
+/** Twice the app's fold: a summary reads without unfolding. */
+const DESCRIPTION_FOLD_PX = 2 * FOLD_PX;
+
 /**
- * The description: shown whole when short; otherwise cut at FOLD_PX with a
+ * The description: shown whole when short; otherwise cut at DESCRIPTION_FOLD_PX with a
  * fade and a centred Show all, which shows it whole in place (Show less folds it again).
  * Kept per panel tab.
  */
@@ -116,12 +221,12 @@ function Description({ d, prRef, tabKey }: { d: PullRequestDetailView; prRef: Pr
     [panelExtras, d.viewerCanUpdate, slug, number],
   );
   const full = useSectionOpen(tabKey, "fullDescription");
-  const [ref, taller] = useTallerThan(FOLD_PX);
+  const [ref, taller] = useTallerThan(DESCRIPTION_FOLD_PX);
   const folded = taller && !full;
   if (!d.body.trim()) return <p className="text-caption italic">No description provided.</p>;
   return (
     <div className="flex flex-col">
-      <div className={cn("relative", folded && "overflow-hidden")} style={folded ? { maxHeight: FOLD_PX } : undefined} data-testid="pr-description-body" data-folded={folded}>
+      <div className={cn("relative", folded && "overflow-hidden")} style={folded ? { maxHeight: DESCRIPTION_FOLD_PX } : undefined} data-testid="pr-description-body" data-folded={folded}>
         <div ref={ref} data-testid="pr-description-content">
           <Markdown extras={extras}>{d.body}</Markdown>
         </div>
@@ -290,57 +395,34 @@ function OrderToggle({ tabKey, which, compact = false }: { tabKey: string; which
 export { OrderToggle };
 
 /**
- * Overview: reviewers (open pull requests: faces ringed by outcome, and the picker),
- * labels, the description (faded out when long), and the conversation. The checks live
- * in the readiness box above the tabs.
+ * Overview: the details (a side column from 680px, a strip over everything narrower), the
+ * requirement cards (what is not passing, then one card for what passed), the description
+ * (faded out when long) and the conversation.
  */
 export function PrOverview({ d, prRef, tabKey }: { d: PullRequestDetailView; prRef: PrRef; tabKey: string }) {
   const order = usePrPanelStore((s) => s.byTab[tabKey]?.commentOrder ?? "newest");
   const items = useMemo(() => conversation(d, order), [d, order]);
-  const open = d.pullRequest.state === "open";
   return (
-    <div className="flex flex-col pb-6" data-testid="pr-overview">
-      {(open || d.labels.length > 0) && (
-        <div className="flex flex-col gap-0.5 px-4 pt-3 pb-1 @max-[340px]:px-3">
-          {open && (
-            <Field label="Reviewers" testId="pr-reviewers">
-              {d.reviewers.length === 0 && <span className="text-caption">None</span>}
-              {d.reviewers.map((r) => (
-                <Reviewer key={r.login} r={r} />
-              ))}
-              {d.reviewersTruncated && (
-                <span className="text-caption" data-testid="pr-truncated">
-                  and more on GitHub
-                </span>
-              )}
-              <ReviewerPicker prRef={prRef} canUpdate={d.viewerCanUpdate} />
-            </Field>
+    <div className="grid grid-cols-1 @min-[680px]:grid-cols-[minmax(0,1fr)_216px]" data-testid="pr-overview">
+      <Details d={d} prRef={prRef} />
+      <div className="flex min-w-0 flex-col pb-6 @min-[680px]:col-start-1 @min-[680px]:row-start-1">
+        <ReadinessCards d={d} prRef={prRef} tabKey={tabKey} />
+        <Section tabKey={tabKey} section="description" title="Description" testId="pr-description">
+          <Description d={d} prRef={prRef} tabKey={tabKey} />
+        </Section>
+        <Section tabKey={tabKey} section="comments" title="Comments" count={commentCount(d)} extra={<OrderToggle tabKey={tabKey} which="commentOrder" />} testId="pr-comments">
+          <Conversation items={items} />
+          {(d.commentsTruncated || d.reviewThreadsTruncated) && (
+            <Notice>
+              Older {d.commentsTruncated && d.reviewThreadsTruncated ? "comments and threads" : d.commentsTruncated ? "comments" : "threads"} are only on{" "}
+              <button type="button" className="underline underline-offset-2 hover:text-cf-text" onClick={() => void openUrl(d.pullRequest.url)}>
+                GitHub
+              </button>
+              .
+            </Notice>
           )}
-          {d.labels.length > 0 && (
-            <Field label="Labels" testId="pr-labels">
-              {d.labels.map((l) => (
-                <Label key={l.name} l={l} />
-              ))}
-              {d.labelsTruncated && <span className="text-caption">and more on GitHub</span>}
-            </Field>
-          )}
-        </div>
-      )}
-      <Section tabKey={tabKey} section="description" title="Description" testId="pr-description">
-        <Description d={d} prRef={prRef} tabKey={tabKey} />
-      </Section>
-      <Section tabKey={tabKey} section="comments" title="Comments" count={commentCount(d)} extra={<OrderToggle tabKey={tabKey} which="commentOrder" />} testId="pr-comments">
-        <Conversation items={items} />
-        {(d.commentsTruncated || d.reviewThreadsTruncated) && (
-          <Notice>
-            Older {d.commentsTruncated && d.reviewThreadsTruncated ? "comments and threads" : d.commentsTruncated ? "comments" : "threads"} are only on{" "}
-            <button type="button" className="underline underline-offset-2 hover:text-cf-text" onClick={() => void openUrl(d.pullRequest.url)}>
-              GitHub
-            </button>
-            .
-          </Notice>
-        )}
-      </Section>
+        </Section>
+      </div>
     </div>
   );
 }

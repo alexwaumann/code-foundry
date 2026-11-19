@@ -38,8 +38,10 @@ test("the fetch landing behind a stale copy leaves the panel where it was scroll
       if (y >= 0) el.scrollTop = y;
       return el.scrollTop;
     }, to);
-  const before = await scrollTop(240);
-  expect(before).toBeGreaterThan(100);
+  // Scrolled into the header, above the timeline: a new entry at the timeline's top would move
+  // what is under it, and scroll anchoring would then move scrollTop with it, as it should.
+  const before = await scrollTop(80);
+  expect(before).toBeGreaterThan(40);
 
   await mockPost(`gh/pr-stale?repo=${SLUG}&number=145&ms=100&body=Added%20while%20the%20copy%20was%20stale`);
   await mockPost(`gh/pr-comment?repo=${SLUG}&number=145&body=A%20new%20comment`); // the event that brings the read of the copy
