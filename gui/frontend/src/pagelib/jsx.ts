@@ -179,11 +179,43 @@ async function runAll(): Promise<void> {
   root.dataset.cfJsx = ok ? "ready" : "error";
 }
 
+/**
+ * The error a script handed window.reportError, while the error event it fires is being
+ * dispatched. React reports a render's or an event handler's uncaught error that way, from
+ * /cf/react-dom-client.js; in a frame of another origin (the opaque sandbox of a page no thread
+ * owns) WebKit gives that event "Script error." and no error, so the box had nothing to show.
+ */
+let reported: { error: unknown } | null = null;
+
+/** Wraps window.reportError (before React's modules read it) to keep what it is handed. */
+function keepReported(): void {
+  const original = (window as { reportError?: (e: unknown) => void }).reportError;
+  if (typeof original !== "function") return;
+  window.reportError = (error: unknown) => {
+    const outer = reported;
+    reported = { error };
+    try {
+      original.call(window, error);
+    } finally {
+      reported = outer;
+    }
+  };
+}
+
+/** What the box says for an error the browser hid from the page entirely. */
+const HIDDEN_ERROR =
+  "Script error. The browser hid this error's message: it was thrown inside code of another origin (React or @cf/ui running the page's components). " +
+  "Look for a value the page passes them that can be null or undefined (cf.thread is null on a page no thread owns).";
+
 /** Uncaught errors (a render that throws, a rejected promise) once the page's code runs. */
 function watchErrors(): void {
+  keepReported();
   window.addEventListener("error", (e) => {
     if (e.message.startsWith("ResizeObserver loop")) return;
-    report("Uncaught error", e.error instanceof Error ? detail(e.error) : e.message, e.error);
+    const err: unknown = e.error ?? reported?.error ?? null;
+    if (err instanceof Error) report("Uncaught error", detail(err), err);
+    else if (err === null && /^Script error\.?$/.test(e.message)) report("Uncaught error", HIDDEN_ERROR);
+    else report("Uncaught error", e.message, err);
   });
   window.addEventListener("unhandledrejection", (e) => {
     report("Unhandled rejection", e.reason instanceof Error ? detail(e.reason) : String(e.reason), e.reason);

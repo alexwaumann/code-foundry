@@ -87,7 +87,7 @@
       }
       return ["Finished", "text-cf-success-text"];
     };
-    const rows = threads.filter((t) => t.createdBy === cf.thread.id && !t.archivedAtMs).sort((a, b) => a.createdAtMs - b.createdAtMs);
+    const rows = threads.filter((t) => t.createdBy === cf.thread?.id && !t.archivedAtMs).sort((a, b) => a.createdAtMs - b.createdAtMs);
     return (
       <div className="mt-3 rounded-lg border border-cf-border bg-cf-surface-sunken p-3">
         <div className="flex items-center justify-between">

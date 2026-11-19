@@ -60,6 +60,8 @@ const { EMBER_OFF_SCREEN } = await import("./bridgeSources");
 const cmd = (name: string, over: Partial<CommandView> = {}): CommandView => ({ name, title: name, description: "", category: "Thread", args: [], keybindings: [], available: true, ...over });
 const commands = [
   cmd("thread.list", { readOnly: true }),
+  cmd("thread.wait", { readOnly: true }),
+  cmd("file.export"),
   cmd("ui.notify"),
   cmd("thread.new", {
     args: [
@@ -148,7 +150,9 @@ describe("bridge host", () => {
     await vi.waitFor(() => {
       expect(posts).toHaveLength(1);
     });
-    expect(posts[0]).toMatchObject({ type: "cf:ready", cf: 1, thread: { id: "t-1", name: "Fix stale badge" }, readOnly: ["thread.list"] });
+    expect(posts[0]).toMatchObject({ type: "cf:ready", cf: 1, thread: { id: "t-1", name: "Fix stale badge" }, readOnly: ["thread.list", "thread.wait"] });
+    // Every command's name, so the page knows a misspelt one from one that needs a click.
+    expect(posts[0]?.verbs).toEqual(["file.export", "thread.archive", "thread.list", "thread.new", "thread.wait", "ui.notify", "workspace.members"]);
     expect(listCommands).toHaveBeenCalledWith({ activeTerminalId: "", activeThreadId: "t-1", activeProjectId: "", activeWorktreePath: "", activeView: "", activeWorkspaceId: "", origin: "page" }, { includeUnavailable: true });
   });
 
@@ -289,9 +293,31 @@ describe("bridge host", () => {
     await vi.waitFor(() => {
       expect(posts.filter((p) => p.type === "cf:result").map((p) => [p.id, p.ok])).toEqual(expect.arrayContaining([["a", false], ["b", false], ["c", true]]));
     });
-    expect(posts.find((p) => p.id === "a")).toMatchObject({ error: { code: "gesture" } });
+    expect(posts.find((p) => p.id === "a")).toMatchObject({ error: { code: "gesture", message: expect.stringContaining("within 5 s of a click") as unknown } });
+    // A name that is no command says so, and the strip shows it: no click would help.
+    expect(posts.find((p) => p.id === "b")).toMatchObject({ error: { code: "unavailable", message: expect.stringContaining('unknown command "nope.nope"') as unknown } });
     expect(invokeCommand.mock.calls.map((c) => c[0] as string)).toEqual(["thread.list"]);
-    expect(errors).toEqual([]);
+    expect(errors).toEqual([expect.objectContaining({ call: "nope.nope", code: "unavailable" })]);
+  });
+
+  it("answers a name that is no command as unknown from a click too, without asking the daemon", async () => {
+    const { h, posts } = host();
+    h.receive(run("a", "thread.lst"));
+    await vi.waitFor(() => {
+      expect(posts.at(-1)).toMatchObject({ type: "cf:result", id: "a", ok: false, error: { code: "unavailable" } });
+    });
+    expect(invokeCommand).not.toHaveBeenCalled();
+  });
+
+  it("leaves a name to the daemon when the commands could not be listed", async () => {
+    listCommands.mockRejectedValue(new Error("daemon away"));
+    invokeCommand.mockRejectedValue(new ConnectError('unknown command "thread.lst"', Code.NotFound));
+    const { h, posts } = host();
+    h.receive(run("a", "thread.lst"));
+    await vi.waitFor(() => {
+      expect(posts.at(-1)).toMatchObject({ type: "cf:result", id: "a", ok: false, error: { code: "unavailable" } });
+    });
+    expect(invokeCommand).toHaveBeenCalled();
   });
 
   it("judges the user's presence when the call arrives, not after it looked the verb up", async () => {
@@ -577,7 +603,7 @@ describe("bridge host", () => {
     await vi.waitFor(() => {
       expect(posts).toHaveLength(3);
     });
-    expect(posts).toContainEqual({ type: "cf:ready", cf: 1, thread: null, theme: expect.anything() as unknown, readOnly: [], sources: [], storage: {}, can: { storage: false, fetch: false }, refusal: "this page is not shown in a thread" });
+    expect(posts).toContainEqual({ type: "cf:ready", cf: 1, thread: null, theme: expect.anything() as unknown, readOnly: [], verbs: [], sources: [], storage: {}, can: { storage: false, fetch: false }, refusal: "this page is not shown in a thread" });
     const refusal = { ok: false, error: { code: "unavailable", message: "this page is not shown in a thread" } };
     expect(posts).toContainEqual({ type: "cf:result", id: "r", ...refusal });
     expect(posts).toContainEqual({ type: "cf:result", id: "s", ...refusal });
@@ -821,7 +847,7 @@ describe("bridge host: a page no thread owns", () => {
     await vi.waitFor(() => {
       expect(posts).toHaveLength(1);
     });
-    expect(posts[0]).toMatchObject({ type: "cf:ready", thread: null, readOnly: ["thread.list"], storage: { n: "3" }, can: { storage: true, fetch: true }, refusal: "" });
+    expect(posts[0]).toMatchObject({ type: "cf:ready", thread: null, readOnly: ["thread.list", "thread.wait"], storage: { n: "3" }, can: { storage: true, fetch: true }, refusal: "" });
     expect((posts[0] as { sources: string[] }).sources).toContain("thread");
     // The commands are listed with no thread in the context, as the CLI outside one.
     expect(listCommands).toHaveBeenCalledWith(expect.objectContaining({ activeThreadId: "", origin: "page" }), { includeUnavailable: true });

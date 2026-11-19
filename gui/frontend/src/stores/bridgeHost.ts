@@ -24,8 +24,10 @@
  *
  * A verb that is not read-only runs only while the user is in the frame
  * (BridgeFrame.userPresent), whatever the page's script checked: past that it answers
- * `gesture`. A run that has to ask the user tells the page (`cf:pending`) as its question
- * is queued, so the page's clock stops until the answer (`cf:resume`); a page that gives up
+ * `gesture`. A name that is no command is answered `unavailable` first, gesture or not:
+ * cf:ready names every command, so the page sends such a call here instead of asking for
+ * a click it does not need. A run that has to ask the user tells the page (`cf:pending`)
+ * as its question is queued, so the page's clock stops until the answer (`cf:resume`); a page that gives up
  * (`cf:cancel`), or goes, takes its question with it, declined, and the command never runs.
  * A question is guarded (stores/confirm.ts). A frame has one open at a time. A question the
  * user did not say yes to (a no, a dismiss, the page giving up) holds the next back
@@ -65,12 +67,14 @@ import {
   fillPageArgs,
   isBridgeSource,
   jsonSafe,
+  needsGesture,
   needsThread,
   NO_THREAD,
   NOT_ALLOWED,
   okResult,
   parsePageMessage,
   readyMessage,
+  unknownVerb,
   type AskingMessage,
   type BridgeError,
   type BridgeErrorCode,
@@ -387,7 +391,7 @@ export function createBridgeHost(frame: BridgeFrame): BridgeHost {
     }
     const access = m.kind === "thread" ? { kind: "thread" as const, thread: { id: m.id, name: useThreadsStore.getState().byId[m.id]?.name ?? "" } } : { kind: "page" as const };
     const verbs = listed().then(
-      (cmds) => cmds.filter((c) => c.readOnly).map((c) => c.name),
+      (cmds) => cmds,
       () => [],
     );
     // A storage the daemon cannot read now reads as empty; a write still goes through. The
@@ -396,8 +400,9 @@ export function createBridgeHost(frame: BridgeFrame): BridgeHost {
       stale();
       return {};
     });
-    void Promise.all([verbs, storage]).then(([readOnly, values]) => {
-      post(forDoc, readyMessage(access, publishedTheme(), readOnly, values));
+    void Promise.all([verbs, storage]).then(([cmds, values]) => {
+      const readOnly = cmds.filter((c) => c.readOnly).map((c) => c.name);
+      post(forDoc, readyMessage(access, publishedTheme(), readOnly, values, cmds.map((c) => c.name)));
     });
   };
 
@@ -507,12 +512,16 @@ export function createBridgeHost(frame: BridgeFrame): BridgeHost {
     running.set(id, abort);
     const asked = { declined: false, refused: null as BridgeError | null, started: false };
     try {
-      const spec = await listed().then(
-        (cmds) => cmds.find((c) => c.name === verb),
-        () => undefined,
-      );
+      const cmds = await listed().catch(() => []);
+      const spec = cmds.find((c) => c.name === verb);
+      // A name that is no command says so, not that it needs a click (the daemon would say the
+      // same after one). No list (the daemon did not answer) leaves the name to the daemon.
+      if (cmds.length > 0 && !spec) {
+        fail(forDoc, id, verb, unknownVerb(verb));
+        return;
+      }
       if (!present && !spec?.readOnly) {
-        fail(forDoc, id, verb, { code: "gesture", message: `${verb} changes something, so it runs only from a click or key press in the page` });
+        fail(forDoc, id, verb, needsGesture(verb));
         return;
       }
       const cwd = tid ? (useThreadsStore.getState().byId[tid]?.worktreePath ?? "") : "";

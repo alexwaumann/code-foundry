@@ -115,7 +115,7 @@ Imports (`/cf/jsx.js` maps them; nothing else resolves, no other package exists)
     const [error, setError] = useState("");
     useEffect(() => cf.on("thread-list", (list: Thread[]) => { setThreads(list); setError(""); }, (e) => setError(e.message)), []);
     // Stable order (by id), live ones only, never this page's own thread.
-    const live = threads.filter((t) => !t.archivedAtMs && t.id !== cf.thread.id).sort((a, b) => a.id.localeCompare(b.id));
+    const live = threads.filter((t) => !t.archivedAtMs && t.id !== cf.thread?.id).sort((a, b) => a.id.localeCompare(b.id));
     const groups = { all: live, attention: live.filter((t) => t.status === "attention" || t.status === "error") };
     return (
       <Card className="m-3">

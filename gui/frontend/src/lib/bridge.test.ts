@@ -110,6 +110,7 @@ describe("replies", () => {
       thread: { id: "t", name: "Fix" },
       theme,
       readOnly: ["action.list", "thread.list"],
+      verbs: ["action.list", "thread.list"],
       sources: [...BRIDGE_SOURCES],
       storage: { n: "3" },
       can: { storage: true, fetch: true },

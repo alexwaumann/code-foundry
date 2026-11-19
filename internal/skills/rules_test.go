@@ -81,7 +81,7 @@ var rules = []rule{
 	{note: "bridge-fix-c-daemon", file: sourcesRef, says: []string{"thread_status_idle", "atms", `new date\(ms\)`}},
 	// Pages of `--yes` lines to copy, and an API key left in localStorage (the note's page
 	// tasks): the page's own thread, its confirmations, its bulk actions, a password field.
-	{note: "bridge-3-skill", file: pagesFile, says: []string{`promise\.all`, "on change, not input", "never pass yes or force", `id: cf\.thread\.id`, `"created-by": ""`, "password field"}},
+	{note: "bridge-3-skill", file: pagesFile, says: []string{`promise\.all`, "on change, not input", "never pass yes or force", `id: cf\.thread\?\.id`, `"created-by": ""`, "password field"}},
 	// localStorage does not outlive the app.
 	{note: "bridge-fix-storage", file: pagesFile, says: []string{`cf\.storage\(`, `localstorage.{0,40}cleared`}},
 	// A model told the user to paste a key into the file by hand.

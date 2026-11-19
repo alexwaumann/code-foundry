@@ -39,6 +39,9 @@ $P cli eval '() => window.__cfModule("/src/stores/ui.ts").then((m) => m.useUiSto
 ```
 
 - Snapshots go stale after the DOM changes: snapshot again before reusing refs.
+- A React page (`/cf/jsx.js`) imports each script from a `blob:` URL, which the origin allowlist
+  blocks ("Importing a module script failed"). Once per `open`, before showing one:
+  `$P cli run-code "async page => page.context().route(u => u.protocol === 'blob:', r => r.continue())"`.
 - `window.__cfModule(path)` gives `src/stores/*.ts` and `src/api/*.ts` (dev builds only).
 - Mock mode: script state through the mock's `/__mock/*` endpoints (see `mock/server.ts`),
   e.g. `curl -X POST "http://127.0.0.1:$DRIVE_DAEMON_PORT/__mock/thread/status?id=s-1&status=attention"`

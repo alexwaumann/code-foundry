@@ -100,7 +100,7 @@ in flight or a decline stays on its row while the list updates.
 ```
 
 Keep one button per PR: `pr.merge` asks each time, and a page has one question open at a
-time, so a loop over several gets the first asked and the rest refused `invalid`.
+time, so a loop over several gets one of them asked and the rest refused `invalid`.
 
 ## Something small in plain HTML: one live figure
 

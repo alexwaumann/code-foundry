@@ -22,10 +22,10 @@ Args by name, values after them in plain text; `code-foundry help <verb>` has th
 | `usage.show` (read) | `thread` an id, or `all` true |
 | `composer.stage` | `text` goes in the composer for the user to send (never sent); `thread` defaults to this one |
 | `project.add` | no args opens the Add Project dialog; `path` adds a folder without it (shows the user a dialog) |
-| `view.open.page` | `path` an .html page opens as a tab beside this thread only (no card), with this bridge; `title` names its tab |
+| `view.open.page` | `path` an absolute .html path (write it into the page: its location is not it) opens as a tab beside this thread only (no card), with this bridge; `title` names its tab |
 | `view.settings` | `page` general, appearance, memory, plugins, skills…; an unknown one lists them |
 | `theme.reset` | `slot` dark or light (default: the one in use) back to the default theme; the user's themes stay |
-| `file.export` (asks first) | `path` a file name, or a path in this thread's checkout to a folder that exists (no name starting with a dot); `text`, or `base64` for bytes; at most 256 KiB; replacing a file asks again |
+| `file.export` (asks first) | `path` a file name, or a path in this thread's checkout to a folder that exists (no name starting with a dot); `text`, or `base64` for bytes; at most 256 KiB of call (about 190 KiB as `base64`); replacing a file asks again |
 
 A page cannot download: an Export button saves into this thread's checkout, and the result's
 `json.path` says where. Build the contents in the handler and show the path:

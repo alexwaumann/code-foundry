@@ -13,7 +13,7 @@
  *   cf.storage(prefix?)           the page's storage, kept across app restarts
  *   cf.fetch(url, init?)          Promise of {status, ok, headers, text(), json()}; the app makes it: no CORS
  *
- * A verb that is not read-only runs only from a user gesture in the page (a click, a key).
+ * A verb that is not read-only runs only within 5 s of a click or key press in the page.
  * Every call is a postMessage to the app, which runs it as the page's thread would. A call
  * waiting on the app's confirm dialog does not time out; cf.on throws for an unknown source.
  * At most 32 runs and fetches are at the app at once (more wait here, their timeouts running)
@@ -189,14 +189,18 @@
     try {
       if (typeof verb !== "string" || verb === "") throw cfError("invalid", "verb must be a command name");
       clean = normalizeArgs(args);
-      if (tooLarge({ type: "cf:run", verb: verb, args: clean })) throw cfError("invalid", verb + ": the args are too large (256 KiB at most)");
+      if (tooLarge({ type: "cf:run", verb: verb, args: clean })) throw cfError("invalid", verb + ": the args are too large: 256 KiB of text at most, all together (base64 makes bytes a third larger)");
     } catch (e) {
       return Promise.reject(e);
     }
     return whenReady(READY_MS).then(function () {
-      if (!readOnly[verb] && !gesture) {
-        throw cfError("gesture", verb + " changes something, so it runs only from a click or key press in the page");
-      }
+      // Only a command the app has (cf:ready's verbs; none from an older app, or one that could
+      // not list them, and then every name) needs the gesture: the app answers a name that is
+      // no command, and every call of a page it refused, saying so, instead of sending the
+      // page after a click it does not need.
+      var verbs = readyMsg.verbs;
+      var known = !Array.isArray(verbs) || verbs.length === 0 || verbs.indexOf(verb) >= 0;
+      if (!readOnly[verb] && !gesture && known && !readyMsg.refusal) throw gestureError(verb);
       return new Promise(function (resolve, reject) {
         var id = nextId();
         var p = { resolve: resolve, reject: reject, timer: 0, left: timeout, until: 0, verb: verb, total: timeout, msg: { type: "cf:run", id: id, verb: verb, args: clean }, sent: false };
@@ -206,6 +210,15 @@
         pump();
       });
     });
+  }
+
+  function gestureError(verb) {
+    return cfError("gesture", verb + " changes something, so it runs only within 5 s of a click or key press in the page: start it in the handler, before slow awaits");
+  }
+
+  // A run's timeout as its error says it: whole seconds, tenths under 10 s ("1.5 s", not "2 s").
+  function seconds(ms) {
+    return ms >= 10000 ? String(Math.round(ms / 1000)) : String(Math.round(ms / 100) / 10);
   }
 
   // Posts waiting runs while fewer than MAX_RUNS are at the app.
@@ -242,7 +255,7 @@
       if (pending[id] !== p) return;
       if (p.sent) post({ type: "cf:cancel", id: id });
       done(id, p);
-      p.reject(cfError("timeout", p.verb + " did not answer in " + Math.round(p.total / 1000) + " s"));
+      p.reject(cfError("timeout", p.verb + " did not answer in " + seconds(p.total) + " s"));
     }, p.left);
   }
 
@@ -472,15 +485,17 @@
   }
 
   // One write through to the app (cf:store; text null removes), applied here at once. A
-  // refusal (the storage is full) rejects, and the app's cf:storage after it puts back
-  // what is stored.
+  // refusal (the storage is full, the key too long) rejects with what was there put back,
+  // so keys() and clear() right after it do not see the refused key; the app's cf:storage
+  // after it puts back what is stored.
   function write(key, text) {
+    var before = stored[key];
     if (text === null) delete stored[key];
     else stored[key] = text;
     writing[key] = (writing[key] || 0) + 1;
     var id = nextId();
     var done = new Promise(function (resolve, reject) {
-      stores[id] = { key: key, resolve: resolve, reject: reject };
+      stores[id] = { key: key, before: before, resolve: resolve, reject: reject };
     });
     done.catch(function (e) {
       if (window.console) console.error("cf.storage: " + e.message);
@@ -539,8 +554,16 @@
     if (w) {
       delete stores[id];
       if (--writing[w.key] <= 0) delete writing[w.key];
-      if (msg.ok) w.resolve();
-      else w.reject(cfError((msg.error && msg.error.code) || "failed", (msg.error && msg.error.message) || "cannot store " + w.key));
+      if (msg.ok) {
+        w.resolve();
+        return;
+      }
+      // Refused, and no later write of the key in flight (its value stays): the key as it was.
+      if (!writing[w.key]) {
+        if (w.before === undefined) delete stored[w.key];
+        else stored[w.key] = w.before;
+      }
+      w.reject(cfError((msg.error && msg.error.code) || "failed", (msg.error && msg.error.message) || "cannot store " + w.key));
       return;
     }
     var p = pending[id];
@@ -749,7 +772,10 @@
     return u.href;
   }
 
-  var nav = window.navigation;
+  // A document of an opaque origin (the sandbox of a page no thread owns) has the Navigation
+  // API's events turned off (HTML: "has entries and events disabled"): no navigate event comes,
+  // so it carries the nonce on a followed link, as a browser without the API does.
+  var nav = window.origin === "null" ? null : window.navigation;
   if (nav && typeof nav.addEventListener === "function") {
     nav.addEventListener("navigate", function (e) {
       // A form's POST would turn into a GET; a reload or a step back keeps its own URL.

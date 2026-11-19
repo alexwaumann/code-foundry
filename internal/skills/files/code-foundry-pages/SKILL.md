@@ -87,8 +87,8 @@ stylesheets, keep `/cf/bridge.js`, and read `reference/react.md`.
   in the handler: `await Promise.all(items.map((x) => cf.run(…)))`; a slider on `change`, not `input`.
 - **The app asks the user** before a verb that needs it, and before any that runs a program, saves a file, writes to git or GitHub or installs code (`terminal.new` with `argv`, `action.run`, `pr.comment`, a plugin's own): its own dialog shows the call over the page. Add no `confirm()`. One question at a time, 5 s apart, 3 a minute; past that a call rejects `invalid`, so ask from one button, not a loop.
 - **On success** update that row from the result at once in your own words: never print `text`.
-- **This thread**: pass `id` (`id: cf.thread.id` for the page's own: without one, archive, remove and snooze
-  refuse it). Leave `cf.thread.id` out of lists of threads to act on: archiving it closes the page.
+- **This thread**: pass `id` (`id: cf.thread?.id` for the page's own: without one, archive, remove and snooze
+  refuse it). Leave `cf.thread?.id` out of lists of threads to act on: archiving it closes the page.
 - **Threads a page starts** (`thread.new`) are this thread's hidden children (`"created-by": ""` and a `project` id: the user's own,
   in their sidebar); pass a `prompt`, and a `request-id` per row: a second click then resolves with the same thread, a success.
 - **Errors**: catch every `cf.run` and show `e.message` where it happened (that row, that button), never in `alert()`: it shows nothing in the app.

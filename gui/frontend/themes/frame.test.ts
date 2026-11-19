@@ -15,6 +15,12 @@ describe("frame stylesheet", () => {
     expect(fs.readFileSync(PATHS.frameDefaults, "utf8")).toBe(frameDefaultsJson(buildCatalog(readInputs())));
   });
 
+  // ui.css opens `properties` (its --tw-* fallbacks where @supports finds no margin-trim) after
+  // this statement: unnamed here it would sort above utilities and undo translate, shadow, ring.
+  it("names Tailwind's layer order, properties first, before anything ui.css opens", () => {
+    expect(frameCss(indexCss)).toContain("\n@layer properties, theme, base, components, utilities;\n");
+  });
+
   it("aliases every component name to its slot, as index.css does", () => {
     const css = frameCss(indexCss);
     for (const [name, slot] of Object.entries(COMPONENT_ALIASES)) expect(css).toContain(`  ${name}: var(${slot});\n`);
