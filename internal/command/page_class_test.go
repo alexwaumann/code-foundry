@@ -61,7 +61,7 @@ var pageState = []string{
 	"thread.find.next", "thread.find.previous", "thread.flag.clear", "thread.focus", "thread.fork",
 	"thread.label", "thread.move.open", "thread.next", "thread.pin", "thread.pr.link",
 	"thread.previous", "thread.regenerate-name", "thread.remove", "thread.rename", "thread.report",
-	"thread.setup.cancel", "thread.setup.discard", "thread.shell.stop", "thread.snooze", "thread.snooze.clear",
+	"thread.setup.cancel", "thread.setup.discard", "thread.shell.stop", "thread.snooze", "thread.snooze.clear", "thread.unread",
 	"thread.unsubscribe", "ui.focus.project", "ui.focus.terminal", "ui.notify", "ui.palette.open",
 	"view.back", "view.forward", "view.help", "view.inline", "view.open.diff",
 	"view.open.file", "view.open.gallery", "view.open.mcp", "view.open.page", "view.open.pr", "view.open.url",

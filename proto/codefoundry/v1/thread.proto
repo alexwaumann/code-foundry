@@ -159,6 +159,13 @@ service ThreadService {
   // "at prompt", as a re-snooze or an archive does, without putting it away again.
   // cleared is false, and nothing changes, when the thread is not woken. Persisted.
   rpc ClearSnoozeEnded(ClearSnoozeEndedRequest) returns (ClearSnoozeEndedResponse) {}
+  // MarkUnread puts an idle thread at its prompt back into NEEDS_ATTENTION "finished",
+  // the status of a turn that ended unseen (the sidebar's Done), cleared as that one is:
+  // a new view, the thread gaining the focus, a message or a new turn. A view already
+  // open does not clear it. FAILED_PRECONDITION for any other thread (working, starting,
+  // setting up, asking, in error, needing attention, waiting, archived, snoozed, saved).
+  // Fires no wake. Persisted. docs/notes/thread-mark-unread.md.
+  rpc MarkUnread(MarkUnreadRequest) returns (MarkUnreadResponse) {}
   // Label adds and removes a thread's labels (clear first, then remove, then add) and
   // returns the thread. Any state. Persisted. See docs/notes/agents-2-metadata.md.
   rpc Label(LabelThreadRequest) returns (LabelThreadResponse) {}

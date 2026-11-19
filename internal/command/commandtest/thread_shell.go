@@ -2,6 +2,7 @@ package commandtest
 
 import (
 	"context"
+	"errors"
 
 	"connectrpc.com/connect"
 
@@ -39,4 +40,18 @@ func (s *Thread) ClearSnoozeEnded(_ context.Context, r *connect.Request[v1.Clear
 	}
 	cur.Status, cur.StatusReason = v1.ThreadStatus_THREAD_STATUS_IDLE, "at prompt"
 	return connect.NewResponse(&v1.ClearSnoozeEndedResponse{Thread: cur, Cleared: true}), nil
+}
+
+// MarkUnread returns Current, needs attention "finished" when it was idle "at prompt";
+// FailedPrecondition otherwise, as the daemon.
+func (s *Thread) MarkUnread(_ context.Context, r *connect.Request[v1.MarkUnreadRequest]) (*connect.Response[v1.MarkUnreadResponse], error) {
+	if err := s.do(r.Msg); err != nil {
+		return nil, err
+	}
+	cur := s.current(r.Msg.GetId())
+	if cur.GetStatus() != v1.ThreadStatus_THREAD_STATUS_IDLE || cur.GetStatusReason() != "at prompt" {
+		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("thread is not idle at its prompt"))
+	}
+	cur.Status, cur.StatusReason = v1.ThreadStatus_THREAD_STATUS_NEEDS_ATTENTION, "finished"
+	return connect.NewResponse(&v1.MarkUnreadResponse{Thread: cur}), nil
 }

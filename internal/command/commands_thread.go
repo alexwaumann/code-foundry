@@ -73,6 +73,8 @@ type ThreadBackend interface {
 	ShellBackend
 	// SnoozeClearBackend backs thread.snooze.clear (commands_thread_snooze_clear.go).
 	SnoozeClearBackend
+	// UnreadBackend backs thread.unread (commands_thread_unread.go).
+	UnreadBackend
 	// StopWaitingBackend backs thread.stop-waiting (commands_thread_stop_waiting.go).
 	StopWaitingBackend
 	// WorkspaceRefBackend backs thread.workspace (commands_thread_workspace.go).

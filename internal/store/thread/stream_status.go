@@ -46,6 +46,10 @@ type streamStatus struct {
 	budget, budgetEnded bool
 	// wakeLimit: wakes to the thread are being dropped (subscriptions_fire.go).
 	wakeLimit bool
+	// held: the user marked the thread unread (unread.go): "finished" again, and the
+	// viewer already there does not see it. A new viewer, the thread gaining the focus,
+	// a message or a new turn end the hold.
+	held bool
 }
 
 type pendingReason struct{ id, reason string }
@@ -79,7 +83,7 @@ func (d *streamStatus) Status() (Status, string) {
 // once its turn ended): the user has seen it. clearedWhenSeen is the same list for a
 // thread with no runner.
 func (d *streamStatus) Acknowledge() {
-	d.unseen, d.turnError, d.wakeLimit = false, "", false
+	d.unseen, d.turnError, d.wakeLimit, d.held = false, "", false, false
 	if d.budgetEnded {
 		d.budget, d.budgetEnded = false, false
 	}
@@ -97,11 +101,15 @@ func (d *streamStatus) midTurn() bool {
 
 func (d *streamStatus) initialized() { d.started = true }
 
+// markUnread: the user marks the idle thread unread (Manager.MarkUnread): "finished"
+// as a turn that ended unseen, held against the viewer already there.
+func (d *streamStatus) markUnread() { d.unseen, d.turnError, d.held = true, "", true }
+
 // sent: a message went to Claude. The user's own message also clears the wake-limit
 // stop (they have seen it); a wake does not, so a wake queued behind the handshake
 // cannot clear a limit raised while it waited (TestWakeLimit).
 func (d *streamStatus) sent(byUser bool) {
-	d.busy = true
+	d.busy, d.held = true, false
 	d.budget, d.budgetEnded = false, false
 	if byUser {
 		d.wakeLimit = false
@@ -111,7 +119,7 @@ func (d *streamStatus) sent(byUser bool) {
 // turnStarted: Claude works (again); a budget stop whose turn ended gives way to a turn
 // Claude starts on its own (a background task's notification).
 func (d *streamStatus) turnStarted() {
-	d.busy = true
+	d.busy, d.held = true, false
 	if d.budgetEnded {
 		d.budget, d.budgetEnded = false, false
 	}

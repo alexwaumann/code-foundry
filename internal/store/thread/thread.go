@@ -723,6 +723,11 @@ type Store interface {
 	// into idle at its prompt, persisted; cleared is false, and nothing changes, when the
 	// thread is not woken.
 	ClearSnoozeEnded(ctx context.Context, id string) (t Thread, cleared bool, err error)
+	// MarkUnread puts an idle thread at its prompt back into NeedsAttention "finished",
+	// the status of a turn that ended unseen, persisted (unread.go). Anything else is
+	// ErrFailedPrecondition: working, starting, setting up, asking, in error, already
+	// needing attention, waiting, archived, snoozed or saved.
+	MarkUnread(ctx context.Context, id string) (Thread, error)
 	// SaveForLater snoozes a thread with no wake time: everything Snooze does, but it
 	// sets SavedAt (kept when already set) and clears SnoozedUntil, and nothing wakes it.
 	SaveForLater(ctx context.Context, id string) (Thread, error)

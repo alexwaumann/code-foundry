@@ -822,6 +822,9 @@ func (m *Manager) addViewer(id string, d int) {
 		delete(m.viewers, id)
 	}
 	rec, ok := m.recs[id]
+	if ok && d > 0 {
+		rec.unreadHold = false // a new view sees a thread marked unread (unread.go)
+	}
 	if ok && d > 0 && m.attended() {
 		// The user opened the thread while looking at the app. Otherwise it is seen once
 		// presence is attended (attended.go).

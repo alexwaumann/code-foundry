@@ -63,3 +63,36 @@ func TestStreamStatus(t *testing.T) {
 		})
 	}
 }
+
+// A mark (markUnread) is "finished" held against the viewer there: Acknowledge, a
+// message and a new turn end the hold, and the turn after a message ends unseen as ever.
+func TestStreamStatusMarkUnread(t *testing.T) {
+	result := func(d *streamStatus) { d.event(claudestream.Parse([]byte(`{"type":"result","subtype":"success"}`))) }
+	tests := []struct {
+		name     string
+		after    func(*streamStatus)
+		held     bool
+		want     Status
+		reason   string
+		wantSeen bool // unseen is false
+	}{
+		{"marked", func(*streamStatus) {}, true, StatusNeedsAttention, "finished", false},
+		{"acknowledged", (*streamStatus).Acknowledge, false, StatusIdle, "at prompt", true},
+		{"a message", func(d *streamStatus) { d.sent(true) }, false, StatusBusy, "working", false},
+		{"a wake", func(d *streamStatus) { d.sent(false) }, false, StatusBusy, "working", false},
+		{"a turn Claude starts", (*streamStatus).turnStarted, false, StatusBusy, "working", false},
+		{"a message's turn ends", func(d *streamStatus) { d.sent(true); result(d) }, false, StatusNeedsAttention, "finished", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			d := &streamStatus{}
+			d.initialized()
+			d.markUnread()
+			tt.after(d)
+			st, reason := d.Status()
+			if st != tt.want || reason != tt.reason || d.held != tt.held || !d.unseen != tt.wantSeen {
+				t.Errorf("got %s %q held=%v unseen=%v", st, reason, d.held, d.unseen)
+			}
+		})
+	}
+}

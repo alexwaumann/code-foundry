@@ -40,6 +40,7 @@ export const THREAD_COMMANDS = {
   archive: "thread.archive",
   snooze: "thread.snooze",
   clearSnoozeEnded: "thread.snooze.clear",
+  markUnread: "thread.unread",
   runIn: "thread.run-in",
   send: "thread.send",
   compact: "thread.compact",
@@ -118,6 +119,14 @@ export function snoozeThread(id: string, untilMs: number | null, source: Command
  */
 export function clearSnoozeEnded(id: string, source: CommandSource = {}): Promise<boolean> {
   return runCommand(THREAD_COMMANDS.clearSnoozeEnded, {}, threadContext(id), source);
+}
+
+/**
+ * thread.unread ("Mark as unread"): an idle thread goes back to Done, as after a turn the user
+ * has not seen, until they open or focus it again (docs/notes/thread-mark-unread.md).
+ */
+export function markThreadUnread(id: string, source: CommandSource = {}): Promise<boolean> {
+  return runCommand(THREAD_COMMANDS.markUnread, {}, threadContext(id), source);
 }
 
 /**

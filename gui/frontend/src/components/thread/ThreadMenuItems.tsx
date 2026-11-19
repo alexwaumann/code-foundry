@@ -4,6 +4,7 @@ import { ProjectIcon } from "@/components/icons/ProjectKindIcon";
 import { SnoozePresetItems } from "@/components/snooze/SnoozeMenu";
 import { beginRename } from "@/keys/bindings";
 import { WORKSPACE_FOLDER } from "@/lib/projectSet";
+import { canMarkUnread } from "@/lib/markUnread";
 import { isSnoozed } from "@/lib/snooze";
 import { canNewLike, canRunElsewhere, worktreeBranch } from "@/lib/threadRow";
 import { isUnplaced, setupUnfinished } from "@/lib/threadSetup";
@@ -12,7 +13,7 @@ import { composeLike } from "@/stores/compose";
 import { openMovePicker } from "@/stores/movePicker";
 import { useProjectsStore } from "@/stores/projects";
 import { openSaveWorkspace, useCanSaveAsWorkspace } from "@/stores/saveWorkspace";
-import { archiveThread, forkThread, pinThread, regenerateThreadName, removeThread, runThreadIn, snoozeThread, threadContext } from "@/stores/threadActions";
+import { archiveThread, forkThread, markThreadUnread, pinThread, regenerateThreadName, removeThread, runThreadIn, snoozeThread, threadContext } from "@/stores/threadActions";
 import { useThreadsStore } from "@/stores/threads";
 import { useWorkspacesStore } from "@/stores/workspaces";
 import { markInPlace, markMovePicking, type MenuKit } from "./menuKit";
@@ -90,7 +91,8 @@ function RunInMenu({ kit, threadId }: { kit: MenuKit; threadId: string }) {
  * A thread's menu items, one list for the sidebar row's context menu (RowMenu) and the
  * thread header's title menu (ThreadTitleMenu), each item a registry command (or the inline
  * rename that commits one): Rename, Regenerate name (not for a resident thread; disabled while
- * a naming call runs), Move to project… (a thread without a project: the move picker), Pin, Snooze ▸ (and Unsnooze while snoozed); New
+ * a naming call runs), Move to project… (a thread without a project: the move picker), Pin, Snooze ▸ (and Unsnooze while snoozed),
+ * Mark as unread (a thread idle at its prompt: lib/markUnread); New
  * thread on this branch, Save as workspace, Run in ▸, Restart Claude (while a plugin's
  * environment changed since Claude started: thread.restart); Archive, then `afterArchive` (the
  * header's and the tab's Close); Fork (not for a setup that did not finish; disabled once the
@@ -98,7 +100,7 @@ function RunInMenu({ kit, threadId }: { kit: MenuKit; threadId: string }) {
  *
  * Success toasts (docs/notes/toast-success-rule.md): none where both menus' places show the
  * result (Regenerate name: the row and the tab; Unsnooze: the row and the pane's snooze
- * strip; Run in: the row and the header's chip). Pin, Snooze, Save for later and
+ * strip; Run in: the row and the header's chip). Pin, Snooze, Save for later, Mark as unread and
  * Archive show only in the sidebar row (a snooze closes the thread's tab): silent from the
  * row's menu, toasted from the header's (kit.rowInView); Remove likewise. Restart Claude shows
  * nowhere and toasts from both. Fork selects the new thread, which shows it.
@@ -119,6 +121,8 @@ export function ThreadMenuItems({ id, kit, afterArchive }: { id: string; kit: Me
     return t !== undefined && isSnoozed(t);
   });
   const stale = useThreadsStore((s) => s.byId[id]?.pluginEnvStale ?? false);
+  // The daemon's rule (lib/markUnread): only a thread idle at its prompt goes back to Done.
+  const markable = useThreadsStore((s) => canMarkUnread(s.byId[id]));
   // The palette's and the daemon's rules (lib/threadRow): somewhere else to run; a project or workspace to copy.
   // A setup that did not finish takes neither: the daemon refuses Run in and Snooze as above, and New thread on this branch while there is no branch.
   const unfinished = useThreadsStore((s) => setupUnfinished(s.byId[id]?.setup));
@@ -203,6 +207,18 @@ export function ThreadMenuItems({ id, kit, afterArchive }: { id: string; kit: Me
           }}
         >
           Unsnooze
+        </kit.Item>
+      )}
+      {markable && (
+        <kit.Item
+          data-testid="menu-mark-unread"
+          onSelect={() => {
+            markInPlace(kit, id);
+            // Done again in the sidebar row.
+            void markThreadUnread(id, { inView: kit.rowInView });
+          }}
+        >
+          Mark as unread
         </kit.Item>
       )}
       {second && <kit.Separator />}

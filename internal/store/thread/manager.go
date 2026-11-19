@@ -438,6 +438,9 @@ type record struct {
 	lateMoveName string
 	// setup is the thread's setup stage while one runs (setup_run.go).
 	setup *setupJob
+	// unreadHold: the user marked the stopped thread unread (unread.go), and the viewer
+	// already there does not see it until a new viewer or the focus. In memory only.
+	unreadHold bool
 }
 
 var _ Store = (*Manager)(nil)
@@ -1054,6 +1057,7 @@ func (m *Manager) spawn(ctx context.Context, id string, l launch) error {
 		return errSetupCancelled
 	}
 	rec.run = r
+	rec.unreadHold = false // the runner's status starts afresh (unread.go)
 	rec.release()
 	if rec.s.SettingUp() {
 		rec.s.Setup = rec.s.Setup.done(now) // with the process, in one commit (setup.go)
@@ -1456,6 +1460,7 @@ func (m *Manager) detach(r *runner, fn func(*Thread)) {
 		if rec.away != nil && putAwayStatus(&rec.s, rec.away.reason, m.opts.Now()) {
 			rec.away.cut = true
 		}
+		m.holdUnreadLocked(rec, r) // a mark the runner held stays held (unread.go)
 		m.seenStoppedLocked(rec)
 	})
 	m.servers.changed() // its shells are gone (servers.go)

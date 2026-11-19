@@ -63,10 +63,11 @@ func (m *Manager) seenLocked(rec *record) {
 // while presence is attended: what streamStatus.Acknowledge would have cleared becomes
 // Idle "at prompt". It reads the raw status: under the waiting overlay (waiting.go) the
 // finished turn is seen and the thread keeps showing waiting. An archived thread keeps
-// its status. It reports whether it changed the status; the caller commits, persisted.
+// its status, and so does one the user marked unread with its view open (unread.go). It
+// reports whether it changed the status; the caller commits, persisted.
 // Callers hold m.mu.
 func (m *Manager) seenStoppedLocked(rec *record) bool {
-	if rec.run != nil || (rec.away != nil && rec.away.reason == ReasonArchived) || !rec.s.ArchivedAt.IsZero() || m.viewers[rec.s.ID] == 0 || !m.attended() {
+	if rec.run != nil || rec.unreadHold || (rec.away != nil && rec.away.reason == ReasonArchived) || !rec.s.ArchivedAt.IsZero() || m.viewers[rec.s.ID] == 0 || !m.attended() {
 		return false
 	}
 	if raw := rec.rawStatus(); !clearedWhenSeen(raw.st, raw.reason) {
@@ -97,10 +98,11 @@ func (r *runner) attendedRose() {
 }
 
 // onAttended: the user looks at the app again with this thread open: what Claude
-// produced meanwhile is seen.
+// produced meanwhile is seen. A thread the user marked unread with this view open stays
+// so (unread.go).
 func (r *runner) onAttended() {
 	r.viewers = r.m.viewerCount(r.id)
-	if r.viewers > 0 && r.m.attended() {
+	if r.viewers > 0 && r.m.attended() && !r.st.sd.held {
 		r.acknowledge()
 		r.checkStatus()
 	}

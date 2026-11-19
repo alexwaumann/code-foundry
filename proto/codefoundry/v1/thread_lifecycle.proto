@@ -1413,6 +1413,14 @@ message ClearSnoozeEndedResponse {
   bool cleared = 2;
 }
 
+message MarkUnreadRequest {
+  string id = 1;
+}
+
+message MarkUnreadResponse {
+  Thread thread = 1;
+}
+
 message LabelThreadRequest {
   string id = 1;
   // Removes every label first.

@@ -2944,6 +2944,29 @@ export class World {
   }
 
   /**
+   * The daemon's rule for thread.unread (internal/store/thread/unread.go): an idle thread at
+   * its prompt, not starting, archived, snoozed, saved or setting up.
+   */
+  canMarkUnread(s: MockThread): boolean {
+    const setupOk = s.setup === null || s.setup.phase === ThreadSetupPhase.DONE || s.setup.phase === ThreadSetupPhase.UNSPECIFIED;
+    return s.status === ThreadStatus.IDLE && s.statusReason === "at prompt" && s.state !== ThreadState.STARTING && s.archivedAt === null && s.snoozedUntil === null && s.savedAt === null && setupOk;
+  }
+
+  /**
+   * thread.unread: an idle thread goes back to "finished" (Done), as after a turn not seen; the
+   * view already open keeps it (the mock sees a thread only when a view opens, mock/thread.ts).
+   * Anything else is refused like the daemon. Returns the message.
+   */
+  markUnread(id: string): string {
+    const s = this.thread(id);
+    const label = s.name ? `${s.name} (${s.id})` : s.id;
+    if (!this.canMarkUnread(s)) throw new CommandError("unavailable", `thread ${s.id} is not idle at its prompt; only an idle thread at its prompt can be marked unread`);
+    this.setStatus(s, ThreadStatus.NEEDS_ATTENTION, "finished");
+    this.publishThread(s);
+    return `marked thread ${label} unread`;
+  }
+
+  /**
    * thread.snooze without its confirmation (POST /__mock/thread/snooze does what the CLI
    * with --yes does). Snoozing closes Claude like archiving (busy becomes ERROR
    * "interrupted"), removes the thread's shells, unpins and unarchives it and sets the wake
@@ -4989,6 +5012,23 @@ export class World {
           const s = activeThread(ctx);
           if (!s) throw new CommandError("unavailable", "no active thread");
           return this.clearSnoozeEnded(s.id);
+        },
+      },
+      {
+        cmd: {
+          name: "thread.unread",
+          title: "Mark as Unread",
+          category: "Thread",
+          description: "Mark an idle thread unread: it shows Done again, as after a turn you have not seen, until you open or focus it, or a message or a new turn clears it. Only for a thread idle at its prompt (not working, asking, in error, archived, snoozed or saved).",
+          keybindings: ["cmd+shift+u"],
+          args: [],
+        },
+        // Like the daemon: wherever a thread is; markUnread refuses any but an idle one.
+        when: (ctx) => activeThread(ctx) !== undefined,
+        run: (ctx) => {
+          const s = activeThread(ctx);
+          if (!s) throw new CommandError("unavailable", "no active thread");
+          return this.markUnread(s.id);
         },
       },
       {
