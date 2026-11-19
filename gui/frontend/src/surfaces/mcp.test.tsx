@@ -84,7 +84,9 @@ beforeEach(async () => {
   useUiStore.setState({ sidebarExpanded: true, sidebarWidth: 260, selection: { kind: "thread", id: "s-r" }, palette: { ...useUiStore.getState().palette, open: false } });
   useThreadStore.setState({ logs: {} });
   useMcpTabsStore.setState({ byKey: {} });
-  // Stamped per test: a check time taken when the module loaded drifts past 12s under load.
+  // Stamped per test with the clock held still (Date only; timers stay real): a check time
+  // taken when the module loaded, or a test that runs over a second under load, read "13s ago".
+  vi.useFakeTimers({ toFake: ["Date"] });
   checkedAtMs = Date.now() - 12_000;
   setMcp("s-r", { ...STATUS, checkedAtMs });
   api.get.mockResolvedValue(null);
@@ -93,6 +95,7 @@ beforeEach(async () => {
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
+  vi.useRealTimers();
 });
 
 describe("MCP surface", () => {
