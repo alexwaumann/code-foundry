@@ -42,7 +42,7 @@ focused, across panes and spaces; ctrl+cmd+1…9 switch space. With the flag off
   12 px gutter is a 1.5 px gap; each pane an outlined rectangle; a space with no pane is one
   rectangle. The count is `attentionIds` (the user's own threads, not archived, snoozed or started by
   a thread) by the space each lives in; it is the warning tint, with "n threads need you" as its
-  label. A name cut short has its `whenTruncated` tooltip.
+  label. (Which tabs show it now follows the Needs you scope: `space-tab-counts-scope.md`.) A name cut short has its `whenTruncated` tooltip.
 - **Rename**: double click, F2 or the menu's Rename… put a field over the name; Enter or leaving it
   renames (`space.rename`), Escape keeps it. "+" runs `space.new --focus` and opens the field on the
   new space's default name, selected, so typing names it.

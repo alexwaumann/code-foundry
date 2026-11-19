@@ -105,7 +105,8 @@ opens the update dialog as the chip does. No tile while there is no update.
 - Footer buttons keep their own 14px glyph (the expanded footer's, as the final sketch has them),
   inside the rail's 26px target.
 - Removed: the top bar's Needs you control (`NeedsPopover`), `useNeedsList`, and the needs store's
-  `popover` flag and `setNeedsPopover`. The space tabs' counts, the bell and the Needs you popup stay.
+  `popover` flag and `setNeedsPopover`. The space tabs' counts, the bell and the Needs you popup stay
+  (which tabs show a count follows the Needs you scope, collapsed or not: `space-tab-counts-scope.md`).
 
 ## Gotchas
 

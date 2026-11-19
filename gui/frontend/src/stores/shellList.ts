@@ -69,8 +69,8 @@ export function getNeedsIds(): string[] {
 }
 
 /**
- * The count each space tab shows: the threads in that space that Needs you lists for it
- * (lib/shellSections.ts needsBySpace), by space id. Rebuilt when a thread's list key or space
+ * The count a space tab can show: the threads in that space that Needs you lists for it
+ * (lib/shellSections.ts needsBySpace), by space id. Which tabs show it is SpaceTabs'. Rebuilt when a thread's list key or space
  * changes, as the sidebar is.
  */
 export function useNeedsBySpace(): Readonly<Record<string, number>> {

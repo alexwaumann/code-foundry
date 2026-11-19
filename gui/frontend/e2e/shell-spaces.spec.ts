@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { appPath, CF, invocations, mockUrl, resetMock } from "./fixtures";
+import { appPath, CF, invocations, mockPost, mockUrl, resetMock } from "./fixtures";
 
 /**
  * The top bar and spaces in the window shell (docs/notes/shell-15-spaces.md), against the mock's
@@ -269,7 +269,8 @@ for (const scheme of ["dark", "light"] as const) {
     test.skip(!shots || info.project.name !== "webkit", "SHOTS=<dir> with WebKit only");
     const at = (name: string) => `${shots ?? ""}/${name}${scheme === "light" ? "-light" : ""}.png`;
     await page.emulateMedia({ colorScheme: scheme });
-    // s-2 waits on a permission in Release: its tab counts 1.
+    // s-2 waits on a permission in Release: with Needs you in this space only, its tab counts 1.
+    await mockPost("settings/external?sidebar.needs_scope=space");
     await seed([MAIN, RELEASE, REVIEWS]);
     await openShell(page);
     await expect(spaceTab(page, "sp-rel").getByTestId("space-tab-count")).toHaveText("1");
@@ -300,5 +301,28 @@ for (const scheme of ["dark", "light"] as const) {
     await expect(page.getByTestId("menu-move-to-space-spaces")).toBeVisible();
     await still(page);
     await page.screenshot({ path: at("move-to-space") });
+  });
+}
+
+/**
+ * SHOTS=<dir>: the space tabs' counts in both Needs you scopes, two spaces each with threads that
+ * need the user (Main: s-sb-badge; Release: s-2 and s-sb-notes); dark and light. Which tab shows
+ * a count is vitest's (components/shell/TopBar.test.tsx); these are the PR's pictures.
+ */
+for (const scheme of ["dark", "light"] as const) {
+  test(`space tab counts screenshots (${scheme})`, async ({ page }, info) => {
+    const shots = process.env.SHOTS;
+    test.skip(!shots || info.project.name !== "webkit", "SHOTS=<dir> with WebKit only");
+    const at = (name: string) => `${shots ?? ""}/${name}${scheme === "light" ? "-light" : ""}.png`;
+    await page.emulateMedia({ colorScheme: scheme });
+    await mockPost("shell-sidebar");
+    await seed([MAIN, RELEASE, REVIEWS], "sp-main", { "s-2": { space: "sp-rel" }, "s-sb-notes": { space: "sp-rel" }, "s-sb-badge": { space: "sp-main" } });
+    for (const scope of ["all", "space"] as const) {
+      await mockPost(`settings/external?sidebar.needs_scope=${scope}`);
+      await openShell(page);
+      await page.mouse.move(700, 880);
+      await still(page);
+      await page.screenshot({ path: at(`counts-${scope}`), clip: { x: 0, y: 0, width: 1000, height: 360 } });
+    }
   });
 }

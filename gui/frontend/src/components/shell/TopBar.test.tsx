@@ -27,6 +27,12 @@ const { useCommandsStore } = await import("@/stores/commands");
 const { useThreadsStore } = await import("@/stores/threads");
 const { resetFocusHistory, useFocusHistoryStore } = await import("@/stores/focusHistory");
 const { useShellDragStore, resetShellDrag } = await import("@/shell/drag/state");
+const { useSettingsStore } = await import("@/stores/settings");
+
+/** The sidebar's Needs you scope (sidebar.needs_scope): every space, or the current one only. */
+const scope = (v: "all" | "space") => {
+  useSettingsStore.setState({ snapshot: { values: { "sidebar.needs_scope": v } } as never });
+};
 
 const command = (name: string, title: string): CommandView => ({ name, title, description: "", category: "View", args: [], keybindings: [], available: true });
 
@@ -93,6 +99,7 @@ beforeEach(async () => {
   resetLayout();
   resetFocusHistory();
   resetShellDrag();
+  useSettingsStore.setState({ snapshot: null });
   useCommandsStore.setState({ commands: [command("view.back", "Back"), command("view.forward", "Forward")] });
   // s-1 needs the user in Main, s-2 and s-3 in Release; s-4 too but another thread started it; s-5 is archived;
   // s-6 in Main finished its turn (Active's, not Needs you's).
@@ -127,7 +134,7 @@ describe("the top bar", () => {
     expect(screen.getByTestId("top-bar-sidebar-toggle")).toBeTruthy();
     expect(screen.getByTestId("top-bar-back")).toBeTruthy();
     expect(screen.getByTestId("top-bar-forward")).toBeTruthy();
-    expect(tabs().map((t) => t.textContent)).toEqual(["Main1", "Release 0.222", "Reviews"]);
+    expect(tabs().map((t) => t.textContent)).toEqual(["Main", "Release 0.22", "Reviews"]);
     expect(tabOf("sp-a").getAttribute("aria-selected")).toBe("true");
     expect(screen.getByTestId("top-bar-new-space")).toBeTruthy();
   });
@@ -142,24 +149,59 @@ describe("the top bar", () => {
     expect(screen.getByTestId("top-bar-sidebar-toggle").getAttribute("aria-label")).toBe("Toggle sidebar");
   });
 
-  it("has no Needs you control with the sidebar collapsed to its rail; each space tab keeps its count", async () => {
+  it("has no Needs you control with the sidebar collapsed to its rail; the tabs' counts follow the same rule", async () => {
     const { useUiStore } = await import("@/stores/ui");
     const before = useUiStore.getState().sidebarExpanded;
     try {
       useUiStore.setState({ sidebarExpanded: false });
+      scope("space");
       render(<TopBar />);
       expect(screen.queryByTestId("needs-control")).toBeNull();
       expect(within(tabOf("sp-b")).getByTestId("space-tab-count").textContent).toBe("2");
+      expect(within(tabOf("sp-a")).queryByTestId("space-tab-count")).toBeNull();
+      act(() => {
+        scope("all");
+      });
+      expect(screen.queryAllByTestId("space-tab-count")).toHaveLength(0);
     } finally {
       useUiStore.setState({ sidebarExpanded: before });
     }
   });
 
-  it("counts the threads Needs you lists for each space: not a thread's threads, archived ones nor a finished turn", () => {
-    render(<TopBar />);
-    expect(within(tabOf("sp-a")).getByTestId("space-tab-count").textContent).toBe("1");
-    expect(within(tabOf("sp-b")).getByTestId("space-tab-count").getAttribute("aria-label")).toBe("2 threads need you");
-    expect(within(tabOf("sp-c")).queryByTestId("space-tab-count")).toBeNull();
+  // Main (current) has 1 thread that needs the user, Release 2, Reviews none.
+  describe("a space tab's count", () => {
+    it("is on no tab, current or other, with Needs you in every space (the sidebar lists them all)", () => {
+      scope("all");
+      render(<TopBar />);
+      expect(within(tabOf("sp-a")).queryByTestId("space-tab-count")).toBeNull();
+      expect(within(tabOf("sp-b")).queryByTestId("space-tab-count")).toBeNull();
+    });
+
+    it("is on no tab while the setting is unset: every space is the default scope", () => {
+      render(<TopBar />);
+      expect(screen.queryAllByTestId("space-tab-count")).toHaveLength(0);
+    });
+
+    it("is on every other tab with Needs you in this space only, counting what Needs you lists for that space", () => {
+      scope("space");
+      render(<TopBar />);
+      expect(within(tabOf("sp-a")).queryByTestId("space-tab-count")).toBeNull();
+      expect(within(tabOf("sp-b")).getByTestId("space-tab-count").textContent).toBe("2");
+      expect(within(tabOf("sp-b")).getByTestId("space-tab-count").getAttribute("aria-label")).toBe("2 threads need you");
+      expect(within(tabOf("sp-c")).queryByTestId("space-tab-count")).toBeNull();
+    });
+
+    it("moves with the current space: the space left shows its count, the one shown drops it", async () => {
+      scope("space");
+      render(<TopBar />);
+      await act(async () => {
+        await seedLayout({ ...LAYOUT, currentSpaceId: "sp-b", rev: 2 });
+      });
+      // Main counts s-1, not s-6 (a finished turn is Active's).
+      expect(within(tabOf("sp-a")).getByTestId("space-tab-count").textContent).toBe("1");
+      expect(within(tabOf("sp-a")).getByTestId("space-tab-count").getAttribute("aria-label")).toBe("1 thread needs you");
+      expect(within(tabOf("sp-b")).queryByTestId("space-tab-count")).toBeNull();
+    });
   });
 
   it("draws each space's glyph from its own panes", () => {
@@ -167,7 +209,7 @@ describe("the top bar", () => {
     expect(tabs().map((t) => within(t).getByTestId("space-icon").getAttribute("data-panes"))).toEqual(["2", "1", "1"]);
   });
 
-  it("fills only the current space's tab with the accent, glyph and count included", () => {
+  it("fills only the current space's tab with the accent, glyph included", () => {
     render(<TopBar />);
     const current = tabs().filter((t) => t.getAttribute("data-current") === "true");
     expect(current).toHaveLength(1);
@@ -175,8 +217,6 @@ describe("the top bar", () => {
       const on = t === current[0];
       expect(t.className.includes("bg-cf-accent")).toBe(on);
       expect(within(t).getByTestId("space-icon").getAttribute("data-filled")).toBe(on ? "true" : null);
-      const count = within(t).queryByTestId("space-tab-count");
-      if (count) expect(count.className.includes("text-cf-accent-foreground")).toBe(on);
     }
   });
 

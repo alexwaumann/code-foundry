@@ -2,7 +2,8 @@
  * Spaces in the top bar (docs/notes/shell-model.md, "Structure"): pure functions the top bar, its
  * dialogs and the drag layer read. A space tab shows a small glyph drawn from the space's real pane
  * layout, its name, and the count of the user's own threads in it that need them (that count is
- * lib/shellSections.ts needsBySpace, the Needs you section's own membership). A tab or a pane
+ * lib/shellSections.ts needsBySpace, the Needs you section's own membership; which tabs show it
+ * follows the section's scope, components/shell/SpaceTabs.tsx). A tab or a pane
  * dropped on a space tab moves there as the daemon's verbs move it.
  * See docs/notes/shell-15-spaces.md.
  */
