@@ -203,10 +203,36 @@ describe("the other terminal keys", () => {
     expect(names()).toEqual([["terminal.cycle", { tab: "t-th", focus: "true" }]]);
   });
 
-  it("a code block's Run in terminal: terminal.new --run with that thread", async () => {
+  it("a code block's Run: the thread's quick terminal types it (terminal.new --quick --run), then opens with the keyboard in it", async () => {
     await seed("p-2", "t-prs");
-    await actions.runInLinkedTerminal("s-1", "make test");
-    expect(runs).toEqual([{ name: "terminal.new", args: { run: "make test" }, thread: "s-1", terminal: "" }]);
+    results.set("terminal.new", JSON.stringify({ id: "term-q", labels: { kind: "shell", thread: "s-1", slot: "quick" } }));
+    await actions.runInQuickTerminal("s-1", "make test");
+    expect(runs).toEqual([
+      { name: "terminal.new", args: { quick: "true", run: "make test" }, thread: "s-1", terminal: "" },
+      { name: "terminal.quick", args: { id: "s-1", open: "true", focus: "true" }, thread: "", terminal: "" },
+    ]);
+    const focus = vi.fn();
+    registerQuickHost("s-1", focus);
+    expect(focus).toHaveBeenCalledTimes(1);
+  });
+
+  it("a code block's Run while the quick terminal is busy: the daemon's new linked terminal ran it, its tab takes the keyboard, the quick terminal stays as it was", async () => {
+    await seed("p-1");
+    resetShellView();
+    results.set("terminal.new", JSON.stringify({ id: "term-1", labels: { kind: "shell", thread: "s-1" } }));
+    await actions.runInQuickTerminal("s-1", "make test");
+    expect(names()).toEqual([["terminal.new", { quick: "true", run: "make test" }]]);
+    expect(useShellViewStore.getState().focusRequest.paneId).toBe("p-2");
+    const focus = vi.fn();
+    registerQuickHost("s-1", focus);
+    expect(focus).not.toHaveBeenCalled();
+  });
+
+  it("a code block's Run the daemon refused: nothing opens", async () => {
+    await seed("p-1");
+    results.set("terminal.new", "");
+    await actions.runInQuickTerminal("s-1", "make test");
+    expect(names()).toEqual([["terminal.new", { quick: "true", run: "make test" }]]);
   });
 });
 

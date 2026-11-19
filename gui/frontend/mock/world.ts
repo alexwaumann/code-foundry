@@ -4280,6 +4280,7 @@ export class World {
           args: [
             { name: "cwd", type: ArgType.PATH, required: false, description: "Working directory" },
             { name: "run", type: ArgType.STRING, required: false, description: "A command line typed into the new shell once it has printed its prompt, then Return" },
+            { name: "quick", type: ArgType.BOOL, required: false, description: "The thread's quick terminal: when it is running it is returned, and --run types into it when it is at its prompt" },
             TERMINAL_PANE_ARG,
           ],
         },
@@ -4294,15 +4295,36 @@ export class World {
           if (this.terminalNewDelayMs > 0) await new Promise((r) => setTimeout(r, this.terminalNewDelayMs));
           if (fail !== null) throw new CommandError("unavailable", fail);
           const keys = runKeys(args.run ?? "");
+          const thread = ctx?.activeThreadId ?? "";
+          let busy = "";
+          if (args.quick === "true") {
+            if (!thread) throw new CommandError("invalid", "the quick terminal belongs to a thread: run it with a thread (--context-thread)");
+            const running = [...this.terms.values()].find((x) => x.state === TerminalState.RUNNING && x.labels[LABEL_THREAD] === thread && x.labels.slot === "quick");
+            // Like the daemon (TerminalDeps.AtPrompt): typed into only at its prompt (no foreground job, which /__mock/terminal/facts sets);
+            // busy, a new shell of the thread runs the command instead.
+            if (running && keys !== "" && running.foreground) busy = `thread ${thread}'s quick terminal ${running.id} is busy; `;
+            else if (running) {
+              if (keys !== "") this.write(running.id, enc.encode(keys));
+              const json = JSON.stringify({ id: running.id, cwd: running.cwd, labels: running.labels });
+              return { message: `thread ${thread}'s quick terminal is ${running.id}${keys ? "; ran the command in it" : ""}`, resultJson: json };
+            } else {
+              const q = this.ensureQuick(thread);
+              const json = JSON.stringify({ id: q.id, cwd: q.cwd, labels: q.labels });
+              if (keys === "") return { message: `created thread ${thread}'s quick terminal ${q.id}`, resultJson: json };
+              await new Promise((r) => setTimeout(r, RUN_PROMPT_MS));
+              this.write(q.id, enc.encode(keys));
+              return { message: `created thread ${thread}'s quick terminal ${q.id} and ran the command in it`, resultJson: json };
+            }
+          }
           const t = this.create(["/bin/zsh"], owner.cwd, owner.labels, "shell");
           this.openTerminalTab(t.id, owner.labels[LABEL_THREAD] ?? "", args.pane ?? "");
           const resultJson = JSON.stringify({ id: t.id, cwd: t.cwd, labels: t.labels });
-          if (keys === "") return { message: `created terminal ${t.id}`, resultJson };
+          if (keys === "") return { message: `${busy}created terminal ${t.id}`, resultJson };
           // Like the daemon: the shell is listed at once, and the command is typed once it
           // has printed its prompt (RUN_PROMPT_MS here), before the command returns.
           await new Promise((r) => setTimeout(r, RUN_PROMPT_MS));
           this.write(t.id, enc.encode(keys));
-          return { message: `created terminal ${t.id} and ran the command in it`, resultJson };
+          return { message: `${busy}created terminal ${t.id} and ran the command in it`, resultJson };
         },
       },
       {

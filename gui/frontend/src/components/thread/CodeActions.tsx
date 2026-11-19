@@ -1,35 +1,42 @@
 import { Play } from "lucide-react";
 import { CopyIcon } from "@/components/copy/CopyButton";
-import { Tip } from "@/components/ui/tooltip";
+import { Button } from "@/components/ui/button";
 import { isStreamingBlock, runnableCommand } from "@/lib/codeActions";
 import { useCopied } from "@/lib/useCopied";
-import { runInLinkedTerminal } from "@/shell/terminalActions";
+import { runInQuickTerminal } from "@/shell/terminalActions";
 import { useCommandsStore } from "@/stores/commands";
 import { useCodeRun } from "./codeContext";
 import "./codeActions.css";
 
+/** The header's quiet buttons: an icon and a word, no tooltip (the word is the name), no transition. */
+const HEAD_BUTTON = "h-5 gap-1 px-1.5 text-caption-sm text-cf-text-muted transition-none hover:text-cf-text has-[>svg]:px-1.5 [&_svg]:size-3";
+
 /**
- * An icon button that copies `text` and shows a check with "Copied" for a moment. The
- * thread's code blocks and Bash commands (codeActions.css: shown on hover or focus).
+ * Copy with its word: "Copy", then a check and "Copied" in the success colour for a moment
+ * (lib/useCopied). Both words sit in one grid cell, the idle one hidden, so the button is as
+ * wide as the longer and nothing beside it moves.
  */
-export function CopyButton({ text, label = "Copy code" }: { text: string; label?: string }) {
+function CopyCodeButton({ text }: { text: string }) {
   const { copied, copy } = useCopied();
   return (
-    <Tip label={copied ? null : label}>
-      <button
-        type="button"
-        className="cf-code-btn"
-        aria-label={copied ? "Copied" : label}
-        data-copied={copied || undefined}
-        data-testid="code-copy"
-        onClick={() => {
-          void copy(text);
-        }}
-      >
-        <CopyIcon copied={copied} />
-        {copied && <span>Copied</span>}
-      </button>
-    </Tip>
+    <Button
+      type="button"
+      variant="ghost"
+      size="xs"
+      className={HEAD_BUTTON}
+      aria-label={copied ? "Copied" : "Copy code"}
+      data-copied={copied || undefined}
+      data-testid="code-copy"
+      onClick={() => {
+        void copy(text);
+      }}
+    >
+      <CopyIcon copied={copied} />
+      <span className="grid">
+        <span className={copied ? "invisible col-start-1 row-start-1" : "col-start-1 row-start-1"}>Copy</span>
+        <span className={copied ? "col-start-1 row-start-1 text-cf-success-text" : "invisible col-start-1 row-start-1"}>Copied</span>
+      </span>
+    </Button>
   );
 }
 
@@ -39,10 +46,10 @@ function useCanStartShell(): boolean {
 }
 
 /**
- * "Run in terminal" for a shell block in Claude's reply: a new terminal tab linked to the thread,
- * placed by the rules, runs the command (terminal.new --run) and stays open
- * (shell/terminalActions.ts). Only when the block is runnable (lib/codeActions), finished, and
- * terminal.new is available.
+ * Run for a shell block in Claude's reply: the thread's quick terminal types the command and
+ * opens; when a command is still running there, a new terminal tab linked to the thread runs it
+ * (shell/terminalActions.ts runInQuickTerminal). Only when the block is runnable
+ * (lib/codeActions), finished, and terminal.new is available.
  */
 function RunButton({ lang, code }: { lang: string; code: string }) {
   const run = useCodeRun();
@@ -50,28 +57,36 @@ function RunButton({ lang, code }: { lang: string; code: string }) {
   const command = run ? runnableCommand(lang, code) : null;
   if (!run || !can || command === null || isStreamingBlock(run.text, code, run.streaming)) return null;
   return (
-    <Tip label="Run in terminal">
-      <button
-        type="button"
-        className="cf-code-btn"
-        aria-label="Run in terminal"
-        data-testid="code-run"
-        onClick={() => {
-          void runInLinkedTerminal(run.threadId, command);
-        }}
-      >
-        <Play aria-hidden />
-      </button>
-    </Tip>
+    <Button
+      type="button"
+      variant="ghost"
+      size="xs"
+      className={HEAD_BUTTON}
+      aria-label="Run in terminal"
+      data-testid="code-run"
+      onClick={() => {
+        void runInQuickTerminal(run.threadId, command);
+      }}
+    >
+      <Play aria-hidden />
+      Run
+    </Button>
   );
 }
 
-/** A fenced block's buttons, top right: Run in terminal (shell blocks in replies) and Copy. */
-export function CodeActions({ lang, code }: { lang: string; code: string }) {
+/**
+ * A fenced block's header, part of its layout and always shown: the fence's language at the
+ * left (nothing for a block without one), Run (shell blocks in replies) and Copy at the right.
+ * Find and citations leave its text out (data-find-skip, data-cite-skip): it is not the code.
+ */
+export function CodeHeader({ lang, code }: { lang: string; code: string }) {
   return (
-    <div className="cf-code-actions">
+    <div className="cf-code-head" data-testid="code-head" data-find-skip data-cite-skip>
+      <span className="cf-code-lang min-w-0 flex-1 truncate text-caption-sm" data-testid="code-lang">
+        {lang}
+      </span>
       <RunButton lang={lang} code={code} />
-      <CopyButton text={code.replace(/\n$/, "")} />
+      <CopyCodeButton text={code.replace(/\n$/, "")} />
     </div>
   );
 }

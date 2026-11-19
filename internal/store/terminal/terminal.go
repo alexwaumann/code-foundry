@@ -204,6 +204,12 @@ type Store interface {
 	// in ESC[200~ … ESC[201~ is then inserted as is (tabs are not completion, newlines
 	// do not run lines one by one). Must not be called from an Observer.
 	BracketedPaste(ctx context.Context, id string) (bool, error)
+	// AtPrompt reports whether the terminal's own process (a shell) is in the PTY's
+	// foreground now, read when asked rather than from the sampled Foreground fact: false
+	// while a job it started runs, and false when the foreground group cannot be read or
+	// the process has exited. terminal.new --quick --run types into the quick terminal only
+	// when it is at its prompt. Must not be called from an Observer.
+	AtPrompt(ctx context.Context, id string) (bool, error)
 	// SetLabels replaces a terminal's labels (Terminal.Labels) and publishes the change. The
 	// process is not touched. The first-load import uses it to make a running shell a
 	// thread's quick terminal (docs/notes/shell-18-legacy-import.md).

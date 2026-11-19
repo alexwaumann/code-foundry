@@ -1,77 +1,58 @@
 /*
- * A thread's code block buttons (CodeActions.tsx): Copy, and Run in terminal on shell
- * blocks in Claude's replies, at the block's top right. Hidden until the block is hovered
- * or a button has the keyboard (they stay in the tab order). Kept apart from thread.css.
- * A plugin's markdown node (.cf-plugin-md, components/plugin/nodes/MarkdownNode.tsx) uses
- * the same code blocks outside any .cf-thread.
+ * A thread's fenced code blocks (Code.tsx CodeBlock, CodeActions.tsx CodeHeader): one frame
+ * holding a header row (the language at the left; Run and Copy at the right) over the
+ * code. The header is part of the block's layout and always shown: nothing sits over the
+ * code, nothing fades in on hover. Kept apart from thread.css. A plugin's markdown node
+ * (.cf-plugin-md, components/plugin/nodes/MarkdownNode.tsx) uses the same code blocks
+ * outside any .cf-thread.
  */
+/* The wrapper is the frame (index.css gives .cf-markdown pre its own; the pre here has
+   none) and takes the block's place in the markdown flow (.cf-markdown's first/last child
+   margins apply to it). */
 :is(.cf-thread, .cf-plugin-md) .cf-code {
-  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--cf-border);
+  border-radius: 6px;
+  background: var(--cf-code-background);
 }
-/* The wrapper takes the block's place in the markdown flow (.cf-markdown's first/last
-   child margins apply to it); the pre inside has none of its own. */
 :is(.cf-thread, .cf-plugin-md) .cf-markdown :where(.cf-code) {
   margin: 0.5em 0;
 }
 :is(.cf-thread, .cf-plugin-md) .cf-markdown .cf-code > pre {
   margin: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
 }
-:is(.cf-thread, .cf-plugin-md) .cf-code-actions {
-  position: absolute;
-  top: 5px;
-  right: 5px;
+/* The header: one row of a fixed height (the buttons are shorter), a hairline under it.
+   Not selectable: dragging across blocks selects code, not "bash Run Copy". */
+:is(.cf-thread, .cf-plugin-md) .cf-code-head {
   display: flex;
-  gap: 4px;
-  opacity: 0;
-  transition: opacity 0.12s;
+  align-items: center;
+  gap: 2px;
+  height: 28px;
+  padding: 0 4px 0 0.8em;
+  border-bottom: 1px solid var(--cf-border);
+  color: var(--cf-text-muted);
   user-select: none;
   -webkit-user-select: none;
 }
-:is(.cf-thread, .cf-plugin-md) .cf-code:hover > .cf-code-actions,
-:is(.cf-thread, .cf-plugin-md) .term:hover > .cf-code > .cf-code-actions,
-:is(.cf-thread, .cf-plugin-md) .cf-code-actions:focus-within,
-:is(.cf-thread, .cf-plugin-md) .cf-code-actions:has([data-copied]) {
-  opacity: 1;
+/* The language, mono like the code under it. */
+:is(.cf-thread, .cf-plugin-md) .cf-code-lang {
+  font-family: var(--t-mono, ui-monospace, "SF Mono", Menlo, monospace);
 }
-:is(.cf-thread, .cf-plugin-md) .cf-code-btn {
-  height: 22px;
-  min-width: 22px;
-  padding: 0 4px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  border: 1px solid var(--cf-border);
-  border-radius: 6px;
-  background: var(--cf-canvas);
-  color: var(--cf-text-muted);
-  font-family: var(--font-sans, ui-sans-serif, system-ui);
-  font-size: 11px;
-  line-height: 1;
-  cursor: pointer;
-}
-:is(.cf-thread, .cf-plugin-md) .cf-code-btn:hover {
-  color: var(--cf-text);
-  background: color-mix(in oklab, var(--cf-text) 7%, var(--cf-canvas));
-}
-:is(.cf-thread, .cf-plugin-md) .cf-code-btn:focus-visible {
-  outline: 2px solid var(--cf-focus);
-  outline-offset: 1px;
-}
-:is(.cf-thread, .cf-plugin-md) .cf-code-btn svg {
-  width: 12px;
-  height: 12px;
-}
-:is(.cf-thread, .cf-plugin-md) .cf-code-btn[data-copied] {
-  color: var(--t-emerald);
-}
-/* A Bash row's command line: room on the right for its Copy button. */
-:is(.cf-thread, .cf-plugin-md) .term .cmd.cf-code {
+
+/* A Bash row's command line (ToolDetail BashDetail): no header, its icon-only Copy at the
+   right, always shown, in room the line keeps for it (padding), so it covers no text. */
+:is(.cf-thread, .cf-plugin-md) .term .cmd.cf-cmd {
+  position: relative;
   padding-right: 40px;
 }
-:is(.cf-thread, .cf-plugin-md) .term .cmd.cf-code > .cf-code-actions {
+:is(.cf-thread, .cf-plugin-md) .term .cmd.cf-cmd > .cf-cmd-copy {
+  position: absolute;
   top: 6px;
   right: 6px;
+  transition: none;
 }
 
 /* The streaming caret (thread.css) inside a wrapped block's code, not after the wrapper. */

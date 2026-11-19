@@ -276,6 +276,7 @@ func Run(ctx context.Context, opts Options) (retErr error) {
 			return terminal.AwaitOutput(ctx, st.terminal, id, promptSettle)
 		},
 		TerminalBracketedPaste: st.terminal.BracketedPaste,
+		TerminalAtPrompt:       st.terminal.AtPrompt,
 		Project:                projectAPI,
 		Clone:                  projectAPI.CloneRef,
 		NewProjects: command.NewProjectDeps{

@@ -139,3 +139,14 @@ export function terminalIdFromResult(resultJson: string): string | null {
     return null;
   }
 }
+
+/** Whether the Terminal in a command result's JSON (terminalIdFromResult's) is a thread's quick terminal (labels slot=quick). */
+export function isQuickTerminalResult(resultJson: string): boolean {
+  if (!resultJson) return false;
+  try {
+    const v = JSON.parse(resultJson) as { labels?: Record<string, unknown> };
+    return v.labels?.slot === "quick";
+  } catch {
+    return false;
+  }
+}

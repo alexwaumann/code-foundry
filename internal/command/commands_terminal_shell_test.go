@@ -124,35 +124,59 @@ func TestTerminalNewQuick(t *testing.T) {
 		return &v1.Terminal{Id: id, State: state, Labels: termlabel.QuickShell(thread, "r1", feat)}
 	}
 	running, exited := v1.TerminalState_TERMINAL_STATE_RUNNING, v1.TerminalState_TERMINAL_STATE_EXITED
+	idle := func(context.Context, string) (bool, error) { return true, nil }
+	busy := func(context.Context, string) (bool, error) { return false, nil }
+	unknown := func(context.Context, string) (bool, error) {
+		return false, errors.New("TIOCGPGRP: bad file descriptor")
+	}
 	tests := []struct {
 		name       string
 		ctx        command.Context
 		args       map[string]string
 		terminals  []*v1.Terminal
+		atPrompt   func(ctx context.Context, id string) (bool, error)
 		wantCreate bool
+		wantQuick  bool // what it created is a quick terminal (else an ordinary shell of the thread)
 		wantMsg    string
 		wantKeys   string
 		wantErr    error
 	}{
-		{name: "the first one is created", ctx: command.Context{ActiveThreadID: "s1"}, wantCreate: true,
+		{name: "the first one is created", ctx: command.Context{ActiveThreadID: "s1"}, wantCreate: true, wantQuick: true,
 			wantMsg: "created thread s1's quick terminal t1"},
+		{name: "the first one is created and --run types into it", ctx: command.Context{ActiveThreadID: "s1"}, args: map[string]string{"run": "ls"}, atPrompt: busy,
+			wantCreate: true, wantQuick: true, wantMsg: "created thread s1's quick terminal t1 and ran the command in it", wantKeys: "ls\r"},
 		{name: "a running one is returned", ctx: command.Context{ActiveThreadID: "s1"}, terminals: []*v1.Terminal{quickOf("t-q", "s1", running)},
 			wantMsg: "thread s1's quick terminal is t-q"},
 		{name: "--run types into the running one", ctx: command.Context{ActiveThreadID: "s1"}, args: map[string]string{"run": "ls"},
 			terminals: []*v1.Terminal{quickOf("t-q", "s1", running)}, wantMsg: "thread s1's quick terminal is t-q; ran the command in it", wantKeys: "ls\r"},
+		{name: "--run types into the running one at its prompt", ctx: command.Context{ActiveThreadID: "s1"}, args: map[string]string{"run": "ls"}, atPrompt: idle,
+			terminals: []*v1.Terminal{quickOf("t-q", "s1", running)}, wantMsg: "thread s1's quick terminal is t-q; ran the command in it", wantKeys: "ls\r"},
+		{name: "--run on a busy one runs in a new shell of the thread", ctx: command.Context{ActiveThreadID: "s1"}, args: map[string]string{"run": "ls"}, atPrompt: busy,
+			terminals: []*v1.Terminal{quickOf("t-q", "s1", running)}, wantCreate: true,
+			wantMsg: "thread s1's quick terminal t-q is busy; created terminal t1 and ran the command in it", wantKeys: "ls\r"},
+		{name: "--run where the foreground cannot be read: busy", ctx: command.Context{ActiveThreadID: "s1"}, args: map[string]string{"run": "ls"}, atPrompt: unknown,
+			terminals: []*v1.Terminal{quickOf("t-q", "s1", running)}, wantCreate: true,
+			wantMsg: "thread s1's quick terminal t-q is busy; created terminal t1 and ran the command in it", wantKeys: "ls\r"},
+		{name: "a busy one without --run is still returned", ctx: command.Context{ActiveThreadID: "s1"}, atPrompt: busy,
+			terminals: []*v1.Terminal{quickOf("t-q", "s1", running)}, wantMsg: "thread s1's quick terminal is t-q"},
 		{name: "an exited one does not count", ctx: command.Context{ActiveThreadID: "s1"}, terminals: []*v1.Terminal{quickOf("t-q", "s1", exited)},
-			wantCreate: true, wantMsg: "created thread s1's quick terminal t1"},
+			wantCreate: true, wantQuick: true, wantMsg: "created thread s1's quick terminal t1"},
 		{name: "another thread's does not count", ctx: command.Context{ActiveThreadID: "s1"}, terminals: []*v1.Terminal{quickOf("t-q", "s2", running)},
-			wantCreate: true, wantMsg: "created thread s1's quick terminal t1"},
+			wantCreate: true, wantQuick: true, wantMsg: "created thread s1's quick terminal t1"},
 		{name: "an ordinary shell of the thread does not count", ctx: command.Context{ActiveThreadID: "s1"},
 			terminals:  []*v1.Terminal{{Id: "t-s", State: running, Labels: termlabel.Shell("s1", "r1", feat)}},
-			wantCreate: true, wantMsg: "created thread s1's quick terminal t1"},
+			wantCreate: true, wantQuick: true, wantMsg: "created thread s1's quick terminal t1"},
 		{name: "without a thread", args: map[string]string{"here": feat}, wantErr: command.ErrInvalidArgs},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			term := &commandtest.Terminal{Terminals: tt.terminals}
-			reg := newTerminalRegistry(t, term, &commandtest.Thread{Current: thread})
+			reg := command.NewRegistry()
+			if err := command.RegisterTerminal(reg, command.TerminalDeps{
+				Terminal: term, Project: &commandtest.Project{}, Thread: &commandtest.Thread{Current: thread}, AtPrompt: tt.atPrompt,
+			}); err != nil {
+				t.Fatal(err)
+			}
 			args := map[string]string{"quick": "true"}
 			maps.Copy(args, tt.args)
 			res, err := reg.Invoke(context.Background(), tt.ctx, "terminal.new", args)
@@ -169,7 +193,11 @@ func TestTerminalNewQuick(t *testing.T) {
 			if tt.wantCreate != (len(c) == 1) || len(c) > 1 {
 				t.Fatalf("creates = %v, want one: %v", c, tt.wantCreate)
 			}
-			if tt.wantCreate && (c[0].GetCwd() != feat || !maps.Equal(c[0].GetLabels(), termlabel.QuickShell("s1", "r1", feat))) {
+			labels := termlabel.Shell("s1", "r1", feat)
+			if tt.wantQuick {
+				labels = termlabel.QuickShell("s1", "r1", feat)
+			}
+			if tt.wantCreate && (c[0].GetCwd() != feat || !maps.Equal(c[0].GetLabels(), labels)) {
 				t.Errorf("Create = %v", c[0])
 			}
 			if res.Message != tt.wantMsg {

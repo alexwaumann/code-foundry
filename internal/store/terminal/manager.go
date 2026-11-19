@@ -397,6 +397,19 @@ func (m *Manager) BracketedPaste(ctx context.Context, id string) (bool, error) {
 	return on, nil
 }
 
+// AtPrompt reads the PTY's foreground group on the terminal's actor. See Store.AtPrompt.
+func (m *Manager) AtPrompt(ctx context.Context, id string) (bool, error) {
+	a, err := m.actor(id)
+	if err != nil {
+		return false, err
+	}
+	var at bool
+	if err := a.call(ctx, func() { at = a.atPrompt() }); err != nil {
+		return false, err
+	}
+	return at, nil
+}
+
 // Watch merges TerminalUpdated and TerminalRemoved bus events into one channel.
 func (m *Manager) Watch(ctx context.Context) (<-chan Event, error) {
 	return watchBus(ctx, m.opts.Bus), nil

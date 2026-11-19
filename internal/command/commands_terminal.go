@@ -63,6 +63,12 @@ type TerminalDeps struct {
 	// command as one paste and then Return, so tabs are not completion and a multi-line
 	// block lands in the editor whole. Nil, or an error: the keys are typed one by one.
 	BracketedPaste func(ctx context.Context, id string) (bool, error)
+	// AtPrompt reports whether terminal id's shell is in its PTY's foreground now, at its
+	// prompt with no job running (terminal.Store.AtPrompt). terminal.new --quick --run types
+	// into a running quick terminal only then; otherwise, and when it fails (the
+	// foreground cannot be read), a new terminal linked to the thread runs the command
+	// instead. Nil: not checked, the command is typed into the quick terminal.
+	AtPrompt func(ctx context.Context, id string) (bool, error)
 	// Layout is the window shell's layout: a new shell gets a tab in it, and terminal.quick
 	// and terminal.cycle act on it (commands_terminal_quick.go). Nil: no tab, and those two
 	// fail with Unimplemented.
@@ -110,7 +116,9 @@ func RegisterTerminal(r *Registry, d TerminalDeps) error {
 				"else to the registered worktree containing --cwd (from the CLI: the working directory). " +
 				"It starts in --cwd, else in the CLI's working directory when that chose the owner, else in the thread's or worktree's directory. " +
 				"With --run, a command line is typed into it once it has printed its prompt (the shell stays open). " +
-				"With --quick it is the thread's quick terminal: a thread has one, and when it is running that one is returned instead.",
+				"With --quick it is the thread's quick terminal: a thread has one, and when it is running that one is returned instead; " +
+				"with --run as well, the command is typed into it only while its shell is at its prompt: when a command is still running in it " +
+				"(or that cannot be read), a new terminal of the thread runs it instead, and that one is returned.",
 			Category:    "Terminal",
 			Keybindings: []string{"cmd+t"},
 			Args: []ArgSpec{
@@ -121,7 +129,7 @@ func RegisterTerminal(r *Registry, d TerminalDeps) error {
 				{Name: "here", Type: Path, DefaultToCwd: true, Description: "Where the CLI runs: without a thread, worktree or --cwd, " +
 					"the registered worktree containing it owns the shell, which starts there (CLI default: the working directory)"},
 				{Name: "quick", Type: Bool, Description: "The thread's quick terminal (needs a thread): one per thread; " +
-					"when it is running it is returned, and --run types into it"},
+					"when it is running it is returned, and --run types into it when its shell is at its prompt (busy: a new terminal of the thread runs it)"},
 				terminalPaneArg,
 			},
 			When: canStartShell,
@@ -140,7 +148,9 @@ func RegisterTerminal(r *Registry, d TerminalDeps) error {
 				if err != nil {
 					return Result{}, err
 				}
-				if a.Bool("quick") {
+				quickShell := a.Bool("quick")
+				busy := ""
+				if quickShell {
 					if c.ActiveThreadID == "" {
 						return Result{}, InvalidArg("quick", "the quick terminal belongs to a thread: run it with a thread (--context-thread)")
 					}
@@ -150,7 +160,12 @@ func RegisterTerminal(r *Registry, d TerminalDeps) error {
 					if err != nil {
 						return Result{}, err
 					}
-					if running != nil {
+					switch {
+					case running != nil && run != "" && !atPrompt(ctx, d, running.GetId()):
+						// Busy: never typed into a command that is running; a new shell of the thread runs it.
+						quickShell = false
+						busy = "thread " + c.ActiveThreadID + "'s quick terminal " + running.GetId() + " is busy; "
+					case running != nil:
 						msg := "thread " + c.ActiveThreadID + "'s quick terminal is " + running.GetId()
 						if run != "" {
 							if err := typeRun(ctx, d, running.GetId(), run); err != nil {
@@ -167,7 +182,7 @@ func RegisterTerminal(r *Registry, d TerminalDeps) error {
 					return Result{}, err
 				}
 				labels := termlabel.Shell(owner.thread, owner.project, owner.worktree)
-				if a.Bool("quick") {
+				if quickShell {
 					labels = termlabel.QuickShell(owner.thread, owner.project, owner.worktree)
 				}
 				res, err := d.Terminal.Create(ctx, connect.NewRequest(&v1.CreateTerminalRequest{
@@ -177,8 +192,8 @@ func RegisterTerminal(r *Registry, d TerminalDeps) error {
 					return Result{}, err
 				}
 				t := res.Msg.GetTerminal()
-				msg := "created terminal " + t.GetId()
-				if a.Bool("quick") {
+				msg := busy + "created terminal " + t.GetId()
+				if quickShell {
 					msg = "created thread " + owner.thread + "'s quick terminal " + t.GetId()
 				} else {
 					tab, err := openTerminalTab(ctx, d.Layout, c, owner.thread, t.GetId(), a.String("pane"))
@@ -285,6 +300,20 @@ func RegisterTerminal(r *Registry, d TerminalDeps) error {
 			},
 		},
 	}, append(shellWindowTerminalCommands(d, idArg, quick), terminalLayoutCommands(d, quick)...)...)...)
+}
+
+// atPrompt is whether running quick terminal id may be typed into: its shell is at its
+// prompt (TerminalDeps.AtPrompt). A failed read is busy: the safe side.
+func atPrompt(ctx context.Context, d TerminalDeps, id string) bool {
+	if d.AtPrompt == nil {
+		return true
+	}
+	at, err := d.AtPrompt(ctx, id)
+	if err != nil {
+		slog.WarnContext(ctx, "terminal.new --quick --run: could not read the quick terminal's foreground job, running in a new terminal", "terminal", id, "err", err)
+		return false
+	}
+	return at
 }
 
 // runInput is terminal.new --run's value as the text to enter: CRLF becomes LF and

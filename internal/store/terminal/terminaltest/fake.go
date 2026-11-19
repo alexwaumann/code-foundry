@@ -258,6 +258,17 @@ func (f *Fake) BracketedPaste(_ context.Context, id string) (bool, error) {
 	return t.paste, nil
 }
 
+// AtPrompt reports a running terminal with no Foreground (SetFacts) as at its prompt.
+func (f *Fake) AtPrompt(_ context.Context, id string) (bool, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	t, err := f.get(id)
+	if err != nil {
+		return false, err
+	}
+	return t.info.State == terminal.StateRunning && t.info.Foreground == "", nil
+}
+
 // Watch merges bus events like the real store.
 func (f *Fake) Watch(ctx context.Context) (<-chan terminal.Event, error) {
 	return terminal.WatchBus(ctx, f.bus), nil
