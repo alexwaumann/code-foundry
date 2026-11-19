@@ -1414,6 +1414,26 @@ export class MockThreadLogs {
   }
 
   /**
+   * The thread whose log last showed the page at `abs` (an html item), and when (ms); null for
+   * none: the owner PageService answers (mock/pages.ts; docs/notes/page-ownership-daemon.md).
+   */
+  lastShown(abs: string): { threadId: string; at: number } | null {
+    let best: { threadId: string; at: number } | null = null;
+    for (const [id, l] of this.logs) {
+      for (const it of l.items) {
+        if (it.payload?.case !== "html") continue;
+        const v = it.payload.value;
+        const path = v.path ?? "";
+        const full = path.startsWith("/") ? path : `${v.baseDir ?? ""}/${path}`;
+        if (full.replace(/\/+/g, "/") !== abs) continue;
+        const at = Number(it.createdAt?.seconds ?? 0n) * 1000;
+        if (!best || at >= best.at) best = { threadId: id, at };
+      }
+    }
+    return best;
+  }
+
+  /**
    * ThreadService.ShowHtml (code-foundry view.inline; docs/notes/inline-html.md): an html
    * item at the end of the log, its path relative to the thread's cwd when inside it. Only
    * the extension is checked here (the daemon also wants a file under home).

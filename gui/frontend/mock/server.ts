@@ -13,6 +13,9 @@
  *   GET  /__mock/invocations | writes | threads | streams
  *   GET  /__mock/waits                            (every thread.wait invoked, held until its caller aborts it: mock/bridge.ts)
  *   GET  /__mock/fetches                          (every proxied page fetch: mock/proxyFetch.ts)
+ *   POST /__mock/page?path=…[&owner=s-1|&owner=][&how=shown|written][&consent=allowed|refused|not-asked][&unavailable=<reason>]
+ *        (a page file's owner, the user's answer, or why it is no page: mock/pages.ts; answers its PageAccess)
+ *   GET  /__mock/page/calls                       (page.allow / page.disallow as "allow <path>")
  *   POST /__mock/reset                            (a new home: layout.threads_open_as unset, so Panes)
  *   POST /__mock/install?state=existing|fresh     (the daemon's first start after Panes became the default:
  *        existing writes layout.threads_open_as = tabs when unset and posts the one notice, source "app";
@@ -279,12 +282,13 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { Code, ConnectError, cors as connectCors, type ConnectRouter } from "@connectrpc/connect";
 import { connectNodeAdapter } from "@connectrpc/connect-node";
-import { fromJson, type JsonValue, type MessageInitShape } from "@bufbuild/protobuf";
+import { create, fromJson, type JsonValue, type MessageInitShape } from "@bufbuild/protobuf";
 import { durationFromMs, timestampFromDate } from "@bufbuild/protobuf/wkt";
 import { CommandService, ConfirmationRequiredSchema } from "../src/gen/codefoundry/v1/command_pb";
 import { SettingsService, SettingsValidationErrorsSchema } from "../src/gen/codefoundry/v1/settings_pb";
 import { EventService, EventSource } from "../src/gen/codefoundry/v1/events_pb";
 import { FilesystemService } from "../src/gen/codefoundry/v1/filesystem_pb";
+import { PageAccessSchema, PageService } from "../src/gen/codefoundry/v1/page_pb";
 import { GhService } from "../src/gen/codefoundry/v1/gh_pb";
 import { HealthService } from "../src/gen/codefoundry/v1/health_pb";
 import { ProjectService } from "../src/gen/codefoundry/v1/project_pb";
@@ -346,6 +350,18 @@ const mockFiles = new MockFiles((path) => {
   return { projectId: d.projectId ?? "", baseRef: d.baseRef, files: (d.files ?? []).map((f) => ({ path: f.path ?? "", status: f.status ?? "", oldPath: f.oldPath, binary: f.binary, uncommitted: f.uncommitted })) };
 });
 world.exportDisk = mockFiles;
+world.pages.world = {
+  resolve: (path) => {
+    try {
+      const r = mockFiles.readWithLink("", path, 1n);
+      return r.notFound || r.isDir ? undefined : (r.realPath ?? r.resolvedPath ?? path);
+    } catch {
+      return undefined;
+    }
+  },
+  lastShown: (abs) => world.logs.lastShown(abs),
+  threadExists: (id) => world.threads.has(id),
+};
 
 function rpcError(err: unknown): ConnectError {
   if (err instanceof ConnectError) return err;
@@ -522,10 +538,21 @@ function routes(router: ConnectRouter): void {
     },
     readFile: (req) => mockFiles.readWithLink(req.baseDir, req.path, req.maxBytes, req.tail),
     writeFile: (req) => mockFiles.writeFile(req),
-    previewFile: (req) => mockFiles.previewFile(req.baseDir, req.path),
+    // With who owns the page and the user's answer (mock/pages.ts).
+    previewFile: (req) => {
+      const r = mockFiles.previewFile(req.baseDir, req.path);
+      return { ...r, page: create(PageAccessSchema, world.pages.previewPage(mockFiles.readFile(req.baseDir, req.path, 1n).resolvedPath ?? req.path)) };
+    },
     streamFile: (req) => mockFiles.streamFile(req.baseDir, req.path),
   });
 
+  // Who owns a page and the user's answer; storage and fetch for a page no thread owns (mock/pages.ts).
+  router.service(PageService, {
+    getPage: (req) => world.pages.getPage(req.path),
+    pageStorage: (req) => world.pages.pageStorage(req.path),
+    setPageStorage: (req) => world.pages.setPageStorage(req.path, req.key, req.value),
+    proxyFetch: (req, ctx) => (world.pages.checkFetch(req.path), mockProxyFetch(req, ctx.signal)),
+  });
   router.service(GhService, {
     getViewer: () => ({ viewer: world.gh.dashboard.viewer, authenticated: world.gh.authenticated, fetchedAt: world.gh.dashboard.fetchedAt }),
     getDashboard: () => world.gh.getDashboard(trackedSlugs()),
@@ -1638,6 +1665,12 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       break;
     case "GET /__mock/fetches":
       json(res, 200, mockFetches());
+      break;
+    case "POST /__mock/page":
+      json(res, 200, world.pages.script(q.get("path") ?? "", { owner: q.get("owner"), how: q.get("how"), consent: q.get("consent"), unavailable: q.get("unavailable") }));
+      break;
+    case "GET /__mock/page/calls":
+      json(res, 200, world.pages.calls);
       break;
     case "GET /__mock/settings":
       json(res, 200, { raw: world.settings.raw, values: world.settings.values(), loadError: world.settings.loadError });

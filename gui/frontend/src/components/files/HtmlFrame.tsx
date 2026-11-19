@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { LoaderCircle, RotateCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { createBridgeHost, type BridgeHost } from "@/stores/bridgeHost";
+import { createBridgeHost, type BridgeHost, type PageBridge } from "@/stores/bridgeHost";
 import { watchFrameAttention } from "@/lib/frameAttention";
 import { frameNonce, nonceMatches, withNonce } from "@/lib/bridge";
 import { addPageError, type PageError } from "@/lib/pageErrors";
@@ -87,9 +87,13 @@ export const LEFT_WAIT_MS = 400;
  * served as written and, once shown, has a white canvas, as in a browser.
  *
  * The bridge (stores/bridgeHost.ts): a page loading `/cf/bridge.js` runs verbs and
- * subscribes to the app's state as `thread`, the thread that shows it; without one (a File
- * tab on any other HTML file) it gets a bridge that refuses every call, in an opaque
- * origin (HTML_PREVIEW_SANDBOX). The frame's src carries a nonce of its own in its fragment
+ * subscribes to the app's state as `thread`, the thread it acts for (its owner); without one
+ * it is in an opaque origin (HTML_PREVIEW_SANDBOX) and its bridge does what `page` says
+ * (docs/notes/page-ownership-gui.md): the bridge without a thread once the user allowed the
+ * page, its ready held while they are asked (`onAsk` hears a document that wants it), every
+ * call refused otherwise. A change of `page` that a document already had its ready under
+ * loads the frame again, so the page starts over under the new answer; a held ready just
+ * goes out. The frame's src carries a nonce of its own in its fragment
  * (lib/bridge.ts withNonce), which the script sends back on every message. Only this
  * frame's own window, at the origin its URL names ("null" without a thread), with that
  * nonce is heard; `cf:resize` and `cf:theme:ack` may come without one (a page without the
@@ -127,6 +131,9 @@ export function HtmlFrame({
   onResize,
   testId,
   thread = null,
+  page,
+  pagePath,
+  onAsk,
   onPageErrors,
   onKey,
 }: {
@@ -134,6 +141,12 @@ export function HtmlFrame({
   name: string;
   /** The thread that shows the page, whose verbs and state its bridge may use; null for none. */
   thread?: string | null;
+  /** What a page with no thread may do (usePageThread); absent: nothing, every call refused. */
+  page?: PageBridge | undefined;
+  /** The page's file, named in a confirmation of a page with no thread. */
+  pagePath?: string;
+  /** A document of a page that is asked about said hello: it wants Code Foundry. */
+  onAsk?: () => void;
   className?: string;
   style?: CSSProperties;
   onResize?: (height: number) => void;
@@ -232,16 +245,32 @@ export function HtmlFrame({
   const present = useRef<() => boolean>(() => false);
   const openedAt = useRef(Number.NEGATIVE_INFINITY);
   const nameRef = useRef(name);
+  const pagePathRef = useRef(pagePath);
+  const askRef = useRef(onAsk);
   useEffect(() => {
     nameRef.current = name;
+    pagePathRef.current = pagePath;
+    askRef.current = onAsk;
+  });
+  // The page's access as one value an effect can follow (PageBridge is a fresh object each render).
+  const access = page ? JSON.stringify(page) : "";
+  const pageRef = useRef(page);
+  useEffect(() => {
+    pageRef.current = page;
   });
   useEffect(() => {
     const attention = watchFrameAttention(() => frameRef.current);
+    const first = pageRef.current;
     const h = createBridgeHost({
       threadId: thread,
+      ...(first ? { page: first } : {}),
       get pageName() {
         return nameRef.current;
       },
+      get pagePath() {
+        return pagePathRef.current ?? "";
+      },
+      onAsk: () => askRef.current?.(),
       userPresent: attention.present,
       post: (msg) => {
         const win = frameRef.current?.contentWindow;
@@ -259,6 +288,12 @@ export function HtmlFrame({
       if (host.current === h) host.current = null;
     };
   }, [thread, target, report]);
+  // The user answered (or the grant changed): the host is told; a document that had its ready loads again.
+  useEffect(() => {
+    const p = pageRef.current;
+    if (!p || !host.current) return;
+    if (host.current.setPage(p)) setLoad((n) => n + 1);
+  }, [access]);
   const resizeRef = useRef(onResize);
   const keyRef = useRef(onKey);
   useEffect(() => {

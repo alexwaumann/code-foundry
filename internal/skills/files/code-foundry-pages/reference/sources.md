@@ -41,8 +41,9 @@ pointer makes a click act on the wrong one. So:
 
 `get(key)` and `keys()` answer at once from the copy the page got with `cf.ready`; `set`,
 `remove` and `clear` change that copy at once and return a Promise that rejects when the
-thread's storage is full (256 KiB, 1 KiB a key) or the write was refused: the value is
-then put back. Another page of the thread writing a key updates this page's copy.
+storage is full (256 KiB, 1 KiB a key) or the write was refused: the value is then put
+back. Another page of the thread (or another frame of a page no thread owns) writing a key
+updates this page's copy.
 
 ## External APIs: cf.fetch and tokens
 
@@ -65,7 +66,7 @@ does not allow the page's origin fails whatever the token, and most internal API
 - It rejects with `invalid` (a bad URL, a scheme other than http or https, a Cookie, Origin
   or Host header, a body over 1 MiB, a refused host), `failed` (no answer: DNS, TLS, the
   network, more than 5 redirects or one to another scheme, an answer over 8 MiB),
-  `timeout`, or `unavailable` (the page is not shown in a thread). Show `e.message`.
+  `timeout`, or `unavailable` (the user has not allowed the page). Show `e.message`.
 - The app sends no cookies and no Origin, and adds `User-Agent: code-foundry/<version>`
   unless you set one. An Authorization header is not sent on to a redirect to another domain.
 - Refused hosts: this Mac's own (localhost, 127.0.0.1, ::1, 0.0.0.0) and link-local

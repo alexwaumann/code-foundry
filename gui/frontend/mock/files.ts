@@ -268,6 +268,11 @@ ${Array.from({ length: 40 }, (_, i) => `<p>Line ${String(i + 1)} of a page longe
 </body></html>
 `;
 
+/** A page no thread owns that uses the bridge: it asks first (mock/board-page.html; docs/notes/page-ownership-gui.md). */
+export const BOARD_PAGE_HTML = readFileSync(new URL("./board-page.html", import.meta.url), "utf8");
+/** Where it is: under home, in no project and no thread's pages directory. */
+export const BOARD_PAGE = `${HOME}/notes/board.html`;
+
 /** A page that calls Code Foundry through /cf/bridge.js (mock/bridge-page.html; docs/notes/bridge-2-gui.md). */
 export const BRIDGE_PAGE_HTML = readFileSync(new URL("./bridge-page.html", import.meta.url), "utf8");
 
@@ -343,6 +348,8 @@ function fixtures(): Map<string, Entry> {
     [WELCOME_PAGE, text(WELCOME_HTML, "text/html")],
     // Outside the checkout, so it is served under a grant of its own.
     [`${HOME}/elsewhere/bridge.html`, text(BRIDGE_PAGE_HTML, "text/html")],
+    // A page no thread owns: the user is asked before it uses Code Foundry (e2e/page-consent.spec.ts).
+    [BOARD_PAGE, text(BOARD_PAGE_HTML, "text/html")],
     [`${CF}/docs/logo.png`, { data: PNG, mime: "image/png", binary: true }],
     [`${CF}/docs/logo.svg`, text(LOGO_SVG, "image/svg+xml")],
     ...Object.entries(MERMAID_FILES).map(([p, f]): [string, Entry] => [`${CF}/${p}`, text(f.text, f.mime)]),

@@ -34,9 +34,25 @@ vi.mock("@/api/pageStorage", () => ({
 // The daemon's ProxyFetch: what each call asked, answered by the test.
 const proxyFetch = vi.hoisted(() => vi.fn());
 vi.mock("@/api/proxyFetch", () => ({ proxyFetch }));
+// PageService for a page no thread owns: storage per path in memory, fetch answered by the test.
+const fileStore = vi.hoisted(() => ({ values: new Map<string, Record<string, string>>(), sets: [] as string[], refuse: null as Error | null }));
+const proxyPageFetch = vi.hoisted(() => vi.fn());
+vi.mock("@/api/page", () => ({
+  getPageFileStorage: (path: string) => (fileStore.refuse ? Promise.reject(fileStore.refuse) : Promise.resolve({ ...fileStore.values.get(path) })),
+  setPageFileStorage: (path: string, key: string, value: string | null) => {
+    if (fileStore.refuse) return Promise.reject(fileStore.refuse);
+    fileStore.sets.push(`${path} ${key}`);
+    const vals = Object.fromEntries(Object.entries({ ...fileStore.values.get(path) }).filter(([k]) => k !== key));
+    if (value !== null) vals[key] = value;
+    fileStore.values.set(path, vals);
+    return Promise.resolve({ ...vals });
+  },
+  proxyPageFetch,
+}));
 const noticePageResult = vi.hoisted(() => vi.fn());
 vi.mock("./pageSaved", () => ({ noticePageResult }));
 const { createBridgeHost, BRIDGE_DEBOUNCE_MS, PAGE_ASKS } = await import("./bridgeHost");
+type PageBridge = import("./bridgeHost").PageBridge;
 const { EMBER_OFF_SCREEN } = await import("./bridgeSources");
 
 const cmd = (name: string, over: Partial<CommandView> = {}): CommandView => ({ name, title: name, description: "", category: "Thread", args: [], keybindings: [], available: true, ...over });
@@ -56,12 +72,22 @@ const archiveConfirm = new NeedsConfirm({ command: "thread.archive", title: "Arc
 
 const thread = (id: string, name: string): ThreadView => ({ id, name, projectId: "", worktreePath: "", workspaceId: "" }) as ThreadView;
 
-function host(threadId: string | null = "t-1") {
+function host(threadId: string | null = "t-1", page?: PageBridge) {
   const posts: Record<string, unknown>[] = [];
   const errors: { call: string; code: string; message: string }[] = [];
   const attention = { present: true };
-  const h = createBridgeHost({ threadId, pageName: "page.html", userPresent: () => attention.present, post: (m) => posts.push(m as unknown as Record<string, unknown>), onError: (e) => errors.push(e) });
-  return { h, posts, errors, attention };
+  const asked = { n: 0 };
+  const h = createBridgeHost({
+    threadId,
+    ...(page ? { page } : {}),
+    pageName: "page.html",
+    pagePath: "/Users/me/p/page.html",
+    userPresent: () => attention.present,
+    post: (m) => posts.push(m as unknown as Record<string, unknown>),
+    onError: (e) => errors.push(e),
+    onAsk: () => asked.n++,
+  });
+  return { h, posts, errors, attention, asked };
 }
 
 const run = (id: string, verb: string, args: Record<string, string> = {}) => ({ cf: 1, type: "cf:run", id, verb, args });
@@ -95,6 +121,10 @@ beforeEach(() => {
   listCommands.mockResolvedValue(commands);
   pageStore.values.clear();
   pageStore.sets = [];
+  fileStore.values.clear();
+  fileStore.sets = [];
+  fileStore.refuse = null;
+  proxyPageFetch.mockReset();
   useThreadsStore.setState({ byId: { "t-1": thread("t-1", "Fix stale badge") }, order: ["t-1"] });
 });
 
@@ -534,7 +564,7 @@ describe("bridge host", () => {
     });
   });
 
-  it("refuses every call without a thread", async () => {
+  it("refuses every call without a thread (a daemon older than page ownership)", async () => {
     const { h, posts } = host(null);
     h.receive(hello);
     h.receive(run("r", "thread.list"));
@@ -542,7 +572,7 @@ describe("bridge host", () => {
     await vi.waitFor(() => {
       expect(posts).toHaveLength(3);
     });
-    expect(posts).toContainEqual({ type: "cf:ready", cf: 1, thread: null, theme: expect.anything() as unknown, readOnly: [], sources: [], storage: {} });
+    expect(posts).toContainEqual({ type: "cf:ready", cf: 1, thread: null, theme: expect.anything() as unknown, readOnly: [], sources: [], storage: {}, can: { storage: false, fetch: false }, refusal: "this page is not shown in a thread" });
     const refusal = { ok: false, error: { code: "unavailable", message: "this page is not shown in a thread" } };
     expect(posts).toContainEqual({ type: "cf:result", id: "r", ...refusal });
     expect(posts).toContainEqual({ type: "cf:result", id: "s", ...refusal });
@@ -770,5 +800,188 @@ describe("bridge host", () => {
     expect(posts).toEqual([]);
     expect(invokeCommand).not.toHaveBeenCalled();
     expect(pageStore.sets).toEqual([]);
+  });
+});
+
+/** A page no thread owns, at its resolved path (docs/notes/page-ownership-gui.md). */
+const PAGE = "/Users/me/p/page.html";
+const ALLOWED: PageBridge = { kind: "allowed", path: PAGE };
+const NOT_ALLOWED_MSG = "the user has not allowed this page to use Code Foundry";
+
+describe("bridge host: a page no thread owns", () => {
+  it("allowed: a ready with no thread, its file's storage, the read-only verbs and every source", async () => {
+    fileStore.values.set(PAGE, { n: "3" });
+    const { h, posts } = host(null, ALLOWED);
+    h.receive(hello);
+    await vi.waitFor(() => {
+      expect(posts).toHaveLength(1);
+    });
+    expect(posts[0]).toMatchObject({ type: "cf:ready", thread: null, readOnly: ["thread.list"], storage: { n: "3" }, can: { storage: true, fetch: true }, refusal: "" });
+    expect((posts[0] as { sources: string[] }).sources).toContain("thread");
+    // The commands are listed with no thread in the context, as the CLI outside one.
+    expect(listCommands).toHaveBeenCalledWith(expect.objectContaining({ activeThreadId: "", origin: "page" }), { includeUnavailable: true });
+  });
+
+  it("allowed: storage goes to PageService under the page's path, and other frames of the same file hear it", async () => {
+    const a = host(null, ALLOWED);
+    const b = host(null, ALLOWED);
+    const other = host(null, { kind: "allowed", path: "/Users/me/p/other.html" });
+    a.h.receive({ cf: 1, type: "cf:store", id: "w", key: "k", value: "1" });
+    await vi.waitFor(() => {
+      expect(a.posts).toContainEqual({ type: "cf:result", id: "w", ok: true, result: { text: "", json: null } });
+    });
+    expect(fileStore.sets).toEqual([`${PAGE} k`]);
+    expect(pageStore.sets).toEqual([]);
+    expect(b.posts).toContainEqual({ type: "cf:storage", values: { k: "1" } });
+    expect(other.posts).toEqual([]);
+  });
+
+  it("allowed: a write the daemon refuses for consent says the user has not allowed the page, and puts back what is stored", async () => {
+    const { h, posts } = host(null, ALLOWED);
+    fileStore.refuse = new ConnectError("not allowed", Code.PermissionDenied);
+    h.receive({ cf: 1, type: "cf:store", id: "w", key: "k", value: "1" });
+    await vi.waitFor(() => {
+      expect(posts).toContainEqual({ type: "cf:result", id: "w", ok: false, error: { code: "unavailable", message: NOT_ALLOWED_MSG } });
+    });
+  });
+
+  it("allowed: fetch goes to PageService under the page's path, never a thread's", async () => {
+    proxyPageFetch.mockResolvedValue({ status: 200, statusText: "OK", headers: {}, body: "hi", url: "https://api.example.com/x" });
+    const { h, posts } = host(null, ALLOWED);
+    h.receive({ cf: 1, type: "cf:fetch", id: "f", url: "https://api.example.com/x", method: "GET", headers: {}, body: "", timeout: 1000 });
+    await vi.waitFor(() => {
+      expect(posts).toContainEqual(expect.objectContaining({ type: "cf:result", id: "f", ok: true }));
+    });
+    expect(proxyPageFetch).toHaveBeenCalledWith(PAGE, { url: "https://api.example.com/x", method: "GET", headers: {}, body: "", timeoutMs: 1000 }, { signal: expect.any(AbortSignal) as unknown });
+    expect(proxyFetch).not.toHaveBeenCalled();
+  });
+
+  it("allowed: a run has no thread in its context and sends no thread arg; the confirmation names the page's file", async () => {
+    invokeCommand.mockResolvedValue({ message: "started", resultJson: "" });
+    const { h, posts } = host(null, ALLOWED);
+    h.receive(run("r", "thread.new", { prompt: "go" }));
+    await vi.waitFor(() => {
+      expect(posts).toContainEqual(expect.objectContaining({ type: "cf:result", id: "r", ok: true }));
+    });
+    expect(invokeCommand).toHaveBeenCalledWith("thread.new", expect.objectContaining({ activeThreadId: "", origin: "page" }), { prompt: "go", focus: "false" }, ...signalled);
+    // No thread's panel to open a saved file in.
+    expect(noticePageResult).not.toHaveBeenCalled();
+    invokeCommand.mockRejectedValueOnce(archiveConfirm);
+    h.receive(run("a", "thread.archive", { id: "t-1" }));
+    await vi.waitFor(() => {
+      expect(useConfirmStore.getState().pending).toMatchObject({ guarded: true, caller: "a page", callerDetail: 'Page "page.html" at ~/p/page.html, in no thread' });
+    });
+  });
+
+  it("allowed: a verb that needs the caller's thread says the page has none", async () => {
+    invokeCommand.mockRejectedValue(new ConnectError('missing --id (default: the active thread; there is none)', Code.InvalidArgument));
+    const { h, posts } = host(null, ALLOWED);
+    h.receive(run("r", "thread.list"));
+    await vi.waitFor(() => {
+      expect(posts).toContainEqual(expect.objectContaining({ type: "cf:result", id: "r", ok: false }));
+    });
+    const res = posts.find((p) => p.id === "r") as { error: { code: string; message: string } };
+    expect(res.error.code).toBe("unavailable");
+    expect(res.error.message).toMatch(/^this page has no thread .*thread\.list needs one unless its args name the thread: .*missing --id/);
+  });
+
+  it("allowed: follows app-wide sources, and refuses its own thread's, saying it has none", () => {
+    const { h, posts } = host(null, ALLOWED);
+    h.receive({ cf: 1, type: "cf:on", id: "s", source: "thread-list" });
+    h.receive({ cf: 1, type: "cf:on", id: "t", source: "thread" });
+    expect(posts[0]).toMatchObject({ type: "cf:event", id: "s", source: "thread-list" });
+    expect(posts[1]).toMatchObject({ type: "cf:result", id: "t", ok: false, error: { code: "unavailable" } });
+    expect((posts[1] as { error: { message: string } }).error.message).toMatch(/^this page has no thread .*cf\.on\("thread"\) needs one/);
+    h.dispose();
+  });
+
+  it("refused: a ready that says why, and every call refused with it", async () => {
+    const { h, posts, asked, errors } = host(null, { kind: "refused", error: { code: "unavailable", message: NOT_ALLOWED_MSG } });
+    h.receive(hello);
+    h.receive(run("r", "thread.list"));
+    h.receive({ cf: 1, type: "cf:store", id: "w", key: "k", value: "1" });
+    h.receive({ cf: 1, type: "cf:on", id: "s", source: "thread-list" });
+    await vi.waitFor(() => {
+      expect(posts).toHaveLength(4);
+    });
+    expect(posts[0]).toMatchObject({ type: "cf:ready", thread: null, can: { storage: false, fetch: false }, refusal: NOT_ALLOWED_MSG, readOnly: [], sources: [] });
+    for (const id of ["r", "w", "s"]) expect(posts).toContainEqual({ type: "cf:result", id, ok: false, error: { code: "unavailable", message: NOT_ALLOWED_MSG } });
+    expect(invokeCommand).not.toHaveBeenCalled();
+    expect(fileStore.sets).toEqual([]);
+    expect(asked.n).toBe(0);
+    // The user's own answer, which the footer shows: not the page's error to report.
+    expect(errors).toEqual([]);
+  });
+
+  it("ask: holds the ready (cf:asking), tells the frame, and holds the page's calls until the user allows it", async () => {
+    fileStore.values.set(PAGE, { n: "1" });
+    const { h, posts, asked } = host(null, { kind: "ask" });
+    h.loaded();
+    expect(asked.n).toBe(0);
+    h.receive(hello);
+    expect(posts).toEqual([{ type: "cf:asking", cf: 1 }]);
+    expect(asked.n).toBe(1);
+    h.receive({ cf: 1, type: "cf:on", id: "s", source: "thread-list" });
+    await new Promise((r) => setTimeout(r, 10));
+    expect(posts).toHaveLength(1);
+    expect(listCommands).not.toHaveBeenCalled();
+    // The user allows it: no reload, the ready goes out and the held call runs.
+    expect(h.setPage(ALLOWED)).toBe(false);
+    await vi.waitFor(() => {
+      expect(posts.some((p) => p.type === "cf:ready")).toBe(true);
+    });
+    expect(posts.find((p) => p.type === "cf:ready")).toMatchObject({ thread: null, storage: { n: "1" }, can: { storage: true, fetch: true } });
+    expect(posts).toContainEqual(expect.objectContaining({ type: "cf:event", id: "s", source: "thread-list" }));
+    h.dispose();
+  });
+
+  it("ask: the user does not allow it: the held ready says so, and the held calls are refused", async () => {
+    const { h, posts } = host(null, { kind: "ask" });
+    h.receive(hello);
+    h.receive({ cf: 1, type: "cf:on", id: "s", source: "thread-list" });
+    expect(h.setPage({ kind: "refused", error: { code: "unavailable", message: NOT_ALLOWED_MSG } })).toBe(false);
+    await vi.waitFor(() => {
+      expect(posts).toHaveLength(3);
+    });
+    expect(posts[1]).toMatchObject({ type: "cf:ready", refusal: NOT_ALLOWED_MSG });
+    expect(posts[2]).toEqual({ type: "cf:result", id: "s", ok: false, error: { code: "unavailable", message: NOT_ALLOWED_MSG } });
+  });
+
+  it("ask: a new document starts over, its predecessor's held calls dropped, and the frame is told again", () => {
+    const { h, posts, asked } = host(null, { kind: "ask" });
+    h.receive(hello);
+    h.receive({ cf: 1, type: "cf:on", id: "s", source: "thread-list" });
+    h.receive({ cf: 1, type: "cf:bye" });
+    h.receive(hello);
+    expect(asked.n).toBe(2);
+    h.setPage(ALLOWED);
+    expect(posts.filter((p) => p.type === "cf:event")).toEqual([]);
+    h.dispose();
+  });
+
+  it("ask: past the bound, a held call is refused at once", () => {
+    const { h, posts } = host(null, { kind: "ask" });
+    h.receive(hello);
+    for (let i = 0; i < 65; i++) h.receive({ cf: 1, type: "cf:on", id: `s${String(i)}`, source: "thread-list" });
+    expect(posts.slice(1)).toEqual([{ type: "cf:result", id: "s64", ok: false, error: { code: "invalid", message: "too many calls while the user is asked about this page (64)" } }]);
+  });
+
+  it("a change for a document that already had its ready asks the frame to load it again, and stops its calls", async () => {
+    const { h, posts } = host(null, { kind: "refused", error: { code: "unavailable", message: NOT_ALLOWED_MSG } });
+    // A plain page that never said hello: nothing to load again.
+    expect(h.setPage({ kind: "refused", error: { code: "unavailable", message: "other" } })).toBe(false);
+    h.receive(hello);
+    await vi.waitFor(() => {
+      expect(posts).toHaveLength(1);
+    });
+    expect(h.setPage(ALLOWED)).toBe(true);
+    // The same answer again changes nothing.
+    expect(h.setPage(ALLOWED)).toBe(false);
+  });
+
+  it("a frame with a thread ignores setPage", () => {
+    const { h } = host("t-1");
+    h.receive(hello);
+    expect(h.setPage({ kind: "ask" })).toBe(false);
   });
 });

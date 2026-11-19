@@ -60,6 +60,7 @@ import { A as PEER_A, B as PEER_B, C as PEER_C, W as PEER_W, scriptReceiver, scr
 import { CRASH_STDERR, MockThreadLogs, type SeedHistory, type ThreadState as ScriptedThreadState } from "./thread";
 import { contextFields, recordCompaction, recordResult, type MockContext } from "./context";
 import { intoUsersDiff, panelItemCommands, type PlaceTab } from "./panelItemVerbs";
+import { MockPages } from "./pages";
 import { createHints, type SetThread } from "./projectSets";
 
 type TerminalInit = MessageInitShape<typeof TerminalSchema>;
@@ -836,6 +837,8 @@ export class World {
   readonly threadListEvents = new Hub<ThreadListEventInit>((v) => this.events.publish({ source: EventSource.THREAD_LIST, event: { event: { case: "threadList", value: v } } }));
   readonly intents = new Hub<UiIntentInit>((v) => this.events.publish({ source: EventSource.UI, event: { event: { case: "ui", value: v } } }));
   readonly gitopsEvents = new Hub<GitOpsEventInit>((v) => this.events.publish({ source: EventSource.GITOPS, event: { event: { case: "gitops", value: v } } }));
+  /** Who owns each page file and the user's answers (mock/pages.ts); server.ts gives it the files. */
+  readonly pages = new MockPages();
   /** Threads' conversations (mock/thread.ts); the EventService thread source carries their pending requests. */
   readonly logs: MockThreadLogs = new MockThreadLogs(
     {
@@ -1154,6 +1157,7 @@ export class World {
   }
 
   reset(): void {
+    this.pages.reset();
     for (const t of this.terms.values()) t.attach.publish("end");
     this.terms.clear();
     this.projects.clear();
@@ -4714,7 +4718,10 @@ export class World {
           checkouts: Object.entries(t.checkoutPaths).filter(([, path]) => path).map(([projectId, path]) => ({ projectId, path })),
           changed: (root) => this.gh.details.get(root)?.files?.map((f) => f.path ?? ""),
         };
-      }, this.placeItemTab),
+      }, this.placeItemTab, (path, thread) => {
+        this.pages.shown(path, thread);
+      }),
+      ...this.pages.commands(),
       ...agentsCommands(this.logs, (i) => this.emit(i)),
       ...shellCommands(this.logs),
       ...this.actions.commands(),

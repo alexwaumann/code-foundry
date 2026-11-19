@@ -91,6 +91,7 @@ describe("fillPageArgs", () => {
     { name: "unless the page asks", args: { focus: "true" }, specs: [spec("focus", { type: "bool", defaultValue: "true" })], want: { focus: "true" } },
     { name: "a focus that is off by default is left alone", args: {}, specs: [spec("focus", { type: "bool" })], want: {} },
     { name: "nothing else", args: {}, specs: [spec("prompt")], want: {} },
+    { name: "a page with no thread sends no thread, as the CLI outside one", args: { prompt: "hi" }, specs: [spec("created-by", { defaultToThreadEnv: true }), spec("prompt")], place: { threadId: "", cwd: "" }, want: { prompt: "hi" } },
   ];
   for (const c of cases) {
     it(c.name, () => {
@@ -102,7 +103,7 @@ describe("fillPageArgs", () => {
 describe("replies", () => {
   it("ready names the thread, its read-only verbs (sorted) and every source", () => {
     const theme = { id: "github-dark", scheme: "dark" as const, vars: { "--cf-text": "#ffffff" } };
-    expect(readyMessage({ id: "t", name: "Fix" }, theme, ["thread.list", "action.list"], { n: "3" })).toEqual({
+    expect(readyMessage({ kind: "thread", thread: { id: "t", name: "Fix" } }, theme, ["thread.list", "action.list"], { n: "3" })).toEqual({
       type: "cf:ready",
       cf: 1,
       thread: { id: "t", name: "Fix" },
@@ -110,14 +111,17 @@ describe("replies", () => {
       readOnly: ["action.list", "thread.list"],
       sources: [...BRIDGE_SOURCES],
       storage: { n: "3" },
+      can: { storage: true, fetch: true },
+      refusal: "",
     });
   });
-  it("ready without a thread offers nothing", () => {
-    const m = readyMessage(null, { id: "x", scheme: "light", vars: {} }, ["thread.list"], { n: "3" });
-    expect(m.thread).toBeNull();
-    expect(m.readOnly).toEqual([]);
-    expect(m.sources).toEqual([]);
-    expect(m.storage).toEqual({});
+  it("ready for a page alone has no thread, and storage, fetch, verbs and sources all the same", () => {
+    const m = readyMessage({ kind: "page" }, { id: "x", scheme: "light", vars: {} }, ["thread.list"], { n: "3" });
+    expect(m).toMatchObject({ thread: null, readOnly: ["thread.list"], sources: [...BRIDGE_SOURCES], storage: { n: "3" }, can: { storage: true, fetch: true }, refusal: "" });
+  });
+  it("ready with no bridge offers nothing and says why", () => {
+    const m = readyMessage({ kind: "none", refusal: "the user has not allowed this page to use Code Foundry" }, { id: "x", scheme: "light", vars: {} }, ["thread.list"], { n: "3" });
+    expect(m).toMatchObject({ thread: null, readOnly: [], sources: [], storage: {}, can: { storage: false, fetch: false }, refusal: "the user has not allowed this page to use Code Foundry" });
   });
   it("a result carries the text and the parsed JSON", () => {
     expect(okResult("r", { message: "done", resultJson: '{"a":1}' })).toEqual({ type: "cf:result", id: "r", ok: true, result: { text: "done", json: { a: 1 } } });

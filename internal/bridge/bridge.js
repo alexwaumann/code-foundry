@@ -5,12 +5,12 @@
  *
  * gives the page window.cf:
  *   cf.ready                      Promise, resolved once the app said hello (cf:ready)
- *   cf.thread {id, name}          the thread the page is shown in
+ *   cf.thread {id, name} | null   the thread that last showed or wrote the page; null: none (errors-and-limits.md)
  *   cf.theme {id, scheme, vars}   the app's theme; cf.onTheme(fn) on every change
  *   cf.run(verb, args?, opts?)    Promise of {text, json}; rejects with {code, message}
  *   cf.on(source, fn) / cf.off    live data, fn(value, source): now, then on change; on returns an unsubscribe
  *   cf.resize(height?)            the card follows the page's height by itself
- *   cf.storage(prefix?)           the thread's page storage, kept across app restarts
+ *   cf.storage(prefix?)           the page's storage, kept across app restarts
  *   cf.fetch(url, init?)          Promise of {status, ok, headers, text(), json()}; the app makes it: no CORS
  *
  * A verb that is not read-only runs only from a user gesture in the page (a click, a key).
@@ -18,6 +18,10 @@
  * waiting on the app's confirm dialog does not time out; cf.on throws for an unknown source.
  * At most 32 runs and fetches are at the app at once (more wait here, their timeouts running)
  * and 16 subscriptions; a call's args, or a stored value, may be up to 256 KiB.
+ *
+ * A page no thread owns asks the user once whether it may use Code Foundry: until they answer,
+ * cf.ready waits (the app said cf:asking), and nothing times out. Allowed, it has storage, fetch,
+ * the verbs that need no thread and every source but "thread"; refused, every call says so.
  *
  * The app opens the page with a nonce in its URL's fragment (#cf=<nonce>), sent back on
  * every message (docs/notes/bridge-fix-frames.md), and carried on to the page's own other
@@ -62,6 +66,10 @@
   var themeFns = [];
   var readyMsg = null;
   var readyWaiters = [];
+  var readyTimer = 0;
+  // The app holds cf:ready while it asks the user about this page (cf:asking): no wait for
+  // it times out, however long the user takes to answer.
+  var holding = false;
   var readOnly = {};
   var lastGesture = 0;
   var lastHeight = 0;
@@ -114,7 +122,7 @@
     if (!bridged) return Promise.reject(notShown());
     return new Promise(function (resolve, reject) {
       var w = { resolve: resolve, reject: reject, timer: 0 };
-      if (ms > 0) {
+      if (ms > 0 && !holding) {
         w.timer = setTimeout(function () {
           readyWaiters = readyWaiters.filter(function (x) { return x !== w; });
           reject(cfError("unavailable", "Code Foundry did not answer this page"));
@@ -122,6 +130,22 @@
       }
       readyWaiters.push(w);
     });
+  }
+
+  // Whether the app gave this page `what` ("storage", "fetch") in its cf:ready. An app from
+  // before pages without a thread sends no `can`: then a page has them only with a thread.
+  function may(what) {
+    if (!readyMsg) return false;
+    var can = readyMsg.can;
+    if (can && typeof can === "object") return can[what] === true;
+    return !!cf.thread;
+  }
+
+  // The refusal of `call` the app gave no `may` for: its reason (the user has not allowed the
+  // page, it is not a page the app gives a bridge), or no thread from an older app.
+  function denied(call) {
+    var why = typeof readyMsg.refusal === "string" && readyMsg.refusal !== "" ? readyMsg.refusal : "this page is not shown in a thread";
+    return cfError("unavailable", call + ": " + why);
   }
 
   function notShown() {
@@ -289,7 +313,7 @@
       return Promise.reject(e);
     }
     return whenReady(READY_MS).then(function () {
-      if (!cf.thread) throw cfError("unavailable", "cf.fetch needs the page's thread: this page is not shown in one");
+      if (!may("fetch")) throw denied("cf.fetch");
       return new Promise(function (resolve, reject) {
         var id = nextId();
         var host = msg.host;
@@ -331,7 +355,8 @@
     if (typeof source !== "string" || source === "" || typeof fn !== "function") {
       throw cfError("invalid", "cf.on(source, fn): a source name and a function");
     }
-    var known = readyMsg && cf.thread ? cf.sources : SOURCES;
+    // Before cf:ready, and on a page given no sources (the app refuses its calls, saying why), every name.
+    var known = readyMsg && cf.sources.length > 0 ? cf.sources : SOURCES;
     if (known.indexOf(source) < 0) {
       throw cfError("invalid", "cf.on: no source " + source + "; the sources are " + known.join(", "));
     }
@@ -465,8 +490,8 @@
   }
 
   function storage(prefix) {
-    if (!readyMsg) throw cfError("unavailable", "cf.storage needs the page's thread: await cf.ready first");
-    if (!cf.thread) throw cfError("unavailable", "cf.storage needs the page's thread: this page is not shown in one");
+    if (!readyMsg) throw cfError("unavailable", "cf.storage: Code Foundry has not answered this page yet; await cf.ready first");
+    if (!may("storage")) throw denied("cf.storage");
     var base = prefix ? String(prefix) + ":" : "";
     function own() {
       return Object.keys(stored).filter(function (k) { return k.indexOf(base) === 0; });
@@ -498,7 +523,7 @@
     };
   }
 
-  // cf:storage: the thread's whole storage, after another page wrote or a write was refused.
+  // cf:storage: the whole storage, after another page wrote or a write was refused.
   function restore(values) {
     if (!values || typeof values !== "object") return;
     Object.keys(stored).forEach(function (k) {
@@ -558,6 +583,7 @@
     switch (m.type) {
       case "cf:ready":
         readyMsg = m;
+        clearTimeout(readyTimer);
         cf.thread = m.thread && typeof m.thread === "object" ? { id: String(m.thread.id || ""), name: String(m.thread.name || "") } : null;
         readOnly = {};
         (Array.isArray(m.readOnly) ? m.readOnly : []).forEach(function (v) { readOnly[v] = true; });
@@ -571,6 +597,15 @@
         });
         resolveReady(cf);
         queueResize();
+        break;
+      case "cf:asking":
+        if (readyMsg) break;
+        holding = true;
+        clearTimeout(readyTimer);
+        readyWaiters.forEach(function (w) {
+          clearTimeout(w.timer);
+          w.timer = 0;
+        });
         break;
       case "cf:result":
         settle(m.id, m);
@@ -617,7 +652,7 @@
   ready.catch(function () {}); // a page that never awaits it outside the app logs nothing
   if (!bridged) rejectReady(notShown());
   else {
-    setTimeout(function () {
+    readyTimer = setTimeout(function () {
       if (!readyMsg) rejectReady(cfError("unavailable", "Code Foundry did not answer this page"));
     }, READY_MS);
   }
