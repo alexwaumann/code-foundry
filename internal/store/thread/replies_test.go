@@ -407,6 +407,32 @@ func TestReplyToOwnWorker(t *testing.T) {
 			t.Errorf("%d wakes, want 2", got)
 		}
 	})
+	// The worker's turn can end before Send's bookkeeping runs (a short turn): the renewed
+	// notify subscription then fires at once and ends. That one wake is the answer; a
+	// reply-wait on top would wake the lead a second time for the same turn's end. Driven
+	// by hand (afterSend after the turn ended) so the order is fixed; a fire queues its
+	// wake before afterSend returns, so the drained queue holds every wake there is.
+	t.Run("turn over before the bookkeeping", func(t *testing.T) {
+		n := newNotifyEnv(t)
+		n.setStep(n.child.ID, finished)
+		n.waitItems(n.parent.ID, "the finish's wake", func(items []Item) bool { return len(wakes(items)) == 1 })
+		n.setStep(n.child.ID, busy)
+		n.m.update(n.child.ID, false, func(rec *record) { rec.s.HandledThrough = 5 })
+		n.setStep(n.child.ID, finished)
+		n.m.afterSend(n.ctx(), n.child.ID, Message{Text: "Which file did you change?", ByThreadID: n.parent.ID, Reply: ReplyWanted},
+			Item{ID: "i-5", Ordinal: 5})
+		n.waitDrained(n.parent.ID)
+		items := n.items(n.parent.ID).Items
+		if got := len(wakes(items)); got != 2 {
+			t.Fatalf("%d wakes, want 2:\n%s", got, describeItems(items))
+		}
+		if strings.Contains(wakes(items)[1].WakeTitle, "It handled your message") {
+			t.Errorf("the answer's wake is a reply-wait's: %s", wakes(items)[1].WakeTitle)
+		}
+		if subs := n.subsOf(n.parent.ID); len(subs) != 0 {
+			t.Errorf("subscriptions = %+v", subs)
+		}
+	})
 	t.Run("none renews no notify", func(t *testing.T) {
 		n := newNotifyEnv(t)
 		n.setStep(n.child.ID, step{StateDisconnected, StatusNeedsAttention, "finished", ""})
