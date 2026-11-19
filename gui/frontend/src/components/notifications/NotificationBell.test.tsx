@@ -195,3 +195,167 @@ describe("a card", () => {
     expect(useNotificationsStore.getState().open).toBe(false);
   });
 });
+
+/**
+ * When the list shuts (docs/notes/bell-close-on-action.md): at once for an action or the thread
+ * link; after the user's own dismiss, snooze or clear only when that emptied the list; never
+ * because the list emptied by itself.
+ */
+describe("when the list shuts", () => {
+  const isOpen = () => useNotificationsStore.getState().open;
+  const withAction = (id: string) => note(id, { actions: [{ label: "Open PR", kind: "open", resolves: false, url: "https://x" }] });
+
+  /** The daemon's snapshot drops the card before the command's result comes back. */
+  function eventFirst(rest: NotificationView[]): void {
+    runCommandForResult.mockImplementationOnce(() => {
+      applyNotificationEvent(noteEvent(rest));
+      return Promise.resolve({ message: "", resultJson: "{}" });
+    });
+  }
+
+  async function snoozeFirstPreset(id: string): Promise<void> {
+    fireEvent.pointerDown(within(cardOf(id)).getByTestId("notification-snooze"), { button: 0, ctrlKey: false });
+    const presets = await screen.findAllByTestId("notification-snooze-preset");
+    fireEvent.click(presets[0] as HTMLElement);
+    await settle();
+  }
+
+  it("an action button shuts it at the click, before the result", async () => {
+    runCommandForResult.mockImplementationOnce(() => new Promise(() => undefined));
+    show(withAction("n-1"), note("n-2"));
+    render(<NotificationBell />);
+    await openBell();
+    fireEvent.click(within(cardOf("n-1")).getByTestId("notification-action"));
+    expect(runCommandForResult).toHaveBeenCalledWith("notification.act", { id: "n-1", action: "1" }, expect.objectContaining({ quiet: true }));
+    expect(isOpen()).toBe(false);
+  });
+
+  it("a failed action still shut it; the error toasts and the notification stays in the bell", async () => {
+    runCommandForResult.mockImplementationOnce((...args: unknown[]) => {
+      (args[2] as { onError: (m: string) => void }).onError("no such command");
+      return Promise.resolve(null);
+    });
+    show(withAction("n-1"));
+    render(<NotificationBell />);
+    await openBell();
+    fireEvent.click(within(cardOf("n-1")).getByTestId("notification-action"));
+    await settle();
+    expect(isOpen()).toBe(false);
+    expect(notify).toHaveBeenCalledWith({ level: "error", title: "Open PR failed", description: "no such command" });
+    await openBell();
+    expect(cards().map((c) => c.dataset.notificationId)).toEqual(["n-1"]);
+  });
+
+  it("the thread link shuts it", async () => {
+    show(note("n-1", { threadId: "s-4" }), note("n-2"));
+    render(<NotificationBell />);
+    await openBell();
+    fireEvent.click(within(cardOf("n-1")).getByTestId("notification-thread"));
+    expect(isOpen()).toBe(false);
+  });
+
+  it("dismissing one while others remain keeps it open", async () => {
+    eventFirst([note("n-2")]);
+    show(note("n-1"), note("n-2"));
+    render(<NotificationBell />);
+    await openBell();
+    fireEvent.click(within(cardOf("n-1")).getByTestId("notification-dismiss"));
+    await settle();
+    expect(isOpen()).toBe(true);
+    expect(cards().map((c) => c.dataset.notificationId)).toEqual(["n-2"]);
+  });
+
+  it("dismissing the last shown one shuts it when the snapshot comes first", async () => {
+    eventFirst([note("s", { status: "snoozed" })]);
+    show(note("n-1"), note("s", { status: "snoozed" }), note("t", { status: "scheduled" }));
+    render(<NotificationBell />);
+    await openBell();
+    fireEvent.click(within(cardOf("n-1")).getByTestId("notification-dismiss"));
+    await settle();
+    expect(isOpen()).toBe(false);
+  });
+
+  it("dismissing the last shown one shuts it when the result comes first", async () => {
+    show(note("n-1"));
+    render(<NotificationBell />);
+    await openBell();
+    fireEvent.click(within(cardOf("n-1")).getByTestId("notification-dismiss"));
+    await settle();
+    // The result is in; the snapshot still lists the card.
+    expect(isOpen()).toBe(false);
+    show();
+    expect(isOpen()).toBe(false);
+  });
+
+  it("a failed dismiss of the last one keeps it open", async () => {
+    runCommandForResult.mockImplementationOnce(() => Promise.resolve(null));
+    show(note("n-1"));
+    render(<NotificationBell />);
+    await openBell();
+    fireEvent.click(within(cardOf("n-1")).getByTestId("notification-dismiss"));
+    await settle();
+    expect(isOpen()).toBe(true);
+    expect(cards().map((c) => c.dataset.notificationId)).toEqual(["n-1"]);
+  });
+
+  it("dismissing the last one keeps it open when another arrived meanwhile", async () => {
+    eventFirst([note("n-new")]);
+    show(note("n-1"));
+    render(<NotificationBell />);
+    await openBell();
+    fireEvent.click(within(cardOf("n-1")).getByTestId("notification-dismiss"));
+    await settle();
+    expect(isOpen()).toBe(true);
+    expect(cards().map((c) => c.dataset.notificationId)).toEqual(["n-new"]);
+  });
+
+  it("snoozing one while others remain shuts the menu and keeps the list open", async () => {
+    eventFirst([note("n-1", { status: "snoozed" }), note("n-2")]);
+    show(note("n-1"), note("n-2"));
+    render(<NotificationBell />);
+    await openBell();
+    await snoozeFirstPreset("n-1");
+    expect(screen.queryByTestId("notification-snooze-menu")).toBeNull();
+    expect(isOpen()).toBe(true);
+    expect(cards().map((c) => c.dataset.notificationId)).toEqual(["n-2"]);
+  });
+
+  it("snoozing the last shown one shuts the menu and the list", async () => {
+    eventFirst([note("n-1", { status: "snoozed" })]);
+    show(note("n-1"));
+    render(<NotificationBell />);
+    await openBell();
+    await snoozeFirstPreset("n-1");
+    expect(screen.queryByTestId("notification-snooze-menu")).toBeNull();
+    expect(isOpen()).toBe(false);
+  });
+
+  it("Clear all shuts it", async () => {
+    show(note("n-1"), note("n-2"));
+    render(<NotificationBell />);
+    const pop = await openBell();
+    fireEvent.click(within(pop).getByTestId("notification-clear"));
+    await settle();
+    expect(isOpen()).toBe(false);
+  });
+
+  it("a failed Clear all keeps it open", async () => {
+    runCommandForResult.mockImplementationOnce(() => Promise.resolve(null));
+    show(note("n-1"), note("n-2"));
+    render(<NotificationBell />);
+    const pop = await openBell();
+    fireEvent.click(within(pop).getByTestId("notification-clear"));
+    await settle();
+    expect(isOpen()).toBe(true);
+  });
+
+  it("stays open on No notifications. when the source withdraws the last one", async () => {
+    show(note("n-1"));
+    render(<NotificationBell />);
+    const pop = await openBell();
+    show();
+    await settle();
+    expect(isOpen()).toBe(true);
+    expect(within(pop).getByTestId("notification-empty").textContent).toBe("No notifications.");
+  });
+});

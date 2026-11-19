@@ -53,6 +53,9 @@ toast, and the dock badge and bounce for time-sensitive notifications. No daemon
   (`thread.open --focus`), as a preview for an archived or snoozed thread (as the sidebar
   does), and shuts the bell. A thread the GUI does not know shows no link (the daemon withdraws
   a removed thread's notifications).
+- **When the list shuts** (`bell-close-on-action.md`): at once for an action button or the
+  thread link; after a dismiss, snooze or Clear all only when the user's own command emptied
+  the list; never when a source withdraws the last one.
 - **The list virtualizes past 40** (`VirtualStack`, measured rows, the list's own scroll box as
   its root): a source holds at most 100 active notifications and any number of plugins post.
 - **Toast buttons.** sonner has one action and one cancel; a notification has up to three
