@@ -277,6 +277,8 @@ export interface ReadyMessage {
   thread: { id: string; name: string } | null;
   theme: PublishedTheme;
   readOnly: string[];
+  /** Every command's name, so the page asks for a click only for one there is: a name that is no command goes to the host, which says so. */
+  verbs: string[];
   sources: string[];
   /** The page's storage: key → the value's JSON text (its thread's, or its own file's). */
   storage: Record<string, string>;
@@ -297,7 +299,13 @@ export interface ReadyMessage {
  */
 export type ReadyAccess = { kind: "thread"; thread: { id: string; name: string } } | { kind: "page" } | { kind: "none"; refusal: string };
 
-export function readyMessage(access: ReadyAccess, theme: PublishedTheme, readOnly: readonly string[], storage: Readonly<Record<string, string>> = {}): ReadyMessage {
+export function readyMessage(
+  access: ReadyAccess,
+  theme: PublishedTheme,
+  readOnly: readonly string[],
+  storage: Readonly<Record<string, string>> = {},
+  verbs: readonly string[] = readOnly,
+): ReadyMessage {
   const some = access.kind !== "none";
   return {
     type: "cf:ready",
@@ -305,6 +313,7 @@ export function readyMessage(access: ReadyAccess, theme: PublishedTheme, readOnl
     thread: access.kind === "thread" ? access.thread : null,
     theme,
     readOnly: some ? [...readOnly].sort() : [],
+    verbs: some ? [...verbs].sort() : [],
     sources: some ? [...BRIDGE_SOURCES] : [],
     storage: some ? { ...storage } : {},
     can: { storage: some, fetch: some },
@@ -386,6 +395,16 @@ export const NOT_ALLOWED: BridgeError = { code: "unavailable", message: "the use
 /** The refusal of a file the daemon never gives a bridge (PageAccess.unavailable_reason). */
 export function pageUnavailable(reason: string): BridgeError {
   return { code: "unavailable", message: reason ? `Code Foundry gives this page no bridge: ${reason}` : "Code Foundry gives this page no bridge" };
+}
+
+/** The refusal of a verb that changes something, from a page the user is not in (BridgeFrame.userPresent). */
+export function needsGesture(verb: string): BridgeError {
+  return { code: "gesture", message: `${verb} changes something, so it runs only within 5 s of a click or key press in the page: start it in the handler, before slow awaits` };
+}
+
+/** The refusal of a name that is no command, whatever the gesture: the page's author guessed or misspelt it. */
+export function unknownVerb(verb: string): BridgeError {
+  return { code: "unavailable", message: `unknown command ${JSON.stringify(verb)}: cf.readOnly lists the reads, and code-foundry help the rest` };
 }
 
 /** The refusal of a call that needs the page's thread, from a page no thread owns. */

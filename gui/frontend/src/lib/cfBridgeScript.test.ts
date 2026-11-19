@@ -38,7 +38,7 @@ interface Cf {
 /** The nonce the fake frame's URL carries (HtmlFrame's `?cf-nonce=<nonce>`). */
 const N = "n0nce";
 
-function load(opts: { userActivation?: { isActive: boolean } | null; embedded?: boolean; stylesheet?: boolean; search?: string; hash?: string; url?: string; navigation?: object } = {}) {
+function load(opts: { userActivation?: { isActive: boolean } | null; embedded?: boolean; stylesheet?: boolean; search?: string; hash?: string; url?: string; navigation?: object; origin?: string } = {}) {
   const listeners: Record<string, ((e: unknown) => void)[]> = {};
   const posted: { m: Msg; origin: string }[] = [];
   const parent = {
@@ -54,6 +54,7 @@ function load(opts: { userActivation?: { isActive: boolean } | null; embedded?: 
   };
   win.parent = opts.embedded === false ? win : parent;
   if (opts.navigation) win.navigation = opts.navigation;
+  if (opts.origin !== undefined) win.origin = opts.origin;
   const rootStyle: Record<string, string> = {};
   const doc = {
     body: { scrollHeight: 120 },
@@ -173,6 +174,34 @@ describe("bridge.js", () => {
     await expect(p).rejects.toMatchObject({ code: "declined", message: "the user said no" });
   });
 
+  it("says how long a gesture lasts, and what to do, when a call comes too late", async () => {
+    const h = load();
+    h.ready({ verbs: ["thread.get", "thread.send"] });
+    await expect(h.cf.run("thread.send")).rejects.toMatchObject({
+      code: "gesture",
+      message: "thread.send changes something, so it runs only within 5 s of a click or key press in the page: start it in the handler, before slow awaits",
+    });
+  });
+
+  it("sends a name that is no command on to the app, which says so, instead of asking for a click", async () => {
+    const h = load();
+    h.ready({ verbs: ["thread.get", "thread.send"] });
+    const p = h.cf.run("thread.lst");
+    await flush();
+    const [run] = h.sent("cf:run");
+    expect(run?.verb).toBe("thread.lst");
+    h.send({ type: "cf:result", id: run?.id, ok: false, error: { code: "unavailable", message: 'unknown command "thread.lst"' } });
+    await expect(p).rejects.toMatchObject({ code: "unavailable" });
+    // An app from before `verbs`, or one that could not list them: every name not read-only
+    // needs the click, as before.
+    for (const extra of [{}, { verbs: [] }]) {
+      const old = load();
+      old.ready(extra);
+      await expect(old.cf.run("thread.lst")).rejects.toMatchObject({ code: "gesture" });
+      expect(old.sent("cf:run")).toHaveLength(0);
+    }
+  });
+
   it("decides the gesture when called, not after waiting for cf:ready", async () => {
     const h = load({ userActivation: { isActive: true } });
     const p = h.cf.run("thread.send");
@@ -230,8 +259,21 @@ describe("bridge.js", () => {
     const h = load();
     h.ready();
     const p = h.cf.run("thread.get", {}, { timeout: 1000 });
-    const check = expect(p).rejects.toMatchObject({ code: "timeout" });
+    const check = expect(p).rejects.toMatchObject({ code: "timeout", message: "thread.get did not answer in 1 s" });
     await vi.advanceTimersByTimeAsync(1001);
+    await check;
+  });
+
+  it.each([
+    [1500, "1.5 s"],
+    [400, "0.4 s"],
+    [60_000, "60 s"],
+  ])("says a timeout of %d ms as %s", async (ms, said) => {
+    vi.useFakeTimers();
+    const h = load();
+    h.ready();
+    const check = expect(h.cf.run("thread.get", {}, { timeout: ms })).rejects.toMatchObject({ message: `thread.get did not answer in ${said}` });
+    await vi.advanceTimersByTimeAsync(ms + 1);
     await check;
   });
 
@@ -475,7 +517,7 @@ describe("bridge.js", () => {
     h.ready();
     await h.cf.ready;
     const big = "x".repeat(256 * 1024);
-    await expect(h.cf.run("thread.get", { body: big })).rejects.toMatchObject({ code: "invalid", message: /too large/ });
+    await expect(h.cf.run("thread.get", { body: big })).rejects.toMatchObject({ code: "invalid", message: /too large: 256 KiB of text at most, all together \(base64/ });
     await expect(h.cf.storage().set("k", big)).rejects.toMatchObject({ code: "invalid", message: /too large/ });
     expect(h.cf.storage().get("k")).toBeNull();
     expect(h.sent("cf:run")).toEqual([]);
@@ -572,6 +614,42 @@ describe("bridge.js", () => {
   });
 });
 
+describe("bridge.js: a refused write", () => {
+  it("leaves no refused key behind at once, so keys() and clear() right after it work", async () => {
+    const h = load();
+    h.ready({ storage: { a: "1" } });
+    await h.cf.ready;
+    const s = h.cf.storage("p");
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    const long = "k".repeat(1025);
+    const refused = s.set(long, 1);
+    const changed = h.cf.storage().set("a", 2);
+    expect(s.keys()).toEqual([long]);
+    const [w, v] = h.sent("cf:store");
+    for (const m of [w, v]) h.send({ type: "cf:result", id: m?.id, ok: false, error: { code: "invalid", message: "keys are at most 1024 bytes" } });
+    await expect(refused).rejects.toMatchObject({ code: "invalid" });
+    await expect(changed).rejects.toMatchObject({ code: "invalid" });
+    error.mockRestore();
+    expect(s.keys()).toEqual([]);
+    expect(h.cf.storage().get("a")).toBe(1);
+  });
+
+  it("keeps a later write of the same key still on the way", async () => {
+    const h = load();
+    h.ready({ storage: {} });
+    await h.cf.ready;
+    const s = h.cf.storage();
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    const first = s.set("k", 1);
+    void s.set("k", 2);
+    const [w] = h.sent("cf:store");
+    h.send({ type: "cf:result", id: w?.id, ok: false, error: { code: "invalid", message: "full" } });
+    await expect(first).rejects.toMatchObject({ code: "invalid" });
+    error.mockRestore();
+    expect(s.get("k")).toBe(2);
+  });
+});
+
 describe("bridge.js: a page no thread owns (docs/notes/page-ownership-gui.md)", () => {
   it("allowed: storage and fetch work with cf.thread null", async () => {
     const h = load();
@@ -597,6 +675,19 @@ describe("bridge.js: a page no thread owns (docs/notes/page-ownership-gui.md)", 
     // A subscription still goes to the app, which refuses it saying why (no "no source" here).
     expect(() => h.cf.on("thread-list", () => {})).not.toThrow();
     expect(h.sent("cf:on")).toHaveLength(1);
+  });
+
+  it("refused: a run goes to the app, which says the page is not allowed, never that it needs a click", async () => {
+    const why = "the user has not allowed this page to use Code Foundry";
+    const h = load();
+    h.ready({ thread: null, readOnly: [], verbs: [], sources: [], storage: {}, can: { storage: false, fetch: false }, refusal: why });
+    await h.cf.ready;
+    const p = h.cf.run("thread.list");
+    await flush();
+    const [run] = h.sent("cf:run");
+    expect(run?.verb).toBe("thread.list");
+    h.send({ type: "cf:result", id: run?.id, ok: false, error: { code: "unavailable", message: why } });
+    await expect(p).rejects.toMatchObject({ code: "unavailable", message: why });
   });
 
   it("an app from before `can`: storage and fetch only with a thread, refused as not shown in one", async () => {
@@ -698,6 +789,16 @@ describe("bridge.js: a page's own next document", () => {
     const e = { target, button: 0, isTrusted: true, defaultPrevented: false, prevented: false, preventDefault: () => (e.prevented = true), ...over };
     return e;
   }
+
+  it("in an opaque frame (a page no thread owns), whose navigate events never come, follows a click on a link with the nonce", () => {
+    const n = navigation();
+    const h = load({ url: PAGE, navigation: n.api, origin: "null" });
+    expect(n.fns).toHaveLength(0);
+    const e = click("detail.html");
+    h.fire("click", e);
+    expect(e.prevented).toBe(true);
+    expect(h.went).toEqual([`assign http://127.0.0.1:9246/preview/g1/docs/detail.html?cf-nonce=${N}`]);
+  });
 
   it("without the Navigation API, follows a plain click on a link to another file of its own with the nonce", () => {
     const h = load({ url: PAGE });

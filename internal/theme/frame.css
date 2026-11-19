@@ -5,8 +5,9 @@
  * specificity, so any rule of the page's own wins. The roles sit in Tailwind's utilities
  * layer, as index.css's @utility roles do in the app, so a colour or weight utility of
  * /cf/ui.css or /cf/tailwind.js (later in that layer) beats them; the statement names
- * Tailwind's layer order first, so a layer this file opens keeps its place. */
-@layer theme, base, components, utilities;
+ * Tailwind's layer order first, so a layer this file opens keeps its place: properties too,
+ * whose --tw-* fallbacks (a WebKit without margin-trim) must lose to every utility. */
+@layer properties, theme, base, components, utilities;
 :root {
   --sheet: var(--cf-canvas);
   --pane: var(--cf-surface);

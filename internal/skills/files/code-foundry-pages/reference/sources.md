@@ -41,8 +41,8 @@ pointer makes a click act on the wrong one. So:
 
 `get(key)` and `keys()` answer at once from the copy the page got with `cf.ready`; `set`,
 `remove` and `clear` change that copy at once and return a Promise that rejects when the
-storage is full (256 KiB, 1 KiB a key) or the write was refused: the value is then put
-back. Another page of the thread (or another frame of a page no thread owns) writing a key
+storage is full (256 KiB per thread, all its pages; 1 KiB a key, prefix and `:` included)
+or the write was refused: the value is then put back. Another page of the thread (or another frame of a page no thread owns) writing a key
 updates this page's copy.
 
 ## External APIs: cf.fetch and tokens
@@ -71,7 +71,7 @@ does not allow the page's origin fails whatever the token, and most internal API
   unless you set one. An Authorization header is not sent on to a redirect to another domain.
 - Refused hosts: this Mac's own (localhost, 127.0.0.1, ::1, 0.0.0.0) and link-local
   addresses (169.254.x.x). Private networks (10.x, 172.16-31.x, 192.168.x) are allowed, so
-  a company API on the VPN works; a dev server on this Mac does not: say so.
+  a company API on the VPN works; a dev server on this Mac only by its LAN address, if it listens on all.
 - No click needed: it changes nothing in Code Foundry. A request that changes the service
   (a POST that files an issue) still belongs in a click handler. Fetches count with `cf.run`
   calls: 32 at the app at once, more wait.
