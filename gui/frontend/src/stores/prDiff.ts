@@ -9,7 +9,8 @@ import { notify } from "@/lib/notify";
 import { create } from "zustand";
 import { getPullRequestDiff, getPullRequestFile, type PullRequestDiffView } from "@/api/prDiff";
 import { errorMessage } from "@/api/stream";
-import { ExpandError } from "@/components/pr/diffModel";
+import type { FileDiffContentsLoader } from "@pierre/diffs";
+import { ExpandError, prFileLoader } from "@/components/pr/diffModel";
 import { pullRequestDetailResource, pullRequestKey } from "./gh";
 import { prefetchHeld } from "./prPrefetch";
 import { createResource } from "./resource";
@@ -104,4 +105,19 @@ export const readPullRequestFile = (repoSlug: string, ref: string, path: string)
 export function expandFailed(path: string, err: unknown): void {
   const why = err instanceof ExpandError ? err.message : errorMessage(err);
   notify({ level: "error", title: "Cannot expand the diff", id: `pr-expand:${path}`, description: `${path}: ${why}` });
+}
+
+/**
+ * What expands a pull request's hunks: the file read at the head commit (prFileLoader), a
+ * failure toasted once per file. The head side of a fork's pull request lives in the fork;
+ * GitHub also keeps the head commit in the base repository, which serves when the fork is
+ * unknown (closed, deleted).
+ */
+export function pullRequestFileLoader(slug: string, headRepo: string, head: string): FileDiffContentsLoader {
+  const load = prFileLoader(headRepo || slug, head, readPullRequestFile);
+  return (fd) =>
+    load(fd).catch((err: unknown) => {
+      expandFailed(fd.name, err);
+      throw err;
+    });
 }

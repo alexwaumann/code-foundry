@@ -12,7 +12,8 @@ const STYLES = [
   { value: "split", label: "Split" },
 ] as const satisfies readonly { value: DiffStyle; label: string }[];
 
-function StyleSwitch() {
+/** Unified | Split, the codeView store's for every diff. */
+export function StyleSwitch() {
   const style = useCodeViewStore((s) => s.diffStyle);
   return <ModeSwitch options={STYLES} value={style} onChange={setDiffStyle} label="Diff layout" testId="diff-style" />;
 }

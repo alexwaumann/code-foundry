@@ -1,5 +1,5 @@
 /**
- * The panel surfaces (once the side panel's), as shell tabs: a file, a diff, a pull request, MCP, the
+ * The panel surfaces (once the side panel's), as shell tabs: a file, a diff, a pull request, its diff, MCP, the
  * gallery, Ember's board and plugin surfaces draw the same body (surfaces/registry.ts), given
  * the layout tab as a seam tab (shell/host.ts). Two layout kinds have other names in the panel:
  * `file` is `files` and `ember.board` is `ember`.
@@ -61,7 +61,7 @@ export function panelSurface(kind: string, spec: SurfaceSpec | undefined): Shell
 }
 
 /** The panel surfaces the shell lists by kind; plugin kinds are looked up as they come. */
-export const panelSurfaces: readonly ShellSurface[] = ["file", "diff", "pullrequest", "mcp", "gallery", "ember.board"].map((k) => panelSurface(k, surfaceOf(panelKindOf(k))));
+export const panelSurfaces: readonly ShellSurface[] = ["file", "diff", "pullrequest", "prdiff", "mcp", "gallery", "ember.board"].map((k) => panelSurface(k, surfaceOf(panelKindOf(k))));
 
 /** A plugin kind's surface (`plugin.<plugin>.<surface>`). */
 export function pluginShellSurface(kind: string): ShellSurface {

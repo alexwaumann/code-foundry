@@ -27,6 +27,7 @@ export const KIND_SIZES: Readonly<Record<string, { frac: number; floor?: number 
   "plugin.": { frac: 0.35 },
   projects: { frac: 0.5 },
   prs: { frac: 0.5 },
+  prdiff: { frac: 0.45, floor: 480 },
   pullrequest: { frac: 0.45, floor: 480 },
   terminal: { frac: 0.3 },
   thread: { frac: 0.5 },

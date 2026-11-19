@@ -53,6 +53,9 @@ function FileLine({ row }: { row: FileRow }) {
 }
 
 const rowKey = (r: FileRow): string => r.key;
+
+/** What the list reads of a comparison: its counts and what it could not list. A pull request's diff gives the same (components/diff/prDiff.ts). */
+export type ListedView = Pick<CompareView, "totalFiles" | "totalAdded" | "totalDeleted" | "truncated" | "skippedNames"> & { files: readonly unknown[] };
 const renderRow = (r: FileRow) => <FileLine row={r} />;
 
 /**
@@ -64,7 +67,8 @@ const renderRow = (r: FileRow) => <FileLine row={r} />;
  * fold are the tab's (params), so they outlast it showing something else. `current` is the
  * file on screen when it is listed. The list keeps its place by file through live updates.
  * `foot` goes under it and stays when the list folds: the Commits section's own height can fold
- * the list, and must not take the section's toggle with it.
+ * the list, and must not take the section's toggle with it. `totals` false leaves the counts to a
+ * bar above that already shows them (a pull request's diff); the position and the steps stay.
  */
 export function FileList({
   view,
@@ -79,8 +83,10 @@ export function FileList({
   onFold,
   foot,
   footHeight = 0,
+  totals = true,
+  className,
 }: {
-  view: CompareView;
+  view: ListedView;
   rows: readonly FileRow[];
   current: FileRow | null;
   onPick: (r: FileRow) => void;
@@ -95,6 +101,8 @@ export function FileList({
   /** What sits at the list's foot (the Commits section), outside its keyboard list, and how tall. */
   foot?: ReactNode;
   footHeight?: number;
+  totals?: boolean;
+  className?: string;
 }) {
   const shown = useMemo(() => filterRows(rows, query), [rows, query]);
   const items = useMemo<NavItem[]>(
@@ -127,7 +135,7 @@ export function FileList({
     <RowList rows={shown} rowKey={rowKey} rowHeight={ROW_H} render={renderRow} capped keepPlace virtualize={rows.length > VIRTUALIZE_OVER} maxHeight={rail ? "100%" : fit.rows * ROW_H} testId="diff-file-rows" />
   );
   return (
-    <div className={cn("flex min-h-0 flex-col", rail ? "w-[260px] shrink-0 border-r border-cf-divider" : "shrink-0 border-b border-cf-divider")} data-testid="diff-list-column">
+    <div className={cn("flex min-h-0 flex-col", rail ? "w-[260px] shrink-0 border-r border-cf-divider" : "shrink-0 border-b border-cf-divider", className)} data-testid="diff-list-column">
       <NavProvider value={nav.ctx}>
         <div
           tabIndex={0}
@@ -140,11 +148,13 @@ export function FileList({
           onKeyDown={nav.onKeyDown}
         >
           <div className="flex h-9 shrink-0 items-center gap-1.5 px-3 text-body-sm tabular-nums" data-testid="diff-totals">
-            <span className="min-w-0 truncate">
-              {view.totalFiles} {view.totalFiles === 1 ? "file" : "files"}
-              {view.totalAdded > 0 && <span className="ml-1.5 text-cf-diff-addition">+{view.totalAdded}</span>}
-              {view.totalDeleted > 0 && <span className="ml-1.5 text-cf-diff-deletion">−{view.totalDeleted}</span>}
-            </span>
+            {totals && (
+              <span className="min-w-0 truncate">
+                {view.totalFiles} {view.totalFiles === 1 ? "file" : "files"}
+                {view.totalAdded > 0 && <span className="ml-1.5 text-cf-diff-addition">+{view.totalAdded}</span>}
+                {view.totalDeleted > 0 && <span className="ml-1.5 text-cf-diff-deletion">−{view.totalDeleted}</span>}
+              </span>
+            )}
             <span className="ml-auto shrink-0 text-caption" data-testid="diff-position">
               {at >= 0 ? `${String(at + 1)} of ${String(shown.length)}` : ""}
             </span>

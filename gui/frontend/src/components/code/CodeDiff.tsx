@@ -1,5 +1,5 @@
 import { memo, useMemo, type ReactNode } from "react";
-import { MultiFileDiff, PatchDiff, Virtualizer, type FileDiffOptions } from "@pierre/diffs/react";
+import { FileDiff, MultiFileDiff, PatchDiff, Virtualizer, type FileDiffContentsLoader, type FileDiffMetadata, type FileDiffOptions } from "@pierre/diffs/react";
 import { useCodeTheme } from "@/lib/codeTheme";
 import { cn } from "@/lib/utils";
 import { useCodeViewStore, type DiffStyle } from "@/stores/codeView";
@@ -13,8 +13,12 @@ export interface CodeSide {
   contents: string;
 }
 
-/** A unified patch for one file, or both sides' contents (a side null for an added or deleted file). */
-export type CodeDiffInput = { patch: string } | { oldFile: CodeSide | null; newFile: CodeSide };
+/**
+ * A unified patch for one file, or both sides' contents (a side null for an added or deleted
+ * file), or a patch already parsed (a pull request's file) with what reads its sides when a
+ * hunk separator is expanded.
+ */
+export type CodeDiffInput = { patch: string } | { oldFile: CodeSide | null; newFile: CodeSide } | { fileDiff: FileDiffMetadata; loadDiffFiles?: FileDiffContentsLoader };
 
 export type CodeDiffProps = CodeDiffInput & {
   /** The codeView store's choice when unset. */
@@ -55,6 +59,11 @@ function PatchView({ patch, options }: { patch: string; options: Options }) {
   return <PatchDiff patch={patch} options={options} />;
 }
 
+function ParsedView({ fileDiff, loadDiffFiles, options }: { fileDiff: FileDiffMetadata; loadDiffFiles?: FileDiffContentsLoader; options: Options }) {
+  const withLoader = useMemo((): Options => (loadDiffFiles ? { ...options, loadDiffFiles } : options), [options, loadDiffFiles]);
+  return <FileDiff fileDiff={fileDiff} options={withLoader} />;
+}
+
 function FilesView({ oldFile, newFile, options }: { oldFile: CodeSide | null; newFile: CodeSide; options: Options }) {
   const oldName = oldFile?.name;
   const oldContents = oldFile?.contents;
@@ -73,7 +82,13 @@ export const CodeDiff = memo(function CodeDiff(props: CodeDiffProps) {
   const host = useCodeHost();
   return (
     <div ref={host} className={cn("cf-code-view", props.className)}>
-      {"patch" in props ? <PatchView patch={props.patch} options={options} /> : <FilesView oldFile={props.oldFile} newFile={props.newFile} options={options} />}
+      {"patch" in props ? (
+        <PatchView patch={props.patch} options={options} />
+      ) : "fileDiff" in props ? (
+        <ParsedView fileDiff={props.fileDiff} loadDiffFiles={props.loadDiffFiles} options={options} />
+      ) : (
+        <FilesView oldFile={props.oldFile} newFile={props.newFile} options={options} />
+      )}
     </div>
   );
 });

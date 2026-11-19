@@ -12,12 +12,13 @@ import { filesSurface } from "./files";
 import { gallerySurface } from "./gallery";
 import { mcpSurface } from "./mcp";
 import { pluginSurfaceSpec } from "./plugin";
+import { prDiffSurface } from "./prdiff";
 import { pullRequestSurface } from "./pullrequest";
 import type { SurfaceAvailability, SurfaceContext, SurfaceSpec } from "./types";
 
 export type { Subscribable, SurfaceAvailability, SurfaceContext, SurfaceSpec } from "./types";
 
-export const surfaces: readonly SurfaceSpec[] = [emberSurface, filesSurface, diffSurface, pullRequestSurface, mcpSurface, gallerySurface];
+export const surfaces: readonly SurfaceSpec[] = [emberSurface, filesSurface, diffSurface, pullRequestSurface, prDiffSurface, mcpSurface, gallerySurface];
 
 const byKind = new Map<SurfaceKind, SurfaceSpec>(surfaces.map((s) => [s.kind, s]));
 const byHotkey = new Map<string, SurfaceSpec>(surfaces.flatMap((s) => (s.hotkey ? [[s.hotkey.toLowerCase(), s] as const] : [])));

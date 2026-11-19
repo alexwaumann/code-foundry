@@ -20,6 +20,14 @@
     "default_frac": 0.35,
     "prefix": true
   },
+  {
+    "kind": "prdiff",
+    "link": "optional",
+    "scope": "space",
+    "key_params": ["slug","number"],
+    "default_frac": 0.45,
+    "floor_px": 480
+  },
   {"kind":"projects","link":"none","scope":"space","default_frac":0.5},
   {"kind":"prs","link":"none","scope":"space","default_frac":0.5},
   {
