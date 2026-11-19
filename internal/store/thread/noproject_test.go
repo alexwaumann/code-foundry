@@ -81,7 +81,7 @@ func TestNoProjectThreadSurvivesForkReconnectAndRestart(t *testing.T) {
 	e.writeTranscriptIn(e.home, cid, userLine("hi"))
 	e.waitFor(s.ID, "discovered", func(s Thread) bool { return s.ClaudeSessionID == cid })
 
-	f, err := e.m.Fork(e.ctx(), s.ID, "")
+	f, err := e.m.Fork(e.ctx(), s.ID, ForkOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}

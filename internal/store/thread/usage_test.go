@@ -321,7 +321,7 @@ func TestForkSkipsParentUsage(t *testing.T) {
 	e.writeTranscript(cid, userLine("hi"), c[1])
 	e.waitFor(s.ID, "usage", func(s Thread) bool { return totalRequests(s.Usage) == 1 })
 
-	f, err := e.m.Fork(e.ctx(), s.ID, "fork")
+	f, err := e.m.Fork(e.ctx(), s.ID, ForkOptions{Name: "fork"})
 	if err != nil {
 		t.Fatal(err)
 	}

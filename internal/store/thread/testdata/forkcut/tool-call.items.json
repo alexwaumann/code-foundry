@@ -1,0 +1,44 @@
+[
+  {
+    "id": "defc61bc-94bf-44a3-bc73-c33df75d49dd",
+    "kind": "userMessage",
+    "ordinal": 1,
+    "text": "Run the shell command 'ls' with the Bash"
+  },
+  {
+    "id": "toolu_01E3AA5XN6b5NKeG8smdZpBx",
+    "kind": "toolCall",
+    "ordinal": 2
+  },
+  {
+    "id": "msg_011ChBxokUCHhi74yTYXREPS/0",
+    "kind": "thinking",
+    "ordinal": 3
+  },
+  {
+    "id": "msg_011ChBxokUCHhi74yTYXREPS/1",
+    "kind": "assistantText",
+    "ordinal": 4
+  },
+  {
+    "id": "turn-f05ef18b-1286-488a-b2cd-0429991eeaf3",
+    "kind": "turnEnd",
+    "ordinal": 5
+  },
+  {
+    "id": "6c7b3884-5cd9-40bd-9cf9-b30888516977",
+    "kind": "userMessage",
+    "ordinal": 6,
+    "text": "Reply with just DONE."
+  },
+  {
+    "id": "msg_011ChBxorDySWJCF77bLkBcc/0",
+    "kind": "assistantText",
+    "ordinal": 7
+  },
+  {
+    "id": "turn-a9118cf2-b448-45fc-86df-94adac242075",
+    "kind": "turnEnd",
+    "ordinal": 8
+  }
+]

@@ -139,6 +139,8 @@ func TestLaunchArgv(t *testing.T) {
 			argv("--resume", "R", "--effort", "low"), "R"},
 		{"fork", launch{resume: "R", fork: true, newID: "N"}, spawnArgs{model: "sonnet", effort: "max", perm: PermissionDefault},
 			argv("--resume", "R", "--fork-session", "--session-id", "N", "--model", "sonnet", "--effort", "max"), "N"},
+		{"fork from a turn", launch{resume: "R", fork: true, newID: "N", at: "U"}, spawnArgs{},
+			argv("--resume", "R", "--fork-session", "--resume-session-at", "U", "--session-id", "N"), "N"},
 		{"supervised", launch{newID: "N"}, spawnArgs{perm: PermissionSupervised},
 			argv("--session-id", "N", "--permission-mode", "manual"), "N"},
 		{"accept edits", launch{newID: "N"}, spawnArgs{perm: PermissionAcceptEdits},

@@ -910,6 +910,15 @@ message CreateThreadResponse {
 message ForkThreadRequest {
   string id = 1;
   string name = 2;
+  // A turn to fork from: its turn_end item id (or "#<ordinal>"). The fork's conversation
+  // is the parent's up to and including that turn, and its items are the parent's up to
+  // that turn end; empty forks the whole conversation. The files are not rewound: the
+  // fork works in the parent's checkouts as they are. Whether a turn can be forked from
+  // is known only here, from Claude's transcript: FAILED_PRECONDITION says why not (the
+  // turn is still running; it came before a /clear or a reseed; the conversation was
+  // compacted after it; the next turn's start is not in the transcript yet),
+  // INVALID_ARGUMENT for an item that is not a turn end or no such item.
+  string at = 3;
 }
 
 message ForkThreadResponse {

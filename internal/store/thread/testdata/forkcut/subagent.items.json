@@ -1,0 +1,67 @@
+[
+  {
+    "id": "bb2518a5-8ad9-4927-ac52-782319c81516",
+    "kind": "userMessage",
+    "ordinal": 1,
+    "text": "Use the Agent tool with the general-purp"
+  },
+  {
+    "id": "toolu_01A8Y6jmucJvBcATSGs4beeK",
+    "kind": "toolCall",
+    "ordinal": 2
+  },
+  {
+    "id": "msg_011ChBy8D4bjDQY5ST2kR6F9/0",
+    "kind": "thinking",
+    "ordinal": 3
+  },
+  {
+    "id": "msg_011ChBy8D4bjDQY5ST2kR6F9/1",
+    "kind": "assistantText",
+    "ordinal": 4
+  },
+  {
+    "id": "toolu_018cBkLbjjuYxRJ4uk5PpPCR",
+    "kind": "toolCall",
+    "parent": "toolu_01A8Y6jmucJvBcATSGs4beeK",
+    "ordinal": 5
+  },
+  {
+    "id": "turn-d2209df5-1abd-4c43-97d8-67ec63abbfde",
+    "kind": "turnEnd",
+    "ordinal": 6
+  },
+  {
+    "id": "4f56e318-5859-4121-b02e-a8249693f21e",
+    "kind": "userMessage",
+    "ordinal": 7,
+    "text": "Reply with just DONE."
+  },
+  {
+    "id": "msg_011ChBy8HxHyV1kLKUSCyig2/th-1795076779067-2",
+    "kind": "thinking",
+    "parent": "toolu_01A8Y6jmucJvBcATSGs4beeK",
+    "ordinal": 8
+  },
+  {
+    "id": "toolu_014xHJzVpVbEgTW8nNLWcDGF",
+    "kind": "toolCall",
+    "parent": "toolu_01A8Y6jmucJvBcATSGs4beeK",
+    "ordinal": 9
+  },
+  {
+    "id": "msg_011ChBy8KzpveEkicBZMMMWk/0",
+    "kind": "assistantText",
+    "ordinal": 10
+  },
+  {
+    "id": "turn-b1da9f87-d597-41b5-bbdb-225dd5bcb949",
+    "kind": "turnEnd",
+    "ordinal": 11
+  },
+  {
+    "id": "agent-1795076779482-4",
+    "kind": "note",
+    "ordinal": 12
+  }
+]

@@ -1,0 +1,21 @@
+{"type":"user","uuid":"1c6d2810-1ca9-4010-9e76-7457ddc6c13a","parentUuid":null,"isMeta":true,"message":{"role":"user","content":"<local-command-caveat>The command below was run "}}
+{"type":"user","uuid":"d83fd803-ada9-41d4-a537-6dd2df196b7e","parentUuid":"1c6d2810-1ca9-4010-9e76-7457ddc6c13a","message":{"role":"user","content":"<command-name>/clear</command-name>\n            "}}
+{"type":"system","uuid":"2cc73932-971a-4616-81fd-cd6a013c212c","parentUuid":"d83fd803-ada9-41d4-a537-6dd2df196b7e","subtype":"local_command"}
+{"type":"user","uuid":"45de4fa4-dd35-481c-a3c7-f6fba4c4c647","parentUuid":"2cc73932-971a-4616-81fd-cd6a013c212c","turnOrigin":"sdk","message":{"role":"user","content":"List every code word I asked you to remember, or"}}
+{"type":"attachment","uuid":"62b75e27-349c-4fdc-83e7-f728ab23ac47","parentUuid":"45de4fa4-dd35-481c-a3c7-f6fba4c4c647","attachment":{"type":"environment"}}
+{"type":"attachment","uuid":"26f8ca5d-31a6-4714-8532-d626b2f5b600","parentUuid":"62b75e27-349c-4fdc-83e7-f728ab23ac47","attachment":{"type":"model"}}
+{"type":"attachment","uuid":"3ce95017-ab6e-428b-96e8-cb8724f0398a","parentUuid":"26f8ca5d-31a6-4714-8532-d626b2f5b600","attachment":{"type":"deferred_tools_delta"}}
+{"type":"attachment","uuid":"d04aa42e-1489-46a7-a09b-4ce3e99bcc81","parentUuid":"3ce95017-ab6e-428b-96e8-cb8724f0398a","attachment":{"type":"agent_listing_delta"}}
+{"type":"attachment","uuid":"39a0026f-071a-415b-9f8d-67f1d54ae8d1","parentUuid":"d04aa42e-1489-46a7-a09b-4ce3e99bcc81","attachment":{"type":"mcp_instructions_delta"}}
+{"type":"attachment","uuid":"95cc5de3-51fc-47f9-96a4-157c1a1067ef","parentUuid":"39a0026f-071a-415b-9f8d-67f1d54ae8d1","attachment":{"type":"skill_listing"}}
+{"type":"attachment","uuid":"3e1aba93-b415-432d-bf7a-c3d283416395","parentUuid":"95cc5de3-51fc-47f9-96a4-157c1a1067ef","attachment":{"type":"total_tokens_reminder"}}
+{"type":"attachment","uuid":"785ad12e-60a9-4ce4-a55d-6dc49d1668ca","parentUuid":"3e1aba93-b415-432d-bf7a-c3d283416395","attachment":{"type":"session_context"}}
+{"type":"attachment","uuid":"29c17c20-8137-45ce-bfe9-8e08e28db7a1","parentUuid":"785ad12e-60a9-4ce4-a55d-6dc49d1668ca","attachment":{"type":"date"}}
+{"type":"attachment","uuid":"45384869-215d-4a55-97fc-4a0b71011d97","parentUuid":"29c17c20-8137-45ce-bfe9-8e08e28db7a1","attachment":{"type":"credential_org"}}
+{"type":"attachment","uuid":"77eff94a-82c3-491c-8889-7d481e149cdf","parentUuid":"45384869-215d-4a55-97fc-4a0b71011d97","attachment":{"type":"prompt_snapshot"}}
+{"type":"assistant","uuid":"ce9f55d4-956f-4f66-9e92-cfd7b20bb8d8","parentUuid":"77eff94a-82c3-491c-8889-7d481e149cdf","message":{"role":"assistant","id":"msg_011ChByBn5YjfGscoiuutgVU","content":[{"type":"thinking"}]}}
+{"type":"assistant","uuid":"87e1ad2c-7046-4315-a7e7-570fcbdc55e0","parentUuid":"ce9f55d4-956f-4f66-9e92-cfd7b20bb8d8","message":{"role":"assistant","id":"msg_011ChByBn5YjfGscoiuutgVU","content":[{"type":"tool_use","id":"toolu_01X83xZYf5zv4A3HzQFA6XAD","name":"Bash"}]}}
+{"type":"user","uuid":"4a4f4816-f653-4776-8147-5a3ea9beb831","parentUuid":"87e1ad2c-7046-4315-a7e7-570fcbdc55e0","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_01X83xZYf5zv4A3HzQFA6XAD"}]}}
+{"type":"attachment","uuid":"d226a9a7-7724-4464-af5d-a21918218dfc","parentUuid":"4a4f4816-f653-4776-8147-5a3ea9beb831","attachment":{"type":"prompt_snapshot"}}
+{"type":"attachment","uuid":"84c7d0f7-2a54-4823-a77d-7da6aa2c4f84","parentUuid":"d226a9a7-7724-4464-af5d-a21918218dfc","attachment":{"type":"total_tokens_reminder"}}
+{"type":"assistant","uuid":"11e8970c-9093-4172-b936-7f0655365627","parentUuid":"84c7d0f7-2a54-4823-a77d-7da6aa2c4f84","message":{"role":"assistant","id":"msg_011ChByC9EnPAAucC33gMdzG","content":[{"type":"text","text":"NONE. This conversation has no code word you ask"}]}}

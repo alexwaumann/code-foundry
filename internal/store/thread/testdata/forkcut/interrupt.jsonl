@@ -1,0 +1,22 @@
+{"type":"user","uuid":"bb124a50-872d-4f75-a489-9585c6ee72c5","parentUuid":null,"turnOrigin":"sdk","message":{"role":"user","content":[{"type":"text","text":"Remember the code word CHERRY. Then run the shel"}]}}
+{"type":"attachment","uuid":"2b310fc0-e930-4af8-8ae6-9208fcc43a58","parentUuid":"bb124a50-872d-4f75-a489-9585c6ee72c5","attachment":{"type":"environment"}}
+{"type":"attachment","uuid":"2ff09023-a286-4df9-8d4b-2b8e07cb4d9a","parentUuid":"2b310fc0-e930-4af8-8ae6-9208fcc43a58","attachment":{"type":"model"}}
+{"type":"attachment","uuid":"85bc9754-4377-4e2d-9586-42ef40154b3d","parentUuid":"2ff09023-a286-4df9-8d4b-2b8e07cb4d9a","attachment":{"type":"deferred_tools_delta"}}
+{"type":"attachment","uuid":"eccd0589-ebd3-444c-9634-6898fcc10d24","parentUuid":"85bc9754-4377-4e2d-9586-42ef40154b3d","attachment":{"type":"agent_listing_delta"}}
+{"type":"attachment","uuid":"8c0e1b42-8c6b-488b-be45-724a799aa06b","parentUuid":"eccd0589-ebd3-444c-9634-6898fcc10d24","attachment":{"type":"skill_listing"}}
+{"type":"attachment","uuid":"c12bfb3a-980d-49aa-a879-d4c8f0d78a41","parentUuid":"8c0e1b42-8c6b-488b-be45-724a799aa06b","attachment":{"type":"total_tokens_reminder"}}
+{"type":"attachment","uuid":"ab1f0997-7761-4900-bbdb-ad32e002b533","parentUuid":"c12bfb3a-980d-49aa-a879-d4c8f0d78a41","attachment":{"type":"session_context"}}
+{"type":"attachment","uuid":"8d666790-a8af-4adf-aa92-89c35e8453da","parentUuid":"ab1f0997-7761-4900-bbdb-ad32e002b533","attachment":{"type":"date"}}
+{"type":"attachment","uuid":"1f758fa3-47ba-4d29-8c3c-e9be19322eab","parentUuid":"8d666790-a8af-4adf-aa92-89c35e8453da","attachment":{"type":"credential_org"}}
+{"type":"attachment","uuid":"e52ca47b-a765-45b2-99ab-baf87efe1117","parentUuid":"1f758fa3-47ba-4d29-8c3c-e9be19322eab","attachment":{"type":"prompt_snapshot"}}
+{"type":"assistant","uuid":"346918d2-3573-4eb0-99f7-42420852d218","parentUuid":"e52ca47b-a765-45b2-99ab-baf87efe1117","message":{"role":"assistant","id":"msg_011ChBxsgr2a6dG8xwJ91aKd","content":[{"type":"thinking"}]}}
+{"type":"assistant","uuid":"30405791-e824-480e-83a4-038efad09893","parentUuid":"346918d2-3573-4eb0-99f7-42420852d218","message":{"role":"assistant","id":"msg_011ChBxsgr2a6dG8xwJ91aKd","content":[{"type":"tool_use","id":"toolu_018hqwkcKMk5tGButsPaLgmX","name":"Bash"}]}}
+{"type":"user","uuid":"2a8df160-0f2b-4b94-a2bb-947a8bd441a7","parentUuid":"30405791-e824-480e-83a4-038efad09893","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_018hqwkcKMk5tGButsPaLgmX"}]}}
+{"type":"attachment","uuid":"88c1e2d2-8f6c-4aa1-9ed1-afab67647989","parentUuid":"2a8df160-0f2b-4b94-a2bb-947a8bd441a7","attachment":{"type":"prompt_snapshot"}}
+{"type":"user","uuid":"590efb6c-508a-40bf-9cbb-56e738e64817","parentUuid":"88c1e2d2-8f6c-4aa1-9ed1-afab67647989","message":{"role":"user","content":[{"type":"text","text":"[Request interrupted by user for tool use]"}]}}
+{"type":"user","uuid":"9c632e38-3ddb-489d-bfa5-f104625ea2b2","parentUuid":"590efb6c-508a-40bf-9cbb-56e738e64817","turnOrigin":"sdk","message":{"role":"user","content":[{"type":"text","text":"Reply with just DONE."}]}}
+{"type":"attachment","uuid":"4657a761-141c-46c1-85e0-d200f26b9f38","parentUuid":"9c632e38-3ddb-489d-bfa5-f104625ea2b2","attachment":{"type":"deferred_tools_delta"}}
+{"type":"attachment","uuid":"76ccdc1a-66ad-46e7-88f5-ce4f14bbf627","parentUuid":"4657a761-141c-46c1-85e0-d200f26b9f38","attachment":{"type":"mcp_instructions_delta"}}
+{"type":"attachment","uuid":"7ad3aa34-789f-47b7-8650-f8ea83d62e61","parentUuid":"76ccdc1a-66ad-46e7-88f5-ce4f14bbf627","attachment":{"type":"total_tokens_reminder"}}
+{"type":"assistant","uuid":"d72c797e-ae1b-4cd1-be5f-40bd117c83f3","parentUuid":"7ad3aa34-789f-47b7-8650-f8ea83d62e61","message":{"role":"assistant","id":"msg_011ChBxtTpinWMNDZWf8q5V1","content":[{"type":"thinking"}]}}
+{"type":"assistant","uuid":"744ec1ef-63b7-4aa1-bdbe-7d5292caf697","parentUuid":"d72c797e-ae1b-4cd1-be5f-40bd117c83f3","message":{"role":"assistant","id":"msg_011ChBxtTpinWMNDZWf8q5V1","content":[{"type":"text","text":"DONE"}]}}

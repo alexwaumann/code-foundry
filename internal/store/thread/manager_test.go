@@ -619,13 +619,13 @@ func TestReconnectResumesOrStartsFresh(t *testing.T) {
 func TestFork(t *testing.T) {
 	e := newEnv(t)
 	s := e.connected(CreateOptions{Model: "sonnet", Name: "Base work"})
-	if _, err := e.m.Fork(e.ctx(), s.ID, ""); !errors.Is(err, ErrFailedPrecondition) {
+	if _, err := e.m.Fork(e.ctx(), s.ID, ForkOptions{}); !errors.Is(err, ErrFailedPrecondition) {
 		t.Errorf("fork without transcript: %v", err)
 	}
 	cid := argOf(e.spec(s.ID).Argv, "--session-id")
 	e.writeTranscript(cid, userLine("hi"))
 	e.waitFor(s.ID, "discovered", func(s Thread) bool { return s.ClaudeSessionID == cid })
-	f, err := e.m.Fork(e.ctx(), s.ID, "")
+	f, err := e.m.Fork(e.ctx(), s.ID, ForkOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -725,7 +725,7 @@ func TestPermissionModeIsKeptForReconnectAndFork(t *testing.T) {
 	if argOf(argv, "--resume") != cid || argOf(argv, "--permission-mode") != "acceptEdits" || slices.Contains(argv, "hi") {
 		t.Errorf("reconnect argv = %q", argv)
 	}
-	f, err := e.m.Fork(e.ctx(), s.ID, "")
+	f, err := e.m.Fork(e.ctx(), s.ID, ForkOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}

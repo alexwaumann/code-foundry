@@ -261,7 +261,7 @@ func TestForkDoesNotSetCreatedBy(t *testing.T) {
 	cid := argOf(e.spec(child.ID).Argv, "--session-id")
 	e.writeTranscript(cid, userLine("hi"))
 	e.waitFor(child.ID, "discovered", func(s Thread) bool { return s.ClaudeSessionID == cid })
-	f, err := e.m.Fork(e.ctx(), child.ID, "")
+	f, err := e.m.Fork(e.ctx(), child.ID, ForkOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}

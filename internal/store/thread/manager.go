@@ -884,9 +884,10 @@ func (m *Manager) openTimeline(ctx context.Context, s Thread, creatorName, brief
 
 // Fork starts a new thread that continues id's conversation under a new Claude
 // session id (claude --resume <id> --fork-session --session-id <new>). Its items start
-// as a copy of id's, ended by a "Forked from <name>" note (fork.go).
-func (m *Manager) Fork(ctx context.Context, id, name string) (Thread, error) {
-	name, err := cleanName(name, true)
+// as a copy of id's, ended by a "Forked from <name>" note (fork.go). With o.At, the
+// conversation and the copy end with that turn (forkcut.go).
+func (m *Manager) Fork(ctx context.Context, id string, o ForkOptions) (Thread, error) {
+	name, err := cleanName(o.Name, true)
 	if err != nil {
 		return Thread{}, err
 	}
@@ -911,13 +912,30 @@ func (m *Manager) Fork(ctx context.Context, id, name string) (Thread, error) {
 	if parent.ClaudeSessionID == "" {
 		return Thread{}, fmt.Errorf("%w: thread %s has no saved conversation to fork yet", ErrFailedPrecondition, id)
 	}
-	if _, ok := m.opts.Paths.transcriptPath(parent.WorktreePath, parent.ClaudeSessionID); !ok {
+	tpath, ok := m.opts.Paths.transcriptPath(parent.WorktreePath, parent.ClaudeSessionID)
+	if !ok {
 		// A stopped parent says so from now on (transcriptmissing.go).
 		m.setTranscriptMissing(id, parent.ClaudeSessionID, parent.needsTranscript())
 		return Thread{}, ErrTranscriptMissing
 	}
 	if _, err := os.Stat(parent.WorktreePath); err != nil {
 		return Thread{}, fmt.Errorf("%w: worktree %s: %v", ErrFailedPrecondition, parent.WorktreePath, err)
+	}
+	// What the fork copies, and where its conversation ends (all of it without At).
+	plog, err := m.thread(ctx, parent.ID)
+	if err != nil {
+		return Thread{}, fmt.Errorf("thread: fork %s: %w", id, err)
+	}
+	pitems := plog.snapshot().Items
+	note := forkNoteText(parent)
+	l := launch{resume: parent.ClaudeSessionID, fork: true}
+	if o.At != "" {
+		t, cut, err := m.forkCutOf(pitems, o.At, parent.Status == StatusBusy, tpath)
+		if err != nil {
+			return Thread{}, err
+		}
+		pitems, l.at = pitems[:t.end+1], cut
+		note = forkTurnNoteText(parent, t)
 	}
 	newID, err := newThreadID()
 	if err != nil {
@@ -958,18 +976,15 @@ func (m *Manager) Fork(ctx context.Context, id, name string) (Thread, error) {
 		m.tmu.Unlock()
 		m.mu.Unlock()
 	}
-	items, err := m.forkLog(ctx, parent, newID)
-	if err != nil {
-		drop()
-		return Thread{}, err
-	}
+	items := m.forkLog(parent, newID, pitems, note)
 	// The fork shares the parent's checkouts: one a cleanup removed is made again first.
 	remade, replaced, err := m.ensureMembers(ctx, s)
 	if err != nil {
 		drop()
 		return Thread{}, err
 	}
-	if err := m.spawn(ctx, newID, launch{resume: parent.ClaudeSessionID, fork: true, newID: cid}); err != nil {
+	l.newID = cid
+	if err := m.spawn(ctx, newID, l); err != nil {
 		drop()
 		return Thread{}, err
 	}

@@ -1,0 +1,24 @@
+{"type":"user","uuid":"bb2518a5-8ad9-4927-ac52-782319c81516","parentUuid":null,"turnOrigin":"sdk","message":{"role":"user","content":[{"type":"text","text":"Use the Agent tool with the general-purpose suba"}]}}
+{"type":"attachment","uuid":"e43ded7d-ad83-4818-b730-4c24cb951eb4","parentUuid":"bb2518a5-8ad9-4927-ac52-782319c81516","attachment":{"type":"environment"}}
+{"type":"attachment","uuid":"03a6ad5c-dbce-4c22-9fc4-7609be22875f","parentUuid":"e43ded7d-ad83-4818-b730-4c24cb951eb4","attachment":{"type":"model"}}
+{"type":"attachment","uuid":"61bb2ae0-2a26-470a-a16e-0c7580915057","parentUuid":"03a6ad5c-dbce-4c22-9fc4-7609be22875f","attachment":{"type":"deferred_tools_delta"}}
+{"type":"attachment","uuid":"77392daf-de8e-4ea7-848c-53b4250e04ba","parentUuid":"61bb2ae0-2a26-470a-a16e-0c7580915057","attachment":{"type":"agent_listing_delta"}}
+{"type":"attachment","uuid":"c7d9d070-20f7-440a-ab1c-1613267c7be9","parentUuid":"77392daf-de8e-4ea7-848c-53b4250e04ba","attachment":{"type":"skill_listing"}}
+{"type":"attachment","uuid":"dc26d9e8-31d2-4481-abfe-db9bfbbf2725","parentUuid":"c7d9d070-20f7-440a-ab1c-1613267c7be9","attachment":{"type":"total_tokens_reminder"}}
+{"type":"attachment","uuid":"2851e368-f53c-4521-94c1-104738f2e486","parentUuid":"dc26d9e8-31d2-4481-abfe-db9bfbbf2725","attachment":{"type":"session_context"}}
+{"type":"attachment","uuid":"3d2844c5-13f1-4529-bb8e-e1a7b3cb0bed","parentUuid":"2851e368-f53c-4521-94c1-104738f2e486","attachment":{"type":"date"}}
+{"type":"attachment","uuid":"c39240ad-8719-44f0-96da-8bacbdef4351","parentUuid":"3d2844c5-13f1-4529-bb8e-e1a7b3cb0bed","attachment":{"type":"credential_org"}}
+{"type":"attachment","uuid":"523cca15-5e85-4d15-b69e-a60f2d4ea691","parentUuid":"c39240ad-8719-44f0-96da-8bacbdef4351","attachment":{"type":"prompt_snapshot"}}
+{"type":"assistant","uuid":"ea3bba65-e421-4bb8-a678-2059ff71ba82","parentUuid":"523cca15-5e85-4d15-b69e-a60f2d4ea691","message":{"role":"assistant","id":"msg_011ChBy83riUXhU4HmkGwqyg","content":[{"type":"tool_use","id":"toolu_01A8Y6jmucJvBcATSGs4beeK","name":"Agent"}]}}
+{"type":"user","uuid":"bf68e58a-513b-414d-8fbb-97d5711a877c","parentUuid":"ea3bba65-e421-4bb8-a678-2059ff71ba82","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_01A8Y6jmucJvBcATSGs4beeK"}]}}
+{"type":"attachment","uuid":"3e1f3bdb-1a3b-483b-bad9-fe6bf8095c57","parentUuid":"bf68e58a-513b-414d-8fbb-97d5711a877c","attachment":{"type":"prompt_snapshot"}}
+{"type":"attachment","uuid":"18c286f9-d840-4918-94e7-dff85904a7fc","parentUuid":"3e1f3bdb-1a3b-483b-bad9-fe6bf8095c57","attachment":{"type":"deferred_tools_delta"}}
+{"type":"attachment","uuid":"4e25c6e8-58e8-4c3c-82d6-3bfbba028fbb","parentUuid":"18c286f9-d840-4918-94e7-dff85904a7fc","attachment":{"type":"mcp_instructions_delta"}}
+{"type":"attachment","uuid":"64ab830a-d38f-4b1e-be7e-c012348cc44a","parentUuid":"4e25c6e8-58e8-4c3c-82d6-3bfbba028fbb","attachment":{"type":"total_tokens_reminder"}}
+{"type":"assistant","uuid":"94de9105-ee81-49c4-b5f0-5771ccbb7082","parentUuid":"64ab830a-d38f-4b1e-be7e-c012348cc44a","message":{"role":"assistant","id":"msg_011ChBy8D4bjDQY5ST2kR6F9","content":[{"type":"thinking"}]}}
+{"type":"assistant","uuid":"eefdf89b-32c2-4832-931a-d53e94f14b81","parentUuid":"94de9105-ee81-49c4-b5f0-5771ccbb7082","message":{"role":"assistant","id":"msg_011ChBy8D4bjDQY5ST2kR6F9","content":[{"type":"text","text":"The README.md summary is still pending. I launch"}]}}
+{"type":"user","uuid":"4f56e318-5859-4121-b02e-a8249693f21e","parentUuid":"eefdf89b-32c2-4832-931a-d53e94f14b81","turnOrigin":"sdk","message":{"role":"user","content":[{"type":"text","text":"Reply with just DONE."}]}}
+{"type":"attachment","uuid":"af8f27c3-c13f-45c4-831b-52f389e02489","parentUuid":"4f56e318-5859-4121-b02e-a8249693f21e","attachment":{"type":"total_tokens_reminder"}}
+{"type":"assistant","uuid":"b35dd424-0189-4d75-95d4-5083a4786f9e","parentUuid":"af8f27c3-c13f-45c4-831b-52f389e02489","message":{"role":"assistant","id":"msg_011ChBy8KzpveEkicBZMMMWk","content":[{"type":"text","text":"DONE"}]}}
+{"type":"user","uuid":"e6b568ad-6c14-449e-87e7-8ae993dfbae1","parentUuid":"b35dd424-0189-4d75-95d4-5083a4786f9e","isMeta":true,"message":{"role":"user","content":"<system-reminder>\n<tools-used-before-summary>Rea"}}
+{"type":"user","uuid":"89f62bfd-a781-40db-986f-fd15b001580d","parentUuid":"e6b568ad-6c14-449e-87e7-8ae993dfbae1","isMeta":true,"turnOrigin":"peer","message":{"role":"user","content":"Another Claude session sent a message:\n<agent-me"}}

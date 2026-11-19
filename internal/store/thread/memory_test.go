@@ -209,7 +209,7 @@ func TestMemoryRefreshOnResume(t *testing.T) {
 	mu.Lock()
 	entries, readErr = []string{"Fork rule"}, nil
 	mu.Unlock()
-	f, err := e.m.Fork(e.ctx(), s.ID, "")
+	f, err := e.m.Fork(e.ctx(), s.ID, ForkOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -4480,11 +4480,12 @@ export class World {
           name: "thread.fork",
           title: "Fork Thread",
           category: "Thread",
-          description: "Start a new thread that continues this one's conversation",
+          description: "Start a new thread that continues this thread's conversation, all of it or, with at, up to and including one finished turn. The fork works in this thread's checkouts as they are now: files are never rewound to that turn.",
           keybindings: [],
           args: [
             { name: "id", type: ArgType.STRING, required: false, description: "Thread id (default: the active thread)" },
             { name: "name", type: ArgType.STRING, required: false, description: "Name for the fork" },
+            { name: "at", type: ArgType.STRING, required: false, description: "A finished turn to fork from: its turn end's item id, or its #ordinal" },
             { name: "focus", type: ArgType.BOOL, required: false, description: "Select the new thread in every window (--focus=false: no window moves). Never for a thread another thread created (created-by): thread focus shows one on request", defaultValue: "true" },
           ],
         },
@@ -4493,9 +4494,11 @@ export class World {
           const s = args.id ? this.thread(args.id) : activeThread(ctx);
           if (!s) throw new CommandError("unavailable", "no active thread");
           this.refuseTranscriptMissing(s.id);
+          // Refused before anything is made, as the daemon's.
+          const turn = args.at ? this.logs.forkTurn(s.id, args.at, s.status === ThreadStatus.BUSY) : undefined;
           const named = args.name ? { name: args.name, autoNamed: false, nameIn: 0 } : { pendingName: `${s.name || s.id} (fork)` };
           const f = this.createThread(s.projectId, s.worktreePath, s.model, s.effort, { ...named, permissionMode: s.permissionMode, parentId: s.id, checkoutPaths: { ...s.checkoutPaths } });
-          this.logs.fork(s.id, f.id, s.name || s.id);
+          this.logs.fork(s.id, f.id, s.name || s.id, turn);
           if (args.focus !== "false") this.focusThread(f.id);
           return `Forked ${s.name || s.id}`;
         },

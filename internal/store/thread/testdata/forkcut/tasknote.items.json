@@ -1,0 +1,79 @@
+[
+  {
+    "id": "7fb8d3d2-b021-4b6c-87ea-5dae6f41e40a",
+    "kind": "userMessage",
+    "ordinal": 1,
+    "text": "Remember the code word CHERRY. Then run "
+  },
+  {
+    "id": "msg_011ChBxrHsPCmYFBFVnRZq6j/0",
+    "kind": "thinking",
+    "ordinal": 2
+  },
+  {
+    "id": "toolu_019CNQQx7jYxR7auqzg6ANxo",
+    "kind": "toolCall",
+    "ordinal": 3
+  },
+  {
+    "id": "msg_011ChBxrT5XC3bz2gshhnWNt/0",
+    "kind": "thinking",
+    "ordinal": 4
+  },
+  {
+    "id": "toolu_01BojosivaoHAfE4kPLyKzfV",
+    "kind": "toolCall",
+    "ordinal": 5
+  },
+  {
+    "id": "msg_011ChBxrcNcR2nDH8uNPNTNv/0",
+    "kind": "assistantText",
+    "ordinal": 6
+  },
+  {
+    "id": "turn-fbb8702d-8250-49b0-9179-a5c1e934dbd6",
+    "kind": "turnEnd",
+    "ordinal": 7
+  },
+  {
+    "id": "7f4ea67d-e890-41e6-84f9-10ce45b85ff4",
+    "kind": "userMessage",
+    "ordinal": 8,
+    "text": "Reply with just DONE."
+  },
+  {
+    "id": "msg_011ChBxs69D3Ju6pYVAB2v1T/0",
+    "kind": "thinking",
+    "ordinal": 9
+  },
+  {
+    "id": "msg_011ChBxs69D3Ju6pYVAB2v1T/1",
+    "kind": "assistantText",
+    "ordinal": 10
+  },
+  {
+    "id": "turn-66284da9-7419-4568-b9d5-74cb1dd82d27",
+    "kind": "turnEnd",
+    "ordinal": 11
+  },
+  {
+    "id": "msg_011ChBxtq895n3ZweAHjr33D/0",
+    "kind": "thinking",
+    "ordinal": 12
+  },
+  {
+    "id": "toolu_01WXeHfGdQdVW6QkQMZE1hVd",
+    "kind": "toolCall",
+    "ordinal": 13
+  },
+  {
+    "id": "msg_011ChBxtwCFnEMUgwfknUPkZ/0",
+    "kind": "assistantText",
+    "ordinal": 14
+  },
+  {
+    "id": "turn-ba6f106b-ead1-4502-b340-5af4c22067a3",
+    "kind": "turnEnd",
+    "ordinal": 15
+  }
+]

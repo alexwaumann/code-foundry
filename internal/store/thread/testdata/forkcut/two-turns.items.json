@@ -1,0 +1,44 @@
+[
+  {
+    "id": "f69e71fe-46e6-4f1d-8a53-7d62bb4976d3",
+    "kind": "userMessage",
+    "ordinal": 1,
+    "text": "Remember the code word APPLE. Reply with"
+  },
+  {
+    "id": "msg_011ChBxn2XHetSRVm8zk4CzX/0",
+    "kind": "thinking",
+    "ordinal": 2
+  },
+  {
+    "id": "msg_011ChBxn2XHetSRVm8zk4CzX/1",
+    "kind": "assistantText",
+    "ordinal": 3
+  },
+  {
+    "id": "turn-a36cc72b-23b0-4a44-881a-15846d06e734",
+    "kind": "turnEnd",
+    "ordinal": 4
+  },
+  {
+    "id": "cf2ab84e-177e-4b48-afa3-4b6ae0593d33",
+    "kind": "userMessage",
+    "ordinal": 5,
+    "text": "Remember the second code word BANANA. Re"
+  },
+  {
+    "id": "msg_011ChBxnD5Yk6h9NqPu8AdTU/0",
+    "kind": "thinking",
+    "ordinal": 6
+  },
+  {
+    "id": "msg_011ChBxnD5Yk6h9NqPu8AdTU/1",
+    "kind": "assistantText",
+    "ordinal": 7
+  },
+  {
+    "id": "turn-44b0f088-5d1a-4929-aae7-b54594813118",
+    "kind": "turnEnd",
+    "ordinal": 8
+  }
+]
