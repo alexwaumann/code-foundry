@@ -6,6 +6,7 @@ import type { FooterSection, HeaderRow } from "@/lib/tree";
 import { cn } from "@/lib/utils";
 import { useShellDragStore } from "@/shell/drag/state";
 import { rowGap } from "../rowSizes";
+import { useSelectedRowKey } from "../shell/listRows";
 import { PanelRows, type ScrollTo } from "../shell/ShellSidebarList";
 import { ThreadListbox } from "../shell/ThreadListbox";
 import { RAIL_CARD_MAX, railTileClass } from "./railLook";
@@ -16,7 +17,10 @@ import { RAIL_CARD_MAX, railTileClass } from "./railLook";
  * draws them, "a menu inside a hover card". The rows are the expanded footer's (PanelRows over the
  * row views) inside the sidebar's listbox (ThreadListbox), so a row clicks, right-clicks, drags
  * and shows its own hover card as it does there. The card lists every row whatever the section's
- * collapsed state in the expanded sidebar, and never changes that state.
+ * collapsed state in the expanded sidebar, and never changes that state. While the selected
+ * thread (the listbox's selectedKey: the focused pane's thread or draft) is one of the section's
+ * rows, the icon takes a thread icon's selected fill, so the rail always shows where the open
+ * thread is; the row inside the card shows as selected too.
  */
 
 /** The card's open and close delay: the pointer crosses the gap from the icon into it within it. */
@@ -53,6 +57,9 @@ export function RailSectionCard({ section, header, rows, icon: Icon, tone }: Rai
   const trigger = useRef<HTMLButtonElement>(null);
   const content = useRef<HTMLDivElement>(null);
   const scrollTo = useRef<ScrollTo>(null);
+  // The selected row is the expanded list's (useSelectedRowKey, which ThreadListbox reads too).
+  const selectedKey = useSelectedRowKey();
+  const selected = selectedKey !== null && rows.some((r) => r.key === selectedKey);
   const shown = hover || menu || focused;
   // A row dragged out of the card: the card stays mounted (it is the drag's source) but out of
   // sight until the drop, then closes.
@@ -105,8 +112,12 @@ export function RailSectionCard({ section, header, rows, icon: Icon, tone }: Rai
           aria-label={label}
           aria-haspopup="listbox"
           aria-expanded={open}
-          className={cn(railTileClass(false, false), open && !dragHeld && "bg-cf-sidebar-row-hover", "focus-visible:ring-1 focus-visible:ring-cf-focus focus-visible:ring-inset")}
+          // A button, not an option: the selected thread being inside is "current", not a selection of the button.
+          aria-current={selected || undefined}
+          // Selected wins over the open card's hover fill, as it does over a thread icon's hover.
+          className={cn(railTileClass(selected, false), open && !dragHeld && !selected && "bg-cf-sidebar-row-hover", "focus-visible:ring-1 focus-visible:ring-cf-focus focus-visible:ring-inset")}
           data-testid={`rail-${section}`}
+          data-selected={selected || undefined}
           data-count={header.count}
           onKeyDown={onTriggerKey}
         >

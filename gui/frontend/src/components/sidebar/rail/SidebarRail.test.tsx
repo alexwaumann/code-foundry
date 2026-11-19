@@ -447,3 +447,77 @@ describe("an icon behaves as its row", () => {
     expect(list().getAttribute("aria-activedescendant")).toBe("row-s:s-1");
   });
 });
+
+describe("the selected thread on the rail", () => {
+  const HOUR = 3_600_000;
+  const all = () => {
+    setThreads(
+      thread({ id: "s-1" }),
+      ask("s-2", "permission"),
+      thread({ id: "w-1", name: "Index the docs", status: "busy" }),
+      thread({ id: "z-1", name: "Bump wails", snoozedUntilMs: Date.now() + 4 * HOUR }),
+      thread({ id: "a-1", name: "Old spike", archivedAtMs: Date.now() - HOUR }),
+    );
+  };
+  /** The focused pane shows this thread (as a preview tab when put away), or no thread: Pull Requests. */
+  const focus = (id: string | null) =>
+    act(async () => {
+      const t = id === null ? tab("t-1", "prs") : tab("t-1", "thread", id, { key: `thread:${id}`, preview: id.startsWith("z") || id.startsWith("a") });
+      await seedLayout(layoutOf([space(pane("p-1", [t], "t-1"), "p-1")], 2));
+    });
+  /** Every element on the rail drawn as selected: thread icons by aria-selected, section icons by data-selected; each with the selected fill. */
+  const selectedOnRail = () => {
+    const els = [...rail().querySelectorAll<HTMLElement>('[aria-selected="true"], [data-selected]')];
+    for (const el of els) expect(el.className).toContain("bg-cf-sidebar-row-selected");
+    expect(rail().querySelectorAll(".bg-cf-sidebar-row-selected")).toHaveLength(els.length);
+    return els.map((el) => el.getAttribute("data-row-key") ?? el.getAttribute("data-testid"));
+  };
+
+  it.each([
+    ["needs", "s-2", "s:s-2"],
+    ["active", "s-1", "s:s-1"],
+    ["working", "w-1", "rail-working"],
+    ["snoozed", "z-1", "rail-snoozed"],
+    ["archived", "a-1", "rail-archived"],
+    ["none", null, null],
+  ])("a selected thread in %s: only that element is selected", async (_section, id, selected) => {
+    all();
+    await focus(id);
+    show();
+    expect(selectedOnRail()).toEqual(selected === null ? [] : [selected]);
+    for (const s of ["working", "snoozed", "archived"]) {
+      const tile = screen.getByTestId(`rail-${s}`);
+      expect(tile.getAttribute("aria-current")).toBe(selected === tile.getAttribute("data-testid") ? "true" : null);
+      expect(tile.hasAttribute("aria-selected")).toBe(false);
+    }
+  });
+
+  it("follows the selection live: the thread starts working, is archived, then focus moves", async () => {
+    all();
+    await focus("s-1");
+    show();
+    expect(selectedOnRail()).toEqual(["s:s-1"]);
+    setThreads(thread({ id: "s-1", status: "busy" }), ask("s-2", "permission"), thread({ id: "w-1", status: "busy" }), thread({ id: "z-1", snoozedUntilMs: Date.now() + HOUR }), thread({ id: "a-1", archivedAtMs: Date.now() - HOUR }));
+    expect(selectedOnRail()).toEqual(["rail-working"]);
+    setThreads(thread({ id: "s-1", archivedAtMs: Date.now() }), ask("s-2", "permission"), thread({ id: "w-1", status: "busy" }), thread({ id: "z-1", snoozedUntilMs: Date.now() + HOUR }), thread({ id: "a-1", archivedAtMs: Date.now() - HOUR }));
+    expect(selectedOnRail()).toEqual(["rail-archived"]);
+    await focus("s-2");
+    expect(selectedOnRail()).toEqual(["s:s-2"]);
+  });
+
+  it("the open card keeps the selected fill over its hover fill, and its row shows as selected", async () => {
+    all();
+    await focus("w-1");
+    show();
+    act(() => {
+      screen.getByTestId("rail-working").focus();
+    });
+    await act(() => new Promise((r) => setTimeout(r, 300)));
+    const tile = screen.getByTestId("rail-working");
+    expect(tile.getAttribute("aria-expanded")).toBe("true");
+    expect(tile.className).toContain("bg-cf-sidebar-row-selected");
+    expect(tile.classList.contains("bg-cf-sidebar-row-hover")).toBe(false);
+    const row = screen.getByTestId("rail-working-card").querySelector('[data-row-key="s:w-1"]') as HTMLElement;
+    expect(row.getAttribute("aria-selected")).toBe("true");
+  });
+});
