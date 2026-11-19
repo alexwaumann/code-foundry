@@ -8,10 +8,10 @@ import (
 	"time"
 )
 
-// Persistence for the notifications table (migration 0063).
+// Persistence for the notifications table (migrations 0063 and 0064).
 
 const columns = `id, source, key, level, time_sensitive, title, body, thread_id, actions, show_at, state,
-	created_at, updated_at, arrived_at, snoozed_until`
+	created_at, updated_at, arrived_at, snoozed_until, seen`
 
 func loadAll(ctx context.Context, db *sql.DB) ([]Notification, error) {
 	rows, err := db.QueryContext(ctx, `SELECT `+columns+` FROM notifications`)
@@ -23,13 +23,13 @@ func loadAll(ctx context.Context, db *sql.DB) ([]Notification, error) {
 	for rows.Next() {
 		var n Notification
 		var level, state, actions string
-		var ts int64
+		var ts, seen int64
 		var showAt, created, updated, arrived, snoozed int64
 		if err := rows.Scan(&n.ID, &n.Source, &n.Key, &level, &ts, &n.Title, &n.Body, &n.ThreadID, &actions, &showAt, &state,
-			&created, &updated, &arrived, &snoozed); err != nil {
+			&created, &updated, &arrived, &snoozed, &seen); err != nil {
 			return nil, fmt.Errorf("notification: load: %w", err)
 		}
-		n.Level, n.State, n.TimeSensitive = Level(level), State(state), ts != 0
+		n.Level, n.State, n.TimeSensitive, n.Seen = Level(level), State(state), ts != 0, seen != 0
 		if err := json.Unmarshal([]byte(actions), &n.Actions); err != nil {
 			return nil, fmt.Errorf("notification: load %s actions: %w", n.ID, err)
 		}
@@ -65,17 +65,20 @@ func save(ctx context.Context, db *sql.DB, ns []Notification) (err error) {
 		if n.Actions == nil {
 			actions = []byte("[]")
 		}
-		ts := 0
+		ts, seen := 0, 0
 		if n.TimeSensitive {
 			ts = 1
 		}
-		if _, err = tx.ExecContext(ctx, `INSERT INTO notifications (`+columns+`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		if n.Seen {
+			seen = 1
+		}
+		if _, err = tx.ExecContext(ctx, `INSERT INTO notifications (`+columns+`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 			ON CONFLICT (id) DO UPDATE SET level = excluded.level, time_sensitive = excluded.time_sensitive,
 				title = excluded.title, body = excluded.body, thread_id = excluded.thread_id, actions = excluded.actions,
 				show_at = excluded.show_at, state = excluded.state, updated_at = excluded.updated_at,
-				arrived_at = excluded.arrived_at, snoozed_until = excluded.snoozed_until`,
+				arrived_at = excluded.arrived_at, snoozed_until = excluded.snoozed_until, seen = excluded.seen`,
 			n.ID, n.Source, n.Key, string(n.Level), ts, n.Title, n.Body, n.ThreadID, string(actions), millis(n.ShowAt), string(n.State),
-			millis(n.CreatedAt), millis(n.UpdatedAt), millis(n.ArrivedAt), millis(n.SnoozedUntil)); err != nil {
+			millis(n.CreatedAt), millis(n.UpdatedAt), millis(n.ArrivedAt), millis(n.SnoozedUntil), seen); err != nil {
 			return fmt.Errorf("notification: save %s: %w", n.ID, err)
 		}
 	}

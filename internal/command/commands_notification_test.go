@@ -294,3 +294,76 @@ func TestNotificationCommandsWithoutStore(t *testing.T) {
 		t.Errorf("post: %v, want Unimplemented", err)
 	}
 }
+
+// notification.seen marks every shown notification seen, or one by id (a suffix resolves),
+// and notification.list reports the seen state and the unseen count.
+func TestNotificationSeen(t *testing.T) {
+	r, s, _ := newNotificationRegistry(t, nil)
+	ctx := context.Background()
+	inv := func(name string, args map[string]string) (command.Result, error) {
+		return r.Invoke(ctx, command.Context{}, name, args)
+	}
+	var ids []string
+	for _, title := range []string{"Build failed", "Deploy waiting", "Review asked"} {
+		res, err := inv("notification.post", map[string]string{"title": title})
+		if err != nil {
+			t.Fatal(err)
+		}
+		ids = append(ids, res.JSON.(command.NotificationPostView).Notification.ID)
+	}
+	unseen := func() int {
+		res, err := inv("notification.list", nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		v := res.JSON.(command.NotificationListView)
+		k := 0
+		for _, n := range v.Notifications {
+			if !n.Seen {
+				k++
+			}
+		}
+		if k != v.Unseen {
+			t.Errorf("list: %d unseen notifications, unseen count %d", k, v.Unseen)
+		}
+		return v.Unseen
+	}
+	for _, tt := range []struct {
+		name       string
+		args       map[string]string
+		wantMsg    string
+		wantSeen   int
+		wantUnseen int
+		wantErr    func(error) bool
+	}{
+		{name: "one by suffix", args: map[string]string{"id": ids[0][len(ids[0])-6:]}, wantMsg: "marked notification " + ids[0] + " seen", wantSeen: 1, wantUnseen: 2},
+		{name: "the same one again", args: map[string]string{"id": ids[0]}, wantMsg: "notification " + ids[0] + " was seen already", wantUnseen: 2},
+		{name: "an unknown one", args: map[string]string{"id": "n-000000000000"}, wantUnseen: 2,
+			wantErr: func(err error) bool { return connect.CodeOf(err) == connect.CodeNotFound }},
+		{name: "all", wantMsg: "marked 2 notifications seen", wantSeen: 2},
+		{name: "all again", wantMsg: "no unseen notifications"},
+	} {
+		res, err := inv("notification.seen", tt.args)
+		switch {
+		case tt.wantErr != nil:
+			if err == nil || !tt.wantErr(err) {
+				t.Errorf("%s: err %v", tt.name, err)
+			}
+		case err != nil:
+			t.Fatalf("%s: %v", tt.name, err)
+		default:
+			if res.Message != tt.wantMsg {
+				t.Errorf("%s: message %q, want %q", tt.name, res.Message, tt.wantMsg)
+			}
+			if v := res.JSON.(command.NotificationSeenView); v.Seen != tt.wantSeen {
+				t.Errorf("%s: seen %d, want %d", tt.name, v.Seen, tt.wantSeen)
+			}
+		}
+		if got := unseen(); got != tt.wantUnseen {
+			t.Errorf("%s: %d unseen after, want %d", tt.name, got, tt.wantUnseen)
+		}
+	}
+	if s.Snapshot().Unseen != 0 {
+		t.Errorf("store: %d unseen", s.Snapshot().Unseen)
+	}
+}

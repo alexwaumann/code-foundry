@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { useBellTilt } from "@/stores/arrivals";
 import { clearNotifications } from "@/stores/notificationActions";
 import { setBellOpen, useBellCount, useNotificationsStore, useShownNotificationIds } from "@/stores/notifications";
+import { useMarkSeenWhileOpen } from "@/stores/notificationSeen";
 import { NotificationItem } from "./NotificationCard";
 
 /** A card's estimated height before it is measured: a title, a line of body, a row of buttons. */
@@ -32,13 +33,17 @@ function NotificationList({ ids }: { ids: readonly string[] }) {
 
 /**
  * The top bar's bell (docs/notes/notifications-3-bell.md): the count of shown notifications, in
- * the attention tone while one of them is time-sensitive, nothing but the icon with none. It opens
+ * the attention tone while one of them is time-sensitive, nothing but the icon with none. While one
+ * is unseen (docs/notes/notification-seen.md) the count moves into a corner badge, in the accent
+ * fill, or the warning fill while an unseen one is time-sensitive; opening the list sees them. It opens
  * the one global list (the same in every space) with Clear all. Its open state is the store's, so
  * an arrival does not toast while the list shows it and the "N more" toast can open it.
  */
 export function NotificationBell() {
-  const { count, urgent } = useBellCount();
+  const { count, urgent, unseen, unseenUrgent } = useBellCount();
   const open = useNotificationsStore((s) => s.open);
+  useMarkSeenWhileOpen();
+  const badge = unseen && count > 0;
   const ids = useShownNotificationIds();
   // Only the glyph tilts when a notification arrives (lib/arrivals.ts); the count stays still.
   const { className: tiltClass, place: tiltPlace } = useBellTilt(Bell);
@@ -52,14 +57,29 @@ export function NotificationBell() {
             aria-label={label}
             className={cn(
               "flex h-7 shrink-0 items-center gap-1 rounded-md px-1.5 text-label font-medium tabular-nums outline-none [--wails-draggable:no-drag] hover:bg-cf-control-hover focus-visible:ring-1 focus-visible:ring-cf-focus aria-expanded:bg-cf-control-hover",
-              urgent ? "text-cf-warning-text" : "text-cf-text-secondary",
+              badge ? "text-cf-text" : urgent ? "text-cf-warning-text" : "text-cf-text-secondary",
             )}
             data-testid="notification-bell"
             data-count={count}
             data-urgent={urgent || undefined}
+            data-unseen={badge || undefined}
           >
-            <Bell className={cn("size-4 shrink-0", urgent && "text-cf-text-secondary", tiltClass)} ref={tiltPlace} aria-hidden data-testid="notification-bell-icon" />
-            {count > 0 && <span data-testid="notification-bell-count">{count}</span>}
+            <Bell className={cn("size-4 shrink-0", urgent && !badge && "text-cf-text-secondary", tiltClass)} ref={tiltPlace} aria-hidden data-testid="notification-bell-icon" />
+            {badge ? (
+              // On the bell's top-right corner, in the flow so two and three digits widen the button rather than cover the bell.
+              <span
+                className={cn(
+                  "-ml-2 flex h-3.5 min-w-3.5 -translate-y-2 items-center justify-center self-center rounded-full px-1 text-caption-sm leading-none font-semibold tabular-nums ring-2 ring-cf-chrome",
+                  unseenUrgent ? "bg-cf-warning text-cf-warning-foreground" : "bg-cf-accent text-cf-accent-foreground",
+                )}
+                data-testid="notification-bell-count"
+                data-tone={unseenUrgent ? "warning" : "accent"}
+              >
+                {count}
+              </span>
+            ) : (
+              count > 0 && <span data-testid="notification-bell-count">{count}</span>
+            )}
           </button>
         </PopoverTrigger>
       </Tip>

@@ -2,24 +2,28 @@
  * The bell's notifications in the mock daemon (docs/notes/notifications-1-store.md,
  * notifications-3-bell.md): NotificationService.List, the EventService notification source (the
  * whole snapshot per change with arrived and updated ids) and the notification.* commands the GUI
- * runs (dismiss, snooze, act, clear), plus post, list and withdraw for the CLI's shape. Simplified
+ * runs (dismiss, snooze, act, seen, clear), plus post, list and withdraw for the CLI's shape. Simplified
  * from internal/store/notification: one per source and key, a changed post of a shown one is an
  * update in place, a dismissed or resolved one comes back only with changed content, snooze ends
- * on a one-second tick. Empty after a reset, so the bell is quiet unless a test posts.
+ * on a one-second tick. Seen as the daemon keeps it (docs/notes/notification-seen.md): an arrival
+ * is unseen, an update in place keeps it, act and notification.seen see it; a quiet post or seed
+ * (no arrival: what was there before the GUI connected) is seen unless seen=0 says otherwise.
+ * Empty after a reset, so the bell is quiet unless a test posts.
  *
  * Controls (mock/server.ts):
- *   POST /__mock/notifications/post?title=…[&body=…&level=info|warning|error&ts=1&thread=s-4
+ *   POST /__mock/notifications/post?title=…[&body=…&level=info|warning|error&ts=1&thread=s-4&seen=1
  *        &source=hello|command|…&key=…&action=Label|kind[|arg][|resolves]…]   (a post: an arrival,
  *        or an update of the same source and key; kind is command, send (arg: the text, to thread),
  *        start (arg: the prompt) or open (arg: the URL); resolves 0|1 overrides the kind's default)
  *   POST /__mock/notifications/withdraw?key=…[&source=…]   (the source takes it back)
- *   POST /__mock/notifications/seed[?quiet=1]   (the sketch's five, one time-sensitive and two
- *        naming s-4, and one snoozed; quiet: as a snapshot, no arrivals, so nothing toasts)
+ *   POST /__mock/notifications/seed[?quiet=1&seen=0|1]   (the sketch's five, one time-sensitive and
+ *        two naming s-4, and one snoozed; quiet: as a snapshot, no arrivals, so nothing toasts;
+ *        seen: whether they are seen, by default as quiet says)
  *   POST /__mock/notifications/plugin-health?name=hello&display=Hello&state=failed|off|running[&reason=…]
  *        (the daemon's source "plugins", internal/daemon/plugin_health.go: failed posts the error
  *        card with Restart and Open plugins, off the warning one the daemon posts when it turned
  *        the plugin off, running withdraws it)
- *   POST /__mock/notifications/github[?quiet=1]   (the daemon's four GitHub cards: review again,
+ *   POST /__mock/notifications/github[?quiet=1&seen=0|1]   (the daemon's four GitHub cards: review again,
  *        review requested, changes requested naming s-4, a merge conflict; Open PR runs
  *        view.open.pr --repo-slug --number --focus, the pull request's tab of no thread)
  *   POST /__mock/notifications/act-fail?message=…   (the next notification.act fails with it; empty: none)
@@ -77,6 +81,7 @@ interface Note {
   createdAt: Date;
   arrivedAt: Date;
   snoozedUntil: Date | null;
+  seen: boolean;
 }
 
 const LEVELS: Record<Level, NotificationLevel> = { info: NotificationLevel.INFO, warning: NotificationLevel.WARNING, error: NotificationLevel.ERROR };
@@ -95,6 +100,12 @@ export interface PostInput {
   body?: string;
   threadId?: string;
   actions?: Action[];
+}
+
+/** seed and github's seen=0|1; undefined: as quiet says. */
+function seenParam(q: URLSearchParams): boolean | undefined {
+  const v = q.get("seen");
+  return v === null ? undefined : v === "1";
 }
 
 export class MockNotifications {
@@ -155,6 +166,7 @@ export class MockNotifications {
       updatedAt: timestampFromDate(n.arrivedAt),
       arrivedAt: timestampFromDate(n.arrivedAt),
       ...(n.snoozedUntil ? { snoozedUntil: timestampFromDate(n.snoozedUntil) } : {}),
+      seen: n.seen,
     };
   }
 
@@ -168,7 +180,13 @@ export class MockNotifications {
 
   snapshot(): SnapshotInit {
     const active = this.active();
-    return { notifications: active.map((n) => this.msg(n)), timeSensitive: active.filter((n) => n.timeSensitive && !n.snoozedUntil).length, version: BigInt(this.version) };
+    const shown = active.filter((n) => !n.snoozedUntil);
+    return {
+      notifications: active.map((n) => this.msg(n)),
+      timeSensitive: shown.filter((n) => n.timeSensitive).length,
+      unseen: shown.filter((n) => !n.seen).length,
+      version: BigInt(this.version),
+    };
   }
 
   /** A connect's event: the snapshot, no arrivals. */
@@ -192,12 +210,13 @@ export class MockNotifications {
     for (const n of woke) {
       n.snoozedUntil = null;
       n.arrivedAt = new Date(now);
+      n.seen = false;
     }
     this.changed(woke.map((n) => n.id), []);
   }
 
   /** A post: a new one arrives; the same source and key with other content updates a shown one in place, or brings a closed one back. */
-  post(p: PostInput, opts: { quiet?: boolean; arrivedAt?: Date } = {}): Note {
+  post(p: PostInput, opts: { quiet?: boolean; arrivedAt?: Date; seen?: boolean } = {}): Note {
     if (!p.title.trim()) throw new CommandError("invalid", "a notification needs a title");
     if (p.threadId && !this.deps.hasThread(p.threadId)) throw new CommandError("notfound", `no thread ${p.threadId}`);
     const source = p.source ?? "command";
@@ -205,6 +224,7 @@ export class MockNotifications {
     // The daemon hashes title, body and thread; the mock keeps them readable.
     const key = p.key || `auto:${fields.title}|${fields.body}|${fields.threadId}`;
     const now = opts.arrivedAt ?? new Date();
+    const seen = opts.seen ?? opts.quiet ?? false;
     const old = this.notes.find((n) => n.source === source && n.key === key);
     if (old) {
       const same = content(old) === content(fields);
@@ -214,11 +234,11 @@ export class MockNotifications {
         this.changed([], [old.id]);
         return old;
       }
-      Object.assign(old, { state: "active", arrivedAt: now, snoozedUntil: null });
+      Object.assign(old, { state: "active", arrivedAt: now, snoozedUntil: null, seen });
       this.changed(opts.quiet ? [] : [old.id], []);
       return old;
     }
-    const n: Note = { id: `n-${String(this.nextId++).padStart(12, "0")}`, source, key, ...fields, state: "active", createdAt: now, arrivedAt: now, snoozedUntil: null };
+    const n: Note = { id: `n-${String(this.nextId++).padStart(12, "0")}`, source, key, ...fields, state: "active", createdAt: now, arrivedAt: now, snoozedUntil: null, seen };
     this.notes.push(n);
     this.changed(opts.quiet ? [] : [n.id], []);
     return n;
@@ -238,9 +258,9 @@ export class MockNotifications {
   }
 
   /** The sketch's bell: five shown (one time-sensitive, two naming s-4) and one snoozed. */
-  seed(quiet: boolean): void {
+  seed(quiet: boolean, seen = quiet): void {
     const t = Date.now();
-    const at = (min: number) => ({ quiet, arrivedAt: new Date(t - min * MINUTE) });
+    const at = (min: number) => ({ quiet, seen, arrivedAt: new Date(t - min * MINUTE) });
     this.post({ source: "acme-data", key: "cf-212", title: "CF-212 Sidebar count is wrong after archive", actions: [{ label: "Start a thread", kind: "start", arg: "Look into CF-212", resolves: true }, { label: "Open ticket", kind: "open", arg: "https://example.com/CF-212", resolves: false }] }, at(60));
     this.post({ source: "command", key: "rotate-key", title: "Rotate the staging API key", actions: [{ label: "Open task", kind: "open", arg: "https://example.com/task/7", resolves: false }] }, at(45));
     this.post({ source: "acme-data", key: "retry", title: "Follow up on the retry", threadId: "s-4", actions: [{ label: "Open task", kind: "open", arg: "https://example.com/task/8", resolves: false }] }, at(9));
@@ -256,9 +276,9 @@ export class MockNotifications {
    * for pull requests the mock's dashboard holds (mock/github.ts), so Open PR's tab shows one; the
    * changes-requested one names s-4, a thread linked to its pull request.
    */
-  seedGitHub(quiet: boolean): void {
+  seedGitHub(quiet: boolean, seen = quiet): void {
     const t = Date.now();
-    const at = (min: number) => ({ quiet, arrivedAt: new Date(t - min * MINUTE) });
+    const at = (min: number) => ({ quiet, seen, arrivedAt: new Date(t - min * MINUTE) });
     // Open PR: the pull request's tab in the app (view.open.pr --repo-slug, a tab of no thread), brought forward; the card stays.
     const open = (url: string): Action => {
       const [, slug = "", number = ""] = /\/([^/]+\/[^/]+)\/pull\/(\d+)$/.exec(url) ?? [];
@@ -286,14 +306,17 @@ export class MockNotifications {
           if (kind !== "command" && kind !== "send" && kind !== "start" && kind !== "open") throw new CommandError("invalid", `unknown action kind ${kind}`);
           return { label, kind, arg, resolves: resolves === undefined ? kind !== "open" : resolves === "1" };
         });
-        const n = this.post({ source: q.get("source") ?? "command", key: q.get("key") ?? "", level, timeSensitive: q.get("ts") === "1", title: q.get("title") ?? "", body: q.get("body") ?? "", threadId: q.get("thread") ?? "", actions });
+        const n = this.post(
+          { source: q.get("source") ?? "command", key: q.get("key") ?? "", level, timeSensitive: q.get("ts") === "1", title: q.get("title") ?? "", body: q.get("body") ?? "", threadId: q.get("thread") ?? "", actions },
+          { seen: q.get("seen") === "1" },
+        );
         return { id: n.id };
       }
       case "withdraw":
         this.withdraw(q.get("key") ?? "", q.get("source") ?? "command");
         return {};
       case "seed":
-        this.seed(q.get("quiet") === "1");
+        this.seed(q.get("quiet") === "1", seenParam(q));
         return { notifications: this.active().length };
       case "plugin-health": {
         const name = q.get("name") ?? "hello";
@@ -313,7 +336,7 @@ export class MockNotifications {
         return { id: this.post({ source: PLUGINS_SOURCE, key: name, level: "error", title: `${display} stopped`, body, actions: [restart, open] }).id };
       }
       case "github":
-        this.seedGitHub(q.get("quiet") === "1");
+        this.seedGitHub(q.get("quiet") === "1", seenParam(q));
         return { notifications: this.active().length };
       case "act-fail":
         this.actFail = q.get("message") ?? "";
@@ -419,6 +442,11 @@ export class MockNotifications {
           const i = Number(a.action ?? "1") - 1;
           const act = n.actions[i];
           if (!act) throw new CommandError("invalid", `notification ${n.id} has no action ${String(i + 1)}`);
+          // The user acted on it, so they saw it: marked before the run, which may fail (as the daemon does).
+          if (!n.seen) {
+            n.seen = true;
+            this.changed([], []);
+          }
           if (this.actFail) {
             const message = this.actFail;
             this.actFail = "";
@@ -435,6 +463,19 @@ export class MockNotifications {
           };
           // A verb that fails fails the act (the card's "<label> failed" toast) and leaves the card.
           return ran instanceof Promise ? ran.then(() => ({ message: done(), resultJson: "" })) : done();
+        },
+      },
+      {
+        cmd: cmd("notification.seen", "Notifications: Mark Seen", "Mark the bell's notifications seen; with an id, only that one.", [{ ...id, required: false }]),
+        when: always,
+        run: (_c, a) => {
+          record("notification.seen", a);
+          const which = a.id ? [this.find(a.id)] : this.notes.filter((n) => n.state === "active" && !n.snoozedUntil);
+          const unseen = which.filter((n) => !n.seen);
+          for (const n of unseen) n.seen = true;
+          if (unseen.length > 0) this.changed([], []);
+          if (unseen.length === 0) return a.id ? `notification ${which[0]?.id ?? ""} was seen already` : "no unseen notifications";
+          return a.id ? `marked notification ${unseen[0]?.id ?? ""} seen` : `marked ${String(unseen.length)} notification${unseen.length === 1 ? "" : "s"} seen`;
         },
       },
       {

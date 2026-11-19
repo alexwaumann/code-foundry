@@ -42,10 +42,34 @@ export function shownNotifications(s: NotificationSnapshotView | null): readonly
   return s.notifications.filter((n) => n.status === "shown");
 }
 
-/** The bell's count, and whether any shown one is time-sensitive (the count takes the attention tone). */
-export function bellCount(s: NotificationSnapshotView | null): { count: number; urgent: boolean } {
+/** The bell's look (docs/notes/notification-seen.md). */
+export interface BellCount {
+  /** The shown notifications: the number on the bell, in either look. */
+  count: number;
+  /** A shown one is time-sensitive: the plain number takes the attention tone. */
+  urgent: boolean;
+  /** A shown one is unseen: the number moves into the corner badge. */
+  unseen: boolean;
+  /** An unseen one is time-sensitive: the badge takes the warning fill instead of the accent. */
+  unseenUrgent: boolean;
+}
+
+/**
+ * The bell's count and tones. Unseen follows the snapshot's count, not each notification's flag,
+ * so a daemon from before the seen state (which sends neither) never lights the badge.
+ */
+export function bellCount(s: NotificationSnapshotView | null): BellCount {
   const shown = shownNotifications(s);
-  return { count: shown.length, urgent: shown.some((n) => n.timeSensitive) };
+  const unseen = (s?.unseen ?? 0) > 0;
+  return { count: shown.length, urgent: shown.some((n) => n.timeSensitive), unseen, unseenUrgent: unseen && shown.some((n) => n.timeSensitive && !n.seen) };
+}
+
+/** The shown notifications not seen yet, by id (none from a daemon that does not keep seen). */
+export function unseenIds(s: NotificationSnapshotView | null): readonly string[] {
+  if (!s || s.unseen === 0) return [];
+  return shownNotifications(s)
+    .filter((n) => !n.seen)
+    .map((n) => n.id);
 }
 
 /** A card's source: "Code Foundry" for notification.post, "Plugins" for the daemon's plugin health, "GitHub" for its GitHub notifications, else the plugin's display name, else the source as given. */

@@ -94,7 +94,7 @@ func NotificationSnapshotToProto(snap *notification.Snapshot) *v1.NotificationSn
 	if snap == nil {
 		return out
 	}
-	out.TimeSensitive, out.Version = int32(snap.TimeSensitive), snap.Version
+	out.TimeSensitive, out.Unseen, out.Version = int32(snap.TimeSensitive), int32(snap.Unseen), snap.Version
 	for _, n := range snap.Notifications {
 		out.Notifications = append(out.Notifications, NotificationToProto(n))
 	}
@@ -138,7 +138,7 @@ func NotificationToProto(n notification.Notification) *v1.Notification {
 		Id: n.ID, Source: n.Source, Key: n.Key, Level: notificationLevels[n.Level], TimeSensitive: n.TimeSensitive,
 		Title: n.Title, Body: n.Body, ThreadId: n.ThreadID, Status: notificationStatuses[n.Status()],
 		ShowAt: timestamp(n.ShowAt), CreatedAt: timestamp(n.CreatedAt), UpdatedAt: timestamp(n.UpdatedAt),
-		ArrivedAt: timestamp(n.ArrivedAt), SnoozedUntil: timestamp(n.SnoozedUntil),
+		ArrivedAt: timestamp(n.ArrivedAt), SnoozedUntil: timestamp(n.SnoozedUntil), Seen: n.Seen,
 	}
 	for _, a := range n.Actions {
 		pa := &v1.NotificationAction{Label: a.Label, Resolves: a.Resolves}

@@ -180,6 +180,9 @@ func (m *Manager) rebuild() *Snapshot {
 		if n.Shown() && n.TimeSensitive {
 			snap.TimeSensitive++
 		}
+		if n.Shown() && !n.Seen {
+			snap.Unseen++
+		}
 	}
 	slices.SortFunc(snap.Notifications, compareActive)
 	m.snap.Store(snap)
@@ -307,7 +310,7 @@ func (m *Manager) arrive(ctx context.Context, n Notification, due bool, now time
 	out := OutcomeScheduled
 	n.ArrivedAt = time.Time{}
 	if due {
-		n.ArrivedAt, out = now, OutcomePosted
+		n.ArrivedAt, n.Seen, out = now, false, OutcomePosted
 		c.arrived = []string{n.ID}
 	}
 	c.saved = []Notification{n}
@@ -433,20 +436,9 @@ func (m *Manager) Clear(ctx context.Context) (int, error) {
 
 // Act implements Store.
 func (m *Manager) Act(ctx context.Context, id string, index int, run func(context.Context, Notification, Action) error) (Notification, Action, error) {
-	m.mu.Lock()
-	n, err := m.lookup(id)
-	m.mu.Unlock()
+	n, err := m.actOn(ctx, id, index)
 	if err != nil {
-		return Notification{}, Action{}, err
-	}
-	if n.State != StateActive {
-		return n, Action{}, fmt.Errorf("%w: notification %s was %s", ErrFailedPrecondition, id, n.State)
-	}
-	if index < 0 || index >= len(n.Actions) {
-		if len(n.Actions) == 0 {
-			return n, Action{}, fmt.Errorf("%w: notification %s has no actions", ErrInvalidArgument, id)
-		}
-		return n, Action{}, fmt.Errorf("%w: notification %s has %d actions; no action %d", ErrInvalidArgument, id, len(n.Actions), index+1)
+		return n, Action{}, err
 	}
 	a := n.Actions[index]
 	if err := run(ctx, n, a); err != nil {
@@ -468,6 +460,63 @@ func (m *Manager) Act(ctx context.Context, id string, index int, run func(contex
 	}
 	n, err = m.closeAs(ctx, cur, StateResolved)
 	return n, a, err
+}
+
+// actOn returns the active notification id whose action index Act runs, marked seen (the
+// user acted on it, so they saw it; marked before the run, which may fail).
+func (m *Manager) actOn(ctx context.Context, id string, index int) (Notification, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	n, err := m.lookup(id)
+	if err != nil {
+		return Notification{}, err
+	}
+	if n.State != StateActive {
+		return n, fmt.Errorf("%w: notification %s was %s", ErrFailedPrecondition, id, n.State)
+	}
+	if index < 0 || index >= len(n.Actions) {
+		if len(n.Actions) == 0 {
+			return n, fmt.Errorf("%w: notification %s has no actions", ErrInvalidArgument, id)
+		}
+		return n, fmt.Errorf("%w: notification %s has %d actions; no action %d", ErrInvalidArgument, id, len(n.Actions), index+1)
+	}
+	if n.Seen {
+		return n, nil
+	}
+	n.Seen = true
+	if err := m.commit(ctx, change{saved: []Notification{n}}); err != nil {
+		return n, err
+	}
+	return n, nil
+}
+
+// See implements Store. Seen is not a change to the notification: UpdatedAt stays.
+func (m *Manager) See(ctx context.Context, id string) (int, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	var c change
+	if id != "" {
+		n, err := m.lookup(id)
+		if err != nil {
+			return 0, err
+		}
+		if n.State == StateActive && !n.Seen {
+			n.Seen = true
+			c.saved = append(c.saved, n)
+		}
+	} else {
+		for _, n := range m.byID {
+			if n.Shown() && !n.Seen {
+				s := *n
+				s.Seen = true
+				c.saved = append(c.saved, s)
+			}
+		}
+	}
+	if err := m.commit(ctx, c); err != nil {
+		return 0, err
+	}
+	return len(c.saved), nil
 }
 
 // ThreadGone implements Store.
@@ -531,7 +580,7 @@ func (m *Manager) Tick() {
 			continue
 		}
 		a := *n
-		a.SnoozedUntil, a.ArrivedAt, a.UpdatedAt = time.Time{}, now, now
+		a.SnoozedUntil, a.ArrivedAt, a.UpdatedAt, a.Seen = time.Time{}, now, now, false
 		c.saved = append(c.saved, a)
 		c.arrived = append(c.arrived, a.ID)
 	}

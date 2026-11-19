@@ -156,6 +156,10 @@ type Notification struct {
 	ArrivedAt time.Time
 	// SnoozedUntil is when a snoozed one comes back; zero when it is not snoozed.
 	SnoozedUntil time.Time
+	// Seen: the user has seen it since it last arrived (the bell's panel showed it, or they
+	// acted on it). Every arrival makes it unseen; an in-place update does not. The bell's
+	// corner badge shows while a shown one is unseen (docs/notes/notification-seen.md).
+	Seen bool
 }
 
 // Status says how a list shows n.
@@ -185,6 +189,8 @@ type Snapshot struct {
 	Notifications []Notification
 	// TimeSensitive counts the shown time-sensitive notifications: the dock badge's share.
 	TimeSensitive int
+	// Unseen counts the shown notifications the user has not seen: the bell's badge.
+	Unseen int
 	// Version grows by one per change in this daemon's lifetime.
 	Version uint64
 }
@@ -287,10 +293,13 @@ type Store interface {
 	// scheduled ones stay.
 	Clear(ctx context.Context) (int, error)
 	// Act runs the action at index (0 is the primary) of an active notification through
-	// run, and when run succeeds and the action resolves the notification, marks it
+	// run (marking it seen first: the user acted on it), and when run succeeds and the action resolves the notification, marks it
 	// resolved. run is called without the store's lock.
 	Act(ctx context.Context, id string, index int, run func(context.Context, Notification, Action) error) (Notification, Action, error)
 	// ThreadGone withdraws every active notification naming thread id (the thread was
 	// removed) and returns how many.
 	ThreadGone(ctx context.Context, id string) (int, error)
+	// See marks notifications seen and returns how many were unseen: with id "" every
+	// shown one (the bell's panel opened), else that one (ErrNotFound when there is none).
+	See(ctx context.Context, id string) (int, error)
 }

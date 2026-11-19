@@ -54,6 +54,8 @@ type NotificationView struct {
 	UpdatedAt     string                   `json:"updated_at"`
 	ArrivedAt     string                   `json:"arrived_at"`
 	SnoozedUntil  string                   `json:"snoozed_until"`
+	// Seen: the user has seen it since it last arrived (the bell's badge).
+	Seen bool `json:"seen"`
 }
 
 // NotificationListView is notification.list's JSON.
@@ -61,6 +63,8 @@ type NotificationListView struct {
 	Notifications []NotificationView `json:"notifications"`
 	// TimeSensitive counts the shown time-sensitive ones (the dock badge's share).
 	TimeSensitive int `json:"time_sensitive"`
+	// Unseen counts the shown ones the user has not seen (the bell's badge).
+	Unseen int `json:"unseen"`
 }
 
 // NotificationPostView is notification.post's JSON: the notification and what the post
@@ -76,6 +80,11 @@ type NotificationActView struct {
 	Notification NotificationView       `json:"notification"`
 	Action       NotificationActionView `json:"action"`
 	Result       any                    `json:"result,omitempty"`
+}
+
+// NotificationSeenView is notification.seen's JSON: how many were unseen before it.
+type NotificationSeenView struct {
+	Seen int `json:"seen"`
 }
 
 // NotificationClearView is notification.clear's JSON: how many were dismissed.
@@ -101,7 +110,7 @@ func notificationView(n notification.Notification) NotificationView {
 	v := NotificationView{ID: n.ID, Source: n.Source, Key: n.Key, Level: string(n.Level), TimeSensitive: n.TimeSensitive,
 		Title: n.Title, Body: n.Body, ThreadID: n.ThreadID, Actions: []NotificationActionView{}, Status: string(n.Status()),
 		ShowAt: notificationTime(n.ShowAt), CreatedAt: notificationTime(n.CreatedAt), UpdatedAt: notificationTime(n.UpdatedAt),
-		ArrivedAt: notificationTime(n.ArrivedAt), SnoozedUntil: notificationTime(n.SnoozedUntil)}
+		ArrivedAt: notificationTime(n.ArrivedAt), SnoozedUntil: notificationTime(n.SnoozedUntil), Seen: n.Seen}
 	for _, a := range n.Actions {
 		v.Actions = append(v.Actions, notificationActionView(a))
 	}
@@ -115,7 +124,7 @@ var notificationIDArg = ArgSpec{Name: "id", Type: String, Required: true, Positi
 	Description: "Notification id (notification list)" + IDHelp}
 
 // RegisterNotification registers notification.post, .list, .dismiss, .snooze, .act,
-// .clear and .withdraw: the bell's notifications. A notification posted here has the
+// .seen, .clear and .withdraw: the bell's notifications. A notification posted here has the
 // source "command"; a plugin's come through the plugin protocol.
 func RegisterNotification(r *Registry, d NotificationDeps) error {
 	s := d.Store
@@ -184,7 +193,8 @@ func RegisterNotification(r *Registry, d NotificationDeps) error {
 			Args:         []ArgSpec{{Name: "all", Type: Bool, Description: "Also the dismissed, withdrawn and resolved ones"}},
 			Run: func(_ context.Context, _ Context, a Args) (Result, error) {
 				ns := s.List(a.Bool("all"))
-				v := NotificationListView{Notifications: []NotificationView{}, TimeSensitive: s.Snapshot().TimeSensitive}
+				snap := s.Snapshot()
+				v := NotificationListView{Notifications: []NotificationView{}, TimeSensitive: snap.TimeSensitive, Unseen: snap.Unseen}
 				for _, n := range ns {
 					v.Notifications = append(v.Notifications, notificationView(n))
 				}
@@ -243,6 +253,44 @@ func RegisterNotification(r *Registry, d NotificationDeps) error {
 			},
 		},
 		notificationAct(r, s),
+		Command{
+			// Not in the palette: opening the bell runs it (every shown one), and acting on a
+			// notification marks that one seen in the store.
+			Name:         "notification.seen",
+			NoIndex:      true,
+			Page:         PageState,
+			NoPalette:    true,
+			Title:        "Notifications: Mark Seen",
+			Description:  "Mark the bell's notifications seen, which takes the badge off the bell; with an id, only that one. A notification is unseen again when it next arrives.",
+			Category:     "Notifications",
+			NoKeybinding: true,
+			Args: []ArgSpec{{Name: "id", Type: String, Positional: true, ID: NotificationID,
+				Description: "Notification id (notification list); omit for every one in the bell" + IDHelp}},
+			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
+				id := a.String("id")
+				if id != "" {
+					n, err := s.Get(id)
+					if err != nil {
+						return Result{}, notificationErr(err, "id")
+					}
+					id = n.ID
+				}
+				k, err := s.See(ctx, id)
+				if err != nil {
+					return Result{}, notificationErr(err, "id")
+				}
+				msg := "no unseen notifications"
+				switch {
+				case id != "" && k == 0:
+					msg = fmt.Sprintf("notification %s was seen already", id)
+				case id != "":
+					msg = fmt.Sprintf("marked notification %s seen", id)
+				case k > 0:
+					msg = "marked " + plural(k, "notification") + " seen"
+				}
+				return Result{Message: msg, JSON: NotificationSeenView{Seen: k}}, nil
+			},
+		},
 		Command{
 			Name:         "notification.clear",
 			NoIndex:      true,
@@ -370,3 +418,4 @@ func (noNotifications) Act(context.Context, string, int, func(context.Context, n
 	return notification.Notification{}, notification.Action{}, errNoNotifications
 }
 func (noNotifications) ThreadGone(context.Context, string) (int, error) { return 0, errNoNotifications }
+func (noNotifications) See(context.Context, string) (int, error)        { return 0, errNoNotifications }

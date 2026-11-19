@@ -98,6 +98,10 @@ message Notification {
   google.protobuf.Timestamp arrived_at = 14;
   // When a snoozed one comes back; unset when not snoozed.
   google.protobuf.Timestamp snoozed_until = 15;
+  // The user has seen it since it last arrived: the bell's panel showed it
+  // (notification.seen), or they acted on it. Every arrival makes it unseen; an in-place
+  // update does not. Notifications from before the daemon kept this are seen.
+  bool seen = 16;
 }
 
 // NotificationSnapshot is every active notification: the shown ones first (time-sensitive
@@ -109,6 +113,9 @@ message NotificationSnapshot {
   int32 time_sensitive = 2;
   // Grows by one per change in this daemon's lifetime.
   uint64 version = 3;
+  // The shown notifications the user has not seen: the bell's corner badge shows while
+  // there are any.
+  int32 unseen = 4;
 }
 
 message ListNotificationsRequest {

@@ -8,7 +8,7 @@
 import { create } from "zustand";
 import { useShallow } from "zustand/react/shallow";
 import type { NotificationEventView, NotificationSnapshotView, NotificationView } from "@/api/notifications";
-import { bellCount, shownNotifications, threadMark, threadNotifications, timeSensitiveArrivals, type ThreadMark } from "@/lib/notifications";
+import { bellCount, shownNotifications, threadMark, threadNotifications, timeSensitiveArrivals, unseenIds, type BellCount, type ThreadMark } from "@/lib/notifications";
 
 interface NotificationsState {
   /** The last snapshot; null until the source sends one. */
@@ -43,9 +43,17 @@ export function useNotification(id: string): NotificationView | undefined {
   return useNotificationsStore((s) => s.snapshot?.notifications.find((n) => n.id === id));
 }
 
-/** The bell's count and whether it takes the attention tone. */
-export function useBellCount(): { count: number; urgent: boolean } {
+/** The bell's count, its tones and whether one is unseen (the corner badge). */
+export function useBellCount(): BellCount {
   return useNotificationsStore(useShallow((s) => bellCount(s.snapshot)));
+}
+
+/**
+ * While the bell's list is open: its unseen shown ones, as one key ("" while shut or with none).
+ * A new arrival changes the key even when two events land in one render.
+ */
+export function useUnseenWhileOpen(): string {
+  return useNotificationsStore((s) => (s.open ? unseenIds(s.snapshot).join(" ") : ""));
 }
 
 /**
