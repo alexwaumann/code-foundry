@@ -95,6 +95,8 @@ func TestPullRequestStateCommands(t *testing.T) {
 			case tt.wantAsk != "":
 				if !errors.As(err, &ce) || ce.Message != tt.wantAsk {
 					t.Errorf("err = %v, want the confirmation %q", err, tt.wantAsk)
+				} else if ce.Tone != command.ConfirmToneSuccess {
+					t.Errorf("tone = %q, want %q (a merge to come is asked calmly)", ce.Tone, command.ConfirmToneSuccess)
 				}
 			case tt.wantErr != nil:
 				if !errors.Is(err, tt.wantErr) {

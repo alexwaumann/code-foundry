@@ -161,6 +161,10 @@ func TestPullRequestMergeConfirmMessage(t *testing.T) {
 			if ce.Message != tt.want || ce.Title != "Merge Pull Request" {
 				t.Errorf("confirm = %q (%q), want %q", ce.Message, ce.Title, tt.want)
 			}
+			// Asked calmly: the GUI draws a merge's question in the success tone, never as a warning.
+			if ce.Tone != command.ConfirmToneSuccess {
+				t.Errorf("tone = %q, want %q", ce.Tone, command.ConfirmToneSuccess)
+			}
 			if len(be.Requests()) != 1 {
 				t.Errorf("requests = %v, want the detail read only", be.Requests())
 			}

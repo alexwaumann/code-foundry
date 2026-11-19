@@ -1,4 +1,5 @@
-import { TriangleAlert } from "lucide-react";
+import { CircleCheck, TriangleAlert, type LucideIcon } from "lucide-react";
+import type { ConfirmTone } from "@/api/command";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
@@ -87,14 +88,30 @@ function useArmed(guarded: boolean): boolean {
 
 type Pending = NonNullable<ReturnType<typeof useConfirmStore.getState>["pending"]>;
 
+/** A question's look by its tone (ConfirmRequest.tone): its icon, and its confirm button's colours. */
+interface ConfirmLook {
+  icon: LucideIcon;
+  iconClass: string;
+  variant: "destructive" | "default";
+  confirmClass?: string;
+}
+
+/** "warning" is a request without a tone: it ends or deletes something. */
+const looks: Record<ConfirmTone | "warning", ConfirmLook> = {
+  warning: { icon: TriangleAlert, iconClass: "text-cf-error-text", variant: "destructive" },
+  // A step forward (a merge): the success tone, as the merge button that asked.
+  success: { icon: CircleCheck, iconClass: "text-cf-success-text", variant: "default", confirmClass: "bg-cf-success text-cf-success-foreground hover:bg-cf-success/90" },
+};
+
 /** The dialog's content, one per request: a new request starts over with its focus and its wait. */
 function ConfirmBody({ pending }: { pending: Pending | null }) {
   const guarded = pending?.guarded === true;
   const armed = useArmed(guarded);
+  const look = looks[pending?.tone ?? "warning"];
   return (
     <>
       <div className="flex gap-3">
-        <TriangleAlert className="mt-0.5 size-5 shrink-0 text-cf-error-text" aria-hidden />
+        <look.icon className={cn("mt-0.5 size-5 shrink-0", look.iconClass)} aria-hidden data-testid="confirm-icon" data-tone={pending?.tone ?? "warning"} />
         <div className="min-w-0 space-y-2">
           <DialogTitle>{pending?.title}</DialogTitle>
           <DialogDescription className="max-h-96 overflow-y-auto break-words whitespace-pre-wrap">{pending?.message}</DialogDescription>
@@ -128,7 +145,8 @@ function ConfirmBody({ pending }: { pending: Pending | null }) {
           </Button>
         )}
         <Button
-          variant={pending?.alternateLabel ? "default" : "destructive"}
+          variant={pending?.alternateLabel ? "default" : look.variant}
+          className={pending?.alternateLabel ? undefined : look.confirmClass}
           size="sm"
           autoFocus={pending !== null && !guarded}
           disabled={!armed}
@@ -147,11 +165,14 @@ function ConfirmBody({ pending }: { pending: Pending | null }) {
 
 /**
  * Asks before a destructive command runs (Command.requires_confirmation). The confirm
- * button has focus, so Enter confirms and Escape cancels. A three-way prompt
+ * button has focus, so Enter confirms and Escape cancels. A request's tone sets its look:
+ * a warning (red icon, destructive button) unless the command says it is a step forward
+ * ("success": pr.merge, pr.auto-merge), asked in the success tone. A three-way prompt
  * (requestChoice) also has its alternate, which is then the destructive one. A guarded
  * request (stores/confirm.ts) has Cancel focused instead, so Enter and Space say no, its
- * Confirm waits (useArmed), and its colours are fixed (.cf-guarded in index.css): what asked
- * may be able to change the theme, and the question has to stay readable.
+ * Confirm waits (useArmed), and its colours are fixed (.cf-guarded in index.css, a fixed
+ * green set for the success tone): what asked may be able to change the theme, and the
+ * question has to stay readable.
  */
 export function ConfirmDialog() {
   const pending = useConfirmStore((s) => s.pending);
@@ -162,7 +183,11 @@ export function ConfirmDialog() {
         if (!open) answerConfirm(false);
       }}
     >
-      <DialogContent className={cn("max-w-md p-5", pending?.centered && "top-1/2 -translate-y-1/2", pending?.guarded && "cf-guarded")} data-testid="confirm-dialog">
+      <DialogContent
+        className={cn("max-w-md p-5", pending?.centered && "top-1/2 -translate-y-1/2", pending?.guarded && "cf-guarded")}
+        data-tone={pending?.tone}
+        data-testid="confirm-dialog"
+      >
         <ConfirmBody key={pending?.seq} pending={pending} />
       </DialogContent>
     </Dialog>

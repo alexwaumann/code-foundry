@@ -108,17 +108,20 @@ const MAX_CONFIRM_STAGES = 3;
  * intent), shown in the dialog. `ask` takes every question instead of the dialogs above: a
  * page's (stores/bridgeHost.ts) gets the guarded confirm dialog and no command's own
  * presenter, so what it asks never counts on what the app's own dialogs accepted. `signal`
- * aborts the call.
+ * aborts the call. `asked`: the app's own dialog already put this exact call to the user
+ * (the pull request page's merge dialog), so the first invoke goes confirmed and the
+ * command's own question is not asked again; a second stage still asks. Never for a call
+ * the user did not make in that dialog (a page's or a plugin's).
  */
 export async function invokeConfirmed(
   name: string,
   args: Record<string, string> = {},
   ctx: UiContextView = getUiContext(),
   caller?: string,
-  opts: { ask?: ConfirmPresenter; signal?: AbortSignal } = {},
+  opts: { ask?: ConfirmPresenter; signal?: AbortSignal; asked?: boolean } = {},
 ): Promise<Awaited<ReturnType<typeof invokeCommand>> | null> {
   let callArgs = args;
-  let confirmed = false;
+  let confirmed = opts.asked === true;
   for (let stage = 0; ; stage++) {
     try {
       const sent = confirmed || opts.signal ? invokeCommand(name, ctx, callArgs, undefined, { confirmed, ...(opts.signal ? { signal: opts.signal } : {}) }) : invokeCommand(name, ctx, callArgs);
@@ -131,7 +134,7 @@ export async function invokeConfirmed(
       const title = confirm.title || (useCommandsStore.getState().commands.find((c) => c.name === name)?.title ?? name);
       const ask = opts.ask ?? (confirm.args ? secondStagePresenter(name) : confirmPresenter(name)) ?? requestConfirm;
       const confirmLabel = confirmButtonLabel(title, confirm.confirmLabel);
-      const req = { title, message: confirm.message, confirmLabel, command: name, args: callArgs, ...(caller ? { caller } : {}) };
+      const req = { title, message: confirm.message, confirmLabel, command: name, args: callArgs, ...(caller ? { caller } : {}), ...(confirm.tone ? { tone: confirm.tone } : {}) };
       const yes = await ask(req);
       if (!yes) return confirm.declined ?? null;
       confirmed = true;
@@ -198,12 +201,13 @@ export async function runCommand(name: string, args: Record<string, string> = {}
  * declined). `quiet` skips the success toast, for callers that report the result their
  * own way, and so does `inView` (CommandSource); failures are toasted, after `onError` (for
  * callers that also show the failure in place), unless `expected` says the failure is one
- * the caller handles itself.
+ * the caller handles itself. `asked`: the caller's own dialog already asked the user for
+ * exactly this call (invokeConfirmed).
  */
 export async function runCommandForResult(
   name: string,
   args: Record<string, string> = {},
-  opts: { ctx?: UiContextView; quiet?: boolean; onError?: (message: string) => void; expected?: (err: unknown) => boolean; caller?: string } & CommandSource = {},
+  opts: { ctx?: UiContextView; quiet?: boolean; onError?: (message: string) => void; expected?: (err: unknown) => boolean; caller?: string; asked?: boolean } & CommandSource = {},
 ): Promise<InvokeResultView | null> {
   const title = useCommandsStore.getState().commands.find((c) => c.name === name)?.title ?? name;
   try {
@@ -211,7 +215,8 @@ export async function runCommandForResult(
     // A plugin's call (`caller`) is not the user's: what it would end is kept, not asked about.
     const guarded = opts.caller === undefined ? guardCommand(name, args, ctx) : true;
     if (guarded !== true && !(await guarded)) return null;
-    const res = await invokeConfirmed(name, args, ctx, opts.caller);
+    // `asked` is the app's own dialog's yes, never a caller's (invokeConfirmed).
+    const res = await invokeConfirmed(name, args, ctx, opts.caller, { asked: opts.asked === true && opts.caller === undefined });
     if (!res) return null;
     // Git operations report through their own toast (gitops events); skip the duplicate.
     const silent = opts.quiet || opts.inView || SHOWS_ITSELF.has(name);

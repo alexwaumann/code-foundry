@@ -29,6 +29,8 @@ type ConfirmError struct {
 	// Label is the confirm button's words when the command names them
 	// (Command.ConfirmLabel); empty, clients derive them from Title.
 	Label string
+	// Tone is how the GUI draws the question (Command.ConfirmTone); empty, a warning.
+	Tone string
 	// Args are merged over the caller's args on the re-invoke (second stage only).
 	Args map[string]string
 	// Declined is what the command already did and answers when the user declines a
@@ -121,3 +123,10 @@ func ConfirmedIn(ctx context.Context) bool {
 	yes, _ := ctx.Value(confirmedKey{}).(bool)
 	return yes
 }
+
+// ConfirmToneSuccess is Command.ConfirmTone for a step forward the user asked for (a
+// merge): the GUI asks in the success tone instead of a warning's.
+const ConfirmToneSuccess = "success"
+
+// confirmTones are the tones Command.ConfirmTone may name.
+var confirmTones = []string{ConfirmToneSuccess}

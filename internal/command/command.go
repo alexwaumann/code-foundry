@@ -89,6 +89,10 @@ type Command struct {
 	// ConfirmLabel, when set with Confirm, is the GUI confirm button's words ("Forget
 	// all"); empty, the GUI uses the title without a "Category: " prefix.
 	ConfirmLabel string
+	// ConfirmTone, when set with Confirm, is how the GUI draws the question:
+	// ConfirmToneSuccess for a step forward the user asked for (pr.merge), not a
+	// destructive one; empty, the warning look.
+	ConfirmTone string
 	// ConfirmIf, when set with Confirm, decides at invoke time whether this call needs
 	// the confirmation at all: false runs the command without one (e.g. thread.archive
 	// asks only while Claude is working or waiting on the user). nil means always.
@@ -322,6 +326,9 @@ func (c *Command) validate() error {
 	}
 	if c.ConfirmLabel != "" && c.Confirm == "" {
 		return invalid("ConfirmLabel without Confirm")
+	}
+	if c.ConfirmTone != "" && (c.Confirm == "" || !slices.Contains(confirmTones, c.ConfirmTone)) {
+		return invalid("ConfirmTone %q needs Confirm and must be one of %v", c.ConfirmTone, confirmTones)
 	}
 	return nil
 }

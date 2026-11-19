@@ -1,4 +1,5 @@
 import { Code, ConnectError } from "@connectrpc/connect";
+import type { PullRequestDetailView } from "@/api/gh";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const invokeCommand = vi.hoisted(() => vi.fn());
@@ -28,7 +29,11 @@ function deferred<T>() {
 
 beforeEach(() => {
   usePrPanelStore.setState({ merging: {} });
+  pullRequestDetailResource.store.setState({ entries: {} });
 });
+
+const detail = (state: "open" | "merged") => ({ pullRequest: { state } }) as unknown as PullRequestDetailView;
+const flush = () => new Promise((r) => setTimeout(r, 0));
 
 afterEach(() => {
   vi.clearAllMocks();
@@ -40,7 +45,8 @@ describe("mergePullRequest", () => {
     invokeCommand.mockReturnValueOnce(answer.promise);
     const invalidate = vi.spyOn(pullRequestDetailResource, "invalidate");
     const run = mergePullRequest(REF, "squash", true, HEAD);
-    expect(usePrPanelStore.getState().merging[KEY]).toBe(true);
+    // Busy with the method chosen: the button's words come from it.
+    expect(usePrPanelStore.getState().merging[KEY]).toBe("squash");
     // A second click meanwhile sends nothing.
     await expect(mergePullRequest(REF, "merge", false, HEAD)).resolves.toBe(false);
     expect(invokeCommand).toHaveBeenCalledTimes(1);
@@ -69,5 +75,66 @@ describe("mergePullRequest", () => {
     expect(notify).toHaveBeenCalledWith(expect.objectContaining({ level: "error", title: "pr.merge failed", description: expect.stringContaining("changed since it was shown") as string }));
     expect(invalidate).toHaveBeenCalledWith(KEY);
     expect(usePrPanelStore.getState().merging[KEY]).toBeUndefined();
+  });
+
+  it("asked in the merge dialog: sent once, confirmed; busy until the detail shows it merged, a lagging read asked again", async () => {
+    const reads: ReturnType<typeof deferred<PullRequestDetailView>>[] = [];
+    getPullRequestDetail.mockImplementation(() => {
+      const d = deferred<PullRequestDetailView>();
+      reads.push(d);
+      return d.promise;
+    });
+    const release = pullRequestDetailResource.watch(KEY);
+    reads[0]?.resolve(detail("open"));
+    await flush();
+    const answer = deferred<unknown>();
+    invokeCommand.mockReturnValueOnce(answer.promise);
+    const run = mergePullRequest(REF, "rebase", false, HEAD, { asked: true });
+    await flush();
+    expect(invokeCommand).toHaveBeenCalledTimes(1);
+    expect(invokeCommand).toHaveBeenCalledWith("pr.merge", expect.anything(), { "repo-slug": "acme/repo", number: "142", method: "rebase", "delete-branch": "false", "head-sha": HEAD }, undefined, { confirmed: true });
+    answer.resolve({ message: "", resultJson: JSON.stringify({ merged: true, sha: "abc", message: "Merged #142 (abc1234)" }) });
+    await flush();
+    // Read at once, not at the next poll.
+    expect(reads).toHaveLength(2);
+    expect(usePrPanelStore.getState().merging[KEY]).toBe("rebase");
+    // A read that still says open (begun before GitHub had it) keeps it busy and asks again.
+    reads[1]?.resolve(detail("open"));
+    await flush();
+    expect(reads).toHaveLength(3);
+    expect(usePrPanelStore.getState().merging[KEY]).toBe("rebase");
+    reads[2]?.resolve(detail("merged"));
+    await expect(run).resolves.toBe(true);
+    expect(usePrPanelStore.getState().merging[KEY]).toBeUndefined();
+    release();
+    getPullRequestDetail.mockReset();
+    getPullRequestDetail.mockImplementation(() => new Promise(() => undefined));
+  });
+
+  it("a merge GitHub did not finish (queued) waits for the re-read only; a refusal frees at once", async () => {
+    const reads: ReturnType<typeof deferred<PullRequestDetailView>>[] = [];
+    getPullRequestDetail.mockImplementation(() => {
+      const d = deferred<PullRequestDetailView>();
+      reads.push(d);
+      return d.promise;
+    });
+    const release = pullRequestDetailResource.watch(KEY);
+    reads[0]?.resolve(detail("open"));
+    await flush();
+    invokeCommand.mockResolvedValueOnce({ message: "", resultJson: JSON.stringify({ merged: false, sha: "", message: "Queued #142" }) });
+    const run = mergePullRequest(REF, "squash", false, HEAD, { asked: true });
+    await flush();
+    expect(usePrPanelStore.getState().merging[KEY]).toBe("squash");
+    reads[1]?.resolve(detail("open"));
+    await expect(run).resolves.toBe(true);
+    expect(usePrPanelStore.getState().merging[KEY]).toBeUndefined();
+
+    invokeCommand.mockRejectedValueOnce(new ConnectError("pull request #142 changed since it was shown", Code.FailedPrecondition));
+    await expect(mergePullRequest(REF, "squash", false, HEAD, { asked: true })).resolves.toBe(false);
+    expect(usePrPanelStore.getState().merging[KEY]).toBeUndefined();
+    expect(reads).toHaveLength(3);
+    release();
+    getPullRequestDetail.mockReset();
+    getPullRequestDetail.mockImplementation(() => new Promise(() => undefined));
   });
 });

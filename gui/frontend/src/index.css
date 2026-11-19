@@ -263,6 +263,17 @@
     background-color: #b62324;
     color: #ffffff;
 }
+/* The success tone (a merge someone else asked for): the same fixed values, in green. */
+.cf-guarded[data-tone="success"] svg,
+.cf-guarded[data-tone="success"] svg * {
+    color: #3fb950;
+}
+.cf-guarded[data-tone="success"] [data-confirm-answer],
+.cf-guarded[data-tone="success"] [data-confirm-answer]:hover,
+.cf-guarded[data-tone="success"] [data-confirm-answer]:active {
+    background-color: #1f883d;
+    color: #ffffff;
+}
 
 /* Type roles (docs/notes/design-system-1-tokens.md). One class bundles size, line-height,
  * weight, tracking and default colour; a colour or weight utility still wins over it

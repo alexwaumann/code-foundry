@@ -57,7 +57,7 @@ export function lastInvocation(name: string): Invocation | undefined {
 }
 
 /** How the daemon asks for a confirmation: FailedPrecondition with a ConfirmationRequired detail. */
-export function needsConfirm(c: { command: string; title?: string; message: string; args?: Record<string, string>; confirmLabel?: string }): ConnectError {
+export function needsConfirm(c: { command: string; title?: string; message: string; args?: Record<string, string>; confirmLabel?: string; tone?: string }): ConnectError {
   return confirmationRequiredError(c);
 }
 

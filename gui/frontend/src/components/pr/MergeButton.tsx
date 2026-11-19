@@ -1,103 +1,145 @@
 import { GitMerge } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 import type { PullRequestDetailView } from "@/api/gh";
-import { DropdownMenuCheckboxItem, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
-import { Tip } from "@/components/ui/tooltip";
-import { pullRequestKey } from "@/stores/gh";
-import { mergePullRequest, usePrPanelStore } from "@/stores/prPanel";
+import { DropdownMenuCheckboxItem, DropdownMenuLabel, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { closeMergeDialog, openMergeDialog, useMergeDialogOpen } from "@/stores/mergeDialog";
+import { setMergeMethodDefault, useMergeMethodDefault } from "@/stores/mergeDefaults";
+import { mergePullRequest, useMergingMethod } from "@/stores/prPanel";
 import type { PrRef } from "@/surfaces/pullrequestTarget";
-import { branchDelete, defaultMergeMethod, MERGE_BUTTON_LABELS, MERGE_METHOD_LABELS, mergeAvailability, mergeMethodHint } from "./merge";
+import { branchDelete, defaultMergeMethod, MERGE_BUSY_LABELS, MERGE_BUTTON_LABELS, MERGE_METHOD_LABELS, mergeAvailability, mergeMethodHint } from "./merge";
+import { MergeDialog } from "./MergeDialog";
 import { SplitButton } from "./SplitButton";
 
 /**
- * The readiness box's Merge, at the footer's right: a split button whose main part merges
- * with the repository's default method (the one last chosen there, else squash) and whose
- * menu offers every method the repository allows plus "Delete branch after merge"
- * (origin's branch only; on unless it cannot be deleted). Merging runs pr.merge with the
- * head shown (the daemon's confirmation goes through the confirm dialog), with a spinner
- * until it answers. Disabled, with the reason as its tooltip and at the top of its menu,
+ * The readiness box's Merge, at the footer's right: a split button whose main part opens
+ * the merge dialog (MergeDialog) with the repository's default method (the one picked
+ * last there, stores/mergeDefaults.ts, else squash), and whose menu picks the default:
+ * a pick there changes the main part's words and closes the menu, and merges nothing. The
+ * menu also holds "Delete branch after merge" (origin's branch only; on unless it cannot
+ * be deleted), which the dialog shows again. The dialog's Merge runs pr.merge with the
+ * head shown, already asked (mergePullRequest's `asked`: one question, the dialog's), and
+ * the button is busy in that method's words ("Squashing and merging…") until the detail
+ * shows it merged. Disabled, with the reason as its tooltip and at the top of its menu,
  * when GitHub would refuse (draft, conflicts, blocked, behind, no method). `note` is one
  * more line in the menu (auto-merge being off for the repository).
  */
 export function MergeButton({ prRef, detail, note = null }: { prRef: PrRef; detail: PullRequestDetailView; note?: string | null }) {
   const a = useMemo(() => mergeAvailability(detail), [detail]);
-  const busy = usePrPanelStore((s) => s.merging[pullRequestKey(prRef.slug, prRef.number)] ?? false);
-  const last = usePrPanelStore((s) => s.mergeMethods[prRef.slug.toLowerCase()]);
+  const merging = useMergingMethod(prRef);
+  const picked = useMergeMethodDefault(prRef.slug);
   const del = branchDelete(detail);
   const [deleteBranch, setDeleteBranch] = useState(true);
+  const dialogId = useId();
+  const dialogOpen = useMergeDialogOpen(dialogId);
+  // A dialog left open by a button that went away (merged elsewhere, the tab closed) would
+  // keep a page's guarded question waiting (stores/mergeDialog.ts).
+  useEffect(() => {
+    if (!a.visible) closeMergeDialog(dialogId);
+  }, [a.visible, dialogId]);
+  useEffect(
+    () => () => {
+      closeMergeDialog(dialogId);
+    },
+    [dialogId],
+  );
   if (!a.visible) return null;
   const pr = detail.pullRequest;
-  const method = defaultMergeMethod(a.methods, last);
-  const merge = (m: typeof method) => void mergePullRequest(prRef, m, deleteBranch && del.deletable, pr.headSha);
+  const method = defaultMergeMethod(a.methods, picked);
+  const pick = (v: string) => {
+    const m = a.methods.find((x) => x === v);
+    if (m) setMergeMethodDefault(prRef.slug, m);
+  };
   return (
-    <SplitButton
-      icon={GitMerge}
-      label={MERGE_BUTTON_LABELS[method]}
-      tone="success"
-      reason={a.reason}
-      busy={busy}
-      onRun={() => {
-        merge(method);
-      }}
-      menuLabel="Merge options"
-      testId="pr-merge-button"
-    >
-      {(close) => (
-        <>
-          <Tip label={`Merge into ${pr.baseRef}`} whenTruncated side="left">
-            <DropdownMenuLabel className="truncate">
-              Merge into <span className="font-mono">{pr.baseRef}</span>
+    <>
+      <SplitButton
+        icon={GitMerge}
+        label={merging ? MERGE_BUSY_LABELS[merging] : MERGE_BUTTON_LABELS[method]}
+        tone="success"
+        reason={a.reason}
+        busy={merging !== null}
+        onRun={() => {
+          openMergeDialog(dialogId);
+        }}
+        menuLabel="Merge options"
+        testId="pr-merge-button"
+      >
+        {(close) => (
+          <>
+            {/* Wraps rather than cuts: the second half is the rule a pick follows. */}
+            <DropdownMenuLabel className="[overflow-wrap:anywhere]" data-testid="pr-merge-menu-heading">
+              Merge into <span className="font-mono">{pr.baseRef}</span> · your pick becomes the default here
             </DropdownMenuLabel>
-          </Tip>
-          {[a.reason, note, ...a.notes].filter((n): n is string => !!n).map((n) => (
-            <p key={n} className="px-2 pb-1.5 text-caption text-cf-warning-text" data-testid="pr-merge-note">
-              {n}
-            </p>
-          ))}
-          {a.methods.map((m) => (
-            <DropdownMenuItem
-              key={m}
-              data-testid={`pr-merge-method-${m}`}
-              disabled={a.reason !== null}
-              onSelect={() => {
-                // Closed here, not by Radix: the merge makes the button busy in this same
-                // event, so the controlled `open` is already false and Radix would skip
-                // onOpenChange, leaving `open` set to reopen the menu once the merge ends.
-                close();
-                merge(m);
+            {[a.reason, note, ...a.notes].filter((n): n is string => !!n).map((n) => (
+              <p key={n} className="px-2 pb-1.5 text-caption text-cf-warning-text" data-testid="pr-merge-note">
+                {n}
+              </p>
+            ))}
+            <DropdownMenuRadioGroup value={method} onValueChange={pick}>
+              {a.methods.map((m) => (
+                <DropdownMenuRadioItem
+                  key={m}
+                  value={m}
+                  data-testid={`pr-merge-method-${m}`}
+                  // The tick sits at the top beside two lines, in the merge's tone.
+                  className="items-start [&>span:first-child]:top-2 [&>span:first-child]:text-cf-success-text"
+                  onSelect={() => {
+                    // Closed here as well as by Radix: the pick is the whole action.
+                    close();
+                  }}
+                >
+                  <span className="flex min-w-0 flex-1 flex-col">
+                    <span>{MERGE_METHOD_LABELS[m]}</span>
+                    <span className="text-caption">{mergeMethodHint(m, detail.commitCount, pr.baseRef)}</span>
+                  </span>
+                </DropdownMenuRadioItem>
+              ))}
+            </DropdownMenuRadioGroup>
+            <DropdownMenuSeparator />
+            <DropdownMenuCheckboxItem
+              data-testid="pr-merge-delete-branch"
+              // pl-9: the box sits 12px from the menu's edge (4px menu padding + 8px); leave
+              // the same 12px between it and the label.
+              className="pl-9"
+              checked={deleteBranch && del.deletable}
+              disabled={!del.deletable}
+              onCheckedChange={(v) => {
+                setDeleteBranch(v);
+              }}
+              // Stay open: it is a setting for the merge that follows.
+              onSelect={(e) => {
+                e.preventDefault();
               }}
             >
               <span className="flex min-w-0 flex-1 flex-col">
-                <span>{MERGE_METHOD_LABELS[m]}</span>
-                <span className="text-caption">{mergeMethodHint(m, detail.commitCount, pr.baseRef)}</span>
+                <span>Delete branch after merge</span>
+                <span className="text-caption [overflow-wrap:anywhere]" data-testid="pr-merge-delete-branch-note">
+                  {del.subtitle}
+                </span>
               </span>
-            </DropdownMenuItem>
-          ))}
-          <DropdownMenuSeparator />
-          <DropdownMenuCheckboxItem
-            data-testid="pr-merge-delete-branch"
-            // pl-9: the box sits 12px from the menu's edge (4px menu padding + 8px); leave
-            // the same 12px between it and the label.
-            className="pl-9"
-            checked={deleteBranch && del.deletable}
-            disabled={!del.deletable}
-            onCheckedChange={(v) => {
-              setDeleteBranch(v);
-            }}
-            // Stay open: it is a setting for the merge that follows.
-            onSelect={(e) => {
-              e.preventDefault();
-            }}
-          >
-            <span className="flex min-w-0 flex-1 flex-col">
-              <span>Delete branch after merge</span>
-              <span className="text-caption [overflow-wrap:anywhere]" data-testid="pr-merge-delete-branch-note">
-                {del.subtitle}
-              </span>
-            </span>
-          </DropdownMenuCheckboxItem>
-        </>
-      )}
-    </SplitButton>
+            </DropdownMenuCheckboxItem>
+          </>
+        )}
+      </SplitButton>
+      <MergeDialog
+        open={dialogOpen && merging === null}
+        onOpenChange={(open) => {
+          if (!open) closeMergeDialog(dialogId);
+        }}
+        detail={detail}
+        methods={a.methods}
+        method={method}
+        onMethod={(m) => {
+          setMergeMethodDefault(prRef.slug, m);
+        }}
+        deletable={del.deletable}
+        deleteBranch={deleteBranch}
+        onDeleteBranch={setDeleteBranch}
+        reason={a.reason}
+        onConfirm={() => {
+          closeMergeDialog(dialogId);
+          void mergePullRequest(prRef, method, deleteBranch && del.deletable, pr.headSha, { asked: true });
+        }}
+      />
+    </>
   );
 }
