@@ -134,6 +134,7 @@ func (o *overlayWindow) prepare() {
 		application.InvokeSync(func() {
 			C.cfOverlayConfigure(o.window.NativeWindow())
 			clearWebViewBackground(o.window.NativeWindow())
+			guardNavigation(o.window.NativeWindow(), "overlay", o.log)
 		})
 		o.mu.Lock()
 		defer o.mu.Unlock()
