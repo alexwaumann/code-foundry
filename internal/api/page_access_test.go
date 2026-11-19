@@ -102,11 +102,11 @@ func pageAccessDetail(t *testing.T, ce *connect.Error) *v1.PageAccess {
 }
 
 // EventService's page source: every page again on connect, then the page whose owner or
-// answer changed, and a removed thread (its pages lost their owner with its row).
+// answer changed, a page whose storage a write changed, and a removed thread (its pages lost their owner with its row).
 func TestPageEventSource(t *testing.T) {
 	e := newPageEnv(t)
 	b := bus.New()
-	s, err := page.New(context.Background(), page.Options{DB: dbtest.Open(t), Home: e.root, PagesRoot: filepath.Join(e.root, ".code-foundry", "pages"), Bus: b})
+	s, err := page.New(context.Background(), page.Options{DB: dbtest.Open(t), Home: e.root, PagesRoot: filepath.Join(e.root, ".code-foundry", "pages"), StorageRoot: t.TempDir(), Bus: b})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -145,9 +145,17 @@ func TestPageEventSource(t *testing.T) {
 	if ev := next(); !slices.Equal(ev.GetPaths(), []string{filepath.Join(e.root, "new.html")}) || ev.GetAll() {
 		t.Errorf("answer event = %v", ev)
 	}
+	// A write to its storage names it in storage_paths, never in paths: no grant is read again.
+	n := "1"
+	if _, err := s.SetStorage(ctx, filepath.Join(e.root, "new.html"), "c:n", &n); err != nil {
+		t.Fatal(err)
+	}
+	if ev := next(); !slices.Equal(ev.GetStoragePaths(), []string{filepath.Join(e.root, "new.html")}) || len(ev.GetPaths()) != 0 || ev.GetAll() {
+		t.Errorf("storage event = %v", ev)
+	}
 	bus.Publish[thread.Event](b, thread.Updated{})
 	bus.Publish[thread.Event](b, thread.Removed{ID: "t-1"})
-	if ev := next(); ev.GetRemovedThread() != "t-1" || len(ev.GetPaths()) != 0 {
+	if ev := next(); ev.GetRemovedThread() != "t-1" || len(ev.GetPaths()) != 0 || len(ev.GetStoragePaths()) != 0 {
 		t.Errorf("removal event = %v", ev)
 	}
 }

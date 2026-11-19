@@ -49,6 +49,9 @@ Imports (`/cf/jsx.js` maps them; nothing else resolves, no other package exists)
 - Subscribe in an effect and return what `cf.on` returns: `useEffect(() => cf.on("gh",
   setDash, (e) => setError(e.message)), [])`. Await `cf.ready` at the top of the script,
   before `createRoot`.
+- Stored state the same way, so a card and a tab of the page stay in step: `const s =
+  cf.storage("board")`, `useState(() => s.get("cards") ?? [])`, `useEffect(() => s.onChange(() =>
+  setCards(s.get("cards") ?? [])), [])`; on a change, `s.set("cards", next)` and `setCards(next)`.
 - Call `cf.run` straight from the `onClick` (a press counts for 5 seconds): no `confirm()`,
   no Dialog that asks before merging or archiving: the app's own dialog does.
 - Keep the row's id from when it was drawn, as in plain pages; rows stay put.

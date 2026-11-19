@@ -21,7 +21,7 @@ input { background: var(--cf-surface); color: var(--cf-text); border: 1px solid 
 </head>
 <body>
 <h1>Bridge check</h1>
-<p class="sub">Shown in <b id="thread">…</b> · <span id="theme">?</span> theme · visit <span id="visits">0</span></p>
+<p class="sub">Shown in <b id="thread">…</b> · <span id="theme">?</span> theme · visit <span id="visits">0</span> · <button id="tally">tally <span id="tally-n">0</span></button></p>
 <div class="grid">
   <span class="k">thread.list · file.export</span><span><button id="list">Read</button> <button id="export">Export CSV</button> <span id="list-out" class="out"></span> <span id="export-out" class="out"></span></span>
   <span class="k">ui.notify</span><span><button id="notify" class="primary">Send a toast</button> <span id="notify-out" class="out"></span></span>
@@ -41,6 +41,18 @@ cf.ready.then(() => {
   const visits = (s.get("visits") || 0) + 1;
   s.set("visits", visits);
   $("visits").textContent = String(visits);
+});
+// A tally drawn from storage in onChange, so the card and a tab of this page stay in step
+// (docs/notes/page-storage-change-event.md).
+cf.ready.then(() => {
+  if (!cf.thread) return;
+  const t = cf.storage("tally");
+  const draw = () => ($("tally-n").textContent = String(t.get("n") || 0));
+  t.onChange(draw);
+  $("tally").addEventListener("click", () => {
+    t.set("n", (t.get("n") || 0) + 1);
+    draw();
+  });
 });
 const show = (el, p) =>
   p.then(

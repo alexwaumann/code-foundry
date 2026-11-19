@@ -60,7 +60,7 @@ The app's own components (only the names in `reference/components.md`: read it a
   import { createRoot } from "react-dom/client";
   import { Button, Table, TableBody, TableCell, TableRow } from "@cf/ui";
   import { Archive } from "@cf/icons";
-  await cf.ready;                       // cf.thread, cf.theme and cf.readOnly are set now
+  await cf.ready; // cf.thread, cf.theme and cf.readOnly are set now
   function App() { /* useEffect(() => cf.on("thread-list", setThreads, (e) => setError(e.message)), []) */ }
   createRoot(document.getElementById("root")!).render(<App />);
 </script>
@@ -108,10 +108,11 @@ click or while nothing is hovered. A button acts on its row's id from when it wa
 
 ## State
 
-`cf.storage("<page name>")` (`get`, `set`, `remove`, `keys`, `clear`, JSON values) survives reloads and
-app restarts: keep what the user typed or chose. Each page file has its own. Plain
-`localStorage` is cleared when the app quits. An external API's token: a password field, kept in
-`cf.storage`, sent with `cf.fetch`.
+`cf.storage("<page name>")` (`get`, `set`, `remove`, `keys`, `clear`) keeps what the user
+chose across restarts, one per page file, shared by its card and tabs. Render from it in a
+`draw()` you call after each `set` and pass to `s.onChange(draw)`: it runs now and on another
+copy's change. Raw `localStorage` is cleared when the app quits. An API token: a password field,
+kept in `cf.storage`, sent with `cf.fetch`.
 
 ## Show it, then say what it does
 

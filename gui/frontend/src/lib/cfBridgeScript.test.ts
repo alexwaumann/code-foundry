@@ -32,7 +32,7 @@ interface Cf {
   resize(height?: number): void;
   sources: string[];
   fetch(url: unknown, init?: unknown): Promise<{ status: number; statusText: string; ok: boolean; url: string; headers: Record<string, string>; text(): string; json(): unknown }>;
-  storage(prefix?: string): { get(k: string): unknown; set(k: string, v: unknown): Promise<void>; remove(k: string): Promise<void>; keys(): string[]; clear(): Promise<unknown> };
+  storage(prefix?: string): { get(k: string): unknown; set(k: string, v: unknown): Promise<void>; remove(k: string): Promise<void>; keys(): string[]; clear(): Promise<unknown>; onChange(fn: (keys: string[]) => void): () => void };
 }
 
 /** The nonce the fake frame's URL carries (HtmlFrame's `?cf-nonce=<nonce>`). */
@@ -648,6 +648,133 @@ describe("bridge.js: a refused write", () => {
     await expect(first).rejects.toMatchObject({ code: "invalid" });
     error.mockRestore();
     expect(s.get("k")).toBe(2);
+  });
+});
+
+describe("bridge.js: cf.storage(prefix).onChange (docs/notes/page-storage-change-event.md)", () => {
+  async function storing(values: Record<string, string>, ready: Record<string, unknown> = {}) {
+    const h = load();
+    h.ready({ storage: values, ...ready });
+    await h.cf.ready;
+    return h;
+  }
+
+  it("calls fn once now with every key of its prefix, as cf.on calls with the value now", async () => {
+    const h = await storing({ "board:n": "1", "board:cards": "[]", other: "2" });
+    const fn = vi.fn();
+    h.cf.storage("board").onChange(fn);
+    expect(fn).not.toHaveBeenCalled(); // a microtask later: after onChange returned its unsubscribe
+    await flush();
+    expect(fn).toHaveBeenCalledTimes(1);
+    expect([...((fn.mock.calls[0]?.[0] as string[] | undefined) ?? [])].sort()).toEqual(["cards", "n"]);
+    const empty = vi.fn();
+    h.cf.storage("none").onChange(empty);
+    await flush();
+    expect(empty).toHaveBeenCalledWith([]);
+  });
+
+  it("tells fn the keys of its prefix another copy set or removed, after the storage holds them", async () => {
+    const h = await storing({ "board:n": "1", "board:gone": "true", other: "2" });
+    const s = h.cf.storage("board");
+    const seen: [string[], unknown][] = [];
+    s.onChange((keys) => seen.push([keys.sort(), s.get("n")]));
+    await flush();
+    seen.length = 0;
+    h.send({ type: "cf:storage", values: { "board:n": "2", "board:new": "1", other: "3" } });
+    expect(seen).toEqual([[["gone", "n", "new"], 2]]);
+  });
+
+  it("hears only its prefix, and the whole storage without one", async () => {
+    const h = await storing({ "board:n": "1", "todo:n": "1" });
+    const board = vi.fn();
+    const all = vi.fn();
+    h.cf.storage("board").onChange(board);
+    h.cf.storage().onChange(all);
+    await flush();
+    board.mockClear();
+    all.mockClear();
+    h.send({ type: "cf:storage", values: { "board:n": "1", "todo:n": "2" } });
+    expect(board).not.toHaveBeenCalled();
+    expect(all).toHaveBeenCalledWith(["todo:n"]);
+  });
+
+  it("is never called for the page's own write, nor for the app's map after it", async () => {
+    const h = await storing({ "c:n": "1" });
+    const s = h.cf.storage("c");
+    const fn = vi.fn();
+    s.onChange(fn);
+    await flush();
+    fn.mockClear();
+    const w = s.set("n", 2);
+    // Another copy's map that still has the old value, while the write is on its way.
+    h.send({ type: "cf:storage", values: { "c:n": "1" } });
+    const [m] = h.sent("cf:store");
+    h.send({ type: "cf:result", id: m?.id, ok: true });
+    await w;
+    // The app's map after the write (this window's or the daemon's news): the same value.
+    h.send({ type: "cf:storage", values: { "c:n": "2" } });
+    expect(fn).not.toHaveBeenCalled();
+    expect(s.get("n")).toBe(2);
+  });
+
+  it("announces a refused write's value put back, at once and not again with the app's map", async () => {
+    const h = await storing({ "c:n": "1" });
+    const s = h.cf.storage("c");
+    const fn = vi.fn();
+    s.onChange(fn);
+    await flush();
+    fn.mockClear();
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    const refused = s.set("n", "x".repeat(10));
+    expect(fn).not.toHaveBeenCalled();
+    const [m] = h.sent("cf:store");
+    h.send({ type: "cf:result", id: m?.id, ok: false, error: { code: "invalid", message: "page storage is full" } });
+    await expect(refused).rejects.toMatchObject({ code: "invalid" });
+    error.mockRestore();
+    expect(fn).toHaveBeenCalledWith(["n"]);
+    expect(s.get("n")).toBe(1);
+    h.send({ type: "cf:storage", values: { "c:n": "1" } });
+    expect(fn).toHaveBeenCalledTimes(1);
+  });
+
+  it("stops after the unsubscribe it returned, even before its first call", async () => {
+    const h = await storing({ "c:n": "1" });
+    const fn = vi.fn();
+    const stop = h.cf.storage("c").onChange(fn);
+    stop();
+    await flush();
+    h.send({ type: "cf:storage", values: { "c:n": "2" } });
+    expect(fn).not.toHaveBeenCalled();
+  });
+
+  it("keeps calling the others when one throws, and needs a function", async () => {
+    const h = await storing({});
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    const fn = vi.fn();
+    h.cf.storage().onChange((keys) => {
+      if (keys.length > 0) throw new Error("boom");
+    });
+    h.cf.storage().onChange(fn);
+    await flush();
+    h.send({ type: "cf:storage", values: { k: "1" } });
+    expect(fn).toHaveBeenLastCalledWith(["k"]);
+    expect(error).toHaveBeenCalled();
+    error.mockRestore();
+    expect(() => h.cf.storage().onChange(null as unknown as () => void)).toThrow(/a function/);
+  });
+
+  it("an app that never sends cf:storage: fn is called once, then never", async () => {
+    const h = await storing({ "c:n": "1" });
+    const fn = vi.fn();
+    const s = h.cf.storage("c");
+    s.onChange(fn);
+    await flush();
+    const w = s.set("n", 2);
+    const [m] = h.sent("cf:store");
+    h.send({ type: "cf:result", id: m?.id, ok: true });
+    await w;
+    await flush();
+    expect(fn).toHaveBeenCalledTimes(1);
   });
 });
 

@@ -63,7 +63,8 @@ var renderings = []Rendering{
 		"cf.onTheme(fn) hears theme changes (the script applies them and acks); the card follows the page's height by itself " +
 		"(cf.resize() forces it). cf.storage(prefix) is the page file's storage, kept by Code Foundry (256 KiB): it persists across " +
 		"reloads and app restarts, every thread showing the file sees the same data, and another page file has its own; " +
-		"get/keys answer at once, set/remove/clear return a Promise; raw localStorage lasts only until the app quits. " +
+		"get/keys answer at once, set/remove/clear return a Promise; .onChange(fn) calls fn(keys) now and when another open copy " +
+		"of the page (its card, a tab) changed keys, never for its own writes; raw localStorage lasts only until the app quits. " +
 		"A page runs only while it is on screen, so no background " +
 		"work: a wake (thread subscribe) or a plugin. " +
 		"cf.fetch(url, {method, headers, body, timeout}) makes an HTTP request from Code Foundry, not the page, so the API's CORS rules never " +

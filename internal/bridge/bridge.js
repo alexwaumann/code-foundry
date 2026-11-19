@@ -10,7 +10,7 @@
  *   cf.run(verb, args?, opts?)    Promise of {text, json}; rejects with {code, message}
  *   cf.on(source, fn) / cf.off    live data, fn(value, source): now, then on change; on returns an unsubscribe
  *   cf.resize(height?)            the card follows the page's height by itself
- *   cf.storage(prefix?)           the page file's storage, kept across app restarts
+ *   cf.storage(prefix?)           the page file's storage, kept across restarts; .onChange(fn) hears other copies
  *   cf.fetch(url, init?)          Promise of {status, ok, headers, text(), json()}; the app makes it: no CORS
  *
  * A verb that is not read-only runs only within 5 s of a click or key press in the page.
@@ -63,6 +63,7 @@
   var stored = {}; // the thread's page storage: key -> the value's JSON text
   var writing = {}; // key -> writes not answered yet; cf:storage leaves those keys alone
   var subs = {}; // subscription id -> {source, fn, onError}
+  var watchers = []; // cf.storage(prefix).onChange: {base, fn}, in the order added
   var themeFns = [];
   var readyMsg = null;
   var readyWaiters = [];
@@ -535,18 +536,68 @@
       clear: function () {
         return Promise.all(own().map(function (k) { return write(k, null); }));
       },
+      onChange: function (fn) {
+        return watch(base, function () {
+          return own().map(function (k) { return k.slice(base.length); });
+        }, fn);
+      },
     };
   }
 
-  // cf:storage: the whole storage, after another page wrote or a write was refused.
+  // cf:storage: the whole storage, after another copy of the page wrote (in this window or
+  // another), or a write was refused. The keys whose value it changed here are announced.
   function restore(values) {
     if (!values || typeof values !== "object") return;
+    var changed = [];
     Object.keys(stored).forEach(function (k) {
-      if (!writing[k] && typeof values[k] !== "string") delete stored[k];
+      if (!writing[k] && typeof values[k] !== "string") {
+        delete stored[k];
+        changed.push(k);
+      }
     });
     Object.keys(values).forEach(function (k) {
-      if (!writing[k] && typeof values[k] === "string") stored[k] = values[k];
+      if (!writing[k] && typeof values[k] === "string" && stored[k] !== values[k]) {
+        stored[k] = values[k];
+        changed.push(k);
+      }
     });
+    announce(changed);
+  }
+
+  // Tells each onChange watcher the keys of its prefix among `keys` (whole keys), without
+  // the prefix. Never for the page's own write: write() changes `stored` without announcing,
+  // and the app's map after it holds what the page wrote, which changes nothing here.
+  function announce(keys) {
+    if (keys.length === 0) return;
+    watchers.slice().forEach(function (w) {
+      if (watchers.indexOf(w) < 0) return;
+      var mine = keys.filter(function (k) { return k.indexOf(w.base) === 0; }).map(function (k) { return k.slice(w.base.length); });
+      if (mine.length > 0) tell(w, mine);
+    });
+  }
+
+  function tell(w, keys) {
+    try {
+      w.fn(keys);
+    } catch (err) {
+      if (window.console) console.error(err);
+    }
+  }
+
+  // cf.storage(prefix).onChange(fn): fn(keys) once now (a microtask later) with every key the
+  // prefix holds, as cf.on calls with the value now, then with the keys another copy of the
+  // page or the app changed (set or removed); the storage holds the new values when fn runs.
+  // Returns an unsubscribe.
+  function watch(base, keysNow, fn) {
+    if (typeof fn !== "function") throw cfError("invalid", "cf.storage().onChange(fn): a function");
+    var w = { base: base, fn: fn };
+    watchers.push(w);
+    Promise.resolve().then(function () {
+      if (watchers.indexOf(w) >= 0) tell(w, keysNow());
+    });
+    return function () {
+      watchers = watchers.filter(function (x) { return x !== w; });
+    };
   }
 
   function settle(id, msg) {
@@ -558,10 +609,13 @@
         w.resolve();
         return;
       }
-      // Refused, and no later write of the key in flight (its value stays): the key as it was.
+      // Refused, and no later write of the key in flight (its value stays): the key as it
+      // was, announced, since the page may have drawn the value it set.
       if (!writing[w.key]) {
+        var refused = stored[w.key];
         if (w.before === undefined) delete stored[w.key];
         else stored[w.key] = w.before;
+        if (stored[w.key] !== refused) announce([w.key]);
       }
       w.reject(cfError((msg.error && msg.error.code) || "failed", (msg.error && msg.error.message) || "cannot store " + w.key));
       return;
@@ -702,6 +756,7 @@
   // this one asked for: tell it this one goes, so its calls and subscriptions end.
   window.addEventListener("pagehide", function () {
     subs = {};
+    watchers = [];
     post({ type: "cf:bye" });
   });
 

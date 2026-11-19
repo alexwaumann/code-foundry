@@ -41,9 +41,27 @@ pointer makes a click act on the wrong one. So:
 
 `get(key)` and `keys()` answer at once from the copy the page got with `cf.ready`; `set`,
 `remove` and `clear` change that copy at once and return a Promise that rejects when the
-storage is full (256 KiB per thread, all its pages; 1 KiB a key, prefix and `:` included)
-or the write was refused: the value is then put back. Another page of the thread (or another frame of a page no thread owns) writing a key
-updates this page's copy.
+storage is full (256 KiB per page file; 1 KiB a key, prefix and `:` included) or the write was
+refused: the value is then put back. Every open copy of the page shares one storage: its card,
+its tabs, the app's other windows, and its own other files opened in its frame.
+
+`onChange(fn)` keeps a copy in step: `fn(keys)` runs once now with every key the prefix holds,
+then with the keys (prefix left out) another copy set or removed, or a refused write put back;
+`get` already answers the new values. Never for the page's own `set`: draw after it yourself.
+It returns an unsubscribe (in React: `useEffect(() => s.onChange(...), [])`). State the page
+keeps only in variables is not shared: keep in storage what every copy should show.
+
+```html
+<button id="b"></button>
+<script type="module">
+  await cf.ready;
+  const s = cf.storage("counter");
+  const b = document.getElementById("b");
+  const draw = () => (b.textContent = `Clicked ${s.get("n") ?? 0} times`);
+  s.onChange(draw); // now, and after a click in another copy
+  b.addEventListener("click", () => { s.set("n", (s.get("n") ?? 0) + 1); draw(); });
+</script>
+```
 
 ## External APIs: cf.fetch and tokens
 

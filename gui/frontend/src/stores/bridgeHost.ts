@@ -48,7 +48,10 @@
  * (PageService.PageStorage/SetPageStorage {path}) whichever thread the page acts for, when the
  * daemon keeps storage per file (`storagePath`, and always for a page alone); its thread's
  * (ThreadService) from an older daemon. One call at a time per storage, in the order sent;
- * every other frame of that storage (a card and a tab of the same file) hears the map after.
+ * every other frame of that storage (a card and a tab of the same file) hears the map after,
+ * and the daemon's page source names the page (storage_paths) to every client, so another
+ * window's frames read it again (applyPageStorageEvent); bridge.js tells the page which of its
+ * keys changed (cf.storage(prefix).onChange; docs/notes/page-storage-change-event.md).
  * The storage is the frame's page's, so a document of the page that goes on to another file
  * of its own in the frame keeps it.
  *
@@ -60,7 +63,7 @@
  */
 import { listCommands, type CommandView, type UiContextView } from "@/api/command";
 import { bridgeErrorOf } from "@/api/bridge";
-import { getPageFileStorage, proxyPageFetch, refusedPageOf, setPageFileStorage } from "@/api/page";
+import { getPageFileStorage, proxyPageFetch, refusedPageOf, setPageFileStorage, type PageEventView } from "@/api/page";
 import { getPageStorage, setPageStorage, type PageStorageValues } from "@/api/pageStorage";
 import { proxyFetch, type ProxyFetchAnswer, type ProxyFetchCall } from "@/api/proxyFetch";
 import {
@@ -170,6 +173,42 @@ function onStorageChain<T>(key: string, call: () => Promise<T>): Promise<T> {
     if (storageChains.get(key) === tail) storageChains.delete(key);
   });
   return next;
+}
+
+/** The storages whose read for the daemon's news is queued and not started: one more is enough. */
+const refreshing = new Set<string>();
+
+/** Reads a storage again on its chain and hands the map to every live frame of it. */
+function refreshStorage(key: string): void {
+  if (!storageFrames.has(key) || refreshing.has(key)) return;
+  refreshing.add(key);
+  const read = (): Promise<PageStorageValues> => {
+    refreshing.delete(key);
+    if (key.startsWith("page:")) return getPageFileStorage(key.slice("page:".length));
+    return getPageStorage(key.slice("thread:".length));
+  };
+  void onStorageChain(key, read).then(
+    (values) => {
+      for (const hear of storageFrames.get(key) ?? []) hear(values);
+    },
+    // A storage the page may no longer read: its frame hears that from its own calls.
+    () => undefined,
+  );
+}
+
+/**
+ * The daemon's page source (docs/notes/page-storage-change-event.md): a page whose storage a
+ * write changed in any client (another window, another GUI, this one), or after a reconnect
+ * every page, is read again for the frames that show it here. A frame is handed the whole
+ * map, as after a write in this window; bridge.js tells the page only of keys whose value it
+ * changed, so the writer's own frames and a repeat of this window's news change nothing.
+ */
+export function applyPageStorageEvent(ev: Pick<PageEventView, "storagePaths" | "all">): void {
+  if (ev.all) {
+    for (const key of [...storageFrames.keys()]) refreshStorage(key);
+    return;
+  }
+  for (const path of ev.storagePaths) refreshStorage(`page:${path}`);
 }
 
 /**

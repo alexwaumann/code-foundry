@@ -15,6 +15,7 @@ import { applyLayoutEvent } from "./layout";
 import { applyMemoryEvent } from "./memory";
 import { applyNotificationEvent } from "./notifications";
 import { applyPageEvent } from "./pageAnswers";
+import { applyPageStorageEvent } from "./bridgeHost";
 import { noteNotificationArrivals } from "./arrivals";
 import { raiseArrivalToasts } from "./notificationToasts";
 import { applySearchActivity } from "./searchActivity";
@@ -114,7 +115,11 @@ const handlers: Handlers = {
     noteNotificationArrivals(ev);
   },
   // Pages whose owner or answer changed: their File tabs read their grant again (stores/pageAnswers.ts).
-  page: applyPageEvent,
+  // Pages whose storage changed: their frames read it again (stores/bridgeHost.ts).
+  page: (ev) => {
+    applyPageEvent(ev);
+    applyPageStorageEvent(ev);
+  },
 };
 
 const taps = new Set<(ev: EventView) => void>();

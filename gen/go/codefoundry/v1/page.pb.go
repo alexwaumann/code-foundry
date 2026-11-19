@@ -774,7 +774,8 @@ func (x *PageProxyFetchResponse) GetStatusText() string {
 // GetPage) and every frame on it follows: a page refused in one window or from the CLI stops
 // in every window, and a page whose last owning thread is removed is asked about again. It is
 // EventService's page source (EVENT_SOURCE_PAGE). It names pages, never their answer, and
-// may name one whose answer did not change.
+// may name one whose answer did not change. It also names pages whose storage changed
+// (storage_paths), never the values.
 type PageEvent struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// The resolved paths (PageAccess.path) that got an owner (owners) or another answer.
@@ -783,8 +784,13 @@ type PageEvent struct {
 	// now when it was the last).
 	RemovedThread string `protobuf:"bytes,2,opt,name=removed_thread,json=removedThread,proto3" json:"removed_thread,omitempty"`
 	// Any page may have changed: the source's snapshot (on connect, and after the client
-	// missed events). Read every page shown again.
-	All           bool `protobuf:"varint,3,opt,name=all,proto3" json:"all,omitempty"`
+	// missed events). Read every page shown again. Its storage too.
+	All bool `protobuf:"varint,3,opt,name=all,proto3" json:"all,omitempty"`
+	// The resolved paths whose cf.storage a write changed (SetPageStorage), from any client:
+	// a client with frames on one reads it again (PageStorage) and hands it to them, so every
+	// open copy of a page hears another's write (docs/notes/page-storage-change-event.md). Not
+	// a change of answer: paths stays empty for it. An event names only one of the two.
+	StoragePaths  []string `protobuf:"bytes,4,rep,name=storage_paths,json=storagePaths,proto3" json:"storage_paths,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -838,6 +844,13 @@ func (x *PageEvent) GetAll() bool {
 		return x.All
 	}
 	return false
+}
+
+func (x *PageEvent) GetStoragePaths() []string {
+	if x != nil {
+		return x.StoragePaths
+	}
+	return nil
 }
 
 var File_codefoundry_v1_page_proto protoreflect.FileDescriptor
@@ -899,11 +912,12 @@ const file_codefoundry_v1_page_proto_rawDesc = "" +
 	"statusText\x1a:\n" +
 	"\fHeadersEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"Z\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x7f\n" +
 	"\tPageEvent\x12\x14\n" +
 	"\x05paths\x18\x01 \x03(\tR\x05paths\x12%\n" +
 	"\x0eremoved_thread\x18\x02 \x01(\tR\rremovedThread\x12\x10\n" +
-	"\x03all\x18\x03 \x01(\bR\x03all*\xb1\x01\n" +
+	"\x03all\x18\x03 \x01(\bR\x03all\x12#\n" +
+	"\rstorage_paths\x18\x04 \x03(\tR\fstoragePaths*\xb1\x01\n" +
 	"\vPageConsent\x12\x1c\n" +
 	"\x18PAGE_CONSENT_UNSPECIFIED\x10\x00\x12\x16\n" +
 	"\x12PAGE_CONSENT_OWNED\x10\x01\x12\x18\n" +

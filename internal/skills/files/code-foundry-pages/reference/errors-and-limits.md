@@ -35,8 +35,9 @@ show `e.message` in the page where it happened (that row, that button); `alert()
   nothing: save it with `file.export` from the click (`verbs.md`) and show the path it answers.
   Each one shows in the page's error badge.
 - **Storage is per page file.** Every thread that showed or wrote the file sees the same
-  `cf.storage`, in a card or a tab. The page's own other files, opened in its frame, share it; any
-  other page has its own: to share data, make one page (several views, hash routes).
+  `cf.storage`, in a card or a tab, and hears another copy's writes in `onChange` (`sources.md`).
+  The page's own other files, opened in its frame, share it; any other page has its own: to share
+  data, make one page (several views, hash routes).
 - **Whom it acts for** (`cf.thread`, `cf.run`): a card acts for its thread; a tab for its own
   thread when that thread showed or wrote the page, else for the first that did.
 - **A page no thread owns** (the user opened a file a script wrote) asks the user once whether it
