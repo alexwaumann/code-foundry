@@ -139,5 +139,5 @@ To discard a child's work: `reference/patterns.md` §7.
 - `reference/patterns.md`: §0 the child's prompt; examples (a wait, fanning out, a sibling's
   branch, several projects, review, CI); §5 supervised; §6 budget; §7 discarding; §8 batch check.
 - `reference/wakes.md`: reading a wake and its turn. `reference/leads.md`: leads.
-  `reference/sidebar.md`: which threads the user sees, forking, what archiving takes.
+  `reference/sidebar.md`: which threads the user sees, forking, archived and snoozed threads.
 

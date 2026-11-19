@@ -143,7 +143,7 @@ func (h *Thread) RegenerateName(ctx context.Context, req *connect.Request[v1.Reg
 
 // Pin sets or clears the user's pin.
 func (h *Thread) Pin(ctx context.Context, req *connect.Request[v1.PinThreadRequest]) (*connect.Response[v1.PinThreadResponse], error) {
-	s, err := h.store.Pin(ctx, req.Msg.GetId(), req.Msg.GetPinned())
+	s, err := h.store.Pin(thread.AskedBy(ctx, req.Msg.GetByThreadId()), req.Msg.GetId(), req.Msg.GetPinned())
 	if err != nil {
 		return nil, threadError(err)
 	}
@@ -160,7 +160,7 @@ func (h *Thread) Archive(ctx context.Context, req *connect.Request[v1.ArchiveThr
 		return connect.NewResponse(&v1.ArchiveThreadResponse{Thread: threadToProto(s), Deferred: deferred}), nil
 	}
 	// Who asks: a group's wake names a member archived by anyone but its subscriber.
-	s, err := h.store.Archive(thread.ArchivedBy(ctx, req.Msg.GetByThreadId()), req.Msg.GetId(), req.Msg.GetArchived())
+	s, err := h.store.Archive(thread.AskedBy(ctx, req.Msg.GetByThreadId()), req.Msg.GetId(), req.Msg.GetArchived())
 	if err != nil {
 		return nil, threadError(err)
 	}
@@ -179,7 +179,7 @@ func (h *Thread) Snooze(ctx context.Context, req *connect.Request[v1.SnoozeThrea
 		if self {
 			return h.snoozeSelf(ctx, req.Msg.GetId(), thread.PutAway{Kind: thread.PutAwaySave})
 		}
-		s, err := h.store.SaveForLater(ctx, req.Msg.GetId())
+		s, err := h.store.SaveForLater(thread.AskedBy(ctx, req.Msg.GetByThreadId()), req.Msg.GetId())
 		if err != nil {
 			return nil, threadError(err)
 		}
@@ -195,7 +195,7 @@ func (h *Thread) Snooze(ctx context.Context, req *connect.Request[v1.SnoozeThrea
 			return h.snoozeSelf(ctx, req.Msg.GetId(), thread.PutAway{Kind: thread.PutAwaySnooze, Until: until})
 		}
 	}
-	s, err := h.store.Snooze(ctx, req.Msg.GetId(), until)
+	s, err := h.store.Snooze(thread.AskedBy(ctx, req.Msg.GetByThreadId()), req.Msg.GetId(), until)
 	if err != nil {
 		return nil, threadError(err)
 	}

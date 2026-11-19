@@ -1,9 +1,6 @@
 package thread
 
-import (
-	"context"
-	"slices"
-)
+import "slices"
 
 // A group member archived (docs/notes/wakes-fuzz-fixes.md). An archive drops the
 // member's subscription before its close (archive_wakes.go), which lets its group's held
@@ -14,24 +11,6 @@ import (
 // (kidsLocked, siblingsOf) leave it out; and when someone other than the subscriber
 // archived it (the user, a plugin, another thread), the group's next released wake
 // names it.
-
-// archivedByKey carries the thread that asks for an archive.
-type archivedByKey struct{}
-
-// ArchivedBy returns ctx carrying the thread that asks Archive for it (an API request's
-// by_thread_id); none is the user or a plugin.
-func ArchivedBy(ctx context.Context, id string) context.Context {
-	if id == "" {
-		return ctx
-	}
-	return context.WithValue(ctx, archivedByKey{}, id)
-}
-
-// archivedBy is the thread ArchivedBy put in ctx, or "".
-func archivedBy(ctx context.Context) string {
-	id, _ := ctx.Value(archivedByKey{}).(string)
-	return id
-}
 
 // markArchivingLocked marks thread id archiving and notes it for the groups its
 // subscribers other than by hold it in: those holding wakes, or with a member still

@@ -223,6 +223,12 @@ func TestThreadSubscriptionCommands(t *testing.T) {
 			wantReqs: []proto.Message{&v1.SendThreadMessageRequest{ThreadId: "s-k", Text: "more", ByThreadId: "s-lead"}}},
 		{name: "send with notify=false", cmd: "thread.send", args: map[string]string{"id": "s-k", "text": "more", "by": "s-lead", "notify": "false"},
 			wantReqs: []proto.Message{&v1.SendThreadMessageRequest{ThreadId: "s-k", Text: "more", ByThreadId: "s-lead", NoNotify: true}}},
+		// The sender is the thread the CLI runs in even when by is left empty: what the
+		// daemon lets it do to a snoozed or archived thread hangs on it.
+		{name: "send from a thread with by left empty is still that thread's", cmd: "thread.send", ctx: inThread, args: map[string]string{"id": "s-k", "text": "more"},
+			wantReqs: []proto.Message{&v1.SendThreadMessageRequest{ThreadId: "s-k", Text: "more", ByThreadId: inThread.ActiveThreadID}}},
+		{name: "send from the app is the user's", cmd: "thread.send", ctx: command.Context{ActiveThreadID: "s-k", ActiveView: "thread"}, args: map[string]string{"id": "s-k", "text": "more"},
+			wantReqs: []proto.Message{&v1.SendThreadMessageRequest{ThreadId: "s-k", Text: "more"}}},
 		{name: "notify needs created-by", cmd: "thread.new", ctx: inThread, args: map[string]string{"project": "r1", "notify": "true"}, wantErr: command.ErrInvalidArgs},
 	}
 	for _, tt := range tests {

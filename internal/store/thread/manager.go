@@ -1198,13 +1198,19 @@ func (m *Manager) Rename(_ context.Context, id, name string) (Thread, error) {
 }
 
 // Pin sets or clears the user's pin. It works in any state and is persisted. Pinning an
-// archived or snoozed thread unarchives or unsnoozes it.
-func (m *Manager) Pin(_ context.Context, id string, pinned bool) (Thread, error) {
+// archived or snoozed thread unarchives or unsnoozes it, so a thread (AskedBy) may pin
+// such a thread only when it created it (holds.go).
+func (m *Manager) Pin(ctx context.Context, id string, pinned bool) (Thread, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	rec, err := m.record(id)
 	if err != nil {
 		return Thread{}, err
+	}
+	if pinned {
+		if err := m.refuseHeldLocked(rec, askedBy(ctx), true, true, "pin"); err != nil {
+			return Thread{}, err
+		}
 	}
 	unarchived := pinned && m.unarchiveLocked(rec)
 	unsnoozed := pinned && m.unsnoozeLocked(rec)

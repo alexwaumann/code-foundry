@@ -48,8 +48,10 @@ func (r *runner) exchange(ctx context.Context, cmd threadCmd) (threadReply, erro
 // told in the timeline, not by an error, unless its transcript is gone
 // (ErrTranscriptMissing: nothing is written). A message to a starting thread waits for the
 // handshake behind the first prompt (queue); one to a closing thread waits for the exit,
-// then starts it; one to a thread in setup goes on its row (sendToSetup). A sent message
-// unarchives and unsnoozes the thread. A thread's message to a thread whose --notify
+// then starts it; one to a thread in setup goes on its row (sendToSetup). The user's
+// message unarchives and unsnoozes the thread; another thread's message, or a wake, leaves
+// a snooze as it is, and is refused on an archived thread unless that thread created it
+// (holds.go). A thread's message to a thread whose --notify
 // subscription to it ended subscribes it again (renotify, subscriptions_until.go).
 func (m *Manager) Send(ctx context.Context, id string, msg Message) (Item, error) {
 	it, err := m.send(ctx, id, msg)
@@ -62,6 +64,10 @@ func (m *Manager) Send(ctx context.Context, id string, msg Message) (Item, error
 func (m *Manager) send(ctx context.Context, id string, msg Message) (Item, error) {
 	log, err := m.thread(ctx, id)
 	if err != nil {
+		return Item{}, err
+	}
+	rv := msg.sender()
+	if err := m.refuseArchivedSend(id, rv); err != nil {
 		return Item{}, err
 	}
 	if err := m.refuseToSetup(id, msg); err != nil {
@@ -99,10 +105,10 @@ func (m *Manager) send(ctx context.Context, id string, msg Message) (Item, error
 		o := &outgoing{text: strings.TrimSpace(msg.Text), composer: strings.TrimSpace(msg.ComposerText), attachments: attachments, prompt: prompt,
 			by: strings.TrimSpace(msg.ByThreadID)}
 		m.nameFromFirstMessage(id, log, o)
-		it, handled, err := m.sendToSetup(ctx, id, log, o)
+		it, handled, err := m.sendToSetup(ctx, id, log, o, rv)
 		if handled || err != nil {
 			if err == nil {
-				m.backToList(id)
+				m.backToList(id, rv)
 			}
 			return it, err
 		}
@@ -155,13 +161,14 @@ func (m *Manager) send(ctx context.Context, id string, msg Message) (Item, error
 			}
 			continue
 		default:
-			if it, err = m.startStopped(ctx, id, startOpts{first: o, backToList: true}); errors.Is(err, errNotStopped) {
+			if it, err = m.startStopped(ctx, id, startOpts{first: o, revive: &rv}); errors.Is(err, errNotStopped) {
 				continue
 			}
 		}
 		if err == nil {
-			// A new turn brings an archived or snoozed thread back to the main list.
-			m.backToList(id)
+			// The user's new turn brings an archived or snoozed thread back to the main
+			// list; a creator's message brings back its archived thread (holds.go).
+			m.backToList(id, rv)
 		}
 		return it, err
 	}

@@ -126,8 +126,8 @@ type startOpts struct {
 	// into the timeline at once, and a failure to start is told there too (an error
 	// item, status error) instead of failing the call. nil starts without a prompt.
 	first *outgoing
-	// backToList unarchives and unsnoozes the thread (a message).
-	backToList bool
+	// revive, for a message, is who sent it: what it brings back (backToListLocked).
+	revive *revive
 	// move starts the thread for a Move (move.go): the destination's --add-dir list.
 	move *moveJob
 }
@@ -252,10 +252,9 @@ func (m *Manager) startStopped(ctx context.Context, id string, o startOpts) (Ite
 	}
 	m.update(id, false, func(r *record) {
 		r.s.LastError = lastErr
-		if o.backToList {
+		if o.revive != nil {
 			// Persisted by spawn's commit, or by failStart.
-			m.unarchiveLocked(r)
-			m.unsnoozeLocked(r)
+			m.backToListLocked(r, *o.revive)
 		}
 		if l.resume == "" {
 			r.s.ClaudeSessionID = ""

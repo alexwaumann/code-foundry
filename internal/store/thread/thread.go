@@ -221,11 +221,13 @@ type Thread struct {
 	// Pinned is the user's pin (Store.Pin). Persisted.
 	Pinned bool
 	// ArchivedAt is when the user archived the thread (Store.Archive); zero when it is
-	// not archived. Pin(true), Send and Snooze clear it. Persisted.
+	// not archived. Pin(true), Send and Snooze clear it (from a thread, only on a thread
+	// it created: holds.go). Persisted.
 	ArchivedAt time.Time
 	// SnoozedUntil is when a snoozed thread wakes (Store.Snooze); zero when it is not
 	// snoozed. Waking clears it and sets StatusNeedsAttention ReasonSnoozeEnded.
-	// Pin(true), Send and Archive(true) clear it. Persisted.
+	// Pin(true), the user's Send and Archive(true) clear it; another thread's Send or a
+	// wake leaves it, so a snoozed thread can be working (holds.go). Persisted.
 	SnoozedUntil time.Time
 	// SavedAt is when the thread was saved for later (Store.SaveForLater): a snooze with
 	// no wake time, so SnoozedUntil stays zero. Zero when it is not saved. The same calls

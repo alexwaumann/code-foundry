@@ -86,9 +86,21 @@ describe("the shell sidebar's sections", () => {
     expect(rows).toEqual(["# Needs you 1", "needs:mine"]);
   });
 
-  it("an archived or snoozed thread never needs you", () => {
-    const rows = view([t("a", { group: "prompt", archivedAtMs: 1 }), t("s", { group: "prompt", snoozedUntilMs: Date.now() + 1000 })]);
+  it("an archived thread never needs you", () => {
+    const rows = view([t("a", { group: "prompt", archivedAtMs: 1 })]);
     expect(rows.filter((r) => r.startsWith("needs") || r.startsWith("# Needs"))).toEqual([]);
+  });
+
+  it("a snoozed thread that asks is under Needs you, not Snoozed, until it is answered (the snooze holds)", () => {
+    const until = Date.now() + 60_000;
+    const asking = view([t("s", { group: "prompt", snoozedUntilMs: until }), t("z", { snoozedUntilMs: until })]);
+    expect(asking).toEqual(["# Needs you 1", "needs:s", "# Snoozed 1", "snoozed:z"]);
+    expect(needsBySpace([t("s", { group: "prompt", snoozedUntilMs: until })])).toEqual({ A: 1 });
+    // Answered and working, or done: back under Snoozed with its time; a nudge (not an ask) never leaves it.
+    for (const group of ["working", "done"] as const) {
+      expect(view([t("s", { group, snoozedUntilMs: until })])).toEqual(["# Snoozed 1", "snoozed:s"]);
+    }
+    expect(view([t("s", { group: "prompt", nudge: true, savedAtMs: 1 })])).toEqual(["# Snoozed 1", "snoozed:s"]);
   });
 
   it("the scope: every space's asks, or this space's; with none here the header stays for its button", () => {
@@ -145,9 +157,9 @@ describe("the Needs you list (the top bar's control and cmd+shift+a)", () => {
     expect(needsList(WORLD, { currentSpaceId: "C", needsScope: "space" })).toEqual({ ids: [], any: true });
   });
 
-  it("only the user's own threads that wait, never a thread's threads, archived or snoozed ones", () => {
+  it("only the user's own threads that wait, never a thread's threads or archived ones; a snoozed one while it asks", () => {
     const ts = [t("mine", { group: "prompt" }), t("child", { group: "prompt", hidden: true }), t("gone", { group: "prompt", archivedAtMs: 1 }), t("later", { group: "prompt", snoozedUntilMs: Date.now() + 60_000 }), t("err", { group: "error" })];
-    expect(needsList(ts, OPTS)).toEqual({ ids: ["mine"], any: true });
+    expect(needsList(ts, OPTS)).toEqual({ ids: ["later", "mine"], any: true });
     expect(needsList([t("child", { group: "prompt", hidden: true })], OPTS)).toEqual({ ids: [], any: false });
   });
 });

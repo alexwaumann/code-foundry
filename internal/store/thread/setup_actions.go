@@ -98,9 +98,13 @@ func (m *Manager) RetrySetup(ctx context.Context, id string) (Thread, error) {
 	if err == nil {
 		err = m.retryRefusal(rec)
 	}
+	by := askedBy(ctx)
+	if err == nil {
+		err = m.refuseHeldLocked(rec, by, true, false, "retry the setup of")
+	}
 	var j *setupJob
 	if err == nil {
-		j, err = m.beginRetryLocked(rec)
+		j, err = m.beginRetryLocked(rec, revive{user: by == "", by: by})
 	}
 	m.mu.Unlock()
 	if err != nil {
@@ -112,8 +116,9 @@ func (m *Manager) RetrySetup(ctx context.Context, id string) (Thread, error) {
 
 // beginRetryLocked puts rec's setup back to running, with a reservation as Create's has,
 // and registers a stage for it; the caller checked retryRefusal and calls runRetry after
-// m.mu. A retry brings the thread back to the list, as a message does. Callers hold m.mu.
-func (m *Manager) beginRetryLocked(rec *record) (*setupJob, error) {
+// m.mu. A retry brings the thread back to the list as a message from rv does
+// (backToListLocked). Callers hold m.mu.
+func (m *Manager) beginRetryLocked(rec *record, rv revive) (*setupJob, error) {
 	s := &rec.s
 	cid, err := newUUID()
 	if err != nil {
@@ -136,8 +141,7 @@ func (m *Manager) beginRetryLocked(rec *record) (*setupJob, error) {
 	s.Setup = s.Setup.retried(now)
 	s.setStatus(StatusBusy, ReasonSettingUp, now)
 	s.DisconnectReason, s.LastError = "", ""
-	m.unarchiveLocked(rec)
-	m.unsnoozeLocked(rec)
+	m.backToListLocked(rec, rv)
 	rec.reserve()
 	m.registerSetupLocked(context.Background(), rec, j)
 	m.commitLocked(rec, true)
@@ -593,7 +597,7 @@ func (m *Manager) refuseToSetup(id string, msg Message) error {
 // the timeline as queued, and the message goes on the row behind the first prompt. After
 // a failure or a cancel it also tries the setup again. handled is false when the setup got
 // past spawn meanwhile: the message then goes to the process under the item written here.
-func (m *Manager) sendToSetup(ctx context.Context, id string, log *threadLog, o *outgoing) (it Item, handled bool, err error) {
+func (m *Manager) sendToSetup(ctx context.Context, id string, log *threadLog, o *outgoing, rv revive) (it Item, handled bool, err error) {
 	w := itemWriter{log: log, save: func(it Item) { m.saveItem(id, it) }}
 	if o.itemID, err = newUUID(); err != nil {
 		return Item{}, false, err
@@ -618,7 +622,7 @@ func (m *Manager) sendToSetup(ctx context.Context, id string, log *threadLog, o 
 	case rec.s.setupStopped():
 		if err = m.retryRefusal(rec); err == nil {
 			queue(rec)
-			j, err = m.beginRetryLocked(rec)
+			j, err = m.beginRetryLocked(rec, rv)
 		}
 	default:
 		m.mu.Unlock()

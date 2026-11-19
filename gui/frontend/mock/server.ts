@@ -27,6 +27,8 @@
  *   POST /__mock/status-kinds                     (one thread per status kind: approval, question,
  *        plan, finished, Claude error, busy, idle, interrupted, and a stopped one still asking
  *        a question)
+ *   POST /__mock/snooze-holds                     (snoozed s-8 working, and a snoozed thread asking for
+ *        a permission: docs/notes/snooze-holds-archive-refuses.md)
  *   POST /__mock/lineage                          (thread lineage: a creator, the child s-l-child with
  *        six siblings, one archived, and a child of its own; every child out of the
  *        sidebar while its creator exists; World.addLineage)
@@ -1415,6 +1417,9 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       break;
     case "POST /__mock/status-kinds":
       json(res, 200, world.addStatusKinds());
+      break;
+    case "POST /__mock/snooze-holds":
+      json(res, 200, world.addSnoozeHolds());
       break;
     case "POST /__mock/shell-sidebar":
       json(res, 200, world.addShellSidebar());

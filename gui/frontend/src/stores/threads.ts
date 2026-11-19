@@ -2,7 +2,7 @@ import { create } from "zustand";
 import type { AgentRunUsageView, BackgroundShellView, ThreadListEventView, ThreadView, UsageBucketView } from "@/api/threads";
 import { inSidebar } from "@/lib/inSidebar";
 import { isSnoozed } from "@/lib/snooze";
-import { threadBadge } from "@/lib/thread";
+import { isActionableAsk, threadBadge } from "@/lib/thread";
 
 export interface ThreadsData {
   /** Every thread, owned ones (a plugin's) included. */
@@ -259,18 +259,20 @@ export function isAttention(s: Pick<ThreadView, "status" | "state">): boolean {
 }
 
 /**
- * Thread ids that need the user, in `order`. An archived or snoozed thread never counts
- * (the window title, the dock badge, cmd+shift+a): archiving one
- * that was waiting (usually a finished turn) says the user is done with it, snoozing says
- * not until later, and it sits in a collapsed section. A snoozed thread counts again once
- * the daemon wakes it ("snooze ended" attention, snoozedUntilMs cleared). Neither does a
+ * Thread ids that need the user, in `order`. An archived thread never counts, nor a snoozed one
+ * unless it is blocked on an actionable ask (the window title, the dock badge, cmd+shift+a):
+ * archiving one that was waiting (usually a finished turn) says the user is done with it,
+ * snoozing says not until later, and it sits in a collapsed section; but a snoozed thread another
+ * thread's message started can ask for a permission or an answer, which it shows under Needs you
+ * with the snooze held (docs/notes/snooze-holds-archive-refuses.md). A snoozed thread counts again
+ * once the daemon wakes it ("snooze ended" attention, snoozedUntilMs cleared). Neither does a
  * thread hidden from the sidebar (lib/inSidebar.ts: another thread created it and that
  * creator still exists): its creator answers it, not the user.
  */
 export function attentionIds(data: ThreadsData): string[] {
   return data.order.filter((id) => {
     const s = data.byId[id];
-    return s !== undefined && s.archivedAtMs === null && !isSnoozed(s) && inSidebar(s, data.byId) && isAttention(s);
+    return s !== undefined && s.archivedAtMs === null && (!isSnoozed(s) || isActionableAsk(s)) && inSidebar(s, data.byId) && isAttention(s);
   });
 }
 

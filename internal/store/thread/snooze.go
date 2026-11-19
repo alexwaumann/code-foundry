@@ -43,6 +43,9 @@ func (m *Manager) snooze(ctx context.Context, id string, until time.Time, closin
 		if err != nil {
 			return Thread{}, err
 		}
+		if err := m.refuseHeldLocked(rec, askedBy(ctx), false, true, "dismiss the snooze of"); err != nil {
+			return Thread{}, err
+		}
 		m.dropPutAwayLocked(rec, "the thread was unsnoozed")
 		if m.unsnoozeLocked(rec) {
 			m.commitLocked(rec, true)
@@ -95,6 +98,10 @@ func (m *Manager) putAway(ctx context.Context, id string, closing *runner, set f
 	if err := m.refuseResident(id, "snoozed"); err != nil {
 		return Thread{}, err
 	}
+	// It unarchives: a thread may do that only to a thread it created (holds.go).
+	if err := m.refuseHeld(ctx, id, true, false, "snooze"); err != nil {
+		return Thread{}, err
+	}
 	if err := m.refuseSettingUp(id, "snoozed"); err != nil {
 		return Thread{}, err
 	}
@@ -131,8 +138,8 @@ func (m *Manager) putAway(ctx context.Context, id string, closing *runner, set f
 }
 
 // unsnoozeLocked clears rec's SnoozedUntil and SavedAt and reports whether either was
-// set, so the caller commits. Pin(true), Send and Archive(true) unsnooze
-// implicitly, at the same spots that unarchive. Callers hold m.mu.
+// set, so the caller commits. Pin(true), the user's Send and Archive(true) unsnooze
+// implicitly; another thread's Send or a wake does not (holds.go). Callers hold m.mu.
 func (m *Manager) unsnoozeLocked(rec *record) bool {
 	if !rec.s.Snoozed() {
 		return false
@@ -172,9 +179,11 @@ func (m *Manager) ClearSnoozeEnded(_ context.Context, id string) (_ Thread, clea
 }
 
 // wakeSnoozed wakes every thread whose SnoozedUntil is not after Options.Now: it
-// clears SnoozedUntil and, for a disconnected thread (every snoozed thread is one;
-// a start unsnoozes), sets StatusNeedsAttention ReasonSnoozeEnded stamped with the
-// wake time, persisted and published. The status is stamped even when it already
+// clears SnoozedUntil and, for a disconnected thread, sets StatusNeedsAttention
+// ReasonSnoozeEnded stamped with the
+// wake time, persisted and published; a thread that works (another thread's message
+// started it, the snooze held: holds.go) is only cleared, its status its own. The
+// status is stamped even when it already
 // reads "snooze ended" (a re-snoozed thread that was never reconnected), so the GUI's
 // "ended … ago" counts from this wake.
 //

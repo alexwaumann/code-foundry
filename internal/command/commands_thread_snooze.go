@@ -31,7 +31,8 @@ func threadSnooze(b ThreadBackend, idArg ArgSpec) Command {
 		Title: "Snooze or Unsnooze Thread",
 		Description: "Snooze a thread until a time: Claude is closed, its terminals removed, it is unpinned and " +
 			"listed apart; then it returns needing attention (\"snooze ended\"). " +
-			"clear unsnoozes, as do pinning, archiving and a message. " +
+			"clear unsnoozes, as do pinning, archiving and the user's message; another thread's message is delivered and leaves it snoozed. " +
+			"From a thread, clear and pin work only on a thread it created. " +
 			"On itself mid-turn: at turn's end.",
 		Category: "Thread",
 		Args: []ArgSpec{

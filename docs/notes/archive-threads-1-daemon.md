@@ -1,5 +1,9 @@
 # Archived threads, PR 1 of 2: daemon, command, API mapping
 
+Update 2026-11-19 (`snooze-holds-archive-refuses.md`): Pin and Send unarchive for the user
+and for the thread's creator (the creator chain) only; another thread is refused
+(FailedPrecondition), and cannot unarchive it either.
+
 Update 2026-10-15 (`thread-lifecycle.md`): `session.reconnect` and `session.close` are gone; a
 message starts a stopped thread (and unarchives it), the daemon stops idle ones, and
 archive also asks while background agents or shells run.

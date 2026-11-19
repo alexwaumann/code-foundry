@@ -3508,7 +3508,10 @@ type SendThreadMessageRequest struct {
 	// The composer's text (UserMessageItem.composer_text), kept on the item for display.
 	ComposerText string `protobuf:"bytes,4,opt,name=composer_text,json=composerText,proto3" json:"composer_text,omitempty"`
 	// The thread that sends it (the CLI sends $CODE_FOUNDRY_THREAD); empty for the user.
-	// Kept on the item, so prompt history (ListPrompts) leaves the message out.
+	// Kept on the item, so prompt history (ListPrompts) leaves the message out. Only the
+	// user's message (none) ends a snooze; a thread's leaves the thread snoozed, and is
+	// FAILED_PRECONDITION on an archived thread it did not create
+	// (docs/notes/snooze-holds-archive-refuses.md).
 	ByThreadId string `protobuf:"bytes,5,opt,name=by_thread_id,json=byThreadId,proto3" json:"by_thread_id,omitempty"`
 	// A send by_thread_id to a thread whose --notify subscription from it ended (the thread
 	// finished) subscribes it again the same way, armed on this message; true opts out

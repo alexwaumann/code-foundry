@@ -1,5 +1,9 @@
 # Agents, PR 4: wake subscriptions (2026-10-17)
 
+Update 2026-11-19 (`snooze-holds-archive-refuses.md`): a wake no longer unsnoozes its
+subscriber: the subscriber starts, works and stays snoozed. A wake to an archived thread is
+refused.
+
 The fourth of five PRs that make threads drivable by agents (PR 1:
 `agents-1-wait-events.md`, PR 2: `agents-2-metadata.md`, PR 3: the GUI). Claude Code is
 turn-based: a thread's agent only runs when a message arrives. A "foreman" thread that

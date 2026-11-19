@@ -217,7 +217,12 @@ func TestThreadLifecycleCommands(t *testing.T) {
 			ctx: command.Context{ActiveThreadID: "s5", ActiveView: "thread"}, args: map[string]string{"project": "api"},
 			current:  &v1.Thread{ProjectId: "web", ProjectIds: []string{"api", "web"}},
 			wantReqs: []proto.Message{&v1.GetThreadRequest{Id: "s5"}, &v1.RunInThreadRequest{Id: "s5", ProjectId: "api"}}},
+		// From a thread's CLI the pin names the thread that asks: the daemon refuses it on a
+		// snoozed or archived thread that thread did not create.
 		{name: "pin toggles an unpinned thread on", cmd: "thread.pin", ctx: command.Context{ActiveThreadID: "s5"},
+			wantMsg:  "pinned thread s5",
+			wantReqs: []proto.Message{&v1.GetThreadRequest{Id: "s5"}, &v1.PinThreadRequest{Id: "s5", Pinned: true, ByThreadId: "s5"}}},
+		{name: "pin from the app is the user's", cmd: "thread.pin", ctx: command.Context{ActiveThreadID: "s5", ActiveView: "thread"},
 			wantMsg:  "pinned thread s5",
 			wantReqs: []proto.Message{&v1.GetThreadRequest{Id: "s5"}, &v1.PinThreadRequest{Id: "s5", Pinned: true}}},
 		{name: "pin toggles a pinned thread off", cmd: "thread.pin", args: map[string]string{"id": "s5"},

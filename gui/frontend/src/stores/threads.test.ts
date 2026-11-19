@@ -194,9 +194,12 @@ describe("thread reducers", () => {
       thread("f", { status: "attention", statusReason: "finished", state: "disconnected", snoozedUntilMs: 9 }),
       thread("g", { status: "attention", statusReason: "snooze ended", state: "disconnected" }),
       thread("h", { status: "attention", statusReason: "finished", state: "disconnected", savedAtMs: 9 }),
+      thread("i", { status: "attention", statusReason: "permission: Bash ls", snoozedUntilMs: 9 }),
+      thread("j", { status: "attention", statusReason: "question: Which one?", savedAtMs: 9 }),
     ]);
     // e waits (a finished turn) but is archived, f is snoozed, h saved: not counted. g woke: counted.
-    expect(attentionIds(d)).toEqual(["a", "b", "g"]);
+    // i and j are snoozed, but a thread's message started them and they ask: counted, the snooze held.
+    expect(attentionIds(d)).toEqual(["a", "b", "g", "i", "j"]);
   });
 
   it("attentionIds leaves out a child thread while its creator exists; orphaned, a waiting one counts (docs/notes/no-sidebar-override-1-gui.md)", () => {
