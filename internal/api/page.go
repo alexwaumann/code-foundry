@@ -114,20 +114,27 @@ func (h *Page) ProxyFetch(ctx context.Context, req *connect.Request[v1.PageProxy
 
 // PageAccessProto is a page's access as the API says it.
 func PageAccessProto(a page.Access) *v1.PageAccess {
-	out := &v1.PageAccess{Path: a.Path, OwnerThread: a.Owner, Answer: consentProto(a.Consent)}
-	switch {
-	case a.Recorded != "" && a.How == page.Written:
-		out.OwnerSource = v1.PageOwnerSource_PAGE_OWNER_SOURCE_WRITTEN
-	case a.Recorded != "":
-		out.OwnerSource = v1.PageOwnerSource_PAGE_OWNER_SOURCE_SHOWN
-	case a.PagesThread != "":
-		out.OwnerSource = v1.PageOwnerSource_PAGE_OWNER_SOURCE_PAGES_DIRECTORY
+	out := &v1.PageAccess{Path: a.Path, OwnerThread: a.Owner, OwnerSource: ownerSourceProto(a.How()), Answer: consentProto(a.Consent), StoragePerFile: true}
+	for _, o := range a.Owners {
+		out.Owners = append(out.Owners, &v1.PageOwner{ThreadId: o.Thread, Source: ownerSourceProto(o.How)})
 	}
 	out.Consent = out.Answer
 	if a.Owner != "" {
 		out.Consent = v1.PageConsent_PAGE_CONSENT_OWNED
 	}
 	return out
+}
+
+func ownerSourceProto(how string) v1.PageOwnerSource {
+	switch how {
+	case page.Written:
+		return v1.PageOwnerSource_PAGE_OWNER_SOURCE_WRITTEN
+	case page.Shown:
+		return v1.PageOwnerSource_PAGE_OWNER_SOURCE_SHOWN
+	case page.PagesDirectory:
+		return v1.PageOwnerSource_PAGE_OWNER_SOURCE_PAGES_DIRECTORY
+	}
+	return v1.PageOwnerSource_PAGE_OWNER_SOURCE_UNSPECIFIED
 }
 
 func consentProto(c page.Consent) v1.PageConsent {

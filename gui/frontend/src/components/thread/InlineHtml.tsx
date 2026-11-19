@@ -6,6 +6,7 @@ import { CodeBody } from "@/components/files/CodeBody";
 import { HtmlFrame } from "@/components/files/HtmlFrame";
 import { PageErrors } from "@/components/files/PageErrors";
 import { usePreviewGrant, type PreviewGrant } from "@/components/files/previewGrant";
+import { pageStoragePath } from "@/components/files/usePageThread";
 import { useFileChanges, useTabRead } from "@/components/files/useTabRead";
 import { Button } from "@/components/ui/button";
 import { Tip } from "@/components/ui/tooltip";
@@ -44,6 +45,11 @@ import { HoldTopContext, PaneOverlayContext, useThreadCtx } from "./context";
  * follows it up to 60% of the pane, else 420px (lib/inlinePage.ts). Open by default, and
  * the turn's fold never closes it: only its row does (docs/notes/thread-fold-5-text-and-html.md).
  * A closed card and a row scrolled away (the timeline is virtualized) hold no frame.
+ *
+ * The card acts for its thread, whoever else owns the page, and keeps the page's cf.storage
+ * for its file (docs/notes/page-storage-per-file.md): "Open in a tab" opens it beside the thread,
+ * where the tab, linked to this thread (an owner: it showed the page), acts for it too, with
+ * the same data.
  *
  * One live instance per file (docs/notes/inline-page-shows.md): an earlier show of a page
  * shown again later is a one-line link row to the latest card (lib/threadTimeline
@@ -191,7 +197,21 @@ function CardBody({
     );
   if (source) return <SourceView page={page} height={height} version={version} />;
   if (covered) return <div className="bg-cf-surface" style={{ height }} data-testid="thread-html-covered" />;
-  return <HtmlFrame key={version} url={grant.preview.url} scope={grantScope(grant)} name={page.title || page.name} thread={threadId} style={{ height }} onResize={onResize} onPageErrors={onPageErrors} testId="thread-html-frame" />;
+  // The card acts for its thread; the page's storage is its file's (the daemon's grant says so), as in a tab opened from it.
+  return (
+    <HtmlFrame
+      key={version}
+      url={grant.preview.url}
+      scope={grantScope(grant)}
+      name={page.title || page.name}
+      thread={threadId}
+      storagePath={pageStoragePath(grant.preview.page)}
+      style={{ height }}
+      onResize={onResize}
+      onPageErrors={onPageErrors}
+      testId="thread-html-frame"
+    />
+  );
 }
 
 /** The file read-only as code (the File tab's code view), or why it cannot be read. */

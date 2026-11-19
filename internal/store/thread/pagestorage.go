@@ -8,13 +8,13 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/pagestorage"
 )
 
-// A thread's page storage: what the pages it shows keep with the bridge's cf.storage
-// (docs/notes/bridge-fix-storage.md). WebKit keeps a cross-site frame's localStorage in
-// memory for the session only, so the GUI host forwards every write here and hands a
-// page the whole map when it loads. One JSON object per thread (key → the value's JSON
-// text) in <PageStorageRoot>/<thread id>/storage.json, written atomically
-// (internal/pagestorage); reads and writes are serialized (Manager.pageStore). A page no
-// thread owns keeps its own instead (internal/store/page).
+// A thread's own page storage: where the pages it showed kept cf.storage before a page's
+// storage became its file's (docs/notes/bridge-fix-storage.md, page-storage-per-file.md).
+// One JSON object per thread (key → the value's JSON text) in
+// <PageStorageRoot>/<thread id>/storage.json, written atomically (internal/pagestorage);
+// reads and writes are serialized (Manager.pageStore). The page store carries it into the
+// pages' storage once (internal/store/page carry.go) and never writes it; it is kept, and
+// answered, for a GUI older than storage per file, and removed with its thread.
 
 const (
 	// PageStorageMax caps one thread's page storage, as the file it is written to.

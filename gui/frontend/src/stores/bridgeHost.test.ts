@@ -76,7 +76,7 @@ const archiveConfirm = new NeedsConfirm({ command: "thread.archive", title: "Arc
 
 const thread = (id: string, name: string): ThreadView => ({ id, name, projectId: "", worktreePath: "", workspaceId: "" }) as ThreadView;
 
-function host(threadId: string | null = "t-1", page?: PageBridge) {
+function host(threadId: string | null = "t-1", page?: PageBridge, storagePath?: string) {
   const posts: Record<string, unknown>[] = [];
   const errors: { call: string; code: string; message: string }[] = [];
   const attention = { present: true };
@@ -85,6 +85,7 @@ function host(threadId: string | null = "t-1", page?: PageBridge) {
   const h = createBridgeHost({
     threadId,
     ...(page ? { page } : {}),
+    ...(storagePath ? { storagePath } : {}),
     pageName: "page.html",
     pagePath: "/Users/me/p/page.html",
     userPresent: () => attention.present,
@@ -1097,5 +1098,73 @@ describe("bridge host: the page's access changed elsewhere", () => {
       expect(posts).toContainEqual(expect.objectContaining({ type: "cf:ready" }));
     });
     expect(stale.n).toBe(1);
+  });
+});
+
+// docs/notes/page-storage-per-file.md: a page acting for a thread keeps cf.storage for its
+// file when the daemon keeps it per file, so a card and the tab opened from it, or two threads'
+// views of the page, are one storage. (ownership fuzz #1, thread-pages #1, bridge-gui #1 and #5,
+// author-docs #1.)
+describe("bridge host: storage per page file", () => {
+  const FILE = "/Users/me/notes/board.html";
+
+  it("a thread's page reads and writes its file's storage, not its thread's", async () => {
+    fileStore.values.set(FILE, { cards: '["plan trip"]' });
+    pageStore.values.set("t-1", { other: "7" });
+    const { h, posts } = host("t-1", undefined, FILE);
+    h.receive(hello);
+    await vi.waitFor(() => {
+      expect(posts.find((p) => p.type === "cf:ready")).toMatchObject({ thread: { id: "t-1" }, storage: { cards: '["plan trip"]' }, can: { storage: true, fetch: true } });
+    });
+    h.receive({ cf: 1, type: "cf:store", id: "w", key: "n", value: "1" });
+    await vi.waitFor(() => {
+      expect(posts).toContainEqual(expect.objectContaining({ type: "cf:result", id: "w", ok: true }));
+    });
+    expect(fileStore.sets).toEqual([`${FILE} n`]);
+    expect(pageStore.sets).toEqual([]);
+  });
+
+  it("a card and a tab of the same file, acting for two threads, hear each other's writes; another file or a thread's own storage does not", async () => {
+    const card = host("t-1", undefined, FILE);
+    const tab = host("t-2", undefined, FILE);
+    const other = host("t-1", undefined, "/Users/me/notes/other.html");
+    const old = host("t-1");
+    card.h.receive({ cf: 1, type: "cf:store", id: "w", key: "n", value: "5" });
+    await vi.waitFor(() => {
+      expect(tab.posts).toContainEqual({ type: "cf:storage", values: { n: "5" } });
+    });
+    expect(other.posts).toEqual([]);
+    expect(old.posts).toEqual([]);
+    tab.h.receive(hello);
+    await vi.waitFor(() => {
+      expect(tab.posts.find((p) => p.type === "cf:ready")).toMatchObject({ thread: { id: "t-2" }, storage: { n: "5" } });
+    });
+  });
+
+  it("a document that goes on to another file of the page's own in the frame keeps the page's storage", async () => {
+    const { h, posts } = host("t-1", undefined, FILE);
+    h.receive(hello);
+    h.receive({ cf: 1, type: "cf:store", id: "w", key: "n", value: "2" });
+    await vi.waitFor(() => {
+      expect(posts).toContainEqual(expect.objectContaining({ type: "cf:result", id: "w", ok: true }));
+    });
+    // The page's next file says goodbye, then hello, in the same frame.
+    h.receive({ cf: 1, type: "cf:bye" });
+    h.loaded();
+    h.receive(hello);
+    await vi.waitFor(() => {
+      expect(posts.filter((p) => p.type === "cf:ready")).toHaveLength(2);
+    });
+    expect(posts.filter((p) => p.type === "cf:ready").at(-1)).toMatchObject({ storage: { n: "2" } });
+  });
+
+  it("a write the daemon refuses because the page may not use it any more asks for the grant", async () => {
+    fileStore.refuse = new ConnectError("the user did not allow it", Code.PermissionDenied);
+    const { h, posts, stale } = host("t-1", undefined, FILE);
+    h.receive({ cf: 1, type: "cf:store", id: "w", key: "k", value: "1" });
+    await vi.waitFor(() => {
+      expect(stale.n).toBe(1);
+    });
+    expect(posts).toContainEqual(expect.objectContaining({ type: "cf:result", id: "w", ok: false }));
   });
 });

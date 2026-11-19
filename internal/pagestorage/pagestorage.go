@@ -1,8 +1,9 @@
 // Package pagestorage is the file a page's cf.storage is kept in: one JSON object (key →
-// the value's JSON text) in <dir>/storage.json, at most Max bytes, written atomically. A
-// thread's pages share one (internal/store/thread, docs/notes/bridge-fix-storage.md); a
-// page no thread owns has its own (internal/store/page, docs/notes/page-ownership-daemon.md).
-// The caller serializes reads and writes of one directory.
+// the value's JSON text) in <dir>/storage.json, at most Max bytes, written atomically. Each
+// page file has its own (internal/store/page, docs/notes/page-storage-per-file.md); each
+// thread still has the one its pages shared before (internal/store/thread,
+// docs/notes/bridge-fix-storage.md), read by an older GUI. The caller serializes reads and
+// writes of one directory.
 package pagestorage
 
 import (

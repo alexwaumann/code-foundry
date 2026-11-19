@@ -1,8 +1,9 @@
 /**
  * ThreadService.PageStorage / SetPageStorage (docs/notes/bridge-fix-storage.md): each
- * thread's page storage, in memory for the mock's life (so a page's value outlives its
- * frame, as the daemon's file does); emptied on reset. Full past 256 KiB per thread, as
- * the daemon.
+ * thread's own page storage, in memory for the mock's life; emptied on reset. Full past 256
+ * KiB per thread, as the daemon. The GUI keeps a page's storage for its file instead
+ * (PageService, mock/pages.ts; docs/notes/page-storage-per-file.md): this answers for an
+ * older GUI, as the daemon's does.
  */
 import { Code, ConnectError } from "@connectrpc/connect";
 

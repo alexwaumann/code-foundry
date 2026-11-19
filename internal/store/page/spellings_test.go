@@ -101,7 +101,7 @@ func TestRowsUnderOlderSpellings(t *testing.T) {
 		sql  string
 		args []any
 	}{
-		{`INSERT INTO page_owners (path, thread_id, how, updated_at) VALUES (?, 't-b', 'shown', 5)`, []any{lower}},
+		{`INSERT INTO page_owners (path, thread_id, how, first_at, updated_at) VALUES (?, 't-b', 'shown', 5, 5)`, []any{lower}},
 		{`INSERT INTO page_consent (path, allowed, updated_at) VALUES (?, 1, 5)`, []any{nfc}},
 		{`INSERT INTO page_consent (path, allowed, updated_at) VALUES (?, 0, 3)`, []any{lower}},
 	} {
@@ -121,7 +121,7 @@ func TestRowsUnderOlderSpellings(t *testing.T) {
 	}
 
 	a := e.access(board)
-	if a.Path != board || a.Recorded != "t-b" || a.Consent != Allowed {
+	if a.Path != board || !a.Owns("t-b") || a.Consent != Allowed {
 		t.Fatalf("older rows: %+v; want t-b's, allowed (the newest answer), keyed %s", a, board)
 	}
 	e.gone["t-b"] = true

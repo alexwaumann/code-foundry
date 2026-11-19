@@ -25,9 +25,10 @@ import { FileEmptyState, FileLoading } from "./states";
  * it loaded under its scope is written (its stylesheet, its script). A footer says what the
  * page can reach.
  *
- * Whom the page acts for comes with the grant (usePageThread; docs/notes/page-ownership-gui.md):
- * its owning thread's bridge, named in the footer when that is not the tab's thread; for a
- * page no thread owns, the user's answer. A page not asked about yet that loads the bridge
+ * Whom the page acts for comes with the grant (usePageThread; docs/notes/page-ownership-gui.md,
+ * page-storage-per-file.md): the tab's own thread when it owns the page, else the page's first
+ * owner, named in the footer when that is not the tab's thread; for a page no thread owns, the
+ * user's answer. Its storage is its file's either way. A page not asked about yet that loads the bridge
  * gets the band (PageConsentBand) above it; the footer shows the answer and changes it
  * (Stop allowing, Allow Code Foundry). The tab follows the daemon's word about the page
  * whenever it changes (docs/notes/page-access-live.md): an answer given anywhere or a new or
@@ -98,6 +99,7 @@ export function HtmlPreview({ path, text, name, page: own, reloads = 0 }: { path
         scope={grant.preview.singleFile ? null : grant.preview.scope}
         name={page.title || name}
         thread={page.thread}
+        storagePath={page.storagePath}
         page={page.bridge}
         pagePath={access?.path || path}
         onAsk={() => {

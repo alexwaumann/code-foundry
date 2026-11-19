@@ -171,15 +171,18 @@ func (p Paths) Search() string { return filepath.Join(p.home, "search") }
 func (p Paths) Pages() string { return filepath.Join(p.home, "pages") }
 
 // PageStorage holds one directory per thread, named by its id, with what that thread's
-// pages keep through the bridge's cf.storage (internal/store/thread pagestorage.go).
-// Removed with the thread. Not under Pages: the preview route serves that, and a page's
-// stored values (an API token) are not a page's to fetch as a file.
+// pages kept through the bridge's cf.storage before it was kept per page file
+// (internal/store/thread pagestorage.go; docs/notes/page-storage-per-file.md): carried
+// over to the pages once, read by an older GUI, never rewritten. Removed with the thread.
+// Not under Pages: the preview route serves that, and a page's stored values (an API
+// token) are not a page's to fetch as a file.
 func (p Paths) PageStorage() string { return filepath.Join(p.home, "page-storage") }
 
-// PageFileStorage holds what each page no thread owns keeps through cf.storage, one
-// directory per page file, named by a hash of its path (internal/store/page). Removed when
-// the page's file is gone, at the daemon's start. Not under PageStorage, whose directories
-// are threads' and are reaped when no thread has their name.
+// PageFileStorage holds what each page keeps through cf.storage, whichever thread it acts
+// for, one directory per page file, named by a hash of its path (internal/store/page).
+// Removed when the page's file has been gone 30 days (at the daemon's start), or with the
+// thread whose pages directory held it. Not under PageStorage, whose directories are
+// threads' and are reaped when no thread has their name.
 func (p Paths) PageFileStorage() string { return filepath.Join(p.home, "page-file-storage") }
 
 // Residents holds each resident thread's own directory, its cwd: <Residents>/<name>

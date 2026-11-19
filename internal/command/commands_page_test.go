@@ -2,6 +2,7 @@ package command_test
 
 import (
 	"context"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -28,9 +29,11 @@ func pageRegistry(t *testing.T, b command.PageBackend) *command.Registry {
 func TestPageCommands(t *testing.T) {
 	ctx := context.Background()
 	b := &pagetest.Backend{Pages: map[string]page.Access{
-		"/h/owned.html": {Path: "/h/owned.html", Owner: "t-1", Recorded: "t-1", How: page.Written},
-		"/h/dir.html":   {Path: "/h/dir.html", Owner: "t-2", PagesThread: "t-2"},
-		"/h/new.html":   {Path: "/h/new.html"},
+		"/h/owned.html": {Path: "/h/owned.html", Owner: "t-1", Owners: []page.Owner{{Thread: "t-1", How: page.Written}}},
+		"/h/dir.html":   {Path: "/h/dir.html", Owner: "t-2", PagesThread: "t-2", Owners: []page.Owner{{Thread: "t-2", How: page.PagesDirectory}}},
+		"/h/many.html": {Path: "/h/many.html", Owner: "t-2", PagesThread: "t-2",
+			Owners: []page.Owner{{Thread: "t-2", How: page.PagesDirectory}, {Thread: "t-1", How: page.Shown}}},
+		"/h/new.html": {Path: "/h/new.html"},
 	}}
 	reg := pageRegistry(t, b)
 	app, cli, pg := command.Context{ActiveView: "thread"}, command.Context{Origin: command.OriginCLI}, command.Context{Origin: command.OriginPage, ActiveThreadID: "t-1"}
@@ -45,10 +48,14 @@ func TestPageCommands(t *testing.T) {
 		code    connect.Code
 	}{
 		{name: "an owned page", uctx: cli, verb: "page.get", path: "/h/owned.html",
-			want:    command.PageView{Path: "/h/owned.html", OwnerThread: "t-1", OwnerSource: "written", Consent: "owned", Answer: "not-asked"},
-			wantMsg: "owner: thread t-1 (it last wrote the page)"},
+			want:    command.PageView{Path: "/h/owned.html", OwnerThread: "t-1", OwnerSource: "written", Owners: owners("t-1", "written"), Consent: "owned", Answer: "not-asked"},
+			wantMsg: "owner: thread t-1 (it wrote the page)"},
 		{name: "a pages directory's", uctx: cli, verb: "page.get", path: "/h/dir.html",
-			want: command.PageView{Path: "/h/dir.html", OwnerThread: "t-2", OwnerSource: "pages-directory", Consent: "owned", Answer: "not-asked"}},
+			want: command.PageView{Path: "/h/dir.html", OwnerThread: "t-2", OwnerSource: "pages-directory", Owners: owners("t-2", "pages-directory"), Consent: "owned", Answer: "not-asked"}},
+		{name: "many owners", uctx: cli, verb: "page.get", path: "/h/many.html",
+			want: command.PageView{Path: "/h/many.html", OwnerThread: "t-2", OwnerSource: "pages-directory",
+				Owners: owners("t-2", "pages-directory", "t-1", "shown"), Consent: "owned", Answer: "not-asked"},
+			wantMsg: "owners: thread t-2 (its pages directory), thread t-1 (it showed the page): a view of one of them acts for that thread, any other for t-2"},
 		{name: "not asked", uctx: app, verb: "page.get", path: "/h/new.html",
 			want: command.PageView{Path: "/h/new.html", Consent: "not-asked", Answer: "not-asked"}, wantMsg: "answer: not asked: the page gets no bridge"},
 		{name: "a page may read it", uctx: pg, verb: "page.get", path: "/h/new.html",
@@ -60,7 +67,7 @@ func TestPageCommands(t *testing.T) {
 		{name: "allow after refusing", uctx: cli, verb: "page.allow", path: "/h/new.html",
 			want: command.PageView{Path: "/h/new.html", Consent: "allowed", Answer: "allowed"}},
 		{name: "an owned page keeps the answer for later", uctx: app, verb: "page.disallow", path: "/h/owned.html",
-			want:    command.PageView{Path: "/h/owned.html", OwnerThread: "t-1", OwnerSource: "written", Consent: "owned", Answer: "refused"},
+			want:    command.PageView{Path: "/h/owned.html", OwnerThread: "t-1", OwnerSource: "written", Owners: owners("t-1", "written"), Consent: "owned", Answer: "refused"},
 			wantMsg: "counts once no thread owns the page"},
 		{name: "a page cannot allow itself", uctx: pg, verb: "page.allow", path: "/h/new.html", code: connect.CodePermissionDenied},
 		{name: "nor stop another", uctx: pg, verb: "page.disallow", path: "/h/new.html", code: connect.CodePermissionDenied},
@@ -80,7 +87,11 @@ func TestPageCommands(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if got, _ := res.JSON.(command.PageView); got != tt.want {
+			want := tt.want
+			if want.Owners == nil {
+				want.Owners = []command.PageOwnerView{}
+			}
+			if got, _ := res.JSON.(command.PageView); !reflect.DeepEqual(got, want) {
 				t.Errorf("JSON = %+v, want %+v", got, tt.want)
 			}
 			if !strings.Contains(res.Message, tt.wantMsg) || !strings.HasPrefix(res.Message, tt.path+"\n") {
@@ -92,6 +103,15 @@ func TestPageCommands(t *testing.T) {
 	if a, _ := b.Access(ctx, "/h/new.html"); a.Consent != page.Allowed {
 		t.Errorf("after the page's calls: %v", a.Consent)
 	}
+}
+
+// owners are PageView owners from thread, source pairs.
+func owners(pairs ...string) []command.PageOwnerView {
+	out := []command.PageOwnerView{}
+	for i := 0; i+1 < len(pairs); i += 2 {
+		out = append(out, command.PageOwnerView{Thread: pairs[i], Source: pairs[i+1]})
+	}
+	return out
 }
 
 func TestPageCommandErrors(t *testing.T) {

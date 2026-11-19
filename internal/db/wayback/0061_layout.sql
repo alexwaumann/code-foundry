@@ -21,7 +21,10 @@
 -- (docs/notes/snooze-until-event.md); 0066 (auto-tidy's state per thread) loses its marks, so
 -- threads it saved read as saved by the user (docs/notes/auto-tidy.md); 0067 (pages' owners
 -- and the user's answers for pages) loses them, so a page outside a thread's pages directory
--- is asked about again (docs/notes/page-ownership-daemon.md).
+-- is asked about again (docs/notes/page-ownership-daemon.md); 0068 (a page's many owners and
+-- what is left to carry into its storage) goes with them. The pages' storage on disk stays
+-- (page-file-storage/), and the older build reads a thread's page's storage from the thread's
+-- own file again (page-storage/), which 0068 never rewrote (docs/notes/page-storage-per-file.md).
 BEGIN;
 DROP TABLE IF EXISTS layout_spaces;
 DROP TABLE IF EXISTS layout_threads;
@@ -33,5 +36,6 @@ DROP TABLE IF EXISTS snooze_recent_events;
 DROP TABLE IF EXISTS thread_tidy;
 DROP TABLE IF EXISTS page_owners;
 DROP TABLE IF EXISTS page_consent;
-DELETE FROM schema_migrations WHERE version IN (61, 62, 63, 64, 65, 66, 67);
+DROP TABLE IF EXISTS page_storage_carry;
+DELETE FROM schema_migrations WHERE version IN (61, 62, 63, 64, 65, 66, 67, 68);
 COMMIT;

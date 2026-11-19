@@ -5,7 +5,7 @@ import type { FilePreview } from "@/api/files";
 import type { PageAccessView } from "@/api/page";
 import { PanelKeyContext } from "@/shell/panelKeyContext";
 import { useThreadStore } from "@/stores/thread";
-import { usePageThread, type PageOf } from "./usePageThread";
+import { pageStoragePath, usePageThread, type PageOf } from "./usePageThread";
 
 const PAGE = "/Users/me/p/welcome.html";
 
@@ -15,15 +15,15 @@ function inPanel(key: string) {
 
 const grant = (pageThread: string, page: PageAccessView | null = null): FilePreview => ({ url: "http://127.0.0.1:1/preview/g/welcome.html", scope: "/Users/me/p", singleFile: false, pageThread, page });
 
-const access = (over: Partial<PageAccessView>): PageAccessView => ({ path: PAGE, ownerThread: "", ownerSource: "", consent: "not-asked", answer: "not-asked", unavailableReason: "", ...over });
+const access = (over: Partial<PageAccessView>): PageAccessView => ({ path: PAGE, ownerThread: "", ownerSource: "", owners: [], storagePerFile: false, consent: "not-asked", answer: "not-asked", unavailableReason: "", ...over });
 
 afterEach(() => {
   useThreadStore.setState({ logs: {} });
 });
 
 describe("usePageThread: a daemon older than page ownership (no page in the grant)", () => {
-  const none: PageOf = { thread: null, title: "", actsFor: "", access: null };
-  const of = (thread: string, title: string): PageOf => ({ thread, title, actsFor: "", access: null });
+  const none: PageOf = { thread: null, title: "", actsFor: "", access: null, storagePath: null };
+  const of = (thread: string, title: string): PageOf => ({ thread, title, actsFor: "", access: null, storagePath: null });
   it.each([
     ["a thread's own page (view.panel.page), titled", "thread:s-1", { title: "Welcome" }, of("s-1", "Welcome"), ""],
     ["a thread's own page, untitled", "thread:s-1", { title: "" }, of("s-1", ""), ""],
@@ -75,5 +75,39 @@ describe("usePageThread: the daemon's word (docs/notes/page-ownership-gui.md)", 
     useThreadStore.setState({ logs: { "s-2": { byId: { h: { kind: "html", id: "h", path: PAGE, baseDir: "", title: "Board" } } } } } as never);
     const { result } = renderHook(() => usePageThread(PAGE, undefined, grant("", access({ consent: "owned", ownerThread: "s-2" }))), { wrapper: inPanel("thread:s-1") });
     expect(result.current).toMatchObject({ thread: "s-2", title: "Board", actsFor: "s-2" });
+  });
+});
+
+// docs/notes/page-storage-per-file.md: a page many threads own acts for the tab's own thread when
+// it is one of them, else for the first owner; its storage is its file's when the daemon says so.
+// (thread-pages fuzz #1 and author-docs #1: a card and the tab opened from it acted for two threads.)
+describe("usePageThread: many owners", () => {
+  const owners = [
+    { thread: "s-1", source: "written" as const },
+    { thread: "s-2", source: "shown" as const },
+  ];
+  const owned = (over: Partial<PageAccessView> = {}) => access({ consent: "owned", ownerThread: "s-1", ownerSource: "written", owners, storagePerFile: true, ...over });
+  it.each([
+    ["the tab's thread is the first owner", "thread:s-1", owned(), { thread: "s-1", actsFor: "", storagePath: PAGE }],
+    ["the tab's thread is a later owner: it acts for it (a card's tab), nobody named", "thread:s-2", owned(), { thread: "s-2", actsFor: "", storagePath: PAGE }],
+    ["another thread's tab: the first owner, named", "thread:s-3", owned(), { thread: "s-1", actsFor: "s-1", storagePath: PAGE }],
+    ["an unlinked tab: the first owner, named", "", owned(), { thread: "s-1", actsFor: "s-1", storagePath: PAGE }],
+    ["an older daemon: the thread's own storage", "thread:s-2", owned({ storagePerFile: false }), { thread: "s-2", actsFor: "", storagePath: null }],
+    ["allowed, no owner: the page's own storage through its bridge", "thread:s-2", access({ consent: "allowed", answer: "allowed", storagePerFile: true }), { thread: null, storagePath: null, bridge: { kind: "allowed", path: PAGE } }],
+  ])("%s", (_name, key, page, want) => {
+    const { result } = renderHook(() => usePageThread(PAGE, undefined, grant("", page)), { wrapper: inPanel(key) });
+    expect(result.current).toMatchObject(want);
+  });
+
+  it.each([
+    ["owned, per file", owned(), PAGE],
+    ["allowed, per file", access({ consent: "allowed", answer: "allowed", storagePerFile: true }), PAGE],
+    ["owned, an older daemon", owned({ storagePerFile: false }), null],
+    ["not asked", access({ storagePerFile: true }), null],
+    ["refused", access({ consent: "refused", answer: "refused", storagePerFile: true }), null],
+    ["unavailable", access({ path: "", consent: "unavailable", storagePerFile: true }), null],
+    ["no word", null, null],
+  ])("pageStoragePath: %s", (_name, page, want) => {
+    expect(pageStoragePath(page)).toBe(want);
   });
 });

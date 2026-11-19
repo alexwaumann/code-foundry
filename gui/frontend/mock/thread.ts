@@ -1415,11 +1415,11 @@ export class MockThreadLogs {
   }
 
   /**
-   * The thread whose log last showed the page at `abs` (an html item), and when (ms); null for
-   * none: the owner PageService answers (mock/pages.ts; docs/notes/page-ownership-daemon.md).
+   * Every thread whose log showed the page at `abs` (an html item), with when it first did (ms):
+   * owners PageService answers (mock/pages.ts; docs/notes/page-storage-per-file.md).
    */
-  lastShown(abs: string): { threadId: string; at: number } | null {
-    let best: { threadId: string; at: number } | null = null;
+  shownBy(abs: string): { threadId: string; at: number }[] {
+    const out = new Map<string, number>();
     for (const [id, l] of this.logs) {
       for (const it of l.items) {
         if (it.payload?.case !== "html") continue;
@@ -1428,10 +1428,10 @@ export class MockThreadLogs {
         const full = path.startsWith("/") ? path : `${v.baseDir ?? ""}/${path}`;
         if (full.replace(/\/+/g, "/") !== abs) continue;
         const at = Number(it.createdAt?.seconds ?? 0n) * 1000;
-        if (!best || at >= best.at) best = { threadId: id, at };
+        out.set(id, Math.min(out.get(id) ?? at, at));
       }
     }
-    return best;
+    return [...out].map(([threadId, at]) => ({ threadId, at }));
   }
 
   /**

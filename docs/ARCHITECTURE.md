@@ -311,8 +311,9 @@ Services (v1):
   changed outside the conversation; `docs/notes/plugins-env-restart.md`), StopShell (one of
   the thread's background shells; `docs/notes/thread-servers.md`), ListPrompts (the user's
   earlier prompts; `docs/notes/prompt-history-1-daemon.md`), Search (§6) and AddNote (a
-  `note` item, no turn). ShowHtml, ShowTheme, PageStorage, SetPageStorage and ProxyFetch
-  serve the pages the model shows (§13).
+  `note` item, no turn). ShowHtml, ShowTheme and ProxyFetch serve the pages the model
+  shows (§13); PageStorage and SetPageStorage answer a thread's own page storage of before, for
+  an older GUI.
   The items snapshot and WatchThread also carry the thread's subagent runs (`agents`: every
   Agent run, foreground, background and nested, in spawn order, with live status,
   activity and report; `docs/notes/agents-1-daemon.md`).
@@ -1544,22 +1545,26 @@ tab's preview) run in sandboxed frames that never touch the API
   (`docs/notes/page-frame-links.md`, `docs/notes/page-preview-serving.md`). A frame that went to another site anyway is covered with
   Reload, and the bridge follows a page to its own other files (`docs/notes/leftovers-pages.md`). A page saves a file with `file.export`
   instead, into its thread's checkout, after the user allows it (`docs/notes/page-save.md`).
-* **Who owns a page** (`internal/store/page`, `docs/notes/page-ownership-daemon.md`): the
-  daemon records the thread that last showed a page file (`view.inline`, `view.open.page`)
-  or whose Claude last wrote it (Write, Edit, MultiEdit), keyed by its resolved path; a
-  thread's pages directory is its own. `PreviewFile` answers the owner, whose bridge the page
-  gets in any tab, and for a page no thread owns the user's answer, asked once per file and
-  set with `page.allow` / `page.disallow`. An allowed page with no owner gets the bridge
-  without a thread: `PageService` storage and fetch keyed by the file, which the daemon
-  refuses for a page not allowed. A removed thread's records go with its row. EventService's
-  `page` source names the pages whose owner or answer changed (and a removed thread), so
-  every open frame follows the daemon's answer now; a call from a page no thread owns names
-  it (`UiContext.page_path`) and Invoke refuses it unless the page is allowed
-  (`docs/notes/page-access-live.md`).
+* **Who owns a page** (`internal/store/page`, `docs/notes/page-ownership-daemon.md`,
+  `page-storage-per-file.md`): every thread that showed a page file (`view.inline`,
+  `view.open.page`) or whose Claude wrote it (Write, Edit, MultiEdit) owns it, one row each,
+  keyed by its resolved path, and so does the thread whose pages directory holds it. The first
+  owner (that thread, else the one that first showed or wrote it) is the page's default.
+  `PreviewFile` answers the owners and, for a page no thread owns, the user's answer, asked
+  once per file and set with `page.allow` / `page.disallow`. A thread's card acts for its
+  thread; a File tab for its own thread when that owns the page, else for the first owner. An
+  allowed page with no owner gets the bridge without a thread (`PageService` fetch, which the
+  daemon refuses for a page not allowed). A removed thread's claims go with its row; a page is
+  no thread's once none is left. EventService's `page` source names the pages that got an owner
+  or answer (and a removed thread), so every open frame follows the daemon's answer now; a call
+  from a page no thread owns names it (`UiContext.page_path`) and Invoke refuses it unless the
+  page is allowed (`docs/notes/page-access-live.md`).
 * **Page storage**: WebKit keeps a cross-site frame's localStorage for the session only, so
-  `cf.storage` writes go through the GUI to `ThreadService.SetPageStorage`, one JSON file per
-  thread (at most 256 KiB), handed back to a page as it loads (`PageStorage`;
-  `docs/notes/bridge-fix-storage.md`).
+  `cf.storage` goes through the GUI to `PageService.PageStorage/SetPageStorage`, one JSON file
+  per page file (at most 256 KiB) whichever thread the page acts for, handed back to a page as it
+  loads; the daemon allows it for an owned or allowed page. Each thread's own file of before
+  (`ThreadService.PageStorage`) was carried into its pages once (migration 0068) and still
+  answers an older GUI (`docs/notes/bridge-fix-storage.md`, `page-storage-per-file.md`).
 * **Proxy fetch**: `cf.fetch` is `ThreadService.ProxyFetch` (`internal/proxyfetch`): the daemon
   makes the request, so a page reaches an API that does not allow the pages origin. No
   cookies, Origin or Code Foundry token; never to loopback, link-local or the daemon's own

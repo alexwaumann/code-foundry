@@ -154,8 +154,8 @@ export interface PreviewGrant {
  * (FilesystemService.PreviewFile): `path` absolute, or relative to `baseDir`. Again when the
  * daemon restarts (its pid changes): grants die with it, and a frame reloading on a dead one
  * (a theme switch, an edit) would come back blank. Again when the daemon's word about the page
- * changed (stores/pageAnswers.ts: its owner or the user's answer, from any window or the CLI,
- * its owner removed, or the event stream connected again): the grant carries it
+ * changed (stores/pageAnswers.ts: a new owner or the user's answer, from any window or the CLI,
+ * one of its owners removed, or the event stream connected again): the grant carries it
  * (FilePreview.page; docs/notes/page-access-live.md). Again on `retry` (Retry, the tab's
  * Refresh, an edit of the file, a call the daemon refused as the page's access changed). The
  * grant's URL is the daemon's one per file, so reading it again reloads nothing by itself; the
@@ -173,9 +173,10 @@ export function usePreviewGrant(baseDir: string, path: string): PreviewGrant {
   // A change to this page since its grant came asks again; one before it does not.
   const page = current?.preview?.page;
   const pagePath = page?.path ?? "";
-  const owner = page?.consent === "owned" ? page.ownerThread : "";
-  const changes = usePageAnswers((s) => pageChanges(s, pagePath, owner));
-  const followed = `${pagePath}\u0000${owner}`;
+  // Every owner: removing any of them may change whom the page acts for (or leave it none).
+  const owners = page?.consent === "owned" ? [...new Set([page.ownerThread, ...page.owners.map((o) => o.thread)])].filter(Boolean).join("\u0000") : "";
+  const changes = usePageAnswers((s) => pageChanges(s, pagePath, owners ? owners.split("\u0000") : []));
+  const followed = `${pagePath}\u0000${owners}`;
   const [seen, setSeen] = useState({ followed: "", n: 0 });
   if (followed !== seen.followed) setSeen({ followed, n: changes });
   else if (changes !== seen.n) {

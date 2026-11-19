@@ -7,6 +7,11 @@ confirm dialog was open or queued, and the command still ran afterwards (high); 
 
 ## 1. Page storage
 
+> Since `page-storage-per-file.md`, a page's `cf.storage` is its file's, not its thread's: the
+> per-thread file below is kept (carried into the pages once, still answered for an older GUI,
+> never rewritten), and separate pages of one thread no longer share it. The sentences for the
+> skill and the capabilities line below are the ones of then.
+
 ### Why localStorage could not work
 
 The pages origin is `http://127.0.0.1:<pages port>` (since `page-preview-serving.md`, a

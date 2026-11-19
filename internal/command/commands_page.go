@@ -28,31 +28,48 @@ var _ PageBackend = (*pagestore.Store)(nil)
 
 const pageCategory = "Pages"
 
-// PageView is the page.* commands' JSON. OwnerSource is "shown", "written",
-// "pages-directory" or "" (no owner); Consent is "owned", "allowed", "refused" or
-// "not-asked" (whether the page may use the bridge); Answer is the user's own answer,
-// "allowed", "refused" or "not-asked", kept while a thread owns the page.
+// PageView is the page.* commands' JSON. OwnerThread is the page's first owner (its
+// default thread; docs/notes/page-storage-per-file.md) and Owners every owner, first
+// first; a source is "shown", "written", "pages-directory" or "" (no owner); Consent is
+// "owned", "allowed", "refused" or "not-asked" (whether the page may use the bridge);
+// Answer is the user's own answer, "allowed", "refused" or "not-asked", kept while a
+// thread owns the page.
 type PageView struct {
-	Path        string `json:"path"`
-	OwnerThread string `json:"owner_thread"`
-	OwnerSource string `json:"owner_source"`
-	Consent     string `json:"consent"`
-	Answer      string `json:"answer"`
+	Path        string          `json:"path"`
+	OwnerThread string          `json:"owner_thread"`
+	OwnerSource string          `json:"owner_source"`
+	Owners      []PageOwnerView `json:"owners"`
+	Consent     string          `json:"consent"`
+	Answer      string          `json:"answer"`
+}
+
+// PageOwnerView is one owner of a page in PageView.
+type PageOwnerView struct {
+	Thread string `json:"thread"`
+	Source string `json:"source"`
 }
 
 func pageView(a pagestore.Access) PageView {
-	v := PageView{Path: a.Path, OwnerThread: a.Owner, Answer: consentWord(a.Consent)}
-	switch {
-	case a.Recorded != "":
-		v.OwnerSource = a.How
-	case a.PagesThread != "":
-		v.OwnerSource = "pages-directory"
+	v := PageView{Path: a.Path, OwnerThread: a.Owner, OwnerSource: a.How(), Owners: []PageOwnerView{}, Answer: consentWord(a.Consent)}
+	for _, o := range a.Owners {
+		v.Owners = append(v.Owners, PageOwnerView{Thread: o.Thread, Source: o.How})
 	}
 	v.Consent = v.Answer
 	if a.Owner != "" {
 		v.Consent = "owned"
 	}
 	return v
+}
+
+// ownerWhy says how a thread owns a page.
+func ownerWhy(how string) string {
+	switch how {
+	case pagestore.Written:
+		return "it wrote the page"
+	case pagestore.PagesDirectory:
+		return "its pages directory"
+	}
+	return "it showed the page"
 }
 
 func consentWord(c pagestore.Consent) string {
@@ -63,17 +80,17 @@ func consentWord(c pagestore.Consent) string {
 func pageMessage(a pagestore.Access) string {
 	var b strings.Builder
 	b.WriteString(a.Path + "\n")
-	switch {
-	case a.Recorded != "":
-		did := "showed"
-		if a.How == pagestore.Written {
-			did = "wrote"
-		}
-		fmt.Fprintf(&b, "owner: thread %s (it last %s the page): the page gets its bridge", a.Owner, did)
-	case a.PagesThread != "":
-		fmt.Fprintf(&b, "owner: thread %s (its pages directory): the page gets its bridge", a.Owner)
-	default:
+	switch len(a.Owners) {
+	case 0:
 		b.WriteString("owner: none")
+	case 1:
+		fmt.Fprintf(&b, "owner: thread %s (%s): the page gets its bridge", a.Owner, ownerWhy(a.Owners[0].How))
+	default:
+		whys := make([]string, len(a.Owners))
+		for i, o := range a.Owners {
+			whys[i] = fmt.Sprintf("thread %s (%s)", o.Thread, ownerWhy(o.How))
+		}
+		fmt.Fprintf(&b, "owners: %s: a view of one of them acts for that thread, any other for %s", strings.Join(whys, ", "), a.Owner)
 	}
 	b.WriteString("\n")
 	switch a.Consent {
@@ -134,8 +151,8 @@ func RegisterPage(r *Registry, b PageBackend) error {
 			NoIndex:   true,
 			ReadOnly:  true,
 			Title:     "Show Page Owner",
-			Description: "Show which thread owns an HTML page (it last showed or wrote it, or the page is in its pages directory) " +
-				"and the user's answer for it: a page a thread owns gets that thread's bridge, any other the bridge without " +
+			Description: "Show which threads own an HTML page (each that showed or wrote it, and the thread whose pages directory " +
+				"holds it) and the user's answer for it: a page a thread owns gets a thread's bridge, any other the bridge without " +
 				"a thread once the user allows it.",
 			Category:     pageCategory,
 			NoKeybinding: true,

@@ -109,7 +109,7 @@ click or while nothing is hovered. A button acts on its row's id from when it wa
 ## State
 
 `cf.storage("<page name>")` (`get`, `set`, `remove`, `keys`, `clear`, JSON values) survives reloads and
-app restarts: keep what the user typed or chose. Pages this thread showed or wrote share it. Plain
+app restarts: keep what the user typed or chose. Each page file has its own. Plain
 `localStorage` is cleared when the app quits. An external API's token: a password field, kept in
 `cf.storage`, sent with `cf.fetch`.
 
