@@ -378,10 +378,27 @@ func (s *Store) SetStorage(ctx context.Context, path, key string, value *string)
 	return vals, nil
 }
 
-// Sweep removes the storage of every page whose file is gone (deleted or moved; a moved
-// page starts empty at its new path), and of a directory that does not say whose it is.
-// Owners and answers stay: they are rows, not files, and a file that comes back at its
-// path is the same page. New runs it once.
+// SweepAfter is how long a page's storage is kept after its last write once its file is
+// missing: long enough for a file that is only away (a branch not checked out, a volume
+// not mounted) to come back to what it stored.
+const SweepAfter = 30 * 24 * time.Hour
+
+// goneLong reports whether the page at real does not exist and its storage in dir was
+// last written more than SweepAfter ago (the path file is rewritten with every write).
+func (s *Store) goneLong(real, dir string) bool {
+	if _, err := os.Stat(real); !errors.Is(err, fs.ErrNotExist) {
+		return false
+	}
+	fi, err := os.Stat(filepath.Join(dir, pathFile))
+	return err == nil && s.o.Now().Sub(fi.ModTime()) > SweepAfter
+}
+
+// Sweep removes the storage of every page whose file does not exist (deleted or moved; a
+// moved page starts empty at its new path) and that was last written more than SweepAfter
+// ago, and of a directory that does not say whose it is. A file that cannot be looked at
+// (no permission, its volume away) is not known to be gone: its storage stays. Owners and
+// answers stay: they are rows, not files, and a file that comes back at its path is the
+// same page. New runs it once.
 func (s *Store) Sweep(_ context.Context) {
 	if s.o.StorageRoot == "" {
 		return
@@ -404,8 +421,7 @@ func (s *Store) Sweep(_ context.Context) {
 		keep := false
 		if err == nil {
 			real := string(b)
-			_, statErr := os.Stat(real)
-			keep = filepath.IsAbs(real) && s.storageDir(real) == dir && statErr == nil
+			keep = filepath.IsAbs(real) && s.storageDir(real) == dir && !s.goneLong(real, dir)
 		}
 		if keep {
 			continue

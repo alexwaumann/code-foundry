@@ -392,7 +392,8 @@ func TestStorage(t *testing.T) {
 	}
 }
 
-// A page's storage goes at the next start once its file is gone; another page's stays.
+// A page's storage goes at a start once its file has been gone and unwritten for
+// SweepAfter; before that it stays (the file may only be away); another page's stays.
 func TestSweep(t *testing.T) {
 	ctx := context.Background()
 	e := newEnv(t)
@@ -413,6 +414,14 @@ func TestSweep(t *testing.T) {
 	if err := os.Remove(gone); err != nil {
 		t.Fatal(err)
 	}
+	e.now = time.Now()
+	e.open()
+	for dir, want := range map[string]bool{e.s.storageDir(real(t, keep)): true, goneDir: true, stray: false} {
+		if _, err := os.Stat(dir); (err == nil) != want {
+			t.Errorf("gone a moment, %s: exists %v, want %v", dir, err == nil, want)
+		}
+	}
+	e.now = time.Now().Add(SweepAfter + time.Hour)
 	e.open()
 	for dir, want := range map[string]bool{e.s.storageDir(real(t, keep)): true, goneDir: false, stray: false} {
 		if _, err := os.Stat(dir); (err == nil) != want {

@@ -148,11 +148,14 @@ answers, not an agent's work; the guide was also at its budget), page class `Pag
   a thread's, now shared in `internal/pagestorage`) and `path` (the page it is for). Not
   under `page-storage/`, whose directories are reaped when no thread has their name.
 - **A deleted or moved file**: at each daemon start the store removes the storage of every
-  page whose file is gone (and any directory that does not say whose it is). A moved page
+  page whose file does not exist and whose storage was last written more than 30 days ago
+  (`page.SweepAfter`), and any directory that does not say whose it is. A moved page
   starts empty at its new path and is asked about again there (the answer is per path).
   Owner and answer rows stay: they are small, and a file that comes back at its path (a
-  branch switch) is the same page. A page missing at the moment the daemon starts (a branch
-  that does not have it checked out) loses its storage; its answer stays.
+  branch switch) is the same page, with its storage if it came back within the 30 days.
+  A file that cannot be looked at (no permission, its volume not mounted) is not known to
+  be gone, so its storage stays. (The first version swept at once on any stat error, which
+  would have emptied a page whose branch was not checked out when the daemon started.)
 
 ## Decisions the brief left open
 
