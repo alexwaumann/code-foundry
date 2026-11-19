@@ -12,7 +12,7 @@ import { moveSpace, renameSpace, switchSpace } from "@/shell/spaceActions";
 import { reorderIndex } from "@/shell/spaces";
 import { useLayoutStore } from "@/stores/layout";
 import { openRemoveSpaceDialog } from "@/stores/removeSpaceDialog";
-import { useNeedsBySpace } from "@/stores/shellList";
+import { useNeedsBySpace, useNeedsScope } from "@/stores/shellList";
 import { SpaceIcon } from "./SpaceIcon";
 
 /** The name field over a tab being renamed: Enter or leaving it renames, Escape keeps the name. */
@@ -61,9 +61,10 @@ interface SpaceTabProps {
 }
 
 /**
- * One space in the top bar: its layout glyph, its name and, when threads in it need the user, their
- * count. The current one is filled with the theme's accent, so it is the loudest thing in the bar. A click shows it; a double click or its menu renames it; its menu removes it (not the last
- * one); it drags to reorder. While a tab or a pane of the grid is dragged over it, it is marked: a
+ * One space in the top bar: its layout glyph, its name and its count of threads that need the user
+ * (0 draws none; SpaceTabs decides which tabs get one). The current one is filled with the theme's
+ * accent, so it is the loudest thing in the bar. A click shows it; a double click or its menu
+ * renames it; its menu removes it (not the last one); it drags to reorder. While a tab or a pane of the grid is dragged over it, it is marked: a
  * drop moves them to this space (ShellDnd).
  */
 function SpaceTab({ spaceId, current, count, only, renaming, onRename }: SpaceTabProps) {
@@ -130,11 +131,7 @@ function SpaceTab({ spaceId, current, count, only, renaming, onRename }: SpaceTa
           )}
           {count > 0 && (
             <span
-              className={cn(
-                "flex h-4 min-w-4 shrink-0 items-center justify-center rounded-full px-1 text-caption-sm font-medium tabular-nums",
-                // On the current tab's accent fill the warning tint would not read: the count takes the tab's own foreground.
-                filled && !dropping ? "bg-cf-accent-foreground/20 text-cf-accent-foreground" : "bg-cf-warning-surface text-cf-warning-text",
-              )}
+              className="flex h-4 min-w-4 shrink-0 items-center justify-center rounded-full bg-cf-warning-surface px-1 text-caption-sm font-medium text-cf-warning-text tabular-nums"
               aria-label={`${String(count)} ${count === 1 ? "thread needs" : "threads need"} you`}
               data-testid="space-tab-count"
             >
@@ -181,6 +178,9 @@ function SpaceTab({ spaceId, current, count, only, renaming, onRename }: SpaceTa
 /**
  * The space tabs of the top bar, in their order: a quiet row, the current one a solid accent pill. A switch is
  * instant: nothing here animates.
+ * A tab's count says what the sidebar's Needs you does not list (docs/notes/space-tab-counts-scope.md):
+ * with Needs you in every space (sidebar.needs_scope "all") no tab has one; with it in this space
+ * only, every tab but the current one shows its own. The sidebar collapsed to its rail changes nothing.
  * Dragging one to another place moves it there (space.move); the new order shows until the
  * daemon's commit arrives, so the tab does not jump back.
  */
@@ -188,6 +188,7 @@ export function SpaceTabs({ renaming, onRenaming }: { renaming: string; onRenami
   const stored = useLayoutStore((s) => s.spaceOrder);
   const current = useLayoutStore((s) => s.currentSpaceId);
   const counts = useNeedsBySpace();
+  const scope = useNeedsScope();
   const [moved, setMoved] = useState<readonly string[] | null>(null);
   const order = moved ?? stored;
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
@@ -213,7 +214,7 @@ export function SpaceTabs({ renaming, onRenaming }: { renaming: string; onRenami
               key={id}
               spaceId={id}
               current={id === current}
-              count={counts[id] ?? 0}
+              count={scope === "space" && id !== current ? (counts[id] ?? 0) : 0}
               only={order.length < 2}
               renaming={renaming === id}
               onRename={(on) => {
