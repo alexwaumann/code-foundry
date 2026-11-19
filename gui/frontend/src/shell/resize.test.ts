@@ -145,19 +145,135 @@ describe("a divider beside rails and held panes", () => {
   });
 
   it.each<[string, GutterDrag, number, { back: boolean; forward: boolean }, string, string]>([
-    ["room both ways", { split: "s", i: 0, row: true, sizes: [0.5, 0.5], lens: [500, 500], mins: [300, 300] }, 0, { back: true, forward: true }, "col-resize", "row-resize"],
-    ["the first side at its minimum", { split: "s", i: 0, row: true, sizes: [0.5, 0.5], lens: [300, 700], mins: [300, 300] }, 0, { back: false, forward: true }, "e-resize", "s-resize"],
-    ["the second side at its minimum", { split: "s", i: 0, row: true, sizes: [0.5, 0.5], lens: [700, 300], mins: [300, 300] }, 0, { back: true, forward: false }, "w-resize", "n-resize"],
-    ["dragged to the second side's minimum", { split: "s", i: 0, row: true, sizes: [0.5, 0.5], lens: [500, 500], mins: [300, 300] }, 900, { back: true, forward: false }, "w-resize", "n-resize"],
-    ["both sides at their minimums", { split: "s", i: 0, row: true, sizes: [0.5, 0.5], lens: [300, 300], mins: [300, 300] }, 0, { back: false, forward: false }, "not-allowed", "not-allowed"],
-    ["minimums that do not fit", { split: "s", i: 0, row: true, sizes: [0.5, 0.5], lens: [250, 250], mins: [300, 300] }, 0, { back: false, forward: false }, "not-allowed", "not-allowed"],
+    ["room both ways", { split: "s", i: 0, a: 0, b: 1, row: true, sizes: [0.5, 0.5], lens: [500, 500], mins: [300, 300] }, 0, { back: true, forward: true }, "col-resize", "row-resize"],
+    ["the first side at its minimum", { split: "s", i: 0, a: 0, b: 1, row: true, sizes: [0.5, 0.5], lens: [300, 700], mins: [300, 300] }, 0, { back: false, forward: true }, "e-resize", "s-resize"],
+    ["the second side at its minimum", { split: "s", i: 0, a: 0, b: 1, row: true, sizes: [0.5, 0.5], lens: [700, 300], mins: [300, 300] }, 0, { back: true, forward: false }, "w-resize", "n-resize"],
+    ["dragged to the second side's minimum", { split: "s", i: 0, a: 0, b: 1, row: true, sizes: [0.5, 0.5], lens: [500, 500], mins: [300, 300] }, 900, { back: true, forward: false }, "w-resize", "n-resize"],
+    ["both sides at their minimums", { split: "s", i: 0, a: 0, b: 1, row: true, sizes: [0.5, 0.5], lens: [300, 300], mins: [300, 300] }, 0, { back: false, forward: false }, "not-allowed", "not-allowed"],
+    ["minimums that do not fit", { split: "s", i: 0, a: 0, b: 1, row: true, sizes: [0.5, 0.5], lens: [250, 250], mins: [300, 300] }, 0, { back: false, forward: false }, "not-allowed", "not-allowed"],
   ])("%s: it can go %j, its cursor in a row %s, in a column %s", (_name, d, delta, reach, rowCursor, colCursor) => {
     expect(gutterReach(d, delta)).toEqual(reach);
     expect(gutterCursor(true, reach)).toBe(rowCursor);
     expect(gutterCursor(false, reach)).toBe(colCursor);
   });
 
-  it("a gutter with no drag (beside a side that is all rails) is not-allowed", () => {
+  it("a gutter with no drag (no open kid on a side) is not-allowed", () => {
     expect(gutterCursor(true, null)).toBe("not-allowed");
+  });
+});
+
+/**
+ * A run of rails between two open panes acts as one divider (docs/notes/shell-model.md,
+ * "Dividers"; docs/notes/fix-resize-across-collapsed.md): every gutter in it trades length between
+ * the nearest open kid on each side, the rails keep their stored sizes and ride along.
+ */
+describe("a divider across rails", () => {
+  const collapsed = (n: GeoNode): GeoNode => ({ ...(n as GeoPane), collapsed: true });
+  const split = (dir: "row" | "col", sizes: number[], kids: GeoNode[]): GeoNode => ({ t: "split", id: "s", dir, sizes, kids });
+  const along = (dir: "row" | "col") => (r: { w: number; h: number } | undefined) => (dir === "row" ? r?.w : r?.h) ?? 0;
+  const at = (dir: "row" | "col") => (r: { x: number; y: number } | undefined) => (dir === "row" ? r?.x : r?.y) ?? 0;
+
+  it.each<[string, "row" | "col", number[], GeoNode[], number, number, number]>([
+    ["one collapsed pane in a row", "row", [0.4, 0.2, 0.4], [p("a", "thread"), collapsed(p("x")), p("b")], 1600, 1000, 2],
+    ["two collapsed panes in a row", "row", [0.3, 0.2, 0.2, 0.3], [p("a", "thread"), collapsed(p("x")), collapsed(p("y")), p("b")], 1600, 1000, 3],
+    ["one collapsed pane in a column", "col", [0.4, 0.2, 0.4], [p("a", "terminal"), collapsed(p("x")), p("b", "terminal")], 1000, 1200, 2],
+    [
+      "a column of collapsed panes in a row",
+      "row",
+      [0.4, 0.2, 0.4],
+      [p("a", "thread"), { t: "split", id: "c", dir: "col", sizes: [0.5, 0.5], kids: [collapsed(p("x")), collapsed(p("y"))] }, p("b")],
+      1600,
+      1000,
+      2,
+    ],
+  ])("%s: every gutter pairs the open panes, which trade length while the rails ride along", (_name, dir, sizes, kids, w, h, b) => {
+    const t = split(dir, sizes, kids);
+    const f = frameRects(t, w, h);
+    const len = along(dir);
+    const pos = at(dir);
+    const before = (id: string) => f.rects[id];
+    const results = kids.slice(1).map((_, i) => {
+      const d = startDrag(t, f, "s", i);
+      if (!d) throw new Error(`no drag at ${String(i)}`);
+      expect([d.i, d.a, d.b]).toEqual([i, 0, b]);
+      expect(d.lens).toEqual([len(before("a")), len(before("b"))]);
+      return dragSizes(d, 60);
+    });
+    // Every gutter in the run moves the same two kids the same way.
+    for (const r of results) expect(r).toEqual(results[0]);
+    const moved = results[0] ?? [];
+    // The rails' stored sizes are untouched; the pair's total is kept.
+    for (let j = 1; j < b; j++) expect(moved[j]).toBe(sizes[j]);
+    expect((moved[0] ?? 0) + (moved[b] ?? 0)).toBeCloseTo((sizes[0] ?? 0) + (sizes[b] ?? 0), 9);
+    const g = frameRects(withSizes(t, "s", moved), w, h);
+    expect(tilingErrors(g)).toEqual([]);
+    expect(len(g.rects.a)).toBe(len(before("a")) + 60);
+    expect(len(g.rects.b)).toBe(len(before("b")) - 60);
+    for (const id of ["x", "y"].filter((id) => f.rects[id])) {
+      expect(g.rects[id]?.rail, id).toBe(true);
+      expect(len(g.rects[id]), id).toBe(len(before(id)));
+      expect(pos(g.rects[id]), id).toBe(pos(before(id)) + 60);
+    }
+  });
+
+  const t = split("row", [0.4, 0.2, 0.4], [p("a", "thread"), collapsed(p("x")), p("b")]);
+  const f = frameRects(t, 1600, 1000);
+
+  it("stops each open pane at its minimum, from either gutter, keys and Home/End alike", () => {
+    for (const i of [0, 1]) {
+      const d = startDrag(t, f, "s", i);
+      if (!d) throw new Error("no drag");
+      expect(d.mins).toEqual([480, 480]);
+      expect(gutterReach(d)).toEqual({ back: true, forward: true });
+      expect(frameRects(withSizes(t, "s", dragSizes(d, Infinity)), 1600, 1000).rects.b?.w).toBe(480);
+      expect(frameRects(withSizes(t, "s", dragSizes(d, -Infinity)), 1600, 1000).rects.a?.w).toBe(480);
+      expect(gutterReach(d, 5000)).toEqual({ back: true, forward: false });
+    }
+  });
+
+  it("a double click on either gutter evens the open panes, the rail between keeps its size", () => {
+    for (const i of [0, 1]) {
+      const d = startDrag(withSizes(t, "s", [0.6, 0.2, 0.2]), frameRects(withSizes(t, "s", [0.6, 0.2, 0.2]), 1600, 1000), "s", i);
+      if (!d) throw new Error("no drag");
+      const sizes = evenSizes(d);
+      expect(sizes[1]).toBe(0.2);
+      const even = frameRects(withSizes(t, "s", sizes), 1600, 1000);
+      expect(Math.abs((even.rects.a?.w ?? 0) - (even.rects.b?.w ?? 0))).toBeLessThanOrEqual(1);
+    }
+  });
+
+  it("a collapsed pane opened after the drag takes its stored share", () => {
+    const d = startDrag(t, f, "s", 0);
+    if (!d) throw new Error("no drag");
+    const sizes = dragSizes(d, 200);
+    const reopened = split("row", sizes, [p("a", "thread"), p("x"), p("b")]);
+    // 1576 px to share: x's fifth is under its minimum, so it opens at 480, every pane at least its
+    // minimum, the one dragged larger still the larger.
+    const here = frameRects(reopened, 1600, 1000);
+    expect(here.rects.x?.w).toBe(480);
+    expect(here.rects.b?.w).toBe(480);
+    expect(here.rects.a?.w).toBe(1576 - 960);
+    // With room, it opens at its stored fifth.
+    const wide = frameRects(reopened, 3000, 1000);
+    expect(Math.abs((wide.rects.x?.w ?? 0) - 0.2 * 2976)).toBeLessThanOrEqual(1);
+  });
+
+  it("no drag where a side has no open pane: a collapsed pane at the edge, or a run of them", () => {
+    const edge = split("row", [0.2, 0.4, 0.4], [collapsed(p("x")), p("a", "thread"), p("b")]);
+    expect(startDrag(edge, frameRects(edge, 1600, 1000), "s", 0)).toBeNull();
+    expect(startDrag(edge, frameRects(edge, 1600, 1000), "s", 1)?.a).toBe(1);
+    const run = split("row", [0.4, 0.2, 0.2, 0.2], [p("a", "thread"), p("b"), collapsed(p("x")), collapsed(p("y"))]);
+    const g = frameRects(run, 1600, 1000);
+    expect([0, 1, 2].map((i) => startDrag(run, g, "s", i) !== null)).toEqual([true, false, false]);
+  });
+
+  it("pairs across a pane the window folded too", () => {
+    // Three diffs in 1300px: the middle one folds (the focused a and the last b stay).
+    const three = split("row", [0.4, 0.2, 0.4], [p("a", "thread"), p("x"), p("b")]);
+    const g = shellFrame({ root: three, w: 1300, h: 800, focus: "a", mru: ["t-a", "t-b"] });
+    expect(g.rects.x?.rail).toBe(true);
+    expect(g.gutters.map((gu) => gu.fixed)).toEqual([false, false]);
+    const d = startDrag(three, g, "s", 1);
+    expect([d?.a, d?.b]).toEqual([0, 2]);
   });
 });

@@ -9,6 +9,7 @@ import {
   RAIL,
   TERMINAL_MINIMUM,
   frameRects,
+  gutterPair,
   minimumOf,
   paneMinimum,
   plainRects,
@@ -172,10 +173,36 @@ describe("pane minimums", () => {
     expectTiles(frame);
   });
 
-  it("a gutter beside a rail is fixed; one between open panes is not", () => {
+  it("a gutter with rails at the split's edge is fixed; one between open panes is not, rails between or not", () => {
     const root = row("s", [0.4, 0.3, 0.3], pane("a", "thread:x"), pane("b", "diff:x"), pane("c", "terminal"));
     expect(frameRects(root, 800, 500, new Set(["c"])).gutters.map((g) => g.fixed)).toEqual([false, true]);
     expect(frameRects(root, 800, 500).gutters.map((g) => g.fixed)).toEqual([false, false]);
+    expect(frameRects(root, 800, 500, new Set(["b"])).gutters.map((g) => g.fixed)).toEqual([false, false]);
+    expect(frameRects(root, 800, 500, new Set(["a", "b"])).gutters.map((g) => g.fixed)).toEqual([true, true]);
+    // A column whose panes are all rails is one rail kid of the row; its own gutter has no open pane.
+    const nested = row("s", [0.4, 0.2, 0.4], pane("a", "thread:x"), col("c", [0.5, 0.5], pane("b1", "diff:x"), pane("b2", "diff:x")), pane("d", "diff:x"));
+    const f = frameRects(nested, 1400, 500, new Set(["b1", "b2"]));
+    expect(f.gutters.map((g) => [g.split, g.i, g.fixed])).toEqual([
+      ["s", 0, false],
+      ["c", 0, true],
+      ["s", 1, false],
+    ]);
+  });
+
+  // o: an open kid, r: a kid that is all rails. Each gutter's pair, null when fixed.
+  it.each<[string, (number[] | null)[]]>([
+    ["oo", [[0, 1]]],
+    ["oro", [[0, 2], [0, 2]]],
+    ["orro", [[0, 3], [0, 3], [0, 3]]],
+    ["oorro", [[0, 1], [1, 4], [1, 4], [1, 4]]],
+    ["ro", [null]],
+    ["or", [null]],
+    ["rro", [null, null]],
+    ["oror", [[0, 2], [0, 2], null]],
+    ["rr", [null]],
+  ])("gutterPair: %s pairs %j", (kinds, want) => {
+    const open = kinds.split("").map((c) => c === "o");
+    expect(open.slice(1).map((_, i) => gutterPair(open, i))).toEqual(want);
   });
 });
 

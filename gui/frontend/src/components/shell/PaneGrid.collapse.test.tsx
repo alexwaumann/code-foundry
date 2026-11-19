@@ -1,8 +1,8 @@
 /**
  * Collapsed panes and dividers in the pane grid (docs/notes/shell-model.md, "Collapsing a pane" and
  * "Dividers"; docs/notes/shell-25d-collapse.md): a collapsed pane is a rail with an open control,
- * the strip's control collapses (not the last open pane), and each divider's cursor says which ways
- * it can still move.
+ * the strip's control collapses (not the last open pane), each divider's cursor says which ways
+ * it can still move, and a divider beside a collapsed pane between open ones moves those.
  */
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -178,15 +178,34 @@ describe("dividers' cursors", () => {
   const gutters = () => screen.queryAllByTestId("shell-gutter").map((g) => [g.getAttribute("data-index"), g.style.cursor]);
   const fixed = () => screen.queryAllByTestId("shell-gutter-fixed").map((g) => [g.getAttribute("data-index"), g.style.cursor]);
 
-  it("beside a collapsed pane: not-allowed, no handle to grab and no keyboard", async () => {
+  it("on either side of a collapsed pane between open ones: both move the open panes, the rail's size kept", async () => {
     await seed();
     render(<PaneGrid />);
-    expect(gutters()).toEqual([]);
-    expect(fixed()).toEqual([
-      ["0", "not-allowed"],
-      ["1", "not-allowed"],
+    expect(fixed()).toEqual([]);
+    expect(gutters()).toEqual([
+      ["0", "col-resize"],
+      ["1", "col-resize"],
     ]);
-    expect(screen.getAllByTestId("shell-gutter-fixed").every((g) => g.getAttribute("tabindex") === null)).toBe(true);
+    const [g0, g1] = screen.getAllByTestId("shell-gutter");
+    if (!g0 || !g1) throw new Error("gutters");
+    expect(g1.getAttribute("tabindex")).toBe("0");
+    // A key on either grows the first open pane at the last one's cost; the collapsed pane's third is untouched.
+    fireEvent.keyDown(g0, { key: "ArrowRight" });
+    fireEvent.keyDown(g1, { key: "ArrowRight" });
+    const sent = ran.filter(([name]) => name === "pane.resize").map(([, a]) => a.sizes?.split(",").map(Number) ?? []);
+    expect(sent).toHaveLength(2);
+    for (const [a, b, c] of sent) {
+      expect(b).toBe(0.333333);
+      expect(a).toBeGreaterThan(c ?? 1);
+    }
+  });
+
+  it("beside a collapsed pane at the edge: not-allowed, no handle to grab and no keyboard", async () => {
+    await seed(row("s-r", [collapsed(pane("p-b", [tab("t-prs", "prs")])), pane("p-a", [tab("t-th", "thread", "s-1")]), pane("p-c", [tab("t-d", "diff", "s-1")])]));
+    render(<PaneGrid />);
+    expect(fixed()).toEqual([["0", "not-allowed"]]);
+    expect(gutters()).toEqual([["1", "col-resize"]]);
+    expect(screen.getByTestId("shell-gutter-fixed").getAttribute("tabindex")).toBeNull();
   });
 
   it("both ways with room, one way when a side is at its minimum, not-allowed when both are", async () => {

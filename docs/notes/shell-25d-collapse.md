@@ -106,8 +106,10 @@ full screen, the direction keys), then each was built.
   `not-allowed` when it cannot move. During a drag a transparent layer over the grid carries the
   cursor for where the drag took it (the pointer leaves the gutter once the gutter stops). A
   divider that cannot move starts no drag and shows no handle; an arrow key the way it cannot go
-  commits nothing. A `fixed` gutter (beside a side that is all rails) is drawn now
-  (`shell-gutter-fixed`): the cursor only, no keyboard.
+  commits nothing. A `fixed` gutter (no open kid on one side: rails at the split's edge) is drawn
+  now (`shell-gutter-fixed`): the cursor only, no keyboard. A gutter beside rails with an open kid
+  on each side was fixed too at first; it now resizes across them
+  (docs/notes/fix-resize-across-collapsed.md).
 - The minimum numbers are untouched and read only through `minimumOf`/`paneMinimum`.
 
 ## Differences from the brief

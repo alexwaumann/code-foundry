@@ -5,13 +5,15 @@ import { zoomFactor } from "@/lib/zoom";
 import { gutterKeyDelta } from "@/shell/resize";
 
 /**
- * The gap between two kids of a split: dragging it resizes them (PaneGrid previews the sizes as
- * the pointer moves and commits them with pane.resize on release). It takes the keyboard, as the
- * side panel's edge and divider did: the arrows move it (shell/resize.ts gutterKeyDelta), and a
- * double click shares the two kids evenly. Its cursor says which ways it can still move
- * (shell/resize.ts gutterCursor): both, one, or none (`not-allowed`, and then it shows no handle).
- * A `fixed` gutter (beside a side that is all rails) never moves: it only shows that cursor, and
- * takes neither the pointer's drag nor the keyboard.
+ * The gap between two kids of a split: dragging it resizes the two open kids it pairs, the ones
+ * beside it or, across collapsed or folded panes, the nearest open one on each side (the rails
+ * between ride along; shell/resize.ts). PaneGrid previews the sizes as the pointer moves and
+ * commits them with pane.resize on release. It takes the keyboard, as the side panel's edge and
+ * divider did: the arrows move it (shell/resize.ts gutterKeyDelta), and a double click shares the
+ * two kids evenly. Its cursor says which ways it can still move (shell/resize.ts gutterCursor):
+ * both, one, or none (`not-allowed`, and then it shows no handle). A `fixed` gutter (no open kid on
+ * a side: rails at the split's edge) never moves: it only shows that cursor, and takes neither the
+ * pointer's drag nor the keyboard.
  */
 export function Gutter({
   gutter,
@@ -32,7 +34,7 @@ export function Gutter({
   onEnd: (moved: boolean) => void;
   /** A key moved it this far (layout px, right or down positive; ±Infinity: to a bound). */
   onStep: (delta: number) => void;
-  /** A double click: the two kids beside it even. */
+  /** A double click: the two kids it pairs even. */
   onReset: () => void;
 }) {
   const start = useRef<{ at: number; id: number; moved: boolean } | null>(null);

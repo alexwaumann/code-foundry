@@ -56,6 +56,20 @@ function allRail(n: GeoNode, rails: ReadonlySet<string>): boolean {
   return n.t === "pane" ? rails.has(n.id) : n.kids.every((k) => allRail(k, rails));
 }
 
+/**
+ * The two kids the gutter after kid `i` resizes (docs/notes/shell-model.md, "Dividers"): the
+ * nearest open kid (not all rails) at or before `i` and the nearest at or after `i + 1`. A run of
+ * rails between two open kids acts as one divider: every gutter in it pairs the same two kids, and
+ * the rails ride along with the edge. Null when one side has no open kid: the gutter is fixed.
+ */
+export function gutterPair(open: readonly boolean[], i: number): [number, number] | null {
+  let a = i;
+  while (a >= 0 && !open[a]) a--;
+  let b = i + 1;
+  while (b < open.length && !open[b]) b++;
+  return a >= 0 && b < open.length ? [a, b] : null;
+}
+
 function minOf(n: GeoNode, o: LayOptions): Size {
   if (n.t === "pane") return o.rails.has(n.id) ? { w: RAIL, h: RAIL } : o.minimum(n);
   const row = n.dir === "row";
@@ -163,7 +177,7 @@ function lay(n: GeoNode, r: Rect, out: Frame, o: LayOptions): void {
   const count = n.kids.length;
   const free = Math.max(0, (row ? r.w : r.h) - GUTTER * (count - 1));
   const sz = lengths(n.kids, n.sizes, free, row, o);
-  const railKid = n.kids.map((k) => allRail(k, o.rails));
+  const open = n.kids.map((k) => !allRail(k, o.rails));
   let p = row ? r.x : r.y;
   const end = row ? r.x + r.w : r.y + r.h;
   n.kids.forEach((k, i) => {
@@ -174,7 +188,7 @@ function lay(n: GeoNode, r: Rect, out: Frame, o: LayOptions): void {
     if (i < count - 1) {
       const a2 = Math.round(p + s + GUTTER);
       const gap = row ? { x: b, y: r.y, w: a2 - b, h: r.h } : { x: r.x, y: b, w: r.w, h: a2 - b };
-      out.gutters.push({ split: n.id, i, row, ...gap, fixed: !!(railKid[i] || railKid[i + 1]) });
+      out.gutters.push({ split: n.id, i, row, ...gap, fixed: !gutterPair(open, i) });
     }
     p += s + GUTTER;
   });
