@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { CF, invocations, mockPost, resetMock, row } from "./fixtures";
+import { CF, invocations, mockPost, resetMock, row, threadsOpenAsTabs } from "./fixtures";
 import { layoutState, paneNode, paneOf, rowNode, threadTab } from "./shell";
 import { openLayout, openPrBesidePage, PR_PANE, prTab, showPr, sizePane, SLUG, tabIn } from "./shell-pages";
 
@@ -30,6 +30,8 @@ async function shotViewport(page: Page): Promise<void> {
 
 test.beforeEach(async ({ page }) => {
   await resetMock();
+  // A spec about thread tabs: a reset is a new home, on Panes.
+  await threadsOpenAsTabs();
   // Record copies: the async Clipboard API needs a permission (Chromium) or a gesture (WebKit).
   await page.addInitScript(() => {
     const w = window as unknown as { __copied: string[] };

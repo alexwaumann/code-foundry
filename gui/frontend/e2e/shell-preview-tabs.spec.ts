@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { appPath, mockUrl, resetMock } from "./fixtures";
+import { appPath, mockUrl, resetMock, threadsOpenAsTabs } from "./fixtures";
 
 /**
  * Preview tabs in the window (docs/notes/preview-tabs-3-gui.md), what only a browser shows: three
@@ -63,6 +63,8 @@ function dashes(el: Locator) {
 
 test.beforeEach(async () => {
   await resetMock();
+  // A spec about thread tabs: a reset is a new home, on Panes.
+  await threadsOpenAsTabs();
 });
 
 test("clicking three archived rows in turn leaves one preview tab: the last one's", async ({ page }) => {

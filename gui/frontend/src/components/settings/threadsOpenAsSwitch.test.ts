@@ -32,5 +32,7 @@ describe("the switch dialog's words", () => {
     expect(q?.message).toBe(message);
     expect(q?.title).toBe(to === "panes" ? "Switch to Panes?" : "Switch to Single?");
     expect(q?.confirmLabel).toBe(to === "panes" ? "Switch to Panes" : "Switch to Single");
+    // Nothing is lost: asked calmly, never in the warning look.
+    expect(q?.tone).toBe("neutral");
   });
 });

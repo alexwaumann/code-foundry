@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { expectTerminalText, openHelloDemo, pluginActs, resetMock, row } from "./fixtures";
+import { expectTerminalText, openHelloDemo, pluginActs, resetMock, row, threadsOpenAsTabs } from "./fixtures";
 import { paneOf, paneShowing } from "./shell";
 
 /**
@@ -21,6 +21,8 @@ async function openDemoTab(page: Page, key: string): Promise<void> {
 
 test.beforeEach(async () => {
   await resetMock();
+  // A spec about thread tabs: a reset is a new home, on Panes.
+  await threadsOpenAsTabs();
 });
 
 test("the Assistant tab shows the plugin's thread inline with its composer; it is not in the sidebar", async ({ page }) => {

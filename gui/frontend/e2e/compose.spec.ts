@@ -1,11 +1,13 @@
 import { expect, test, type Page } from "@playwright/test";
-import { BACKGROUND, composeProject, expectTooltip, freshCopyByDefault, invocations, mockPost, mockUrl, openApp, resetMock, row, testPdf } from "./fixtures";
+import { BACKGROUND, composeProject, expectTooltip, freshCopyByDefault, invocations, mockPost, mockUrl, openApp, resetMock, row, testPdf, threadsOpenAsTabs } from "./fixtures";
 
 /** A 1x1 transparent PNG. */
 const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=", "base64");
 
 test.beforeEach(async () => {
   await resetMock();
+  // A spec about thread tabs: a reset is a new home, on Panes.
+  await threadsOpenAsTabs();
 });
 
 async function staged(): Promise<{ path: string; name: string; mimeType: string; size: number; pages: number }[]> {

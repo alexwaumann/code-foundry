@@ -8,6 +8,9 @@
 import { create } from "zustand";
 import type { ConfirmTone } from "@/api/command";
 
+/** A question's look: the daemon's tones, and the GUI's own "neutral" for a change that loses nothing. */
+export type ConfirmLookTone = ConfirmTone | "neutral";
+
 export interface ConfirmRequest {
   title: string;
   message: string;
@@ -22,9 +25,10 @@ export interface ConfirmRequest {
   /**
    * The command's look (ConfirmationRequired.tone): absent, a warning (red icon, destructive
    * button); "success", a step forward the user takes (a merge), asked in the success tone so
-   * it never reads like an error.
+   * it never reads like an error; "neutral", a change that loses nothing (switching how threads
+   * open): an info icon and the plain primary button. The daemon sends only "success".
    */
-  tone?: ConfirmTone;
+  tone?: ConfirmLookTone;
   /** Centered in the window instead of near the top (questions about the content under it). */
   centered?: boolean;
   /** The command being confirmed and its args, when a command asks (runCommand). */

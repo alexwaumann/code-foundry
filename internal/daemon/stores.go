@@ -191,6 +191,9 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, threadEnv 
 	}); err != nil {
 		return nil, err
 	}
+	// Before anything reads the settings and before the database exists on a new home: a
+	// home from before a default changed keeps the old value (default_change.go).
+	keepOldDefaults(ctx, log.With("store", "settings"), s.settings, p.DB())
 	s.themes.OnChange(func(snap *usertheme.Snapshot) { s.settings.SetThemes(snap.Set()) })
 	s.themes.Watch(ctx)
 	s.backdrops = backdrop.New(backdrop.Options{Dir: p.Backdrops(), Settings: s.settings, Log: log.With("store", "backdrop")})
@@ -398,6 +401,7 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, threadEnv 
 	s.flags = pluginFlags{threads: s.thread, notes: s.notification}
 	convertLegacyFlags(ctx, log.With("store", "notification"), s.thread, s.flags)
 	s.stopFlagNotifications = startFlagNotifications(ctx, log.With("store", "notification"), s.thread, s.flags, s.bus)
+	postDefaultNotices(ctx, log.With("store", "notification"), s.settings, s.notification)
 	s.stopThreadLook = startThreadLook(ctx, log.With("store", "notification"), s.thread, s.thread.Snapshot, s.notification, s.bus)
 	// After thread and terminal: the layout follows their lifecycles (layout.go).
 	if s.stopLayout, err = startLayoutGlue(ctx, layoutGlueOptions{

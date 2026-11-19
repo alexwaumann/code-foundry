@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { CF, invocations, mockPost, openApp, resetMock, row, threadPrompt, writes } from "./fixtures";
+import { CF, invocations, mockPost, openApp, resetMock, row, threadPrompt, threadsOpenAsTabs, writes } from "./fixtures";
 import { openShellApp, paneNode, paneOf, rowNode, seedLayout, threadTab } from "./shell";
 import { attachStreams, createShell, inPrompt, inXterm, keyboardIn, openQuick, openSurfaceUnfocused, quickGoneAsDaemon, quickHost, tabHost, terminalTab, terminalTabs } from "./shell-terminals";
 
@@ -17,6 +17,8 @@ import { attachStreams, createShell, inPrompt, inXterm, keyboardIn, openQuick, o
 
 test.beforeEach(async () => {
   await resetMock();
+  // A spec about thread tabs: a reset is a new home, on Panes.
+  await threadsOpenAsTabs();
 });
 
 const quick = (page: Page) => page.getByTestId("quick-terminal");

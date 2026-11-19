@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { mockPost, mockUrl, openApp, resetMock, row } from "./fixtures";
+import { mockPost, mockUrl, openApp, resetMock, row, threadsOpenAsTabs } from "./fixtures";
 
 /**
  * A thread's notifications on its sidebar row (docs/notes/notifications-4-row-mark.md), what only a
@@ -12,6 +12,8 @@ import { mockPost, mockUrl, openApp, resetMock, row } from "./fixtures";
 
 test.beforeEach(async () => {
   await resetMock();
+  // A spec about thread tabs: a reset is a new home, on Panes.
+  await threadsOpenAsTabs();
 });
 
 const enc = encodeURIComponent;

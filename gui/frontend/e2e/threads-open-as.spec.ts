@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { appPath, mockPost, mockUrl, resetMock } from "./fixtures";
+import { appPath, mockPost, mockUrl, resetMock, threadsOpenAsTabs } from "./fixtures";
 
 /**
  * Threads open as Panes and Single in the browser (docs/notes/threads-open-as-2-gui.md): a thread
@@ -69,6 +69,8 @@ async function openSettingsAt(page: Page, key: string): Promise<void> {
 
 test.beforeEach(async () => {
   await resetMock();
+  // A spec about thread tabs: a reset is a new home, on Panes.
+  await threadsOpenAsTabs();
 });
 
 test("under Panes a thread pane draws one 44px row, and its conversation gains the old header's height", async ({ page }) => {

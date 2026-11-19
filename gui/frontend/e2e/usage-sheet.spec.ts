@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { emit, openApp, openTooltip, resetMock, row, threadPrompt } from "./fixtures";
+import { emit, openApp, openTooltip, resetMock, row, threadPrompt, threadsOpenAsTabs } from "./fixtures";
 import { openShellApp, tabOfKind } from "./shell";
 import { diffTab, seedBeside } from "./shell-surfaces";
 
@@ -9,6 +9,8 @@ import { diffTab, seedBeside } from "./shell-surfaces";
 
 test.beforeEach(async () => {
   await resetMock();
+  // A spec about thread tabs: a reset is a new home, on Panes.
+  await threadsOpenAsTabs();
 });
 
 const sheet = (page: Page) => page.getByTestId("usage-sheet");

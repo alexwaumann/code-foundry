@@ -43,12 +43,15 @@ const PLUGINS_SOURCE = "plugins";
 /** The daemon's own source for the GitHub poll's cards (internal/daemon/github_notifications_rules.go). */
 const GITHUB_SOURCE = "github";
 
+/** The daemon's own notices about the app itself (internal/daemon/default_change.go). */
+export const APP_SOURCE = "app";
+
 /**
  * The host sources whose command actions the mock runs as the registry verb they name, as the
  * daemon's notification.act does (internal/command verbSources). The plugins source's are
- * recorded only, as before: the mock's view.settings takes no --page.
+ * recorded only, as before.
  */
-const VERB_SOURCES = [GITHUB_SOURCE];
+const VERB_SOURCES = [GITHUB_SOURCE, APP_SOURCE];
 
 export type NotificationEventInit = MessageInitShape<typeof NotificationEventSchema>;
 type SnapshotInit = MessageInitShape<typeof NotificationSnapshotSchema>;

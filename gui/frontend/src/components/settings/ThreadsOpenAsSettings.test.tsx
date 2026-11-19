@@ -52,7 +52,7 @@ const openAs: SettingFieldView = {
     "As Panes, with one thread pane per space. Every thread opens there.",
   ],
   enumExamples: ["", "", ""],
-  defaultValue: "tabs",
+  defaultValue: "panes",
 };
 const swap: SettingFieldView = {
   ...base,
@@ -96,10 +96,19 @@ describe("Threads open as", () => {
     expect(words(openAs.key)).toBe(openAs.description);
     fireEvent.keyDown(trigger, { key: "Enter" });
     expect(screen.getAllByRole("option").map((o) => o.textContent)).toEqual([
-      "Tabs (default)Each thread you open adds a tab. You close tabs yourself.",
-      `Panes${openAs.enumDescriptions[1] ?? ""}`,
+      "TabsEach thread you open adds a tab. You close tabs yourself.",
+      `Panes (default)${openAs.enumDescriptions[1] ?? ""}`,
       `Single${openAs.enumDescriptions[2] ?? ""}`,
     ]);
+  });
+
+  // The marker is the schema's default, whatever it is: Panes since part 3, Tabs before it.
+  it.each(["panes", "tabs", "single"])("with %s as the schema's default, (default) marks that option alone", (defaultValue) => {
+    render(<SettingRow field={{ ...openAs, defaultValue }} />);
+    fireEvent.keyDown(screen.getByRole("combobox", { name: "Threads open as" }), { key: "Enter" });
+    expect(screen.getAllByRole("option").map((o) => o.textContent)).toEqual(
+      openAs.enumValues.map((v, i) => `${openAs.enumLabels[i] ?? ""}${v === defaultValue ? " (default)" : ""}${openAs.enumDescriptions[i] ?? ""}`),
+    );
   });
 
   it("a switch that closes nothing is made at once, after asking the daemon", async () => {

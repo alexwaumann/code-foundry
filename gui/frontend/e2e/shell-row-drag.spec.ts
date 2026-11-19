@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { appPath, invocations, mockUrl, resetMock } from "./fixtures";
+import { appPath, invocations, mockUrl, resetMock, threadsOpenAsTabs } from "./fixtures";
 
 /**
  * Snoozed and Archived rows drag into the pane grid (docs/notes/preview-tabs-2-row-drag.md), what
@@ -73,6 +73,8 @@ async function liftRow(page: Page, id: string, name: string, to: { x: number; y:
 
 test.beforeEach(async () => {
   await resetMock();
+  // A spec about thread tabs: a reset is a new home, on Panes.
+  await threadsOpenAsTabs();
 });
 
 test("an archived row dragged into a pane of a space that is not the default one opens there and stays archived", async ({ page }) => {

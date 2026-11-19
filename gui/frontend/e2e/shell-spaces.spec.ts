@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { appPath, CF, invocations, mockPost, mockUrl, resetMock } from "./fixtures";
+import { appPath, CF, invocations, mockPost, mockUrl, resetMock, threadsOpenAsTabs } from "./fixtures";
 
 /**
  * The top bar and spaces in the window shell (docs/notes/shell-15-spaces.md), against the mock's
@@ -123,6 +123,8 @@ async function still(page: Page): Promise<void> {
 
 test.beforeEach(async () => {
   await resetMock();
+  // A spec about thread tabs: a reset is a new home, on Panes.
+  await threadsOpenAsTabs();
 });
 
 test("a tab and a pane dropped on a space tab move to that space", async ({ page }) => {

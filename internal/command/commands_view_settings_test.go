@@ -32,8 +32,10 @@ func TestViewSettingsPage(t *testing.T) {
 		noSchema bool
 		viewed   bool
 		wantView string
-		wantErr  string
-		wantCode connect.Code
+		// wantParam is the ShowView's setting param.
+		wantParam string
+		wantErr   string
+		wantCode  connect.Code
 	}{
 		{name: "no page: the page it shows", wantView: command.ViewSettings},
 		{name: "a GUI page", args: map[string]string{"page": "memory"}, wantView: "settings.memory"},
@@ -47,6 +49,14 @@ func TestViewSettingsPage(t *testing.T) {
 		{name: "from a page in a thread a window shows", ctx: inThread, viewed: true, args: map[string]string{"page": "memory"}, wantView: "settings.memory"},
 		{name: "from a thread no window shows", ctx: inThread, args: map[string]string{"page": "memory"}, wantCode: connect.CodeFailedPrecondition},
 		{name: "from a thread no window shows, --focus", ctx: inThread, args: map[string]string{"page": "memory", "focus": "true"}, wantView: "settings.memory"},
+		{name: "a setting: its page, and the row", args: map[string]string{"setting": "layout.threads_open_as"},
+			wantView: "settings.appearance", wantParam: "layout.threads_open_as"},
+		{name: "a setting on General", args: map[string]string{"setting": "threads.default_model"},
+			wantView: "settings.general", wantParam: "threads.default_model"},
+		{name: "an unknown setting", args: map[string]string{"setting": "layout.nope"}, wantErr: `no setting "layout.nope"`},
+		{name: "a setting and a page", args: map[string]string{"setting": "layout.threads_open_as", "page": "appearance"}, wantErr: "give --page or --setting, not both"},
+		{name: "a setting without a schema", noSchema: true, args: map[string]string{"setting": "layout.threads_open_as"}, wantErr: `no setting "layout.threads_open_as"`},
+		{name: "a setting from a thread no window shows", ctx: inThread, args: map[string]string{"setting": "layout.threads_open_as"}, wantCode: connect.CodeFailedPrecondition},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -75,6 +85,9 @@ func TestViewSettingsPage(t *testing.T) {
 			var got []string
 			for _, i := range emit.Intents() {
 				got = append(got, i.GetShowView().GetName())
+				if p := i.GetShowView().GetParams()[command.ViewSettingParam]; p != tt.wantParam {
+					t.Errorf("setting param = %q, want %q", p, tt.wantParam)
+				}
 			}
 			if want := []string{tt.wantView}; tt.wantView != "" && !slices.Equal(got, want) || tt.wantView == "" && len(got) != 0 {
 				t.Errorf("ShowViews = %q, want %q", got, tt.wantView)

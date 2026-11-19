@@ -44,6 +44,12 @@ const SourcePlugins = "plugins"
 // command actions name a registry verb itself (Open PR is view.open.pr).
 const SourceGitHub = "github"
 
+// SourceApp is the source of the daemon's own notices about the app itself (shown as
+// "Code Foundry"): the one-time notice that a default changed
+// (docs/notes/threads-open-as-3-default.md). Like SourcePlugins, its command actions name a
+// registry verb itself (Open settings is view.settings --setting).
+const SourceApp = "app"
+
 // Level is how serious a notification is. There is no success level.
 type Level string
 

@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { appPath, CF, invocations, mockUrl, resetMock } from "./fixtures";
+import { appPath, CF, invocations, mockUrl, resetMock, threadsOpenAsTabs } from "./fixtures";
 import { keyboardPane } from "./shell-surfaces";
 
 /**
@@ -143,6 +143,8 @@ const moves = async () => (await invocations()).filter((i) => i.name === "tab.mo
 
 test.beforeEach(async () => {
   await resetMock();
+  // A spec about thread tabs: a reset is a new home, on Panes.
+  await threadsOpenAsTabs();
 });
 
 test("a tab reorders in its own strip, with the insertion bar where it will go", async ({ page }) => {

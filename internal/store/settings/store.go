@@ -97,8 +97,12 @@ type Store struct {
 	snap atomic.Pointer[Snapshot]
 	// lastGood is what lastGoodPath holds as far as this store wrote it.
 	lastGood []byte
-	// cleared are the once clears that are done (once.go).
+	// cleared are the once clears that are done (once.go), and the default changes' steps
+	// (defaultchange.go).
 	cleared map[string]bool
+	// held are old defaults a default change could not write to the file this run
+	// (defaultchange.go): each applies while the file does not set its key. Never written.
+	held map[string]string
 
 	watcher *fsnotify.Watcher
 	stop    chan struct{}
@@ -222,7 +226,7 @@ func (s *Store) SetCommands(cmds []CommandInfo) {
 	if s.cmds == nil {
 		s.cmds = []CommandInfo{}
 	}
-	r := resolveThemes(s.raw, s.cmds, s.themes)
+	r := resolveThemes(s.withHeld(s.raw), s.cmds, s.themes)
 	// The plugin store calls this whenever plugins' commands come or go: log only what
 	// is new.
 	for _, is := range r.issues {
@@ -240,7 +244,7 @@ func (s *Store) SetThemes(themes theme.Set) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.themes = themes
-	r := resolveThemes(s.raw, s.cmds, s.themes)
+	r := resolveThemes(s.withHeld(s.raw), s.cmds, s.themes)
 	for _, is := range r.issues {
 		if (is.Key == KeyThemeDark || is.Key == KeyThemeLight) && !slices.Contains(s.Snapshot().Issues, is) {
 			s.log.Warn("settings: value ignored", "key", is.Key, "reason", is.Message)
@@ -310,7 +314,7 @@ func (s *Store) Update(_ context.Context, partial map[string]string) (*Snapshot,
 	// The file now holds exactly these values; keeping raw equal to it makes the
 	// watcher's reload of our own write a no-op.
 	s.raw = keep
-	s.publishLocked(resolveThemes(s.raw, s.cmds, s.themes))
+	s.publishLocked(resolveThemes(s.withHeld(s.raw), s.cmds, s.themes))
 	return s.Snapshot(), nil
 }
 
@@ -344,7 +348,7 @@ func (s *Store) reload() {
 			s.saveLastGood(data)
 		}
 	}
-	s.publishLocked(resolveThemes(s.raw, s.cmds, s.themes))
+	s.publishLocked(resolveThemes(s.withHeld(s.raw), s.cmds, s.themes))
 }
 
 // lastGoodPath is the copy of the last settings file that parsed.

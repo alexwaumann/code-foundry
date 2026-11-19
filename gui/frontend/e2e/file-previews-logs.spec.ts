@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { CF, mockPost, openApp, resetMock } from "./fixtures";
+import { CF, mockPost, openApp, resetMock, threadsOpenAsTabs } from "./fixtures";
 import { openThread } from "./shell";
 
 /**
@@ -34,6 +34,8 @@ const topRow = (page: Page) =>
 
 test.beforeEach(async () => {
   await resetMock();
+  // A spec about thread tabs: a reset is a new home, on Panes.
+  await threadsOpenAsTabs();
 });
 
 test("a log opens at its bottom, stays there when the file grows, and otherwise keeps the line being read", async ({ page }) => {

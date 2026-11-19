@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { appPath, invocations, mockPost, mockUrl, openStreams, resetMock, setZoom } from "./fixtures";
+import { appPath, invocations, mockPost, mockUrl, openStreams, resetMock, setZoom, threadsOpenAsTabs } from "./fixtures";
 
 /**
  * The Needs-you inbox (docs/notes/shell-17-needs-you.md), what only a browser shows: the pointer
@@ -54,6 +54,8 @@ async function still(page: Page): Promise<void> {
 
 test.beforeEach(async () => {
   await resetMock();
+  // A spec about thread tabs: a reset is a new home, on Panes.
+  await threadsOpenAsTabs();
   await mockPost("needs-you");
 });
 

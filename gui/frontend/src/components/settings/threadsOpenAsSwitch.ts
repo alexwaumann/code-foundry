@@ -44,7 +44,8 @@ function movedLine(p: SwitchPreview): string {
 
 /**
  * The confirm dialog's question for switching to `to`, or null when the switch closes and moves
- * nothing (it is made without asking). Toward Tabs nothing changes, so never a question.
+ * nothing (it is made without asking). Toward Tabs nothing changes, so never a question. Asked in
+ * the neutral tone: nothing is lost, so it must not look like a warning.
  */
 export function switchQuestion(to: string, p: SwitchPreview): ConfirmRequest | null {
   const mode = threadsOpenAsOf(to);
@@ -56,6 +57,7 @@ export function switchQuestion(to: string, p: SwitchPreview): ConfirmRequest | n
       title: "Switch to Panes?",
       message: `Each pane keeps the thread it is showing now.${closing}${movedLine(p)}${tabs > 0 ? "\n\nNothing is lost: those threads stay in the sidebar and keep running, and each one's diff, files and terminals come back when you open it." : ""}`,
       confirmLabel: "Switch to Panes",
+      tone: "neutral",
     };
   }
   // A pane closing takes its thread tabs with it; a kept pane's other thread tabs close too, so the tab count says the whole.
@@ -69,6 +71,7 @@ export function switchQuestion(to: string, p: SwitchPreview): ConfirmRequest | n
     title: "Switch to Single?",
     message: `Each space keeps the thread pane you used last.${closing}${movedLine(p)}${tabs + p.panes > 0 ? "\n\nNothing is lost: those threads stay in the sidebar and keep running." : ""}`,
     confirmLabel: "Switch to Single",
+    tone: "neutral",
   };
 }
 

@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { CF, openApp, resetMock } from "./fixtures";
+import { CF, openApp, resetMock, threadsOpenAsTabs } from "./fixtures";
 import { openThread } from "./shell";
 
 /**
@@ -33,6 +33,8 @@ async function strays(page: Page): Promise<number> {
 
 test.beforeEach(async ({ page }) => {
   await resetMock();
+  // A spec about thread tabs: a reset is a new home, on Panes.
+  await threadsOpenAsTabs();
   await openApp(page);
   await openThread(page, "s-1");
 });

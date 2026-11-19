@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { emit, invocations, invokeAs, mockPost, resetMock } from "./fixtures";
+import { emit, invocations, invokeAs, mockPost, resetMock, threadsOpenAsTabs } from "./fixtures";
 import { layoutState, openShellApp, paneNode, paneOf, paletteRun, seedLayout, threadTab } from "./shell";
 import { openPrsTab } from "./shell-pages";
 
@@ -19,6 +19,8 @@ const prRows = (page: Page, section: string) => page.getByTestId("prs-list").loc
 
 test.beforeEach(async () => {
   await resetMock();
+  // A spec about thread tabs: a reset is a new home, on Panes.
+  await threadsOpenAsTabs();
 });
 
 /** Sizes the window so the page's pane (the only one) is `width` wide. */

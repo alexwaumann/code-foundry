@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { mockPost, openApp, resetMock, row, threadPrompt } from "./fixtures";
+import { mockPost, openApp, resetMock, row, threadPrompt, threadsOpenAsTabs } from "./fixtures";
 import { openHeaderMenu } from "./shell-threads";
 
 /**
@@ -21,6 +21,8 @@ const header = (page: Page) => page.getByTestId("thread-header");
 
 test.beforeEach(async () => {
   await resetMock();
+  // A spec about thread tabs: a reset is a new home, on Panes.
+  await threadsOpenAsTabs();
 });
 
 // The crumb of each kind of thread (one project, a named workspace, an unnamed set, no project:

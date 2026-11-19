@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { appPath, mockPost, mockUrl, resetMock } from "./fixtures";
+import { appPath, mockPost, mockUrl, resetMock, threadsOpenAsTabs } from "./fixtures";
 
 /**
  * Linked tabs in the window shell (docs/notes/shell-12-linked-tabs.md), against the mock's layout
@@ -72,6 +72,8 @@ async function still(page: Page): Promise<void> {
 
 test.beforeEach(async () => {
   await resetMock();
+  // A spec about thread tabs: a reset is a new home, on Panes.
+  await threadsOpenAsTabs();
 });
 
 test("the + menu's thread submenu opens on hover, and the whole path works from the keyboard", async ({ page }) => {

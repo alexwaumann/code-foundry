@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { appPath, CF, invocations, mockUrl, openStreams, resetMock } from "./fixtures";
+import { appPath, CF, invocations, mockUrl, openStreams, resetMock, threadsOpenAsTabs } from "./fixtures";
 
 /**
  * Full screen and the floating composer (docs/notes/shell-model.md, "Full screen"; docs/notes/
@@ -60,6 +60,8 @@ async function fullscreenDiff(page: Page): Promise<void> {
 
 test.beforeEach(async () => {
   await resetMock();
+  // A spec about thread tabs: a reset is a new home, on Panes.
+  await threadsOpenAsTabs();
 });
 
 test("cmd+shift+enter shows the pane over the whole grid, the others unmounted; Escape and the exit control leave", async ({ page }) => {

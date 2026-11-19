@@ -236,6 +236,25 @@ describe("ConfirmDialog", () => {
     expect(screen.getByTestId("confirm-ok").className).not.toContain("bg-cf-success");
   });
 
+  it("a neutral question (switching Threads open as) is calm: the info icon and the plain primary confirm, no red", () => {
+    render(<ConfirmDialog />);
+    act(() => {
+      void requestConfirm({ title: "Switch to Panes?", message: "Nothing is lost.", confirmLabel: "Switch to Panes", tone: "neutral" });
+    });
+    expect(screen.getByTestId("confirm-dialog").dataset.tone).toBe("neutral");
+    const icon = screen.getByTestId("confirm-icon");
+    expect(icon.dataset.tone).toBe("neutral");
+    expect(icon.getAttribute("class")).toContain("text-cf-info-text");
+    expect(icon.getAttribute("class")).not.toContain("text-cf-error-text");
+    const ok = screen.getByTestId("confirm-ok");
+    expect(ok.getAttribute("data-variant")).toBe("default");
+    expect(ok.className).not.toContain("bg-cf-success");
+    expect(ok.textContent).toBe("Switch to Panes");
+    act(() => {
+      answerConfirm(false);
+    });
+  });
+
   it("a guarded success-toned question keeps the guard: fixed colours, Cancel focused, Confirm off until armed", () => {
     vi.useFakeTimers();
     try {

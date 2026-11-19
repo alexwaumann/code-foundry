@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { openApp, resetMock, mockPost, row, infoCardOff } from "./fixtures";
+import { infoCardOff, mockPost, openApp, resetMock, row, threadsOpenAsTabs } from "./fixtures";
 
 // Switching between threads (docs/notes/thread-switch-place.md), only what needs a browser:
 // what each painted frame of a long conversation shows as its tab opens (no frame without
@@ -9,6 +9,8 @@ import { openApp, resetMock, mockPost, row, infoCardOff } from "./fixtures";
 
 test.beforeEach(async () => {
   await resetMock();
+  // A spec about thread tabs: a reset is a new home, on Panes.
+  await threadsOpenAsTabs();
   await infoCardOff();
   await mockPost("thread?state=long");
 });

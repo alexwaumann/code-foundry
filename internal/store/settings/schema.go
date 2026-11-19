@@ -604,8 +604,9 @@ var staticFields = []Field{
 			"As Panes, with one thread pane per space. Every thread opens there.",
 		},
 		EnumExamples: []string{"", "", ""},
-		Default:      ThreadsOpenAsTabs,
-		bind:         func(s *Settings) any { return &s.Layout.ThreadsOpenAs },
+		// Tabs until 2026-11-19: a home from before keeps it (defaultchange.go).
+		Default: ThreadsOpenAsPanes,
+		bind:    func(s *Settings) any { return &s.Layout.ThreadsOpenAs },
 	},
 	{
 		Key: KeyThreadInfo, Group: GroupLayout, Page: PageAppearance, Section: "panes", Type: Bool, Title: "Thread info by default",

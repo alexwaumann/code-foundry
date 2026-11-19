@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { dragSelect, infoCardOff, invocations, mockPost, openApp, openTooltip, resetMock, row, textPoints } from "./fixtures";
+import { dragSelect, infoCardOff, invocations, mockPost, openApp, openTooltip, resetMock, row, textPoints, threadsOpenAsTabs } from "./fixtures";
 
 // Citations (docs/notes/citations.md): select text in one of Claude's answers, Cite,
 // comment, and the citation lands in the composer as an amber chip; sent, the bubble
@@ -8,6 +8,8 @@ import { dragSelect, infoCardOff, invocations, mockPost, openApp, openTooltip, r
 
 test.beforeEach(async () => {
   await resetMock();
+  // A spec about thread tabs: a reset is a new home, on Panes.
+  await threadsOpenAsTabs();
   // The card off for threads never toggled (on by default), so its toggle shows it.
   await infoCardOff();
   await mockPost("thread?state=idle");
