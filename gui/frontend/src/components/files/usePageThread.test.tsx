@@ -57,7 +57,7 @@ describe("usePageThread: the daemon's word (docs/notes/page-ownership-gui.md)", 
     [
       "unavailable: refused with the daemon's reason",
       "",
-      access({ path: "", consent: "unavailable", answer: "unavailable" as never, unavailableReason: "/x/a.html is not under your home folder" }),
+      access({ path: "", consent: "unavailable", unavailableReason: "/x/a.html is not under your home folder" }),
       { thread: null, bridge: { kind: "refused", error: { code: "unavailable", message: "Code Foundry gives this page no bridge: /x/a.html is not under your home folder" } } },
     ],
   ])("%s", (_name, key, page, want) => {

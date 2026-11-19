@@ -885,7 +885,7 @@ describe("bridge host: a page no thread owns", () => {
     expect(res.error.message).toMatch(/^this page has no thread .*thread\.list needs one unless its args name the thread: .*missing --id/);
   });
 
-  it("allowed: follows app-wide sources, and refuses its own thread's, saying it has none", async () => {
+  it("allowed: follows app-wide sources, and refuses its own thread's, saying it has none", () => {
     const { h, posts } = host(null, ALLOWED);
     h.receive({ cf: 1, type: "cf:on", id: "s", source: "thread-list" });
     h.receive({ cf: 1, type: "cf:on", id: "t", source: "thread" });

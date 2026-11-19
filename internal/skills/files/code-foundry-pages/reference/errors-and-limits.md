@@ -12,7 +12,8 @@ show `e.message` in the page where it happened (that row, that button); `alert()
 
   - `gesture`: called outside a click or key press: move the call into the handler.
   - `declined`: the user said no: not an error. Button back, at most a muted "Not merged".
-  - `unavailable`: no such verb, no thread, or (from `cf.on`) a source the app lacks now.
+  - `unavailable`: no such verb, the user has not allowed the page, a call that needs a thread
+    from a page with none, or (from `cf.on`) a source the app lacks now.
   - `invalid`: a wrong or missing arg: fix the call (`code-foundry help <verb>`). Also a second
     question while one is open, or too soon after a no (the message says how long): ask once
     per press.
@@ -33,6 +34,11 @@ show `e.message` in the page where it happened (that row, that button); `alert()
   null: ask in the page (`Dialog` from `@cf/ui`). A `download` link or a file made in script saves
   nothing: save it with `file.export` from the click (`verbs.md`) and show the path it answers.
   Each one shows in the page's error badge.
-- **Storage is per thread.** The same file in another thread starts empty.
+- **Storage is per thread.** A page belongs to the thread that last showed or wrote it (its
+  bridge acts as that thread in any tab); shown by another thread, it starts empty there.
+- **A page no thread owns** (the user opened a file a script wrote) asks the user once whether it
+  may use Code Foundry; `cf.ready` waits for the answer. Allowed: `cf.thread` is null, `cf.storage`
+  is its own (per file), `cf.fetch` works, a verb runs with no thread (pass ids: `thread.get` needs
+  `id`), every source but `thread`. Not allowed: every call is refused, saying so.
 - **Data a source lacks** (closed PRs, another repo): a read verb through `cf.run`, else the
   service's API through `cf.fetch`. A plugin cannot feed a page: never offer it.

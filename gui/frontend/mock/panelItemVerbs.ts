@@ -197,7 +197,7 @@ function alias(c: Command): Command {
 }
 
 /** The item verbs over `lookup`, opening their tabs through `place`. */
-export function panelItemCommands(lookup: (id: string) => ItemThread | undefined, place?: PlaceTab): Command[] {
+export function panelItemCommands(lookup: (id: string) => ItemThread | undefined, place?: PlaceTab, pageShown?: (path: string, thread: string) => void): Command[] {
   const when = (ctx: UiContext | undefined) => Boolean(ctx?.activeThreadId);
   const show = (ctx: UiContext | undefined, args: Record<string, string>, kind: string, params: (t: ItemThread, id: string) => Record<string, string>): string => {
     const id = args.thread || ctx?.activeThreadId || "";
@@ -256,10 +256,12 @@ export function panelItemCommands(lookup: (id: string) => ItemThread | undefined
       },
       when,
       run: (ctx, args) =>
-        show(ctx, args, "file", (t) => {
+        show(ctx, args, "file", (t, id) => {
           const path = args.path ?? "";
           if (!path.startsWith("/")) throw new CommandError("invalid", `want an absolute path, got "${path}"`);
           if (!/\.html?$/i.test(path)) throw new CommandError("invalid", `${path} is not an .html or .htm file (view.open.file shows any file)`);
+          // The thread showed the page: it owns it now (docs/notes/page-ownership-daemon.md).
+          pageShown?.(path, id);
           const title = tabTitle(args);
           return { path, project: t.projectId, base: t.worktreePath, page: "1", ...(title ? { title } : {}) };
         }),

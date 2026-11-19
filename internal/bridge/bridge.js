@@ -5,13 +5,12 @@
  *
  * gives the page window.cf:
  *   cf.ready                      Promise, resolved once the app said hello (cf:ready)
- *   cf.thread {id, name} | null   the thread the page acts for: the one that last showed or wrote it;
- *                                 null for a page no thread owns, which works once the user allows it
+ *   cf.thread {id, name} | null   the thread that last showed or wrote the page; null: none (errors-and-limits.md)
  *   cf.theme {id, scheme, vars}   the app's theme; cf.onTheme(fn) on every change
  *   cf.run(verb, args?, opts?)    Promise of {text, json}; rejects with {code, message}
  *   cf.on(source, fn) / cf.off    live data, fn(value, source): now, then on change; on returns an unsubscribe
  *   cf.resize(height?)            the card follows the page's height by itself
- *   cf.storage(prefix?)           the page's storage (its thread's, or its file's), kept across app restarts
+ *   cf.storage(prefix?)           the page's storage, kept across app restarts
  *   cf.fetch(url, init?)          Promise of {status, ok, headers, text(), json()}; the app makes it: no CORS
  *
  * A verb that is not read-only runs only from a user gesture in the page (a click, a key).
