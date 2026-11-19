@@ -8,6 +8,8 @@ import (
 	"strings"
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
+	"github.com/alexwaumann/code-foundry/internal/fsx"
+	"github.com/alexwaumann/code-foundry/internal/paths"
 )
 
 // view.open.page (view.panel.page): an HTML page in a tab beside a thread only, with no card in its
@@ -62,6 +64,32 @@ func (d ViewDeps) runPanelPage(ctx context.Context, uctx Context, a Args) (Resul
 	return res, nil
 }
 
+// inPagesRoot reports whether the file at p (symlinks followed) is in the threads' pages
+// directories' folder (PagesRoot), which may be outside home.
+func (d ViewDeps) inPagesRoot(p string) bool {
+	if d.PagesRoot == "" || p == "" {
+		return false
+	}
+	real, err := filepath.EvalSymlinks(p)
+	if err != nil {
+		return false
+	}
+	for _, root := range []string{d.PagesRoot, evalOr(d.PagesRoot)} {
+		if fsx.Within(filepath.Clean(root), real) {
+			return true
+		}
+	}
+	return false
+}
+
+// evalOr is p with its symlinks resolved, or p when that fails.
+func evalOr(p string) string {
+	if real, err := filepath.EvalSymlinks(p); err == nil {
+		return real
+	}
+	return p
+}
+
 // pageCheck is view.open.page's check: an .html or .htm file (as view.inline's), then
 // view.open.file's, plus home only (a temp folder is everyone's, and the bridge acts as the
 // thread) and the params that make the tab the thread's page.
@@ -75,9 +103,10 @@ func (d ViewDeps) pageCheck(ctx context.Context, t *v1.Thread, a Args) (map[stri
 	if err != nil {
 		return nil, err
 	}
-	if outsideHome {
+	if outsideHome && !d.inPagesRoot(params["path"]) {
 		return nil, InvalidArg("path", "%s is outside your home directory, and a page with the thread's bridge must be under it: "+
-			"move it there, or show it without the bridge with view.open.file", a.Path("path"))
+			"move it to your pages directory ($%s) or elsewhere under home, or show it without the bridge with view.open.file",
+			a.Path("path"), paths.EnvPages)
 	}
 	params["page"] = "1"
 	title, err := diffText(a, "title", maxDiffTitle)

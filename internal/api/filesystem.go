@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 
 	"connectrpc.com/connect"
 
@@ -110,7 +111,7 @@ func (h *Filesystem) WithTemp(temps []string) *Filesystem {
 func (h *Filesystem) WithPagesRoot(root string) *Filesystem {
 	h.pagesRoot = root
 	if real, err := filepath.EvalSymlinks(root); err == nil {
-		h.pagesRoot = real
+		h.pagesRoot = fsx.OnDiskPath(real)
 	}
 	return h
 }
@@ -145,7 +146,8 @@ func (h *Filesystem) pageThread(real string) string {
 	if h.pagesRoot == "" || real == "" {
 		return ""
 	}
-	rel, err := filepath.Rel(h.pagesRoot, real)
+	// Both as spelled on disk: …/PAGES/<id>/x.html is the same folder on APFS.
+	rel, err := filepath.Rel(h.pagesRoot, fsx.OnDiskPath(real))
 	if err != nil || !filepath.IsLocal(rel) {
 		return ""
 	}
@@ -411,6 +413,8 @@ func fileError(err error) error {
 		return connect.NewError(connect.CodeFailedPrecondition, err)
 	case errors.Is(err, fsx.ErrDiskFull):
 		return connect.NewError(connect.CodeResourceExhausted, err)
+	case errors.Is(err, syscall.ENAMETOOLONG):
+		return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("the path or a name in it is too long: %w", err))
 	}
 	return connect.NewError(connect.CodeInternal, err)
 }

@@ -49,6 +49,7 @@ import { scriptAgents, type AgentRunInit } from "./agents";
 import { scriptEmberChat } from "./emberChat";
 import type { WorkerCardScript } from "./workerCard";
 import { CommandError } from "./errors";
+import { HOME } from "./filesystem";
 import { Hub } from "./hub";
 import { mcpFixture, type McpStatusInit } from "./mcp";
 import { SETUP_PROMPT, type SetupMessage } from "./setup";
@@ -1435,13 +1436,14 @@ export class MockThreadLogs {
 
   /**
    * ThreadService.ShowHtml (code-foundry view.inline; docs/notes/inline-html.md): an html
-   * item at the end of the log, its path relative to the thread's cwd when inside it. Only
-   * the extension is checked here (the daemon also wants a file under home).
+   * item at the end of the log, its path relative to the thread's cwd when inside it, unless
+   * that cwd is home (a thread of no project: absolute reads as `~/…`). Only the extension is
+   * checked here (the daemon also wants a file under home or the pages root).
    */
   showHtml(id: string, path: string, title: string): ItemInit {
     if (!/\.html?$/i.test(path)) throw new CommandError("invalid", `${path} is not an .html or .htm file`);
     const cwd = this.world.worktreeOf(id);
-    const rel = cwd && path.startsWith(`${cwd}/`) ? path.slice(cwd.length + 1) : path;
+    const rel = cwd && cwd !== HOME && path.startsWith(`${cwd}/`) ? path.slice(cwd.length + 1) : path;
     return this.append(id, this.item(id, { case: "html", value: { path: rel, title, baseDir: cwd } }));
   }
 

@@ -33,7 +33,8 @@ func TestPageCommands(t *testing.T) {
 		"/h/new.html":   {Path: "/h/new.html"},
 	}}
 	reg := pageRegistry(t, b)
-	app, cli, pg := command.Context{}, command.Context{Origin: command.OriginCLI}, command.Context{Origin: command.OriginPage, ActiveThreadID: "t-1"}
+	app, cli, pg := command.Context{ActiveView: "thread"}, command.Context{Origin: command.OriginCLI}, command.Context{Origin: command.OriginPage, ActiveThreadID: "t-1"}
+	unknown := command.Context{Origin: command.OriginUnknown} // internal/api's callerContext for a call with neither
 	for _, tt := range []struct {
 		name    string
 		uctx    command.Context
@@ -63,6 +64,10 @@ func TestPageCommands(t *testing.T) {
 			wantMsg: "counts once no thread owns the page"},
 		{name: "a page cannot allow itself", uctx: pg, verb: "page.allow", path: "/h/new.html", code: connect.CodePermissionDenied},
 		{name: "nor stop another", uctx: pg, verb: "page.disallow", path: "/h/new.html", code: connect.CodePermissionDenied},
+		{name: "a caller that names no origin nor view cannot allow", uctx: unknown, verb: "page.allow", path: "/h/new.html", code: connect.CodePermissionDenied},
+		{name: "nor stop allowing", uctx: unknown, verb: "page.disallow", path: "/h/new.html", code: connect.CodePermissionDenied},
+		{name: "but may read", uctx: unknown, verb: "page.get", path: "/h/new.html",
+			want: command.PageView{Path: "/h/new.html", Consent: "allowed", Answer: "allowed"}},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			res, err := reg.Invoke(ctx, tt.uctx, tt.verb, map[string]string{"path": tt.path})

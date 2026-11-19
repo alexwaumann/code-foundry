@@ -81,6 +81,10 @@ type ViewDeps struct {
 	// (docs/notes/page-ownership-daemon.md); view.inline's ShowHtml records its own. Nil:
 	// not recorded.
 	PageShown func(ctx context.Context, threadID, path string)
+	// PagesRoot is the directory the threads' pages directories are in (paths.Pages):
+	// view.open.page takes a page there even when it is outside home (a CODE_FOUNDRY_HOME
+	// beside the user's, as the page store does). Empty: home only.
+	PagesRoot string
 }
 
 // noFileEdits is FileEdits when nothing backs it.

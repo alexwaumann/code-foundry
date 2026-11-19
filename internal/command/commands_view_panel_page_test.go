@@ -3,6 +3,9 @@ package command_test
 import (
 	"context"
 	"errors"
+	"fmt"
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -88,6 +91,37 @@ func TestPanelPage(t *testing.T) {
 				t.Errorf("warnings = %q, want %q", res.Warnings, tt.wantWarnings)
 			}
 		})
+	}
+}
+
+// A thread's pages directory outside home (a CODE_FOUNDRY_HOME beside the user's) is
+// shown with the bridge, as the page store owns it; anything else outside home is not.
+func TestPanelPagePagesRootOutsideHome(t *testing.T) {
+	root, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	pages := filepath.Join(root, "cf-home", "pages")
+	own, loose := filepath.Join(pages, "s-aaaaaaaaaaa1", "own.html"), filepath.Join(root, "loose.html")
+	for _, p := range []string{own, loose} {
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, []byte("<p>x</p>"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	files := &commandtest.Files{Files: []string{own, loose}, OutsideHome: []string{own, loose}}
+	reg, emit := panelRegistryWith(t, &commandtest.Thread{Current: richThread()}, panelDeps{windows: 1, files: files, pagesRoot: pages})
+	ctx := command.Context{ActiveThreadID: "s-aaaaaaaaaaa1"}
+	res, err := reg.Invoke(context.Background(), ctx, "view.panel.page", map[string]string{"path": own})
+	if err != nil {
+		t.Fatalf("a page in the pages root: %v", err)
+	}
+	openedTab(t, reg, emit, res, "s-aaaaaaaaaaa1", map[string]string{"path": own, "project": "r1", "base": "/wt", "page": "1"})
+	_, err = reg.Invoke(context.Background(), ctx, "view.panel.page", map[string]string{"path": loose})
+	if checkItemErr(t, err, 0, "path"); !strings.Contains(fmt.Sprint(err), "$CODE_FOUNDRY_PAGES") {
+		t.Errorf("outside home: %v; want it to name the pages directory", err)
 	}
 }
 

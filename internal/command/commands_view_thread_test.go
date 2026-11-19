@@ -47,6 +47,8 @@ type panelDeps struct {
 	notes    notification.Store
 	// pageShown is told of the pages view.open.page shows (all.Deps.PageShown).
 	pageShown func(ctx context.Context, threadID, path string)
+	// pagesRoot is the threads' pages directories' folder (all.Deps.PagesRoot).
+	pagesRoot string
 }
 
 // panelRegistry registers every command, with threads read from th and one window open.
@@ -153,6 +155,7 @@ func panelRegistryWith(t *testing.T, th *commandtest.Thread, d panelDeps) (*comm
 		deps.Notification = d.notes
 	}
 	deps.PageShown = d.pageShown
+	deps.PagesRoot = d.pagesRoot
 	if err := all.Register(reg, deps); err != nil {
 		t.Fatal(err)
 	}

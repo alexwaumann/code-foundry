@@ -10,13 +10,16 @@ save as artifact) over the File tab's sandboxed frame. Daemon, CLI, GUI, mock an
 
 - `ThreadItem.html` (`HtmlItem{path, title, base_dir}`), kind `html` in `thread_items`
   (the JSON `data` column gains `html: {path, title, base_dir}`; no migration). `path` is
-  relative to the thread's cwd when inside it, else absolute; `base_dir` is that cwd when
+  relative to the thread's cwd when inside it, else absolute (also when the cwd is home
+  itself, a thread of no project: `~/…` reads better there); `base_dir` is that cwd when
   the item was made, so the GUI resolves the path without the thread's current placement.
   The page's content is never stored: the GUI renders the file from disk each time, so a
   restart (or an edit) re-renders it.
 - `ThreadService.ShowHtml(thread_id, path, title)` (store `ShowHTML`,
   `internal/store/thread/html.go`) checks the file (absolute, `.html`/`.htm` in any case,
-  under home with symlinks followed, a regular file: InvalidArgument; missing: NotFound)
+  under home or the pages root with symlinks followed, a regular file: InvalidArgument,
+  saying what to do instead; missing: NotFound; a page already shown under another
+  spelling, a symlink or another case, is the same card)
   and appends the item: on the runner's goroutine while the thread runs (a `threadCmd`,
   so it lands inside the running turn, after the Bash call that made it), else straight
   onto the stopped thread's log, like the wake-limit note.

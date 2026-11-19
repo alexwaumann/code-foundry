@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/alexwaumann/code-foundry/internal/bus"
+	"github.com/alexwaumann/code-foundry/internal/fsx/fsxtest"
 )
 
 func TestHTMLPage(t *testing.T) {
@@ -38,29 +39,42 @@ func TestHTMLPage(t *testing.T) {
 	if err := os.Symlink(far, link); err != nil {
 		t.Fatal(err)
 	}
+	// The pages root outside home, as with a CODE_FOUNDRY_HOME beside the user's.
+	pages := filepath.Join(root, "cf-home", "pages")
+	if err := os.MkdirAll(filepath.Join(pages, "t-1"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	own := write(filepath.Join(pages, "t-1", "own.html"))
 	tests := []struct {
 		name     string
+		cwd      string
 		path     string
 		want     string
 		wantErr  error
 		wantBase string
+		wantMsg  string
 	}{
-		{"inside the cwd is relative", inCwd, "docs/page.html", nil, cwd},
-		{"an .HTM extension in any case", upper, "Page.HTM", nil, cwd},
-		{"outside the cwd stays absolute", inHome, inHome, nil, cwd},
-		{"a relative path", "docs/page.html", "", ErrInvalidArgument, ""},
-		{"not html", txt, "", ErrInvalidArgument, ""},
-		{"outside home", far, "", ErrInvalidArgument, ""},
-		{"a symlink out of home", link, "", ErrInvalidArgument, ""},
-		{"a directory", filepath.Join(cwd, "docs", "dir.html"), "", ErrInvalidArgument, ""},
-		{"missing", filepath.Join(cwd, "gone.html"), "", ErrNotFound, ""},
+		{"inside the cwd is relative", cwd, inCwd, "docs/page.html", nil, cwd, ""},
+		{"an .HTM extension in any case", cwd, upper, "Page.HTM", nil, cwd, ""},
+		{"outside the cwd stays absolute", cwd, inHome, inHome, nil, cwd, ""},
+		{"a cwd of home (no project) stays absolute", home, inHome, inHome, nil, home, ""},
+		{"a thread's pages directory outside home", cwd, own, own, nil, cwd, ""},
+		{"a relative path", cwd, "docs/page.html", "", ErrInvalidArgument, "", ""},
+		{"not html", cwd, txt, "", ErrInvalidArgument, "", "view.open.file shows any other file"},
+		{"outside home", cwd, far, "", ErrInvalidArgument, "", "pages directory ($CODE_FOUNDRY_PAGES)"},
+		{"a symlink out of home", cwd, link, "", ErrInvalidArgument, "", "links outside your home directory"},
+		{"a directory", cwd, filepath.Join(cwd, "docs", "dir.html"), "", ErrInvalidArgument, "", "is a directory, not a file"},
+		{"missing", cwd, filepath.Join(cwd, "gone.html"), "", ErrNotFound, "", ""},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := htmlPage(home, cwd, tt.path, " Hello ")
+			got, err := htmlPage(home, pages, tt.cwd, tt.path, " Hello ")
 			if tt.wantErr != nil {
 				if !errors.Is(err, tt.wantErr) {
 					t.Fatalf("err = %v, want %v", err, tt.wantErr)
+				}
+				if !strings.Contains(fmt.Sprint(err), tt.wantMsg) {
+					t.Errorf("err = %v, want it to say %q", err, tt.wantMsg)
 				}
 				return
 			}
@@ -91,7 +105,7 @@ func TestShowHTMLLiveStoppedAndRestart(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if live.Kind != KindHTML || live.HTML == nil || live.HTML.Path != "hello.html" || live.HTML.BaseDir != e.home || live.HTML.Title != "Hello" {
+	if live.Kind != KindHTML || live.HTML == nil || live.HTML.Path != page || live.HTML.BaseDir != e.home || live.HTML.Title != "Hello" {
 		t.Fatalf("live item = %+v (html %+v)", live, live.HTML)
 	}
 	if _, err := e.m.ShowHTML(e.ctx(), s.ID, filepath.Join(e.home, "nope.html"), "", ShowHTMLOptions{}); !errors.Is(err, ErrNotFound) || strings.Contains(err.Error(), "thread") || !strings.HasPrefix(err.Error(), "no file at ") {
@@ -118,7 +132,7 @@ func TestShowHTMLLiveStoppedAndRestart(t *testing.T) {
 			got = append(got, it)
 		}
 	}
-	if len(got) != 2 || got[0].ID != live.ID || got[1].ID != stopped.ID || got[0].HTML.Title != "Hello" || got[1].HTML.Path != "hello.html" {
+	if len(got) != 2 || got[0].ID != live.ID || got[1].ID != stopped.ID || got[0].HTML.Title != "Hello" || got[1].HTML.Path != page {
 		t.Fatalf("reloaded html items = %+v", got)
 	}
 	if _, err := e.m.ShowHTML(e.ctx(), "s-000000000000", page, "", ShowHTMLOptions{}); err == nil {
@@ -241,6 +255,11 @@ func TestShowHTMLReusesTheLiveCard(t *testing.T) {
 	if err := os.WriteFile(page, []byte("<p>hi</p>"), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	link := filepath.Join(e.home, "link.html")
+	if err := os.Symlink(page, link); err != nil {
+		t.Fatal(err)
+	}
+	insensitive := fsxtest.Insensitive(t, e.home)
 	for _, live := range []bool{true, false} {
 		t.Run(fmt.Sprintf("live %t", live), func(t *testing.T) {
 			var s Thread
@@ -258,8 +277,18 @@ func TestShowHTMLReusesTheLiveCard(t *testing.T) {
 				t.Fatalf("second: %+v err %v; want the first card, title kept", again, err)
 			}
 			renamed, err := e.m.ShowHTML(e.ctx(), s.ID, page, "PR tracker", ShowHTMLOptions{})
-			if err != nil || !renamed.Reused || renamed.Item.ID != first.Item.ID || renamed.Item.HTML.Title != "PR tracker" || renamed.Item.HTML.Path != "p.html" {
+			if err != nil || !renamed.Reused || renamed.Item.ID != first.Item.ID || renamed.Item.HTML.Title != "PR tracker" || renamed.Item.HTML.Path != page {
 				t.Fatalf("renamed: %+v err %v", renamed, err)
+			}
+			// The same file spelled otherwise (a link to it, another letter case) is the same card.
+			others := []string{link}
+			if insensitive {
+				others = append(others, filepath.Join(e.home, "P.HTML"))
+			}
+			for _, other := range others {
+				if got, err := e.m.ShowHTML(e.ctx(), s.ID, other, "", ShowHTMLOptions{}); err != nil || !got.Reused || got.Item.ID != first.Item.ID {
+					t.Fatalf("%s: %+v err %v; want the first card", other, got, err)
+				}
 			}
 			extra, err := e.m.ShowHTML(e.ctx(), s.ID, page, "", ShowHTMLOptions{Again: true})
 			if err != nil || extra.Reused || extra.Item.ID == first.Item.ID || extra.Earlier != first.Item.ID {

@@ -11,7 +11,12 @@
 //   - the storage of an allowed page no thread owns (cf.storage without a thread), one
 //     file per page, with the limits of a thread's (internal/pagestorage).
 //
-// Everything is keyed by the file's absolute path with its symlinks resolved. A file the
+// Everything is keyed by the file's absolute path with its symlinks resolved, spelled as
+// its volume stores it (fsx.OnDiskPath): APFS ignores case and Unicode normalisation, so
+// …/case/report.html and an NFC spelling of a folder Finder named NFD are one page. A row
+// or a storage directory kept under another spelling of the file (by a daemon from before
+// on-disk keys, docs/notes/page-path-identity.md) is still the file's: reads find it, and
+// an answer or an owner is written to it too, so one never outlives another. A file the
 // preview refuses (Options.Guarded), one outside home and the pages root, and one that is
 // not a regular .html or .htm file never gets an owner, an answer or storage.
 package page
@@ -27,6 +32,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -81,7 +87,8 @@ const (
 
 // Access is what the daemon says about one page file.
 type Access struct {
-	// Path is the file's absolute path, symlinks resolved: the key of everything here.
+	// Path is the file's absolute path, symlinks resolved, spelled as on disk
+	// (fsx.OnDiskPath): the key of everything here.
 	Path string
 	// Owner is the owning thread's id: Recorded's, else PagesThread; "" for none.
 	Owner string
@@ -144,15 +151,20 @@ func New(ctx context.Context, o Options) (*Store, error) {
 	return s, nil
 }
 
-// spellings are p and its resolved path, without repeats; none for "".
+// spellings are p, its resolved path and that spelled as on disk, without repeats; none
+// for "".
 func spellings(p string) []string {
 	if p == "" {
 		return nil
 	}
 	p = filepath.Clean(p)
 	out := []string{p}
-	if real, err := filepath.EvalSymlinks(p); err == nil && real != p {
-		out = append(out, real)
+	if real, err := filepath.EvalSymlinks(p); err == nil {
+		for _, q := range []string{real, fsx.OnDiskPath(real)} {
+			if !slices.Contains(out, q) {
+				out = append(out, q)
+			}
+		}
 	}
 	return out
 }
@@ -166,9 +178,10 @@ func within(roots []string, p string) bool {
 	return false
 }
 
-// Resolve checks path and returns it with its symlinks resolved: an absolute path to a
-// regular .html or .htm file under home or the pages root (both as spelled and resolved),
-// not one the preview refuses. ErrInvalidArgument, ErrNotFound or ErrGuarded otherwise.
+// Resolve checks path and returns it with its symlinks resolved, spelled as on disk
+// (fsx.OnDiskPath): an absolute path to a regular .html or .htm file under home or the
+// pages root (both as spelled and resolved), not one the preview refuses.
+// ErrInvalidArgument, ErrNotFound or ErrGuarded otherwise.
 func (s *Store) Resolve(path string) (string, error) {
 	if path == "" || !filepath.IsAbs(path) {
 		return "", fmt.Errorf("%w: %q is not an absolute path", ErrInvalidArgument, path)
@@ -181,6 +194,7 @@ func (s *Store) Resolve(path string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("%w: %s: %w", ErrInvalidArgument, path, err)
 	}
+	real = fsx.OnDiskPath(real)
 	switch strings.ToLower(filepath.Ext(real)) {
 	case ".html", ".htm":
 	default:
@@ -238,12 +252,77 @@ func (s *Store) Record(ctx context.Context, id, path, how string) error {
 	if id == "" {
 		return fmt.Errorf("%w: no thread", ErrInvalidArgument)
 	}
-	if _, err := s.o.DB.ExecContext(ctx, `INSERT INTO page_owners (path, thread_id, how, updated_at) VALUES (?, ?, ?, ?)
-		ON CONFLICT (path) DO UPDATE SET thread_id = excluded.thread_id, how = excluded.how, updated_at = excluded.updated_at`,
-		real, id, how, s.o.Now().UnixMilli()); err != nil {
+	now := s.o.Now().UnixMilli()
+	if err := s.write(ctx, "page_owners", real, func(tx *sql.Tx, key string) error {
+		_, err := tx.ExecContext(ctx, `INSERT INTO page_owners (path, thread_id, how, updated_at) VALUES (?, ?, ?, ?)
+			ON CONFLICT (path) DO UPDATE SET thread_id = excluded.thread_id, how = excluded.how, updated_at = excluded.updated_at`,
+			key, id, how, now)
+		return err
+	}); err != nil {
 		return fmt.Errorf("page: record %s as %s's: %w", real, id, err)
 	}
 	return nil
+}
+
+// keys are the keys table (page_owners or page_consent) has rows of the page at real
+// under: real, and any other spelling of the file (fsx.OtherSpelling), kept by a daemon
+// from before keys were on-disk spellings. The newest row first; real first among rows
+// of the same time.
+func (s *Store) keys(ctx context.Context, q queryer, table, real string) ([]string, error) {
+	rows, err := q.QueryContext(ctx, `SELECT path FROM `+table+` WHERE path = ? OR path LIKE ? ESCAPE '\'
+		ORDER BY updated_at DESC, path = ? DESC`, real, fsx.LikeSpellings(real), real)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+	var out []string
+	for rows.Next() {
+		var p string
+		if err := rows.Scan(&p); err != nil {
+			return nil, err
+		}
+		if p == real || fsx.OtherSpelling(p, real) {
+			out = append(out, p)
+		}
+	}
+	return out, rows.Err()
+}
+
+type queryer interface {
+	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
+}
+
+// write runs upsert, in one transaction, for real and for every other key table has rows
+// of the same file under (keys): an answer or an owner given under any spelling is the
+// file's under all of them, whichever row a read finds first.
+func (s *Store) write(ctx context.Context, table, real string, upsert func(tx *sql.Tx, key string) error) error {
+	tx, err := s.o.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+	keys, err := s.keys(ctx, tx, table, real)
+	if err != nil {
+		return err
+	}
+	if !slices.Contains(keys, real) {
+		keys = append(keys, real)
+	}
+	for _, k := range keys {
+		if err := upsert(tx, k); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
+// newest is the key of table's newest row for the page at real (keys), "" for none.
+func (s *Store) newest(ctx context.Context, table, real string) (string, error) {
+	keys, err := s.keys(ctx, s.o.DB, table, real)
+	if err != nil || len(keys) == 0 {
+		return "", err
+	}
+	return keys[0], nil
 }
 
 // Access is what the daemon says about the page at path (see Access); Resolve's errors
@@ -258,7 +337,10 @@ func (s *Store) Access(ctx context.Context, path string) (Access, error) {
 
 func (s *Store) access(ctx context.Context, real string) (Access, error) {
 	a := Access{Path: real, PagesThread: s.pagesThread(real)}
-	err := s.o.DB.QueryRowContext(ctx, `SELECT thread_id, how FROM page_owners WHERE path = ?`, real).Scan(&a.Recorded, &a.How)
+	key, err := s.newest(ctx, "page_owners", real)
+	if err == nil && key != "" {
+		err = s.o.DB.QueryRowContext(ctx, `SELECT thread_id, how FROM page_owners WHERE path = ?`, key).Scan(&a.Recorded, &a.How)
+	}
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return Access{}, fmt.Errorf("page: owner of %s: %w", real, err)
 	}
@@ -270,7 +352,13 @@ func (s *Store) access(ctx context.Context, real string) (Access, error) {
 		a.Owner = a.PagesThread
 	}
 	var allowed sql.NullBool
-	err = s.o.DB.QueryRowContext(ctx, `SELECT allowed FROM page_consent WHERE path = ?`, real).Scan(&allowed)
+	key, err = s.newest(ctx, "page_consent", real)
+	if err == nil {
+		err = sql.ErrNoRows
+		if key != "" {
+			err = s.o.DB.QueryRowContext(ctx, `SELECT allowed FROM page_consent WHERE path = ?`, key).Scan(&allowed)
+		}
+	}
 	switch {
 	case errors.Is(err, sql.ErrNoRows):
 	case err != nil:
@@ -285,15 +373,20 @@ func (s *Store) access(ctx context.Context, real string) (Access, error) {
 
 // SetConsent records the user's answer for the page at path, allowed or not, and returns
 // its access after. The answer is kept whether or not a thread owns the page now: it
-// counts once none does.
+// counts once none does. It is the file's under every spelling (write), so "Stop
+// allowing" given under one is never undone by an older answer under another.
 func (s *Store) SetConsent(ctx context.Context, path string, allowed bool) (Access, error) {
 	real, err := s.Resolve(path)
 	if err != nil {
 		return Access{}, err
 	}
-	if _, err := s.o.DB.ExecContext(ctx, `INSERT INTO page_consent (path, allowed, updated_at) VALUES (?, ?, ?)
-		ON CONFLICT (path) DO UPDATE SET allowed = excluded.allowed, updated_at = excluded.updated_at`,
-		real, allowed, s.o.Now().UnixMilli()); err != nil {
+	now := s.o.Now().UnixMilli()
+	if err := s.write(ctx, "page_consent", real, func(tx *sql.Tx, key string) error {
+		_, err := tx.ExecContext(ctx, `INSERT INTO page_consent (path, allowed, updated_at) VALUES (?, ?, ?)
+			ON CONFLICT (path) DO UPDATE SET allowed = excluded.allowed, updated_at = excluded.updated_at`,
+			key, allowed, now)
+		return err
+	}); err != nil {
 		return Access{}, fmt.Errorf("page: consent of %s: %w", real, err)
 	}
 	return s.access(ctx, real)
@@ -329,6 +422,43 @@ func (s *Store) storageDir(real string) string {
 // pathFile names, in a page's storage directory, the page it is for (Sweep reads it).
 const pathFile = "path"
 
+// storageOf is the storage directory of the page at real and the key it is kept under
+// (its path file's): real's own when it has one or none of the file's other spellings
+// has one, else the newest written of those (a daemon from before on-disk keys kept it
+// under the spelling it was given). "" for none kept. Called with storeMu held.
+func (s *Store) storageOf(real string) (dir, key string) {
+	dir = s.storageDir(real)
+	if dir == "" {
+		return "", ""
+	}
+	if _, err := os.Stat(dir); err == nil {
+		return dir, real
+	}
+	entries, err := os.ReadDir(s.o.StorageRoot)
+	if err != nil {
+		return dir, real
+	}
+	var newest time.Time
+	for _, e := range entries {
+		if !e.IsDir() {
+			continue
+		}
+		d := filepath.Join(s.o.StorageRoot, e.Name())
+		f := filepath.Join(d, pathFile)
+		b, err := os.ReadFile(f)
+		if err != nil || s.storageDir(string(b)) != d || !fsx.OtherSpelling(string(b), real) {
+			continue
+		}
+		if fi, err := os.Stat(f); err == nil && fi.ModTime().After(newest) {
+			newest, dir, key = fi.ModTime(), d, string(b)
+		}
+	}
+	if key == "" {
+		key = real
+	}
+	return dir, key
+}
+
 // Storage is what the page at path keeps with cf.storage without a thread: key → the
 // value's JSON text. Allow's errors for a page that may not.
 func (s *Store) Storage(ctx context.Context, path string) (map[string]string, error) {
@@ -338,7 +468,8 @@ func (s *Store) Storage(ctx context.Context, path string) (map[string]string, er
 	}
 	s.storeMu.Lock()
 	defer s.storeMu.Unlock()
-	vals, err := pagestorage.Read(s.storageDir(a.Path), s.o.Log, "page", a.Path)
+	dir, _ := s.storageOf(a.Path)
+	vals, err := pagestorage.Read(dir, s.o.Log, "page", a.Path)
 	if err != nil {
 		return nil, fmt.Errorf("page: storage of %s: %w", a.Path, err)
 	}
@@ -356,16 +487,17 @@ func (s *Store) SetStorage(ctx context.Context, path, key string, value *string)
 	if err != nil {
 		return nil, err
 	}
-	dir := s.storageDir(a.Path)
-	if dir == "" {
+	if s.o.StorageRoot == "" {
 		return nil, fmt.Errorf("%w: this daemon keeps no page storage", ErrInvalidArgument)
 	}
 	s.storeMu.Lock()
 	defer s.storeMu.Unlock()
+	dir, keptAs := s.storageOf(a.Path)
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return nil, fmt.Errorf("page: storage of %s: %w", a.Path, err)
 	}
-	if err := pagestorage.WriteAtomic(filepath.Join(dir, pathFile), []byte(a.Path)); err != nil {
+	// The key its directory is named for, so Sweep keeps it (an older spelling's too).
+	if err := pagestorage.WriteAtomic(filepath.Join(dir, pathFile), []byte(keptAs)); err != nil {
 		return nil, fmt.Errorf("page: storage of %s: %w", a.Path, err)
 	}
 	vals, err := pagestorage.Set(dir, key, value, "page", s.o.Log, "page", a.Path)

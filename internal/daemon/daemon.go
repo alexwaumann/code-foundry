@@ -343,6 +343,7 @@ func Run(ctx context.Context, opts Options) (retErr error) {
 		ShippedSkills: shippedSkills(log, p.Claude()),
 		Layout:        st.layout,
 		Pages:         pages,
+		PagesRoot:     p.Pages(),
 		PageShown: func(ctx context.Context, id, path string) {
 			if err := pages.Record(ctx, id, path, page.Shown); err != nil {
 				log.Debug("a page's owner not recorded", "thread", id, "path", path, "err", err)
