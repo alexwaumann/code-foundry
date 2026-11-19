@@ -6,8 +6,8 @@ import { openPrBesidePage, PR_PANE, SLUG } from "./shell-pages";
 /**
  * A pull request's diff in a tab of its own (components/diff/PrDiffView.tsx) against the mock's
  * three-file diff (mock/prDiff.ts): where openPullRequestDiff puts it, that a second call finds it,
- * and that its code scrolls. What it shows in each state is PrDiffView.test.tsx's. Set
- * SHOTS=<dir> to save screenshots (the tab wide and narrow, and the pull request's Code tab).
+ * and that its code scrolls; the pull request page's Diff button does the same. What it shows in
+ * each state is PrDiffView.test.tsx's. Set SHOTS=<dir> to save screenshots (the tab wide and narrow).
  */
 
 test.beforeEach(async () => {
@@ -51,6 +51,19 @@ test("opens beside the pull request's tab, a second open shows that one, and the
   expect(await pane.getByTestId("file-header").boundingBox()).toEqual(header);
 });
 
+test("the pull request's Diff button opens the diff beside its tab; pressed again, it shows that one", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 600 });
+  await openPrBesidePage(page, 145, 760);
+  const pane = paneOf(page, PR_PANE);
+  await pane.getByTestId("pr-diff-button").click();
+  await expect.poll(prPaneTabs).toEqual({ kinds: ["pullrequest", "prdiff"], active: "prdiff" });
+  await expect(pane.getByTestId("pr-diff")).toBeVisible();
+  await pane.locator('[data-testid="shell-tab"][data-kind="pullrequest"] [role="tab"]').click();
+  await expect.poll(prPaneTabs).toEqual({ kinds: ["pullrequest", "prdiff"], active: "pullrequest" });
+  await pane.getByTestId("pr-diff-button").click();
+  await expect.poll(prPaneTabs).toEqual({ kinds: ["pullrequest", "prdiff"], active: "prdiff" });
+});
+
 for (const scheme of ["dark", "light"] as const) {
   test(`pull request diff tab screenshots (${scheme})`, async ({ page }) => {
     const dir = process.env.SHOTS;
@@ -63,11 +76,7 @@ for (const scheme of ["dark", "light"] as const) {
     ] as const) {
       await resetMock();
       await openPrBesidePage(page, 145, width);
-      // Before: the pull request's own Code tab.
-      await page.getByTestId("pr-tab-code").click();
-      await expect(page.getByTestId("pr-code-diff").locator("[data-line-type='change-addition']").first()).toBeVisible();
-      await page.screenshot({ path: `${dir ?? ""}/before-code-tab-${name}-${scheme}.png` });
-      await openDiff(page);
+      await pane.getByTestId("pr-diff-button").click();
       await expect(pane.getByTestId("pr-diff")).toHaveAttribute("data-layout", name === "wide" ? "rail" : "menu");
       if (name === "wide") await pane.getByRole("option").filter({ hasText: "greeting.ts" }).click();
       else {

@@ -19,13 +19,13 @@ import { openUrl, pullRequestDetailResource, pullRequestKey } from "./gh";
 import { findTab, openTab, subscribeTabs, type Tab, type TabPlaces, type TabTarget } from "@/shell/host";
 import { createResource, type Resource } from "./resource";
 
-export type PrInnerTab = "overview" | "activity" | "code";
+export type PrInnerTab = "overview" | "activity";
 export type SortOrder = "newest" | "oldest";
 /**
  * Collapsible sections: the Overview's, the readiness box's checks row (its full list),
- * the description shown whole (it fades out until Show all), and the Code tab's file list.
+ * and the description shown whole (it fades out until Show all).
  */
-export type PrSection = "description" | "fullDescription" | "checks" | "comments" | "files";
+export type PrSection = "description" | "fullDescription" | "checks" | "comments";
 
 /** Which change of the pull request is running (`changing`): each button spins only for its own. */
 export type PrChange = "ready" | "draft" | "auto-merge" | "cancel-auto-merge";
@@ -41,7 +41,7 @@ export interface PrTabState {
 export const defaultPrTabState: PrTabState = { inner: "overview", commentOrder: "newest", timelineOrder: "newest", open: {} };
 
 /** Sections shown unfolded until the user folds them. */
-export const sectionOpenByDefault: Record<PrSection, boolean> = { description: true, fullDescription: false, checks: false, comments: true, files: true };
+export const sectionOpenByDefault: Record<PrSection, boolean> = { description: true, fullDescription: false, checks: false, comments: true };
 
 interface PrPanelState {
   /** By the pull request tab's layout id, linked or not (a tab is known by its id wherever it is). */
@@ -89,6 +89,15 @@ subscribeTabs(pruneClosedTabs);
 
 export function updatePrTab(key: string, f: (s: PrTabState) => PrTabState): void {
   usePrPanelStore.setState((s) => ({ byTab: { ...s.byTab, [key]: f(s.byTab[key] ?? defaultPrTabState) } }));
+}
+
+/**
+ * The inner tab a pull request tab shows: Activity when it was left there, else Overview. A
+ * tab left on the Code tab (gone: the diff is a tab of its own, docs/notes/pr-diff-button-menu.md)
+ * or on anything unknown shows Overview.
+ */
+export function innerTabOf(s: PrTabState | undefined): PrInnerTab {
+  return s?.inner === "activity" ? "activity" : "overview";
 }
 
 export function setInnerTab(key: string, inner: PrInnerTab): void {

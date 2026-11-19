@@ -1,6 +1,7 @@
 /**
- * The PR Code tab's data (components/pr/PrCode.tsx): the pull request's diff, read while
- * the tab shows, and warmed ahead of it while the pull request does (warmPullRequestDiff). Keyed like the detail (pullRequestKey). The daemon serves its cached
+ * A pull request's diff tab's data (components/diff/PrDiffView.tsx): the pull request's diff,
+ * read while the tab shows, and warmed ahead of it while the pull request's page does, for its
+ * Diff button (warmPullRequestDiff). Keyed like the detail (pullRequestKey). The daemon serves its cached
  * diff when it was fetched for the head the cached detail has, so the tab reads it only
  * after the detail loaded; when the detail's head moves (a push the poll saw, a
  * pull_request_detail_updated re-read), the tab invalidates it (syncPullRequestDiff).
@@ -36,7 +37,7 @@ export const pullRequestDiffResource = createResource(
 export const DIFF_WARM_AFTER_MS = 600;
 
 /**
- * Reads key's diff before the Code tab asks, behind what someone is waiting for: it starts
+ * Reads key's diff before the diff tab asks, behind what someone is waiting for: it starts
  * once no detail read is in flight, and not at all while reads would fail or spend a budget
  * that is running out (prefetchHeld). Returns the release: a read not finished by then is
  * abandoned.

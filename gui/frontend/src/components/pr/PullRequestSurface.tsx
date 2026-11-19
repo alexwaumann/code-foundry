@@ -9,12 +9,12 @@ import { cn } from "@/lib/utils";
 import { pullRequestDetailResource, pullRequestKey, useViewerLogin } from "@/stores/gh";
 import { useCurrentTarget } from "@/shell/host";
 import { pullRequestDiffResource, warmPullRequestDiff } from "@/stores/prDiff";
-import { refreshPullRequest, setInnerTab, usePrPanelStore, type PrInnerTab } from "@/stores/prPanel";
+import { innerTabOf, refreshPullRequest, setInnerTab, usePrPanelStore, type PrInnerTab } from "@/stores/prPanel";
 import type { PrRef } from "@/surfaces/pullrequestTarget";
 import { Banner } from "./Banner";
 import { ago, timeline } from "./model";
 import { PrAskComposer } from "./PrAskComposer";
-import { PrCode } from "./PrCode";
+import { DiffButton } from "./DiffButton";
 import { PrHeader } from "./PrHeader";
 import { PrMenu } from "./PrMenu";
 import { OrderToggle, PrOverview } from "./PrOverview";
@@ -30,19 +30,22 @@ import { useSeedRow } from "./useSeedRow";
 const innerTabs: { id: PrInnerTab; label: string }[] = [
   { id: "overview", label: "Overview" },
   { id: "activity", label: "Activity" },
-  { id: "code", label: "Code" },
 ];
 
 /**
- * Overview | Activity | Code, then the activity's counts and order (Activity); nothing for
- * Overview (the readiness box has the checks) or Code, whose strip has its own. Container
- * queries on the surface give way in steps, so nothing is pushed out of the bar or
- * overlaps: below 480px the order toggle keeps only its icon (the default 420px panel),
- * below 400px the counts go. Measured in WebKit: tabs 208px, counts 119px, toggle 96px.
- * No detail yet (d null): only the tabs, which work.
+ * Overview | Activity, then the activity's counts and order (Activity; nothing for Overview,
+ * whose cards have the checks), and at the right end, alone, the Diff button (DiffButton.tsx)
+ * with "Updating…" before it while a slow refresh runs. Container queries on the surface give
+ * way in steps, so nothing is pushed out of the bar or overlaps: the Diff button drops its file
+ * count under 480px and its counts under 360px; the order toggle keeps only its icon under 480px;
+ * the activity's counts go under 640px. Measured in WebKit: tabs 148px, counts 123px, toggle
+ * 101px (24px as an icon), Diff 178px, 137px without the file count, 52px alone. No detail yet
+ * (d null): the tabs, which work, and the Diff button without counts.
  */
-function InnerTabBar({ d, tabKey, inner }: { d: PullRequestDetailView | null; tabKey: string; inner: PrInnerTab }) {
+function InnerTabBar({ d, prRef, target, tabKey, inner }: { d: PullRequestDetailView | null; prRef: PrRef; target: string; tabKey: string; inner: PrInnerTab }) {
   const entries = useMemo(() => (d && inner === "activity" ? timeline(d).length : 0), [d, inner]);
+  const pr = d?.pullRequest;
+  const stat = useMemo(() => (pr ? { files: pr.changedFiles, added: pr.additions, deleted: pr.deletions } : null), [pr]);
   return (
     <div className="sticky top-0 z-10 flex h-11 min-w-0 items-center gap-2 border-b border-cf-divider bg-cf-surface px-4 @max-[340px]:gap-1.5 @max-[340px]:px-3" data-testid="pr-inner-bar">
       <div role="tablist" aria-label="Pull request views" className="flex shrink-0 items-center gap-0.5 rounded-lg bg-cf-surface-sunken/60 p-0.5 dark:bg-cf-surface-sunken/40">
@@ -68,27 +71,28 @@ function InnerTabBar({ d, tabKey, inner }: { d: PullRequestDetailView | null; ta
           );
         })}
       </div>
-      <div className="ml-auto flex min-w-0 items-center gap-2 overflow-hidden" data-testid="pr-inner-bar-end">
-        {d?.refreshing && !d.fetchFailed && <Updating />}
-        {d && inner === "activity" && (
-          <>
-            <span className="flex shrink-0 items-center gap-2 text-caption whitespace-nowrap tabular-nums @max-[400px]:hidden" data-testid="pr-timeline-counts">
-              {/* Timeline entries, not comments: the header's comment count includes thread replies the timeline leaves out. */}
-              <span className="flex items-center gap-1">
-                <History className="size-3" aria-hidden />
-                {entries} {entries === 1 ? "entry" : "entries"}
-              </span>
-              <span>·</span>
-              <Tip label={`${String(d.commitCount)} commits`}>
-                <span className="flex items-center gap-1">
-                  <GitCommitHorizontal className="size-3.5" aria-hidden />
-                  {d.commitCount}
-                </span>
-              </Tip>
+      {d && inner === "activity" && (
+        <div className="flex min-w-0 items-center gap-2 overflow-hidden" data-testid="pr-inner-bar-activity">
+          <span className="flex shrink-0 items-center gap-2 text-caption whitespace-nowrap tabular-nums @max-[640px]:hidden" data-testid="pr-timeline-counts">
+            {/* Timeline entries, not comments: the header's comment count includes thread replies the timeline leaves out. */}
+            <span className="flex items-center gap-1">
+              <History className="size-3" aria-hidden />
+              {entries} {entries === 1 ? "entry" : "entries"}
             </span>
-            <OrderToggle tabKey={tabKey} which="timelineOrder" compact />
-          </>
-        )}
+            <span>·</span>
+            <Tip label={`${String(d.commitCount)} commits`}>
+              <span className="flex items-center gap-1">
+                <GitCommitHorizontal className="size-3.5" aria-hidden />
+                {d.commitCount}
+              </span>
+            </Tip>
+          </span>
+          <OrderToggle tabKey={tabKey} which="timelineOrder" compact />
+        </div>
+      )}
+      <div className="ml-auto flex min-w-0 items-center gap-2" data-testid="pr-inner-bar-end">
+        {d?.refreshing && !d.fetchFailed && <Updating />}
+        <DiffButton prRef={prRef} target={target} stat={stat} />
       </div>
     </div>
   );
@@ -229,9 +233,10 @@ function MenuPending() {
 }
 
 /**
- * Reads the diff of the pull request on screen ahead of the Code tab, once its detail has
- * landed and is current (a copy being refreshed may name a head about to go). Nothing for a
- * diff already read for this head, or one that failed: the tab tries that one itself.
+ * Reads the diff of the pull request on screen ahead of the Diff button, once its detail has
+ * landed and is current (a copy being refreshed may name a head about to go), so the diff tab
+ * it opens has its files at once. Nothing for a diff already read for this head, or one that
+ * failed: the diff tab tries that one itself.
  */
 function useDiffWarm(key: string, d: PullRequestDetailView | null): void {
   const head = d && detailFresh(d) ? d.pullRequest.headSha : "";
@@ -256,7 +261,8 @@ function Centered({ icon: Icon, title, children, testId }: { icon: typeof Search
  * The Pull request surface: one tab showing a pull request's detail
  * (GhService.GetPullRequestDetail through pullRequestDetailResource). A header the same on
  * every inner tab (title, repository and branches, the state and its buttons), the stale
- * strip when GitHub could not be reached, then Overview | Activity | Code. Inner view state
+ * strip when GitHub could not be reached, then Overview | Activity and the Diff button, which
+ * opens the diff in a tab of its own (stores/prDiffPanel.ts). Inner view state
  * lives in stores/prPanel.ts per tab. While the detail is on its way the row the GUI already
  * holds paints the header and what it can of the cards (seed.ts), and no action shows; with
  * no row, the skeleton.
@@ -270,7 +276,7 @@ export function PullRequestSurface({ tabId, slug, number }: { tabId: string; slu
   useEffect(() => pullRequestDetailResource.watch(key), [key]);
   const d = pullRequestDetailResource.store((s) => s.entries[key]?.data ?? null);
   const error = pullRequestDetailResource.store((s) => s.entries[key]?.error ?? null);
-  const inner = usePrPanelStore((s) => s.byTab[tabKey]?.inner ?? "overview");
+  const inner = usePrPanelStore((s) => innerTabOf(s.byTab[tabKey]));
   const viewer = useViewerLogin();
   const [shortRef, short] = useShortPane();
   const seedRow = useSeedRow(key, d === null);
@@ -311,11 +317,10 @@ export function PullRequestSurface({ tabId, slug, number }: { tabId: string; slu
   }
   return (
     // @container: the header, tab bar and Overview adapt to the panel's width (group/pr: and
-    // to its height, data-short). The Code tab fills the panel: its diff scrolls itself (a
-    // virtualized CodeView) under the header.
+    // to its height, data-short).
     <div
       ref={shortRef}
-      className={cn("group/pr @container flex min-w-0 flex-col", inner === "code" && "min-h-0 flex-1")}
+      className="group/pr @container flex min-w-0 flex-col"
       data-testid="pr-surface"
       data-pr={`${slug}#${String(number)}`}
       data-seeded={d ? undefined : ""}
@@ -349,7 +354,7 @@ export function PullRequestSurface({ tabId, slug, number }: { tabId: string; slu
           keeps the text. */}
       {composer === "ask" && <PrAskComposer key="ask" prRef={prRef} focusRequest={composerFocus} onClose={closeComposer} />}
       {composer !== null && composer !== "ask" && <PrReviewComposer key="review" prRef={prRef} verdict={composer} focusRequest={composerFocus} onClose={closeComposer} />}
-      <InnerTabBar d={d} tabKey={tabKey} inner={inner} />
+      <InnerTabBar d={d} prRef={prRef} target={panelKey} tabKey={tabKey} inner={inner} />
       {!d ? (
         <>
           {inner === "overview" && <SeededReadinessCards d={shown} prRef={prRef} tabKey={tabKey} />}
@@ -357,8 +362,6 @@ export function PullRequestSurface({ tabId, slug, number }: { tabId: string; slu
         </>
       ) : inner === "activity" ? (
         <PrTimeline d={d} tabKey={tabKey} />
-      ) : inner === "code" ? (
-        <PrCode prRef={prRef} tabKey={tabKey} url={d.pullRequest.url} />
       ) : (
         <PrOverview d={d} prRef={prRef} tabKey={tabKey} />
       )}
