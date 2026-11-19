@@ -321,6 +321,10 @@ export function scanSlotRefs(fileName: string, source: string, known: (name: str
  * "sonner" is the module's name; sonner's DOM attributes (`[data-sonner-toast]`) are not.
  */
 export function sonnerRefs(fileName: string, source: string): { line: number; text: string }[] {
+  // A literal that is exactly the module's name has the word in the source: most files are
+  // skipped without parsing (the parse of every file under src took the guard past 5s under
+  // load). The word is not written as a literal here, or the guard would find this line.
+  if (!source.includes(["son", "ner"].join(""))) return [];
   const lines = source.split("\n");
   return stringLiterals(fileName, source)
     .filter((l) => /^["'`]sonner["'`]$/.test(l.raw))
