@@ -72,10 +72,18 @@ test("screenshots: the bell nothing, unseen, unseen time-sensitive, seen, seen t
   await openApp(page);
   const states: [string, () => Promise<void>][] = [
     ["nothing", async () => {}],
-    ["unseen", () => post(`title=${enc("Build failed")}`)],
-    ["unseen-time-sensitive", () => post(`title=${enc("Deploy waiting")}&ts=1`)],
-    ["seen", () => post(`title=${enc("Build failed")}&seen=1`)],
-    ["seen-time-sensitive", () => post(`title=${enc("Deploy waiting")}&ts=1&seen=1`)],
+    ["unseen", async () => {
+      await post(`title=${enc("Build failed")}`);
+    }],
+    ["unseen-time-sensitive", async () => {
+      await post(`title=${enc("Deploy waiting")}&ts=1`);
+    }],
+    ["seen", async () => {
+      await post(`title=${enc("Build failed")}&seen=1`);
+    }],
+    ["seen-time-sensitive", async () => {
+      await post(`title=${enc("Deploy waiting")}&ts=1&seen=1`);
+    }],
     [
       "two-digits",
       async () => {
