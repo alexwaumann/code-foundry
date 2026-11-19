@@ -365,7 +365,8 @@ when the first working version is whole. Nothing partial is released.
 
 The sidebar is the user's thread switcher, so thread tabs are a second list of the same threads.
 A user setting (`layout.threads_open_as`, Appearance › Panes) says how a thread opens: **Tabs**,
-**Panes** or **Single**. Tabs is the default for now; the decisions are in
+**Panes** or **Single**. Panes is the default of a new home; a home from before keeps Tabs
+(`docs/notes/threads-open-as-3-default.md`). The decisions are in
 `docs/notes/threads-open-as-1-rules.md`.
 
 - **Tabs**: everything above, unchanged.

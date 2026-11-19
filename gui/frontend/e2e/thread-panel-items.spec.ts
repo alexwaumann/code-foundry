@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { CF, invokeAs, openApp, resetMock, row } from "./fixtures";
+import { CF, invokeAs, openApp, resetMock, row, threadsOpenAsTabs } from "./fixtures";
 import { openRowThread } from "./shell-threads";
 
 /**
@@ -32,6 +32,8 @@ async function shot(page: Page, name: string): Promise<void> {
 
 test.beforeEach(async () => {
   await resetMock();
+  // A spec about thread tabs: a reset is a new home, on Panes.
+  await threadsOpenAsTabs();
 });
 
 // What each item verb opens: internal/command commands_view_open_test.go (and the mock's

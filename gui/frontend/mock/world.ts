@@ -48,7 +48,7 @@ import { MockLayout, panes as layoutPanes, type ThreadsOpenAs } from "./layout";
 import { layoutCommands } from "./layoutVerbs";
 import { terminalShellCommands } from "./terminalVerbs";
 import { MockMemory } from "./memory";
-import { MockNotifications } from "./notifications";
+import { APP_SOURCE, MockNotifications } from "./notifications";
 import { MockThemes } from "./userThemes";
 import { MockSkills } from "./skills";
 import { EMBER_THREAD, emberWorkers, MockEmber } from "./ember";
@@ -1038,12 +1038,37 @@ export class World {
     const v = this.settings.value("layout.threads_open_as");
     return v === "panes" || v === "single" ? v : "tabs";
   }
+  /** Whether this reset's home had the daemon's one-time step for the Panes default (simulateInstall). */
+  private installStepDone = false;
+  /**
+   * POST /__mock/install?state=existing|fresh: the daemon's first start after Panes became the
+   * default (internal/daemon/default_change.go, docs/notes/threads-open-as-3-default.md). A
+   * reset is a new home, already on Panes. existing: a home from before whose settings do not
+   * set layout.threads_open_as: tabs is written (no conversion: the layout is not touched) and
+   * the one notice is posted. fresh: nothing. Once per reset, as the daemon's marker; a setting
+   * already set is left alone and gets no notice.
+   */
+  simulateInstall(state: string): { wrote: boolean; noticeId: string } {
+    if (state !== "existing" && state !== "fresh") throw new CommandError("invalid", "state is existing or fresh");
+    if (this.installStepDone) return { wrote: false, noticeId: "" };
+    this.installStepDone = true;
+    if (state === "fresh" || "layout.threads_open_as" in this.settings.raw) return { wrote: false, noticeId: "" };
+    this.settings.update({ "layout.threads_open_as": "tabs" });
+    const n = this.notifications.post({
+      source: APP_SOURCE,
+      key: "threads-open-as-panes",
+      title: "Threads can now open as panes",
+      body: "A thread pane shows one thread with its diff, files and terminals beside it. Clicking another thread swaps them, so there are no thread tabs to manage. You are still on tabs: switch in Settings › Panes and sidebar › Threads open as.",
+      actions: [{ label: "Open settings", kind: "command", arg: "view.settings", args: { setting: "layout.threads_open_as" }, resolves: false }],
+    });
+    return { wrote: true, noticeId: n.id };
+  }
   /** The mode the layout was last converted to (internal/daemon layout_mode.go). */
   private threadsOpenAsSeen: ThreadsOpenAs | null = null;
   /** Converts the layout when layout.threads_open_as changes to panes or single, before the change is published, as the daemon does. */
   private convertLayoutOnModeChange(): void {
     const mode = this.threadsOpenAs();
-    const was = this.threadsOpenAsSeen ?? "tabs";
+    const was = this.threadsOpenAsSeen ?? "panes";
     this.threadsOpenAsSeen = mode;
     if (mode !== was && mode !== "tabs") this.layout.apply({ op: "conform" });
   }
@@ -1150,8 +1175,10 @@ export class World {
     this.notifications.reset();
     this.themes.reset();
     this.layout.reset();
-    // The setting is back to its default, so the next switch is seen as one.
-    this.threadsOpenAsSeen = null;
+    // The setting is back to its default (Panes, a new home's), which the empty layout already
+    // conforms to: the next switch away from it is seen as one.
+    this.threadsOpenAsSeen = this.threadsOpenAs();
+    this.installStepDone = false;
     const started = new Date(Date.now() - 42 * 60_000);
     // A shell terminal.new started on the Projects page for feat/sidebar (worktree-owned).
     this.addTerm({ id: "t-top", argv: ["top"], cwd: `${CFW}/feat-sidebar`, title: "", kind: "top", labels: shellLabels("", "repo-cf", `${CFW}/feat-sidebar`), startedAt: started });
@@ -5885,9 +5912,27 @@ export class World {
         rerun: (id, command) => this.rerun(id, command),
       }),
       {
-        cmd: { name: "view.settings", title: "Settings", category: "View", description: "Show the settings page, or close it where it already shows", keybindings: ["cmd+,"], args: [] },
+        // internal/command view.settings: --page (unchecked here), --setting at its row on its page.
+        cmd: {
+          name: "view.settings",
+          title: "Settings",
+          category: "View",
+          description: "Show the settings page in every app window; --page opens it on one page, --setting at one setting's row.",
+          keybindings: ["cmd+,"],
+          args: [
+            { name: "page", type: ArgType.STRING, required: false, description: "The page to open it on" },
+            { name: "setting", type: ArgType.STRING, required: false, description: "A setting's key: open its page with its row in view and focused" },
+          ],
+        },
         when: always,
-        run: () => `delivered=${String(this.emit({ intent: { case: "showView", value: { name: "settings" } } }))}`,
+        run: (_c, a) => {
+          if (a.setting) {
+            const field = this.settings.fields().find((f) => f.key === a.setting);
+            if (!field) throw new ConnectError(`view.settings: invalid argument: no setting "${a.setting}"`, Code.InvalidArgument);
+            return `delivered=${String(this.emit({ intent: { case: "showView", value: { name: `settings.${field.page}`, params: { setting: a.setting } } } }))}`;
+          }
+          return `delivered=${String(this.emit({ intent: { case: "showView", value: { name: a.page ? `settings.${a.page}` : "settings" } } }))}`;
+        },
       },
       {
         cmd: { name: "view.usage", title: "Usage", category: "View", description: "Show the Usage page: token usage and its cost per day and per model over every thread.", keybindings: [], args: [] },

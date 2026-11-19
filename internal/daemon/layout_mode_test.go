@@ -19,6 +19,10 @@ func TestConvertLayoutOnModeChange(t *testing.T) {
 	st := openSettings(t)
 	l := layouttest.New(nil)
 	ctx := context.Background()
+	// The layout below is opened under tabs, which a new home no longer defaults to.
+	if _, err := st.Update(ctx, map[string]string{settings.KeyThreadsOpenAs: settings.ThreadsOpenAsTabs}); err != nil {
+		t.Fatal(err)
+	}
 	// Two thread tabs in one pane, opened under tabs.
 	for _, th := range []string{"a", "b"} {
 		if _, err := l.Apply(ctx, &core.OpenThread{Thread: th, Focus: true}, layoutstore.ApplyOptions{}); err != nil {

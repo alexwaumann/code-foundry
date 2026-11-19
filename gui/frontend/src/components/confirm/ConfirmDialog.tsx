@@ -1,10 +1,9 @@
-import { CircleCheck, TriangleAlert, type LucideIcon } from "lucide-react";
-import type { ConfirmTone } from "@/api/command";
+import { CircleCheck, Info, TriangleAlert, type LucideIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
-import { answerAlternate, answerConfirm, useConfirmStore } from "@/stores/confirm";
+import { answerAlternate, answerConfirm, useConfirmStore, type ConfirmLookTone } from "@/stores/confirm";
 
 /** How long a guarded request's Confirm stays off, from its content showing and from each press. */
 export const CONFIRM_ARM_MS = 600;
@@ -97,10 +96,12 @@ interface ConfirmLook {
 }
 
 /** "warning" is a request without a tone: it ends or deletes something. */
-const looks: Record<ConfirmTone | "warning", ConfirmLook> = {
+const looks: Record<ConfirmLookTone | "warning", ConfirmLook> = {
   warning: { icon: TriangleAlert, iconClass: "text-cf-error-text", variant: "destructive" },
   // A step forward (a merge): the success tone, as the merge button that asked.
   success: { icon: CircleCheck, iconClass: "text-cf-success-text", variant: "default", confirmClass: "bg-cf-success text-cf-success-foreground hover:bg-cf-success/90" },
+  // A change that loses nothing (Threads open as): calm, the plain primary button.
+  neutral: { icon: Info, iconClass: "text-cf-info-text", variant: "default" },
 };
 
 /** The dialog's content, one per request: a new request starts over with its focus and its wait. */
@@ -167,7 +168,8 @@ function ConfirmBody({ pending }: { pending: Pending | null }) {
  * Asks before a destructive command runs (Command.requires_confirmation). The confirm
  * button has focus, so Enter confirms and Escape cancels. A request's tone sets its look:
  * a warning (red icon, destructive button) unless the command says it is a step forward
- * ("success": pr.merge, pr.auto-merge), asked in the success tone. A three-way prompt
+ * ("success": pr.merge, pr.auto-merge), asked in the success tone, or the GUI asks about a
+ * change that loses nothing ("neutral": switching Threads open as), asked calmly. A three-way prompt
  * (requestChoice) also has its alternate, which is then the destructive one. A guarded
  * request (stores/confirm.ts) has Cancel focused instead, so Enter and Space say no, its
  * Confirm waits (useArmed), and its colours are fixed (.cf-guarded in index.css, a fixed

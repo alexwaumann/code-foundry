@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useAddProjectStore } from "./addProject";
 import { useUiStore } from "./ui";
 import { closeUsage, setSettingsPage, showView, startViewSync, toggleView, useViewsStore } from "./views";
@@ -31,6 +31,34 @@ describe("showView", () => {
     expect(useViewsStore.getState()).toMatchObject({ settingsOpen: true, settingsPage: "memory", usageOpen: false });
     expect(showView("settings.skills")).toBe(true);
     expect(useViewsStore.getState()).toMatchObject({ settingsOpen: true, settingsPage: "skills" });
+  });
+
+  it("\"settings.<page>\" with a setting opens that page and brings the row into view, focusing its editor once drawn (view.settings --setting)", () => {
+    const frames: FrameRequestCallback[] = [];
+    vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => frames.push(cb));
+    const scrolled = vi.fn();
+    try {
+      useViewsStore.setState({ settingsOpen: false, usageOpen: false, themesOpen: false, helpOpen: false });
+      expect(showView("settings.appearance", { setting: "layout.threads_open_as" })).toBe(true);
+      expect(useViewsStore.getState()).toMatchObject({ settingsOpen: true, settingsPage: "appearance" });
+      // The page has not drawn the row yet: it tries again on the next frame.
+      frames.shift()?.(0);
+      expect(frames).toHaveLength(1);
+      const row = document.createElement("div");
+      row.dataset.setting = "layout.threads_open_as";
+      row.scrollIntoView = scrolled;
+      const editor = document.createElement("button");
+      editor.setAttribute("role", "combobox");
+      row.append(editor);
+      document.body.append(row);
+      frames.shift()?.(0);
+      expect(scrolled).toHaveBeenCalledOnce();
+      expect(document.activeElement).toBe(editor);
+      expect(frames).toHaveLength(0);
+      row.remove();
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it("\"project.add\" opens the Add Project dialog on Local folder, to stay where the window is", async () => {

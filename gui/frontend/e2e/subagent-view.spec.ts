@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { infoCardOff, invocations, mockPost, openApp, resetMock, row, threadPrompt } from "./fixtures";
+import { infoCardOff, invocations, mockPost, openApp, resetMock, row, threadPrompt, threadsOpenAsTabs } from "./fixtures";
 
 /**
  * The subagent view, drawn as a thread (docs/notes/subagent-as-thread.md), over the mock's scripted thread
@@ -88,6 +88,8 @@ async function expectParent(page: Page): Promise<void> {
 
 test.beforeEach(async () => {
   await resetMock();
+  // A spec about thread tabs: a reset is a new home, on Panes.
+  await threadsOpenAsTabs();
   // The card off for threads never toggled (on by default), so its toggle shows it.
   await infoCardOff();
 });

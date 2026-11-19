@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { CF, mockPost, mockUrl, openApp, openThreadChanges, resetMock, row, setZoom } from "./fixtures";
+import { CF, mockPost, mockUrl, openApp, openThreadChanges, resetMock, row, setZoom, threadsOpenAsTabs } from "./fixtures";
 import { openShellApp, paneNode, rowNode, seedLayout, threadTab } from "./shell";
 import { diffTab, paneWith, stripTabs } from "./shell-surfaces";
 
@@ -59,6 +59,8 @@ async function startEditing(page: Page): Promise<void> {
 
 test.beforeEach(async () => {
   await resetMock();
+  // A spec about thread tabs: a reset is a new home, on Panes.
+  await threadsOpenAsTabs();
 });
 
 test("typing goes into the document and cmd+S saves it from inside the shadow root, line endings as they were", async ({ page }) => {

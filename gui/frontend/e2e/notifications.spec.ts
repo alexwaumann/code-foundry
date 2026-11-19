@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { mockPost, mockUrl, openApp, resetMock } from "./fixtures";
+import { mockPost, mockUrl, openApp, resetMock, threadsOpenAsTabs } from "./fixtures";
 
 /**
  * The bell (docs/notes/notifications-3-bell.md), what only a real browser shows: the popover
@@ -13,6 +13,8 @@ import { mockPost, mockUrl, openApp, resetMock } from "./fixtures";
 
 test.beforeEach(async () => {
   await resetMock();
+  // A spec about thread tabs: a reset is a new home, on Panes.
+  await threadsOpenAsTabs();
 });
 
 async function notifications(): Promise<{ notifications: { id: string; title: string; status: string }[]; calls: string[] }> {

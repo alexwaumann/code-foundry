@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { mockPost, openApp, resetMock, row, threadPrompt } from "./fixtures";
+import { mockPost, openApp, resetMock, row, threadPrompt, threadsOpenAsTabs } from "./fixtures";
 import { openHeaderMenu } from "./shell-threads";
 
 // Moving a No project thread into a project (docs/notes/move-no-project-2-gui.md), against
@@ -13,6 +13,8 @@ import { openHeaderMenu } from "./shell-threads";
 
 test.beforeEach(async () => {
   await resetMock();
+  // A spec about thread tabs: a reset is a new home, on Panes.
+  await threadsOpenAsTabs();
 });
 
 async function homeThread(): Promise<string> {

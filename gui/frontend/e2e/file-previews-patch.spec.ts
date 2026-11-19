@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { CF, openApp, resetMock } from "./fixtures";
+import { CF, openApp, resetMock, threadsOpenAsTabs } from "./fixtures";
 import { openThread } from "./shell";
 
 /**
@@ -21,6 +21,8 @@ async function openFile(page: Page, path: string): Promise<void> {
 
 test.beforeEach(async () => {
   await resetMock();
+  // A spec about thread tabs: a reset is a new home, on Panes.
+  await threadsOpenAsTabs();
 });
 
 test("a 1 MiB patch mounts only the files in view, and reaches its last", async ({ page }) => {

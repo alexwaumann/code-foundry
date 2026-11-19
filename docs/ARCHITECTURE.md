@@ -1619,7 +1619,10 @@ what depends on the drawn frame (rails, full screen, tab fitting, drag targets, 
   forced on (`docs/notes/threads-open-as-1-rules.md`). In the GUI such a pane draws one header
   row in place of its strip and the thread's header (`components/shell/ThreadPaneHeader.tsx`,
   `shell/threadsOpenAs.ts`), and the settings page asks before a switch that closes tabs
-  (`docs/notes/threads-open-as-2-gui.md`).
+  (`docs/notes/threads-open-as-2-gui.md`). Panes is the default of a new home; a home from
+  before keeps Tabs, written once into its settings file at the first start after the change,
+  with one notice in the bell (`internal/store/settings/defaultchange.go`,
+  `internal/daemon/default_change.go`, `docs/notes/threads-open-as-3-default.md`).
 * **Focus from a thread**: `Options.KeepFocus` runs any op and puts back the user's current
   space, focused tabs and MRU, so a model's tab waits behind the user's focused tab. The
   commands use it for every call not made by the user in person (§7).

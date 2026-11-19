@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { CF, openApp, resetMock, setZoom } from "./fixtures";
+import { CF, openApp, resetMock, setZoom, threadsOpenAsTabs } from "./fixtures";
 import { openThread } from "./shell";
 
 /**
@@ -22,6 +22,8 @@ async function openFile(page: Page, path: string): Promise<void> {
 
 test.beforeEach(async () => {
   await resetMock();
+  // A spec about thread tabs: a reset is a new home, on Panes.
+  await threadsOpenAsTabs();
 });
 
 test("a 1 MiB CSV mounts a screenful of rows; the header and the gutter stay put while it scrolls", async ({ page }) => {

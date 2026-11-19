@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { appPath, mockUrl, resetMock } from "./fixtures";
+import { appPath, mockUrl, resetMock, threadsOpenAsTabs } from "./fixtures";
 
 /**
  * Plugin surfaces in a pane's "+" menu (docs/notes/plus-menu-plugins.md), against the mock's
@@ -46,6 +46,8 @@ async function still(page: Page): Promise<void> {
 
 test.beforeEach(async () => {
   await resetMock();
+  // A spec about thread tabs: a reset is a new home, on Panes.
+  await threadsOpenAsTabs();
 });
 
 test("a plugin surface picked in a pane's + opens as a tab in that pane", async ({ page }) => {

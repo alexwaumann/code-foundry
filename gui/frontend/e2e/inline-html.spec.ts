@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { mockPost, openApp, resetMock, row } from "./fixtures";
+import { mockPost, openApp, resetMock, row, threadsOpenAsTabs } from "./fixtures";
 import { paneWith } from "./shell-surfaces";
 
 /**
@@ -11,6 +11,8 @@ import { paneWith } from "./shell-surfaces";
 
 test.beforeEach(async () => {
   await resetMock();
+  // A spec about thread tabs: a reset is a new home, on Panes.
+  await threadsOpenAsTabs();
 });
 
 const items = (page: Page) => page.getByTestId("thread-html");

@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { appPath, invocations, mockPost, mockUrl, openStreams, resetMock } from "./fixtures";
+import { appPath, invocations, mockPost, mockUrl, openStreams, resetMock, threadsOpenAsTabs } from "./fixtures";
 
 /**
  * The window shell's pane grid behind the shell flag (docs/notes/shell-11-pane-grid.md), against
@@ -80,6 +80,8 @@ const THREE: Node = {
 
 test.beforeEach(async () => {
   await resetMock();
+  // A spec about thread tabs: a reset is a new home, on Panes.
+  await threadsOpenAsTabs();
 });
 
 test("a gutter drag resizes the panes beside it, keeps the tiling, and is stored", async ({ page }) => {

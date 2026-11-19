@@ -1,11 +1,13 @@
 import { expect, test, type Page } from "@playwright/test";
-import { emit, openApp, resetMock, row, threadPrompt } from "./fixtures";
+import { emit, openApp, resetMock, row, threadPrompt, threadsOpenAsTabs } from "./fixtures";
 
 // Settings and Themes in one modal sheet over the window (docs/notes/settings-sheet.md):
 // centred, at most 1280x1280, never closer than 48px to a window edge.
 
 test.beforeEach(async () => {
   await resetMock();
+  // A spec about thread tabs: a reset is a new home, on Panes.
+  await threadsOpenAsTabs();
 });
 
 const sheet = (page: Page) => page.getByTestId("settings-sheet");

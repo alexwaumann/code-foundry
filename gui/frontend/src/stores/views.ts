@@ -28,6 +28,7 @@ import { isActingWindow } from "./windowFocus";
 import { previewTheme, resetThemePicker, setPickerQuery, setPickerSlot, useThemePickerStore, whenTheme, type ThemeSlot } from "./themePicker";
 import { afterLeavingEditor, editorBack, editorDirty, leaveEditor, startEditing, stopEditing, syncFromDisk, useThemeEditorStore } from "./themeEditor";
 import { themeById } from "@/themes";
+import { focusSetting } from "@/components/settings/focus";
 import { canStepFocusNow, stepFocus } from "./focusHistory";
 import { shellDrawn, useShellViewStore } from "./shellView";
 import { presentFullscreen } from "@/shell/fullscreen";
@@ -108,9 +109,13 @@ export function showView(name: string, params?: Readonly<Record<string, string>>
     void openThemeEditor(name.slice(THEME_EDIT_VIEW.length));
     return true;
   }
-  // view.settings --page: the settings page on that page (the daemon checked the id).
+  // view.settings --page: the settings page on that page (the daemon checked the id); with
+  // --setting, that setting's row brought into view and focused.
   if (name.startsWith(SETTINGS_PAGE_VIEW)) {
-    openSettingsPage(name.slice(SETTINGS_PAGE_VIEW.length));
+    const page = name.slice(SETTINGS_PAGE_VIEW.length);
+    const setting = params?.[SETTING_PARAM];
+    if (setting) openSettingAt(page, setting);
+    else openSettingsPage(page);
     return true;
   }
   switch (name) {
@@ -268,6 +273,27 @@ function requestPromptFocus(): void {
 /** Opens the settings page on one of its pages (SettingPageView.id), over any other window page. */
 export function openSettingsPage(page: string): void {
   setPages({ settingsOpen: true, settingsPage: page, usageOpen: false, themesOpen: false, helpOpen: false });
+}
+
+/** ShowView param of view.settings --setting: the key of the row to bring into view (internal/command ViewSettingParam). */
+export const SETTING_PARAM = "setting";
+
+/** How many frames openSettingAt waits for the settings page to draw the row. */
+const SETTING_ROW_FRAMES = 30;
+
+/**
+ * Opens the settings page on `page` with the row of setting `key` in view and its editor
+ * focused (focusSetting, retried while the page draws it): view.settings --setting, which a
+ * notification's "Open settings" runs (docs/notes/threads-open-as-3-default.md).
+ */
+export function openSettingAt(page: string, key: string): void {
+  openSettingsPage(page);
+  let left = SETTING_ROW_FRAMES;
+  const tryFocus = () => {
+    if (focusSetting(key) || --left <= 0) return;
+    requestAnimationFrame(tryFocus);
+  };
+  requestAnimationFrame(tryFocus);
 }
 
 /** The Themes page is open with unsaved edits in its editor. */

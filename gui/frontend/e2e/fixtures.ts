@@ -69,6 +69,15 @@ export async function mockPost(pathAndQuery: string): Promise<unknown> {
 }
 
 /**
+ * Threads open as Tabs, for specs about thread tabs: a strip per pane, several threads in one
+ * pane, the thread's own header. A reset is a new home, which opens threads as Panes
+ * (docs/notes/threads-open-as-3-default.md).
+ */
+export async function threadsOpenAsTabs(): Promise<void> {
+  await mockPost("settings/external?layout.threads_open_as=tabs");
+}
+
+/**
  * Makes a fresh copy the composer's default Work in choice (the default is the project
  * folder itself), for specs that exercise the new-worktree flow: the base picker,
  * thread.new --new-worktree.

@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { appPath, holdThreads, invocations, mockPost, mockUrl, resetMock } from "./fixtures";
+import { appPath, holdThreads, invocations, mockPost, mockUrl, resetMock, threadsOpenAsTabs } from "./fixtures";
 
 /**
  * Dragging the sidebar's selection (docs/notes/sidebar-bulk-select.md), what only a browser shows:
@@ -86,6 +86,8 @@ async function lift(page: Page, id: string, to: { x: number; y: number }): Promi
 
 test.beforeEach(async () => {
   await resetMock();
+  // A spec about thread tabs: a reset is a new home, on Panes.
+  await threadsOpenAsTabs();
   await holdThreads("s-6");
   await mockPost("threads?project=repo-cf&count=3&status=idle");
 });

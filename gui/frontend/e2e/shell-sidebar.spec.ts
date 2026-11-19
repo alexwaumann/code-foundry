@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { appPath, invocations, mockPost, mockUrl, resetMock } from "./fixtures";
+import { appPath, invocations, mockPost, mockUrl, resetMock, threadsOpenAsTabs } from "./fixtures";
 
 /**
  * The shell's sidebar (docs/notes/shell-16-sidebar.md), what only a browser shows: a title
@@ -67,6 +67,8 @@ async function still(page: Page): Promise<void> {
 
 test.beforeEach(async () => {
   await resetMock();
+  // A spec about thread tabs: a reset is a new home, on Panes.
+  await threadsOpenAsTabs();
   await mockPost("shell-sidebar");
 });
 

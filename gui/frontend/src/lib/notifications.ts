@@ -10,6 +10,9 @@ export const COMMAND_SOURCE_LABEL = "Code Foundry";
 /** The daemon's own notifications from the GitHub data it polls (docs/notes/notifications-github.md). */
 export const GITHUB_SOURCE = "github";
 
+/** The daemon's own notices about the app itself, named as the app (docs/notes/threads-open-as-3-default.md). */
+export const APP_SOURCE = "app";
+
 /** The daemon's own source for plugins that stopped (docs/notes/notifications-plugin-health.md). */
 export const PLUGINS_SOURCE = "plugins";
 export const PLUGINS_SOURCE_LABEL = "Plugins";
@@ -19,6 +22,7 @@ const HOST_SOURCE_LABELS: Readonly<Record<string, string>> = {
   [COMMAND_SOURCE]: COMMAND_SOURCE_LABEL,
   [PLUGINS_SOURCE]: PLUGINS_SOURCE_LABEL,
   [GITHUB_SOURCE]: "GitHub",
+  [APP_SOURCE]: COMMAND_SOURCE_LABEL,
 };
 
 /**

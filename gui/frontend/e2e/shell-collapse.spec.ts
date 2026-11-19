@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { appPath, CF, invocations, mockUrl, resetMock } from "./fixtures";
+import { appPath, CF, invocations, mockUrl, resetMock, threadsOpenAsTabs } from "./fixtures";
 
 /**
  * Collapsing a pane on demand and dividers that say they stopped (docs/notes/shell-model.md,
@@ -84,6 +84,8 @@ async function cursorAt(page: Page, x: number, y: number): Promise<string> {
 
 test.beforeEach(async () => {
   await resetMock();
+  // A spec about thread tabs: a reset is a new home, on Panes.
+  await threadsOpenAsTabs();
 });
 
 test("cmd+shift+m collapses the focused pane to a rail, its neighbours take its room by their proportions, and it opens again", async ({ page }) => {

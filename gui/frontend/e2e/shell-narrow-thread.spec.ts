@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { appPath, mockPost, mockUrl, resetMock, setZoom } from "./fixtures";
+import { appPath, mockPost, mockUrl, resetMock, setZoom, threadsOpenAsTabs } from "./fixtures";
 
 /**
  * A thread's pane narrower than a thread's minimum (docs/notes/shell-24d-spec-differences.md, 2):
@@ -46,6 +46,8 @@ async function narrow(page: Page): Promise<void> {
 
 test.beforeEach(async () => {
   await resetMock();
+  // A spec about thread tabs: a reset is a new home, on Panes.
+  await threadsOpenAsTabs();
   await mockPost("needs-you");
 });
 

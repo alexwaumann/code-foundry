@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { appPath, CF, mockUrl, resetMock } from "./fixtures";
+import { appPath, CF, mockUrl, resetMock, threadsOpenAsTabs } from "./fixtures";
 
 /**
  * The owner's test feedback on the shell (docs/notes/shell-25a-test-feedback.md), what only a
@@ -71,6 +71,8 @@ const MIN_GRID = 940 - 240 - 24;
 
 test.beforeEach(async () => {
   await resetMock();
+  // A spec about thread tabs: a reset is a new home, on Panes.
+  await threadsOpenAsTabs();
 });
 
 test("at the minimum width, the middle column folds whole instead of being drawn at half its minimum", async ({ page }) => {

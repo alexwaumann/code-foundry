@@ -24,6 +24,51 @@ function created(w: World, message: string) {
 }
 
 describe("the mock world", () => {
+  // docs/notes/threads-open-as-3-default.md: a reset is a new home on Panes; /__mock/install
+  // plays the daemon's first start after the default changed.
+  describe("the Panes default", () => {
+    const notices = (w: World) => w.notifications.json().notifications.filter((n) => n.source === "app");
+
+    it("a reset is a new home: Panes, no notice; fresh changes nothing", () => {
+      const w = new World();
+      expect(w.settings.value("layout.threads_open_as")).toBe("panes");
+      expect(w.simulateInstall("fresh")).toEqual({ wrote: false, noticeId: "" });
+      expect(w.settings.raw["layout.threads_open_as"]).toBeUndefined();
+      expect(notices(w)).toEqual([]);
+    });
+
+    it("an existing home with the key unset gets tabs written and the one notice, once", async () => {
+      const w = new World();
+      const first = w.simulateInstall("existing");
+      expect(first.wrote).toBe(true);
+      expect(w.settings.raw["layout.threads_open_as"]).toBe("tabs");
+      expect(notices(w)).toMatchObject([
+        {
+          key: "threads-open-as-panes",
+          level: "info",
+          timeSensitive: false,
+          title: "Threads can now open as panes",
+          actions: [{ label: "Open settings", kind: "command", arg: "view.settings", args: { setting: "layout.threads_open_as" }, resolves: false }],
+        },
+      ]);
+      expect(w.simulateInstall("existing")).toEqual({ wrote: false, noticeId: "" });
+      expect(notices(w)).toHaveLength(1);
+      // Its button opens Settings at the row, and leaves the notice.
+      const emit = vi.spyOn(w, "emit");
+      const out = await run(w, "notification.act", { activeView: "thread" }, { id: first.noticeId });
+      expect(out).not.toContain("resolved");
+      expect(emit.mock.calls.at(-1)?.[0]).toEqual({ intent: { case: "showView", value: { name: "settings.appearance", params: { setting: "layout.threads_open_as" } } } });
+    });
+
+    it.each(["tabs", "panes", "single"])("an existing home whose settings set %s is left alone", (v) => {
+      const w = new World();
+      w.settings.update({ "layout.threads_open_as": v });
+      expect(w.simulateInstall("existing").wrote).toBe(false);
+      expect(w.settings.value("layout.threads_open_as")).toBe(v);
+      expect(notices(w)).toEqual([]);
+    });
+  });
+
   it("never reuses a removed workspace's id", () => {
     const w = new World();
     const a = w.addWorkspace("a", ["repo-cf"]);

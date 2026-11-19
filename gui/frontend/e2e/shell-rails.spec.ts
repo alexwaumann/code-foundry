@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { appPath, CF, invocations, mockUrl, openStreams, resetMock } from "./fixtures";
+import { appPath, CF, invocations, mockUrl, openStreams, resetMock, threadsOpenAsTabs } from "./fixtures";
 
 /**
  * Rails in a small window (docs/notes/shell-model.md, "Small windows"; docs/notes/shell-19-rails-
@@ -73,6 +73,8 @@ async function openShell(page: Page, width = 2000, height = 900): Promise<void> 
 
 test.beforeEach(async () => {
   await resetMock();
+  // A spec about thread tabs: a reset is a new home, on Panes.
+  await threadsOpenAsTabs();
 });
 
 test("shrinking the window folds panes to rails in order, growing unfolds them, and the stored layout does not change", async ({ page }) => {

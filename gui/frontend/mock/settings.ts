@@ -282,7 +282,8 @@ const staticFields: FieldInit[] = [
       "As Panes, with one thread pane per space. Every thread opens there.",
     ],
     enumExamples: ["", "", ""],
-    defaultValue: "tabs",
+    // Tabs until part 3 (docs/notes/threads-open-as-3-default.md): a reset is a new home.
+    defaultValue: "panes",
   },
   { key: "layout.thread_info", group: "layout", page: "appearance", section: "panes", type: S.BOOL, title: "Thread info by default", description: "Show the thread info card beside a thread's conversation when its pane is wide enough, for every thread you have not toggled it on. The header's button and ⌘⇧I show or hide it for one thread, and that thread keeps its choice.", defaultValue: "true" },
   { key: "sidebar.needs_scope", group: "sidebar", page: "appearance", section: "panes", type: S.ENUM, title: "Needs you lists", description: "Which threads the sidebar's Needs you section lists: those of every space, or only the current space's. Its header's button switches it too.", enumValues: ["all", "space"], enumLabels: ["All spaces", "This space"], defaultValue: "all" },

@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { appPath, CF, mockUrl, resetMock } from "./fixtures";
+import { appPath, CF, mockUrl, resetMock, threadsOpenAsTabs } from "./fixtures";
 
 /**
  * One pane minimum and room for panes (docs/notes/shell-model.md, "Small windows", "Room for
@@ -94,6 +94,8 @@ const TERMS = split("s-r", "col", [0.7, 0.3], pane("p-a", [thread("s-1"), thread
 
 test.beforeEach(async () => {
   await resetMock();
+  // A spec about thread tabs: a reset is a new home, on Panes.
+  await threadsOpenAsTabs();
 });
 
 test("at the limit, a tab dragged over a pane's body adds to the pane wherever it is: no edge splits it", async ({ page }) => {

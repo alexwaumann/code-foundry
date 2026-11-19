@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { invocations, resetMock } from "./fixtures";
+import { invocations, resetMock, threadsOpenAsTabs } from "./fixtures";
 import { focusedPane, layoutState, openShellApp, paneNode, paneOf, rowNode, seedLayout, tabOfKind, threadTab } from "./shell";
 
 /**
@@ -19,6 +19,8 @@ const MARGIN = 20;
 // s-3 "Fix resize race" and s-4: idle, nothing running, so neither asks first.
 test.beforeEach(async () => {
   await resetMock();
+  // A spec about thread tabs: a reset is a new home, on Panes.
+  await threadsOpenAsTabs();
 });
 
 const undoToast = (page: Page): Locator => page.locator("[data-sonner-toast]").filter({ hasText: "Undo" });

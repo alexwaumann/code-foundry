@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { mockPost, openHelloDemo, openStreams, resetMock } from "./fixtures";
+import { mockPost, openHelloDemo, openStreams, resetMock, threadsOpenAsTabs } from "./fixtures";
 import { paneShowing } from "./shell";
 
 /**
@@ -25,6 +25,8 @@ async function openStress(page: Page): Promise<void> {
 
 test.beforeEach(async () => {
   await resetMock();
+  // A spec about thread tabs: a reset is a new home, on Panes.
+  await threadsOpenAsTabs();
 });
 
 test("two threads and a terminal in one view: all live at once, past the old limit, and acts still complete", async ({ page }) => {

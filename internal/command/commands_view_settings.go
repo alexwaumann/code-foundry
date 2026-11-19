@@ -41,23 +41,64 @@ func (d ViewDeps) settingsPageIDs(ctx context.Context) ([]string, error) {
 	return ids, nil
 }
 
-// settingsCommand is view.settings: the settings page, on one of its pages with --page.
+// ViewSettingParam is the ShowView param of view.settings --setting: the key of the row
+// the settings page brings into view, on that setting's page.
+const ViewSettingParam = "setting"
+
+// settingPage is the page the settings page shows key on; "" when the schema has no such
+// setting (or there is no schema reader).
+func (d ViewDeps) settingPage(ctx context.Context, key string) (string, error) {
+	if d.Settings == nil {
+		return "", nil
+	}
+	res, err := d.Settings.GetSchema(ctx, connect.NewRequest(&v1.GetSettingsSchemaRequest{}))
+	if err != nil {
+		return "", err
+	}
+	for _, f := range res.Msg.GetFields() {
+		if f.GetKey() == key {
+			return f.GetPage(), nil
+		}
+	}
+	return "", nil
+}
+
+// settingsCommand is view.settings: the settings page, on one of its pages with --page, or
+// at one setting's row with --setting.
 func (d ViewDeps) settingsCommand() Command {
 	return Command{
-		Name:        "view.settings",
-		Page:        PageState,
-		Title:       "Settings",
-		Description: "Show the settings page in every app window; --page opens it on one page (memory, plugins, skills, appearance, …).",
-		Category:    "View",
+		Name:  "view.settings",
+		Page:  PageState,
+		Title: "Settings",
+		Description: "Show the settings page in every app window; --page opens it on one page (memory, plugins, skills, appearance, …), " +
+			"--setting at one setting's row (layout.threads_open_as).",
+		Category: "View",
 		// The GUI presents cmd+, locally (keys/bindings.ts): there it toggles, in that
 		// window only.
 		Keybindings: []string{"cmd+,"},
 		Args: []ArgSpec{
 			pageFocusArg,
 			{Name: "page", Type: String, Description: "The page to open it on: general, appearance, memory, plugins, skills, … (default: the page it shows)"},
+			{Name: "setting", Type: String, Description: "A setting's key (settings list): open its page with its row in view and focused; leave out --page"},
 		},
 		Run: func(ctx context.Context, uctx Context, a Args) (Result, error) {
 			page := a.String("page")
+			if key := strings.TrimSpace(a.String("setting")); key != "" {
+				if page != "" {
+					return Result{}, InvalidArg("page", "give --page or --setting, not both: --setting opens the setting's own page")
+				}
+				on, err := d.settingPage(ctx, key)
+				if err != nil {
+					return Result{}, err
+				}
+				if on == "" {
+					return Result{}, InvalidArg("setting", "no setting %q; settings list names them", key)
+				}
+				if err := d.refusePage(uctx, a); err != nil {
+					return Result{}, err
+				}
+				return EmitTo(d.Emitter, showViewIntent(ViewSettingsPagePrefix+on, map[string]string{ViewSettingParam: key})).CLIResult(uctx), nil
+			}
 			if page == "" {
 				return d.showPage(uctx, a, ViewSettings)
 			}

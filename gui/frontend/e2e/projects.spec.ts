@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { CF, mockPost, openProjectPage, resetMock } from "./fixtures";
+import { CF, mockPost, openProjectPage, resetMock, threadsOpenAsTabs } from "./fixtures";
 import { layoutState, openShellApp, paneNode, paneOf, rowNode } from "./shell";
 import { openLayout, openProjectsTab, PROJECTS_TAB, sizePane } from "./shell-pages";
 
@@ -15,6 +15,8 @@ import { openLayout, openProjectsTab, PROJECTS_TAB, sizePane } from "./shell-pag
 
 test.beforeEach(async () => {
   await resetMock();
+  // A spec about thread tabs: a reset is a new home, on Panes.
+  await threadsOpenAsTabs();
 });
 
 const row = (page: Page, projectId: string) => page.locator(`[data-nav-key="p:${projectId}"]`);

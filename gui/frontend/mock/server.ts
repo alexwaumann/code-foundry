@@ -13,7 +13,10 @@
  *   GET  /__mock/invocations | writes | threads | streams
  *   GET  /__mock/waits                            (every thread.wait invoked, held until its caller aborts it: mock/bridge.ts)
  *   GET  /__mock/fetches                          (every proxied page fetch: mock/proxyFetch.ts)
- *   POST /__mock/reset
+ *   POST /__mock/reset                            (a new home: layout.threads_open_as unset, so Panes)
+ *   POST /__mock/install?state=existing|fresh     (the daemon's first start after Panes became the default:
+ *        existing writes layout.threads_open_as = tabs when unset and posts the one notice, source "app";
+ *        fresh does nothing; once per reset. World.simulateInstall)
  *   ProjectService.SearchGitHub / LookupGitHub / Clone: mock/clone.ts (a project named "fail" fails
  *        to clone; octo-org/already-here's destination exists)
  *   ProjectService.Create / ListPublishOwners / Publish, project.create, project.github.publish:
@@ -1135,6 +1138,15 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
   const actionCtl = /^\/__mock\/action\/([a-z]+)$/.exec(path);
   if (req.method === "POST" && actionCtl?.[1]) {
     actionControl(res, actionCtl[1], q);
+    return;
+  }
+  // The daemon's first start after Panes became the default, on an existing or a new home (World.simulateInstall).
+  if (req.method === "POST" && path === "/__mock/install") {
+    try {
+      json(res, 200, world.simulateInstall(q.get("state") ?? ""));
+    } catch (err) {
+      json(res, 400, { error: err instanceof Error ? err.message : String(err) });
+    }
     return;
   }
   const notifyCtl = /^\/__mock\/notifications(?:\/([a-z-]+))?$/.exec(path);
