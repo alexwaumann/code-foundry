@@ -93,11 +93,14 @@ function setAuthored(change: (authored: PullRequestView[]) => PullRequestView[])
 
 const mapRow = (number: number, o: Partial<PullRequestView>) => (authored: PullRequestView[]) => authored.map((p) => (p.number === number ? { ...p, ...o } : p));
 
-/** Nothing that acts on the pull request is on screen. */
+/** Nothing that acts on the pull request is on screen: not in the header's status, not on a card. */
 function expectNoActions(): void {
   for (const id of ["pr-merge-button", "pr-auto-merge-button", "pr-review-button", "pr-cancel-auto-merge", "pr-ready-for-review", "pr-revert", "pr-menu-button", "pr-approve-workflow"]) expect(queryTestId(id)).toBeNull();
-  expect(byTestId("pr-readiness").querySelectorAll("button")).toHaveLength(0);
+  expect(byTestId("pr-status").querySelectorAll("button")).toHaveLength(0);
+  expect(queryTestId("pr-readiness")?.querySelectorAll("button") ?? []).toHaveLength(0);
 }
+
+const state = () => byTestId("pr-header").dataset.state;
 
 describe("seeded from the dashboard's row", () => {
   it("#142: the header and the rows at once, bars for the verdict, the controls and the body, nothing to press; the detail lands in the same surface", async () => {
@@ -107,26 +110,25 @@ describe("seeded from the dashboard's row", () => {
     expect(surface.dataset.seeded).toBe("");
     expect(queryTestId("pr-loading")).toBeNull();
     expect(byTestId("pr-title").textContent).toBe("feat(gui): virtualized sidebar tree with thread rows");
-    expect(byTestId("pr-state").textContent).toBe("Open");
-    expect(byTestId("pr-author").textContent).toBe("alexwaumann");
+    expect(state()).toBe("open");
+    expect(byTestId("pr-repo").textContent).toBe(`${SLUG} #142`);
     expect(byTestId("pr-branches").textContent).toMatch(/main\s*feat\/sidebar/);
-    expect(byTestId("pr-diffstat").textContent).toContain("+");
-    expect(byTestId("pr-ages").textContent).toMatch(/^· opened .* · updated /);
     expect(rows()).toEqual(["checks", "review", "mergeable"]);
     expect(texts("pr-ready-title")[0]).toBe("All 31 checks passed · 2 skipped");
-    expect(byTestId("pr-ready-headline").textContent).toBe("");
+    // No verdict yet, so no wash either.
+    expect(queryTestId("pr-ready-headline")).toBeNull();
+    expect(byTestId("pr-header").dataset.tone).toBe("neutral");
     expect(byTestId("pr-ready-pending")).toBeTruthy();
     expect(byTestId("pr-ready-footer-pending")).toBeTruthy();
     expect(byTestId("pr-seed-body").getAttribute("aria-busy")).toBe("true");
     expect(byTestId("pr-menu-pending")).toBeTruthy();
     expectNoActions();
-    // Open on GitHub needs no detail: it is a link.
-    expect(byTestId("pr-open-github")).toBeTruthy();
 
     await land(142);
     expect(byTestId("pr-surface")).toBe(surface);
     expect(surface.dataset.seeded).toBeUndefined();
     expect(byTestId("pr-ready-headline").textContent).toBe("Ready to merge");
+    expect(byTestId("pr-header").dataset.tone).toBe("success");
     expect(byTestId("pr-merge-button")).toBeTruthy();
     expect(byTestId("pr-menu-button")).toBeTruthy();
     expect(queryTestId("pr-seed-body")).toBeNull();
@@ -151,26 +153,29 @@ describe("seeded from the dashboard's row", () => {
   it("a draft: its row without Ready for review until the detail says who may", async () => {
     renderPrPanel();
     await openPr(145);
-    expect(byTestId("pr-state").textContent).toBe("Draft");
+    expect(state()).toBe("draft");
     expect(rows()[0]).toBe("draft");
     expect(texts("pr-ready-title")[1]).toBe("2 checks failing · 2 running · 2 passed · 1 skipped");
     expectNoActions();
     await land(145);
     expect(byTestId("pr-ready-for-review")).toBeTruthy();
-    // The names the rollup could not give.
-    expect(texts("pr-ready-check")).toHaveLength(2);
+    // The names the rollup could not give: the failing ones, on the checks card.
+    expect(screen.getAllByTestId("pr-check").map((c) => c.dataset.tone)).toEqual(["failure", "failure"]);
   });
 
   it("merged: settled, so the headline shows; Revert and the commit wait for the detail", async () => {
     renderPrPanel();
     await openPr(138);
-    expect(byTestId("pr-state").textContent).toBe("Merged");
+    expect(state()).toBe("merged");
     expect(byTestId("pr-ready-headline").textContent).toBe("Merged");
-    expect(texts("pr-ready-title")).toEqual(["Merged into main 1d ago"]);
+    expect(byTestId("pr-ready-meta").textContent).toBe("into main 1d ago");
+    expect(byTestId("pr-header").dataset.tone).toBe("merged");
+    // No requirement cards for a merged pull request.
+    expect(queryTestId("pr-readiness")).toBeNull();
     expect(queryTestId("pr-ready-footer-pending")).toBeNull();
     expectNoActions();
     await land(138);
-    expect(texts("pr-ready-title")).toEqual(["Merged into main by alexwaumann 1d ago"]);
+    expect(byTestId("pr-ready-meta").textContent).toMatch(/^[0-9a-f]{7} into main 1d ago$/);
     expect(byTestId("pr-revert")).toBeTruthy();
   });
 
@@ -178,9 +183,10 @@ describe("seeded from the dashboard's row", () => {
     setAuthored((a) => [...a, { ...(a[0] as PullRequestView), number: 131, title: "Gave up", state: "closed", mergeable: null, mergeState: "" }]);
     renderPrPanel();
     await openPr(131);
-    expect(byTestId("pr-state").textContent).toBe("Closed");
-    expect(byTestId("pr-ready-headline").textContent).toBe("Closed without merging");
-    expect(byTestId("pr-ages").textContent).toMatch(/^· opened [^·]*$/);
+    expect(state()).toBe("closed");
+    expect(byTestId("pr-ready-headline").textContent).toBe("Closed");
+    expect(byTestId("pr-header").dataset.tone).toBe("failure");
+    expect(queryTestId("pr-ready-meta")).toBeNull();
     expect(queryTestId("pr-ready-footer-pending")).toBeNull();
   });
 
@@ -209,10 +215,10 @@ describe("seeded from the dashboard's row", () => {
     });
     renderPrPanel();
     await openPr(138);
-    expect(byTestId("pr-state").textContent).toBe("Open");
+    expect(state()).toBe("open");
     expect(byTestId("pr-ready-footer-pending")).toBeTruthy();
     await land(138);
-    expect(byTestId("pr-state").textContent).toBe("Merged");
+    expect(state()).toBe("merged");
     expect(queryTestId("pr-ready-footer-pending")).toBeNull();
     expect(queryTestId("pr-merge-button")).toBeNull();
   });
@@ -228,16 +234,17 @@ describe("seeded from the dashboard's row", () => {
     expect(byTestId("pr-ready-headline").textContent).toBe("Ready to merge");
   });
 
-  it("the tabs work while it waits: the choice holds, the box goes compact on Code, and the bars stay", async () => {
+  it("the tabs work while it waits: the choice holds, the cards stay on Overview, and the bars stay", async () => {
     renderPrPanel();
     await openPr(142);
     fireEvent.click(byTestId("pr-tab-activity"));
     expect(byTestId("pr-tab-activity").getAttribute("aria-selected")).toBe("true");
     expect(byTestId("pr-seed-body")).toBeTruthy();
     expect(queryTestId("pr-timeline-counts")).toBeNull();
-    fireEvent.click(byTestId("pr-tab-code"));
-    expect(byTestId("pr-readiness").dataset.compact).toBe("true");
     expect(queryTestId("pr-ready-row")).toBeNull();
+    fireEvent.click(byTestId("pr-tab-code"));
+    expect(queryTestId("pr-ready-row")).toBeNull();
+    expect(byTestId("pr-ready-pending")).toBeTruthy();
     expect(byTestId("pr-seed-body")).toBeTruthy();
     expect(getPullRequestDiff).not.toHaveBeenCalled(); // no head to read it for yet
     await land(142);
@@ -300,7 +307,7 @@ describe("switching between pull requests", () => {
     expect(byTestId("pr-title").textContent).toBe("fix(terminal): resize race between attach and first output");
     expect(gate.aborted).toEqual([142]);
     await land(145);
-    expect(byTestId("pr-ready-headline").textContent).toContain("Not ready to merge");
+    expect(byTestId("pr-ready-headline").textContent).toBe("Draft");
     expect(pullRequestDetailResource.store.getState().entries[pullRequestKey(SLUG, 142)]).toMatchObject({ data: null, loading: false, error: null });
   });
 

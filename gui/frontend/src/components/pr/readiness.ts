@@ -1,10 +1,10 @@
 /**
- * The Pull request panel's readiness box (ReadinessBox.tsx) as pure data: a headline, one
- * row per requirement (draft, checks, reviews, conversations, conflicts, behind), and the
- * footer's controls. Table-tested in readiness.test.ts. The daemon and GitHub decide; this
+ * The Pull request surface's readiness as pure data: the header's status (headline) and
+ * buttons (footer), and one row per requirement (draft, checks, reviews, conversations,
+ * conflicts, behind) for Overview's cards (ReadinessBox.tsx). Table-tested in readiness.test.ts. The daemon and GitHub decide; this
  * only says what the detail shows.
  */
-import type { CheckView, MergeMethodView, PullRequestDetailView, PullRequestReviewerView } from "@/api/gh";
+import type { CheckView, PullRequestDetailView, PullRequestReviewerView } from "@/api/gh";
 import { mergeAvailability } from "./merge";
 import { ago, checkTone, threadLocation, type Tone } from "./model";
 import { reviewVisible, sameLogin } from "./review";
@@ -49,8 +49,8 @@ export type SubLine =
   | { kind: "locations"; items: { text: string; path: string; outdated: boolean }[] }
   | { kind: "commit"; sha: string };
 
-/** A row's own button (the thread tasks are `task`, not an action). */
-export type RowAction = { kind: "ready" } | { kind: "approve-workflow"; url: string } | { kind: "revert" };
+/** A row's own button (the thread tasks are `task`, not an action; the state's own action is the header's, ReadinessFooter.main). */
+export type RowAction = { kind: "approve-workflow"; url: string };
 
 export interface ReadinessRow {
   id: RowId;
@@ -64,7 +64,7 @@ export interface ReadinessRow {
   /** The issue this row can hand to a thread; null for passing rows. */
   task: TaskKind | null;
   /**
-   * It keeps the pull request from merging: counted in "N left". Never when GitHub can
+   * It keeps the pull request from merging ("Not ready to merge"). Never when GitHub can
    * merge it now (mergeableNow): the row then only informs.
    */
   blocking: boolean;
@@ -79,30 +79,74 @@ export interface ReadinessRow {
 
 export type FooterMerge = "merge" | "auto-merge" | "cancel-auto-merge";
 
+/** The state's main action in the header: a merge control, Ready for review (a draft), or Revert (merged). */
+export type MainAction = FooterMerge | "ready" | "revert";
+
+/** The header's buttons. */
 export interface ReadinessFooter {
   /** Review ▾ (reviewVisible). */
   review: boolean;
   /** The viewer's review is requested: Review ▾ is the primary button. */
   reviewPrimary: boolean;
-  /** The right-hand control; null for a viewer who cannot merge. */
-  merge: FooterMerge | null;
+  /** The right-hand control; null when the viewer has none (no write access, closed). */
+  main: MainAction | null;
   /** A line inside the Merge ▾ menu ("Auto-merge is off for this repository"). */
   mergeNote: string | null;
 }
 
 export interface Readiness {
+  /** The header's status: the state in words ("Ready to merge", "Merged") and quiet text after it. */
   headline: { icon: ReadyIcon; tone: ReadyTone; title: string; meta: string };
   rows: ReadinessRow[];
-  /** Null for merged and closed pull requests. */
-  footer: ReadinessFooter | null;
+  footer: ReadinessFooter;
+}
+
+/**
+ * The header's wash and the colour of its status: ready is success; open but not ready
+ * (a pending or info headline) is warning; merged and closed their own; a draft, a viewer
+ * who cannot merge and a merge state still being computed none (neutral).
+ */
+export type StatusTone = "success" | "warning" | "merged" | "failure" | "neutral";
+
+export function statusTone(t: ReadyTone): StatusTone {
+  switch (t) {
+    case "success":
+    case "merged":
+    case "failure":
+      return t;
+    case "pending":
+    case "info":
+      return "warning";
+    default:
+      return "neutral";
+  }
+}
+
+/** The checks a failing or running checks card lists while folded: those in its own state (runs awaiting approval have their own card). */
+export function cardChecks(row: Pick<ReadinessRow, "tone">, checks: readonly CheckView[]): CheckView[] {
+  const want = row.tone === "failure" ? "failure" : "pending";
+  return checks.filter((c) => checkTone(c) === want && !awaitingApproval(c));
+}
+
+/**
+ * The requirement cards under Overview: `issues`, one card each (what is not passing), and
+ * `passed`, one quiet card for them all. A checks row only skipped checks counts as passed;
+ * the other neutral rows ("No reviews yet", "No checks") say nothing the details do not.
+ * Merged and closed pull requests have none.
+ */
+export function readinessCards(rows: readonly ReadinessRow[], state: string): { issues: ReadinessRow[]; passed: ReadinessRow[] } {
+  if (state !== "open") return { issues: [], passed: [] };
+  const issue = (row: ReadinessRow) => row.tone === "failure" || row.tone === "pending" || row.tone === "info" || row.tone === "draft";
+  return {
+    issues: rows.filter(issue),
+    passed: rows.filter((row) => row.tone === "success" || (row.tone === "neutral" && row.id === "checks" && row.expandable)),
+  };
 }
 
 export const AUTO_MERGE_OFF_NOTE = "Auto-merge is off for this repository";
 
 /** How many failing (or running) checks a row names before "and N more". */
 export const NAMED_CHECKS = 3;
-
-const METHOD_WORDS: Record<MergeMethodView, string> = { merge: "merge commit", squash: "squash", rebase: "rebase" };
 
 const plural = (n: number, one: string, many = `${one}s`): string => `${String(n)} ${n === 1 ? one : many}`;
 const baseOf = (path: string): string => path.slice(path.lastIndexOf("/") + 1);
@@ -329,15 +373,14 @@ function openRows(d: PullRequestDetailView, viewer: string, now: number): Readin
   const pr = d.pullRequest;
   const rows: ReadinessRow[] = [];
   if (pr.draft) {
-    const mayChange = d.viewerCanUpdate || sameLogin(pr.author, viewer);
     rows.push({
       id: "draft",
       tone: "draft",
       icon: "draft",
-      title: "Draft",
+      title: "Still a draft",
       meta: "",
       lines: [{ kind: "text", text: "Reviewers are not notified until it is ready." }],
-      action: mayChange ? { kind: "ready" } : null,
+      action: null,
       task: null,
       blocking: true,
       expandable: false,
@@ -386,16 +429,20 @@ export function mergeableNow(d: PullRequestDetailView): boolean {
   return !pr.draft && pr.mergeable !== "conflicting" && (pr.mergeState === "clean" || pr.mergeState === "unstable" || pr.mergeState === "has_hooks");
 }
 
-/** The footer of an open pull request: Review ▾, and Merge, Auto-merge or Cancel auto-merge. */
+/**
+ * The buttons of an open pull request: Review ▾, and Merge, Auto-merge or Cancel auto-merge;
+ * a draft's is Ready for review, for the author or anyone with write access.
+ */
 function openFooter(d: PullRequestDetailView, viewer: string, fresh: boolean, reviewPrimary: boolean): ReadinessFooter {
   const pr = d.pullRequest;
   const review = reviewVisible(d, viewer);
-  const out = (merge: FooterMerge | null, mergeNote: string | null = null): ReadinessFooter => ({ review, reviewPrimary: review && reviewPrimary, merge, mergeNote });
+  const out = (main: MainAction | null, mergeNote: string | null = null): ReadinessFooter => ({ review, reviewPrimary: review && reviewPrimary, main, mergeNote });
+  if (pr.draft) return out(d.viewerCanUpdate || sameLogin(pr.author, viewer) ? "ready" : null);
   if (!d.viewerCanUpdate) return out(null);
   if (d.autoMergeEnabled) return out("cancel-auto-merge");
   if (mergeAvailability(d).reason === null) return out("merge");
   // Requirements still pending (checks, reviews, an update): GitHub can merge it once they pass.
-  const pending = !pr.draft && pr.mergeable !== "conflicting" && (pr.mergeState === "blocked" || pr.mergeState === "behind");
+  const pending = pr.mergeable !== "conflicting" && (pr.mergeState === "blocked" || pr.mergeState === "behind");
   if (!pending || !fresh) return out("merge");
   return d.autoMergeAllowed ? out("auto-merge") : out("merge", AUTO_MERGE_OFF_NOTE);
 }
@@ -407,7 +454,8 @@ function computingMergeability(d: PullRequestDetailView): boolean {
 }
 
 function openHeadline(d: PullRequestDetailView, rows: ReadinessRow[]): Readiness["headline"] {
-  if (d.autoMergeEnabled) return { icon: "auto-merge", tone: "info", title: "Auto-merge on", meta: d.autoMergeMethod ? METHOD_WORDS[d.autoMergeMethod] : "" };
+  if (d.pullRequest.draft) return { icon: "draft", tone: "draft", title: "Draft", meta: "" };
+  if (d.autoMergeEnabled) return { icon: "auto-merge", tone: "pending", title: "Auto-merge on", meta: "" };
   if (rows.some((r) => r.id === "review-request")) return { icon: "eye", tone: "pending", title: "Waiting on your review", meta: "" };
   if (!d.viewerCanUpdate) return { icon: "lock", tone: "neutral", title: "You can't merge this", meta: d.viewerPermission ? `${d.viewerPermission} access` : "" };
   const blocking = rows.filter((r) => r.blocking);
@@ -425,22 +473,25 @@ function openHeadline(d: PullRequestDetailView, rows: ReadinessRow[]): Readiness
   if (blocking.length === 1 && only?.id === "checks" && only.tone === "pending") {
     return { icon: "running", tone: "pending", title: "Waiting on checks", meta: only.summary ?? "" };
   }
-  return { icon: "warning", tone: "pending", title: "Not ready to merge", meta: `${String(blocking.length)} left` };
+  return { icon: "warning", tone: "pending", title: "Not ready to merge", meta: "" };
 }
 
 /**
- * The readiness box for d as `viewer` sees it at `now`. `fresh` (detailFresh): the detail
+ * The readiness of d as `viewer` sees it at `now`. `fresh` (detailFresh): the detail
  * was fetched on this read, so autoMergeAllowed=false is the repository's setting and not
  * a cached copy's default; a stale copy shows nothing about auto-merge.
  */
 export function readiness(d: PullRequestDetailView, viewer: string, fresh: boolean, now: number): Readiness {
   const pr = d.pullRequest;
   const base = pr.baseRef || "the base branch";
+  const none: ReadinessFooter = { review: false, reviewPrimary: false, main: null, mergeNote: null };
   if (pr.state === "merged") {
     const by = d.mergedBy ? ` by ${d.mergedBy}` : "";
     const when = ago(pr.mergedAtMs ?? d.closedAtMs, now);
+    // "a3f9c21 into main 2h ago": the commit leads when the detail has it.
+    const meta = [d.mergeCommitSha.slice(0, 7), `into ${base}`, when].filter(Boolean).join(" ");
     return {
-      headline: { icon: "merged", tone: "merged", title: "Merged", meta: "" },
+      headline: { icon: "merged", tone: "merged", title: "Merged", meta },
       rows: [
         {
           id: "merged",
@@ -449,13 +500,13 @@ export function readiness(d: PullRequestDetailView, viewer: string, fresh: boole
           title: `Merged into ${base}${by}${when ? ` ${when}` : ""}`,
           meta: "",
           lines: d.mergeCommitSha ? [{ kind: "commit", sha: d.mergeCommitSha }] : [],
-          action: d.viewerCanUpdate ? { kind: "revert" } : null,
+          action: null,
           task: null,
           blocking: false,
           expandable: false,
         },
       ],
-      footer: null,
+      footer: { ...none, main: d.viewerCanUpdate ? "revert" : null },
     };
   }
   if (pr.state === "closed") {
@@ -463,9 +514,10 @@ export function readiness(d: PullRequestDetailView, viewer: string, fresh: boole
     const rows: ReadinessRow[] = [{ id: "closed", tone: "failure", icon: "closed", title: when ? `Closed ${when}` : "Closed", meta: "", lines: [], action: null, task: null, blocking: false, expandable: false }];
     const c = checksRow(d, d.checks, false);
     if (c) rows.push(c);
-    return { headline: { icon: "closed", tone: "failure", title: "Closed without merging", meta: "" }, rows, footer: null };
+    // The detail has no "closed by": the time alone.
+    return { headline: { icon: "closed", tone: "failure", title: "Closed", meta: when }, rows, footer: none };
   }
-  if (pr.state !== "open") return { headline: { icon: "none", tone: "neutral", title: "Unknown state", meta: "" }, rows: [], footer: null };
+  if (pr.state !== "open") return { headline: { icon: "none", tone: "neutral", title: "Unknown state", meta: "" }, rows: [], footer: none };
   const rows = openRows(d, viewer, now);
   return { headline: openHeadline(d, rows), rows, footer: openFooter(d, viewer, fresh, rows.some((r) => r.id === "review-request")) };
 }

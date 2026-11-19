@@ -15,7 +15,7 @@ const titled = (pr: PullRequestView) => seeded(pr).rows.map((r) => r.title);
 describe("seedReadiness", () => {
   it.each<[string, Partial<PullRequestView>, string[]]>([
     ["checks and a required review", { mergeable: "mergeable" }, ["All 12 checks passed", "Review required", "No conflicts with main"]],
-    ["a draft", { draft: true, mergeable: null }, ["Draft", "All 12 checks passed", "Review required"]],
+    ["a draft", { draft: true, mergeable: null }, ["Still a draft", "All 12 checks passed", "Review required"]],
     ["failing checks from the rollup alone", { checks: { state: "failure", total: 3, passed: 2, failed: 1, pending: 0, skipped: 0 }, mergeable: null }, ["1 check failing", "Review required"]],
     ["conflicts", { mergeable: "conflicting", mergeState: "dirty" }, ["All 12 checks passed", "Review required", "Conflicts with main"]],
     ["behind", { mergeable: "mergeable", mergeState: "behind" }, ["All 12 checks passed", "Review required", "Behind main", "No conflicts with main"]],
@@ -39,7 +39,7 @@ describe("seedReadiness", () => {
     expect(merged.footerPending).toBe(false);
     expect(merged.rows.map((r) => [r.title, r.action])).toEqual([["Merged into main 1h ago", null]]);
     const closed = seeded(row({ state: "closed", mergeable: null, mergeState: "" }));
-    expect(closed.headline?.title).toBe("Closed without merging");
+    expect(closed.headline?.title).toBe("Closed");
     expect(closed.footerPending).toBe(false);
     expect(titled(row({ state: "closed", mergeState: "" }))).toEqual(["Closed", "12 checks passed"]);
   });

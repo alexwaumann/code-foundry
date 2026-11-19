@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { PullRequestCommentView, PullRequestDetailView, PullRequestView, ReviewThreadView } from "@/api/gh";
-import { ago, checkDuration, checkMeta, checkRunning, checkTone, commentCount, conversation, resolveLink, reviewerStatus, stateBadge, threadLocation, timeline } from "./model";
+import { ago, checkDuration, checkMeta, checkRunning, checkTone, commentCount, conversation, detailAges, resolveLink, reviewerStatus, stateBadge, threadLocation, timeline } from "./model";
 
 const NOW = new Date(2026, 9, 8, 12, 0, 0).getTime();
 const M = 60_000;
@@ -174,5 +174,22 @@ describe("resolveLink", () => {
     ["mailto:a@b.c", null],
   ])("%s -> %s", (href, want) => {
     expect(resolveLink(href)).toBe(want);
+  });
+});
+
+describe("detailAges", () => {
+  const pr = (o: Partial<PullRequestView>) => ({ state: "open", createdAtMs: NOW - 2 * 24 * H, updatedAtMs: NOW - 5 * H, mergedAtMs: null, ...o }) as PullRequestView;
+  it.each([
+    ["open: opened and updated", { pullRequest: pr({}), closedAtMs: null }, "Opened 2d ago · Updated 5h ago"],
+    ["merged: opened and merged", { pullRequest: pr({ state: "merged", mergedAtMs: NOW - H }), closedAtMs: NOW - H }, "Opened 2d ago · Merged 1h ago"],
+    ["closed: opened and closed", { pullRequest: pr({ state: "closed" }), closedAtMs: NOW - 3 * H }, "Opened 2d ago · Closed 3h ago"],
+    // A dashboard row has no closing time: none is made up.
+    ["closed, time unknown", { pullRequest: pr({ state: "closed" }), closedAtMs: null }, "Opened 2d ago"],
+  ])("%s", (_name, d, want) => {
+    expect(
+      detailAges(d, NOW)
+        .map((a) => `${a.label} ${a.value}`)
+        .join(" · "),
+    ).toBe(want);
   });
 });

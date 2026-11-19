@@ -18,7 +18,7 @@ function CheckRow({ c, now }: { c: CheckView; now: number }) {
         <button
           type="button"
           disabled={!c.url}
-          className="group flex h-7 w-full items-center gap-2 rounded-md px-1.5 text-left text-body-sm outline-none enabled:hover:bg-cf-control-hover/60 focus-visible:ring-1 focus-visible:ring-cf-focus disabled:cursor-default"
+          className="group flex h-6 w-full items-center gap-2 rounded-md px-1.5 text-left text-body-sm outline-none enabled:hover:bg-cf-control-hover/60 focus-visible:ring-1 focus-visible:ring-cf-focus disabled:cursor-default"
           data-testid="pr-check"
           data-tone={tone}
           onClick={() => void openUrl(c.url)}
@@ -36,17 +36,22 @@ function CheckRow({ c, now }: { c: CheckView; now: number }) {
   );
 }
 
-/** Every check on the head commit, failed first; each opens its log. The readiness box's checks row unfolds to it. */
-export function CheckList({ d }: { d: PullRequestDetailView }) {
+/**
+ * Checks on the head commit, failed first; each opens its log and says "queued", how long it
+ * has run (ticking) or how long it took. `checks`: only those (a failing or running card
+ * folded); every check otherwise, with the note when not all were fetched.
+ */
+export function CheckList({ d, checks }: { d: PullRequestDetailView; checks?: readonly CheckView[] }) {
   const now = useChecksClock(d.checks);
+  const shown = checks ?? d.checks;
   return (
     <>
-      <ul className="-mx-1.5 flex flex-col" data-testid="pr-checks-list">
-        {d.checks.map((c, i) => (
+      <ul className="-mx-1.5 flex flex-col" data-testid="pr-checks-list" data-all={checks === undefined || undefined}>
+        {shown.map((c, i) => (
           <CheckRow key={`${c.workflow}/${c.name}/${String(i)}`} c={c} now={now} />
         ))}
       </ul>
-      {d.checksTruncated && (
+      {checks === undefined && d.checksTruncated && (
         <p className="mt-1.5 text-caption" data-testid="pr-truncated">
           Not every check could be listed{d.lastError && !d.fetchFailed ? `: ${d.lastError}` : "."} The rest are on GitHub.
         </p>

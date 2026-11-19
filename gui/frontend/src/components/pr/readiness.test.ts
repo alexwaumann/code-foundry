@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { CheckView, PullRequestDetailView, PullRequestReviewerView, PullRequestView, ReviewThreadView } from "@/api/gh";
-import { AUTO_MERGE_OFF_NOTE, awaitingApproval, detailFresh, readiness, type ReadinessRow, type SubLine } from "./readiness";
+import { AUTO_MERGE_OFF_NOTE, awaitingApproval, cardChecks, detailFresh, readiness, readinessCards, statusTone, type ReadinessRow, type SubLine } from "./readiness";
 
 const NOW = Date.UTC(2026, 10, 3, 12);
 const HOUR = 3_600_000;
@@ -134,14 +134,14 @@ describe("readiness: headline, rows and footer", () => {
     fresh?: boolean;
     headline: string;
     rows: string[];
-    footer: { review: boolean; reviewPrimary?: boolean; merge: string | null; mergeNote?: string | null } | null;
+    footer: { review: boolean; reviewPrimary?: boolean; main: string | null; mergeNote?: string | null };
   }[] = [
     {
       name: "ready to merge",
       s: {},
       headline: "Ready to merge",
       rows: ["checks success: All 2 checks passed", "review success: Approved", "mergeable success: No conflicts with trunk"],
-      footer: { review: true, merge: "merge" },
+      footer: { review: true, main: "merge" },
     },
     {
       name: "draft with failing checks, changes requested, unresolved threads",
@@ -153,57 +153,57 @@ describe("readiness: headline, rows and footer", () => {
           reviewThreads: [thread("internal/a/actor.go", 142), thread("b/resize.go", 37, { isOutdated: true }), thread("c.go", 1, { isResolved: true })],
         },
       },
-      headline: "Not ready to merge · 4 left",
+      headline: "Draft",
       rows: [
-        "draft draft: Draft",
+        "draft draft: Still a draft",
         "checks failure: 2 checks failing · 2 running · 2 passed · 1 skipped",
         "review failure: Changes requested",
         "conversations pending: 2 unresolved conversations",
         "mergeable success: No conflicts with trunk",
       ],
-      footer: { review: true, merge: "merge" },
+      footer: { review: true, main: "ready" },
     },
     {
       name: "changes requested on a ready pull request: auto-merge offered",
       s: { pr: { review: "changes_requested", mergeState: "blocked" }, d: { reviewers: [reviewer("ana", { state: "changes_requested" })], reviewThreads: [thread("x.go", 3)] } },
-      headline: "Not ready to merge · 2 left",
+      headline: "Not ready to merge",
       rows: ["checks success: All 2 checks passed", "review failure: Changes requested", "conversations pending: 1 unresolved conversation", "mergeable success: No conflicts with trunk"],
-      footer: { review: true, merge: "auto-merge" },
+      footer: { review: true, main: "auto-merge" },
     },
     {
       name: "conflicts: no conflict-free row, Merge stays (disabled), no auto-merge",
       s: { pr: { mergeable: "conflicting", mergeState: "dirty" } },
-      headline: "Not ready to merge · 1 left",
+      headline: "Not ready to merge",
       rows: ["checks success: All 2 checks passed", "review success: Approved", "conflicts failure: Conflicts with trunk"],
-      footer: { review: true, merge: "merge" },
+      footer: { review: true, main: "merge" },
     },
     {
       name: "behind (GitHub reports BEHIND): blocks, auto-merge offered",
       s: { pr: { mergeState: "behind" } },
-      headline: "Not ready to merge · 1 left",
+      headline: "Not ready to merge",
       rows: ["checks success: All 2 checks passed", "review success: Approved", "behind pending: Behind trunk", "mergeable success: No conflicts with trunk"],
-      footer: { review: true, merge: "auto-merge" },
+      footer: { review: true, main: "auto-merge" },
     },
     {
       name: "checks running, approved: waiting on checks",
       s: { pr: { mergeState: "blocked" }, d: { checks: [running("e2e"), running("test"), check("build")] } },
       headline: "Waiting on checks · 2 running",
       rows: ["checks pending: 2 checks running · 1 passed", "review success: Approved", "mergeable success: No conflicts with trunk"],
-      footer: { review: true, merge: "auto-merge" },
+      footer: { review: true, main: "auto-merge" },
     },
     {
       name: "auto-merge on: headline, Cancel auto-merge",
       s: { pr: { mergeState: "blocked" }, d: { checks: [running("e2e")], autoMergeEnabled: true, autoMergeMethod: "squash" } },
-      headline: "Auto-merge on · squash",
+      headline: "Auto-merge on",
       rows: ["checks pending: 1 check running", "review success: Approved", "mergeable success: No conflicts with trunk"],
-      footer: { review: true, merge: "cancel-auto-merge" },
+      footer: { review: true, main: "cancel-auto-merge" },
     },
     {
       name: "auto-merge not allowed by the repository (fresh): Merge with the note",
       s: { pr: { mergeState: "blocked" }, d: { checks: [running("e2e")], autoMergeAllowed: false } },
       headline: "Waiting on checks · 1 running",
       rows: ["checks pending: 1 check running", "review success: Approved", "mergeable success: No conflicts with trunk"],
-      footer: { review: true, merge: "merge", mergeNote: AUTO_MERGE_OFF_NOTE },
+      footer: { review: true, main: "merge", mergeNote: AUTO_MERGE_OFF_NOTE },
     },
     {
       name: "a stale copy (failed fetch) says nothing about auto-merge",
@@ -211,7 +211,7 @@ describe("readiness: headline, rows and footer", () => {
       fresh: false,
       headline: "Waiting on checks · 1 running",
       rows: ["checks pending: 1 check running", "review success: Approved", "mergeable success: No conflicts with trunk"],
-      footer: { review: true, merge: "merge", mergeNote: null },
+      footer: { review: true, main: "merge", mergeNote: null },
     },
     {
       name: "a stale copy that allows auto-merge offers none either",
@@ -219,147 +219,147 @@ describe("readiness: headline, rows and footer", () => {
       fresh: false,
       headline: "Waiting on checks · 1 running",
       rows: ["checks pending: 1 check running", "review success: Approved", "mergeable success: No conflicts with trunk"],
-      footer: { review: true, merge: "merge" },
+      footer: { review: true, main: "merge" },
     },
     {
       name: "your review is requested: primary Review, no review-required row",
       s: { pr: { author: "kim", review: "review_required", mergeState: "blocked" }, d: { reviewers: [reviewer(VIEWER, { requested: true })] } },
       headline: "Waiting on your review",
       rows: ["checks success: All 2 checks passed", "review-request pending: Your review is requested", "mergeable success: No conflicts with trunk"],
-      footer: { review: true, reviewPrimary: true, merge: "auto-merge" },
+      footer: { review: true, reviewPrimary: true, main: "auto-merge" },
     },
     {
       name: "review required: waiting on the requested",
       s: { pr: { review: "review_required", mergeState: "blocked" }, d: { reviewers: [reviewer("kim", { requested: true }), reviewer("acme/core", { requested: true })] } },
-      headline: "Not ready to merge · 1 left",
+      headline: "Not ready to merge",
       rows: ["checks success: All 2 checks passed", "review pending: Review required", "mergeable success: No conflicts with trunk"],
-      footer: { review: true, merge: "auto-merge" },
+      footer: { review: true, main: "auto-merge" },
     },
     {
       name: "reviews not required, none given",
       s: { pr: { review: null }, d: { reviewers: [] } },
       headline: "Ready to merge",
       rows: ["checks success: All 2 checks passed", "review neutral: No reviews yet", "mergeable success: No conflicts with trunk"],
-      footer: { review: true, merge: "merge" },
+      footer: { review: true, main: "merge" },
     },
     {
       name: "read access with a workflow waiting for approval: no merge controls, no Review",
       s: { pr: { author: "first-timer", review: null, mergeState: "blocked" }, d: { viewerCanUpdate: false, viewerPermission: "read", reviewers: [], checks: [awaiting("build")] } },
       headline: "You can't merge this · read access",
       rows: ["workflow-approval pending: 1 workflow waiting for approval", "review neutral: No reviews yet", "mergeable success: No conflicts with trunk"],
-      footer: { review: false, merge: null },
+      footer: { review: false, main: null },
     },
     {
       name: "read access, your review requested: Review ▾ (primary), no merge controls",
       s: { pr: { author: "kim", review: "review_required", mergeState: "blocked" }, d: { viewerCanUpdate: false, viewerPermission: "read", reviewers: [reviewer(VIEWER, { requested: true })] } },
       headline: "Waiting on your review",
       rows: ["checks success: All 2 checks passed", "review-request pending: Your review is requested", "mergeable success: No conflicts with trunk"],
-      footer: { review: true, reviewPrimary: true, merge: null },
+      footer: { review: true, reviewPrimary: true, main: null },
     },
     {
       name: "no checks at all",
       s: { d: { checks: [] }, pr: { checks: { state: "none", total: 0, passed: 0, failed: 0, pending: 0, skipped: 0 } } },
       headline: "Ready to merge",
       rows: ["checks neutral: No checks", "review success: Approved", "mergeable success: No conflicts with trunk"],
-      footer: { review: true, merge: "merge" },
+      footer: { review: true, main: "merge" },
     },
     {
       name: "a detail without a check list counts from the rollup",
       s: { d: { checks: [] }, pr: { mergeState: "blocked", checks: { state: "failure", total: 5, passed: 3, failed: 1, pending: 1, skipped: 0 } } },
-      headline: "Not ready to merge · 1 left",
+      headline: "Not ready to merge",
       rows: ["checks failure: 1 check failing · 1 running · 3 passed", "review success: Approved", "mergeable success: No conflicts with trunk"],
-      footer: { review: true, merge: "auto-merge" },
+      footer: { review: true, main: "auto-merge" },
     },
     {
       name: "blocked with no reason shown",
       s: { pr: { mergeState: "blocked" } },
-      headline: "Not ready to merge · 1 left",
+      headline: "Not ready to merge",
       rows: ["checks success: All 2 checks passed", "review success: Approved", "mergeable success: No conflicts with trunk", "blocked pending: Blocked by branch protection"],
-      footer: { review: true, merge: "auto-merge" },
+      footer: { review: true, main: "auto-merge" },
     },
     {
       name: "mergeability not computed yet: checking, no conflict row, Merge as GitHub allows",
       s: { pr: { mergeable: "unknown", mergeState: "unknown" } },
       headline: "Checking mergeability",
       rows: ["checks success: All 2 checks passed", "review success: Approved"],
-      footer: { review: true, merge: "merge" },
+      footer: { review: true, main: "merge" },
     },
     {
       name: "UNSTABLE: an optional check fails, GitHub merges anyway",
       s: { pr: { mergeState: "unstable" }, d: { checks: [failed("lint"), check("build")] } },
       headline: "Ready to merge · 1 optional check failing",
       rows: ["checks failure: 1 check failing · 1 passed", "review success: Approved", "mergeable success: No conflicts with trunk"],
-      footer: { review: true, merge: "merge" },
+      footer: { review: true, main: "merge" },
     },
     {
       name: "CLEAN with checks still running (none required)",
       s: { d: { checks: [running("e2e"), check("build")] } },
       headline: "Ready to merge · 1 running",
       rows: ["checks pending: 1 check running · 1 passed", "review success: Approved", "mergeable success: No conflicts with trunk"],
-      footer: { review: true, merge: "merge" },
+      footer: { review: true, main: "merge" },
     },
     {
       name: "CLEAN with unresolved conversations (resolving them is not required)",
       s: { d: { reviewThreads: [thread("x.go", 3)] } },
       headline: "Ready to merge · 1 unresolved conversation",
       rows: ["checks success: All 2 checks passed", "review success: Approved", "conversations pending: 1 unresolved conversation", "mergeable success: No conflicts with trunk"],
-      footer: { review: true, merge: "merge" },
+      footer: { review: true, main: "merge" },
     },
     {
       name: "HAS_HOOKS with a failing check and a conversation",
       s: { pr: { mergeState: "has_hooks" }, d: { checks: [failed("lint"), failed("vet")], reviewThreads: [thread("x.go", 3), thread("y.go", 4)] } },
       headline: "Ready to merge · 2 optional checks failing · 2 unresolved conversations",
       rows: ["checks failure: 2 checks failing", "review success: Approved", "conversations pending: 2 unresolved conversations", "mergeable success: No conflicts with trunk"],
-      footer: { review: true, merge: "merge" },
+      footer: { review: true, main: "merge" },
     },
     {
       name: "BLOCKED with unresolved conversations: they count",
       s: { pr: { mergeState: "blocked" }, d: { reviewThreads: [thread("x.go", 3)] } },
-      headline: "Not ready to merge · 1 left",
+      headline: "Not ready to merge",
       rows: ["checks success: All 2 checks passed", "review success: Approved", "conversations pending: 1 unresolved conversation", "mergeable success: No conflicts with trunk"],
-      footer: { review: true, merge: "auto-merge" },
+      footer: { review: true, main: "auto-merge" },
     },
     {
       name: "truncated checks: the rollup's counts, not the fetched page's passes",
       s: { pr: { mergeState: "blocked", checks: { state: "failure", total: 120, passed: 60, failed: 50, pending: 10, skipped: 0 } }, d: { checksTruncated: true, checks: [check("a"), check("b"), check("c")] } },
-      headline: "Not ready to merge · 1 left",
+      headline: "Not ready to merge",
       rows: ["checks failure: 120+ checks · 50 failing · 10 running · 60 passed", "review success: Approved", "mergeable success: No conflicts with trunk"],
-      footer: { review: true, merge: "auto-merge" },
+      footer: { review: true, main: "auto-merge" },
     },
     {
       name: "truncated checks still running",
       s: { pr: { mergeState: "blocked", checks: { state: "pending", total: 120, passed: 100, failed: 0, pending: 20, skipped: 0 } }, d: { checksTruncated: true, checks: [check("a"), running("b")] } },
       headline: "Waiting on checks · 20 running",
       rows: ["checks pending: 120+ checks · 20 running · 100 passed", "review success: Approved", "mergeable success: No conflicts with trunk"],
-      footer: { review: true, merge: "auto-merge" },
+      footer: { review: true, main: "auto-merge" },
     },
     {
       name: "truncated checks the rollup says passed",
       s: { pr: { checks: { state: "success", total: 120, passed: 120, failed: 0, pending: 0, skipped: 0 } }, d: { checksTruncated: true, checks: [check("a"), check("b")] } },
       headline: "Ready to merge",
       rows: ["checks success: All 120 checks passed", "review success: Approved", "mergeable success: No conflicts with trunk"],
-      footer: { review: true, merge: "merge" },
+      footer: { review: true, main: "merge" },
     },
     {
       name: "truncated checks without a rollup never claim success",
       s: { pr: { checks: { state: "none", total: 0, passed: 0, failed: 0, pending: 0, skipped: 0 } }, d: { checksTruncated: true, checks: [check("a"), check("b"), check("c")] } },
       headline: "Ready to merge",
       rows: ["checks neutral: 3+ checks · 3 passed", "review success: Approved", "mergeable success: No conflicts with trunk"],
-      footer: { review: true, merge: "merge" },
+      footer: { review: true, main: "merge" },
     },
     {
       name: "merged: one row, no footer",
       s: { pr: { state: "merged", mergedAtMs: NOW - 24 * HOUR }, d: { mergedBy: "kim", mergeCommitSha: "3f9c2ab".padEnd(40, "0") } },
-      headline: "Merged",
+      headline: "Merged · 3f9c2ab into trunk 1d ago",
       rows: ["merged merged: Merged into trunk by kim 1d ago"],
-      footer: null,
+      footer: { review: false, main: "revert" },
     },
     {
       name: "closed: the end state and the checks as last seen",
       s: { pr: { state: "closed" }, d: { closedAtMs: NOW - 72 * HOUR } },
-      headline: "Closed without merging",
+      headline: "Closed · 3d ago",
       rows: ["closed failure: Closed 3d ago", "checks success: 2 checks passed"],
-      footer: null,
+      footer: { review: false, main: null },
     },
   ];
   it.each(cases)("$name", ({ s, viewer = VIEWER, fresh, headline, rows, footer }) => {
@@ -367,21 +367,22 @@ describe("readiness: headline, rows and footer", () => {
     const r = readiness(d, viewer, fresh ?? detailFresh(d), NOW);
     expect([r.headline.title, r.headline.meta].filter(Boolean).join(" · ")).toBe(headline);
     expect(r.rows.map(brief)).toEqual(rows);
-    if (footer === null) expect(r.footer).toBeNull();
-    else expect(r.footer).toEqual({ reviewPrimary: false, mergeNote: null, ...footer });
+    expect(r.footer).toEqual({ reviewPrimary: false, mergeNote: null, ...footer });
   });
 });
 
 describe("readiness rows in detail", () => {
   const rowOf = (d: PullRequestDetailView, id: string, viewer = VIEWER) => readiness(d, viewer, true, NOW).rows.find((r) => r.id === id);
 
-  it("draft: the sub-line, and Ready for review only for those who may change it", () => {
+  it("draft: the sub-line; the header's Ready for review only for those who may change it", () => {
     const d = detail({ pr: { draft: true } });
-    expect(rowOf(d, "draft")).toMatchObject({ lines: [{ kind: "text", text: "Reviewers are not notified until it is ready." }], action: { kind: "ready" }, blocking: true, task: null });
+    const main = (x: PullRequestDetailView, viewer = VIEWER) => readiness(x, viewer, true, NOW).footer.main;
+    expect(rowOf(d, "draft")).toMatchObject({ lines: [{ kind: "text", text: "Reviewers are not notified until it is ready." }], action: null, blocking: true, task: null });
+    expect(main(d)).toBe("ready");
     // The author may, without write access.
-    expect(rowOf({ ...d, viewerCanUpdate: false }, "draft")?.action).toEqual({ kind: "ready" });
+    expect(main({ ...d, viewerCanUpdate: false })).toBe("ready");
     // Someone else without write access may not.
-    expect(rowOf({ ...d, viewerCanUpdate: false }, "draft", "stranger")?.action).toBeNull();
+    expect(main({ ...d, viewerCanUpdate: false }, "stranger")).toBeNull();
   });
 
   it("failing checks: named first three, the rest counted; the task slot is checks; expandable", () => {
@@ -431,7 +432,7 @@ describe("readiness rows in detail", () => {
     const blocked = detail({ pr: { mergeState: "blocked" }, d: { reviewers: reviewers.slice(0, 2) } });
     expect(rowOf(blocked, "review")).toMatchObject({ tone: "pending", icon: "clock", blocking: true });
     const r = readiness(blocked, VIEWER, true, NOW);
-    expect(r.headline).toMatchObject({ title: "Not ready to merge", meta: "1 left" });
+    expect(r.headline).toMatchObject({ title: "Not ready to merge", meta: "" });
     expect(r.rows.some((x) => x.id === "blocked")).toBe(false);
   });
 
@@ -468,10 +469,13 @@ describe("readiness rows in detail", () => {
     expect(rowOf(detail({ pr: { mergeState: "clean" } }), "behind")).toBeUndefined();
   });
 
-  it("merged: the merge commit and Revert only with write access", () => {
+  it("merged: the merge commit; the header's Revert only with write access", () => {
     const d = detail({ pr: { state: "merged", mergedAtMs: NOW - HOUR }, d: { mergedBy: "kim", mergeCommitSha: "3f9c2ab".padEnd(40, "0") } });
-    expect(rowOf(d, "merged")).toMatchObject({ lines: [{ kind: "commit" }], action: { kind: "revert" } });
-    expect(rowOf({ ...d, viewerCanUpdate: false }, "merged")?.action).toBeNull();
+    expect(rowOf(d, "merged")).toMatchObject({ lines: [{ kind: "commit" }], action: null });
+    expect(readiness(d, VIEWER, true, NOW).footer.main).toBe("revert");
+    expect(readiness({ ...d, viewerCanUpdate: false }, VIEWER, true, NOW).footer.main).toBeNull();
+    // Without the merge commit (a dashboard row): the base and the age only.
+    expect(readiness({ ...d, mergeCommitSha: "" }, VIEWER, true, NOW).headline.meta).toBe("into trunk 1h ago");
   });
 
   it("closed with a failing check hands nothing to a thread", () => {
@@ -499,5 +503,64 @@ describe("detailFresh and awaitingApproval", () => {
     { name: "failed", c: { conclusion: "failure", status: "completed", description: "approval" }, want: false },
   ])("$name", ({ c, want }) => {
     expect(awaitingApproval(c)).toBe(want);
+  });
+});
+
+describe("the header's status tone", () => {
+  it.each([
+    ["success", "success"],
+    ["pending", "warning"],
+    ["info", "warning"],
+    ["failure", "failure"],
+    ["merged", "merged"],
+    ["draft", "neutral"],
+    ["neutral", "neutral"],
+  ] as const)("%s -> %s", (t, want) => {
+    expect(statusTone(t)).toBe(want);
+  });
+
+  const tones: { name: string; s: Shape; want: string }[] = [
+    { name: "ready", s: {}, want: "success" },
+    { name: "waiting on checks", s: { pr: { mergeState: "blocked" }, d: { checks: [running("e2e"), check("ok")] } }, want: "warning" },
+    { name: "not ready", s: { pr: { review: "changes_requested", mergeState: "blocked" } }, want: "warning" },
+    { name: "auto-merge on", s: { pr: { mergeState: "blocked" }, d: { autoMergeEnabled: true, autoMergeMethod: "squash" } }, want: "warning" },
+    { name: "a draft", s: { pr: { draft: true, mergeState: "draft" } }, want: "neutral" },
+    { name: "merged", s: { pr: { state: "merged", mergedAtMs: NOW - HOUR } }, want: "merged" },
+    { name: "closed", s: { pr: { state: "closed" } }, want: "failure" },
+  ];
+  it.each(tones)("$name: $want", ({ s, want }) => {
+    expect(statusTone(readiness(detail(s), VIEWER, true, NOW).headline.tone)).toBe(want);
+  });
+});
+
+describe("readinessCards", () => {
+  const cards = (s: Shape) => {
+    const d = detail(s);
+    const c = readinessCards(readiness(d, VIEWER, true, NOW).rows, d.pullRequest.state);
+    return { issues: c.issues.map((r) => r.id), passed: c.passed.map((r) => r.id) };
+  };
+
+  const shapes: { name: string; s: Shape; want: { issues: string[]; passed: string[] } }[] = [
+    { name: "ready: everything on the passed card", s: {}, want: { issues: [], passed: ["checks", "review", "mergeable"] } },
+    {
+      name: "a draft with failing checks and conversations: one card each, in order",
+      s: { pr: { draft: true, mergeState: "draft" }, d: { checks: [failed("test"), check("ok")], reviewThreads: [thread("a.go", 1)] } },
+      want: { issues: ["draft", "checks", "conversations"], passed: ["review", "mergeable"] },
+    },
+    { name: "conflicts", s: { pr: { mergeable: "conflicting", mergeState: "dirty" } }, want: { issues: ["conflicts"], passed: ["checks", "review"] } },
+    // Neutral rows say nothing the details do not; skipped-only checks count as passed.
+    { name: "no reviews yet, checks all skipped", s: { pr: { review: null }, d: { reviewers: [], checks: [skipped("a")] } }, want: { issues: [], passed: ["checks", "mergeable"] } },
+    { name: "no checks at all", s: { d: { checks: [] }, pr: { checks: { state: "none", total: 0, passed: 0, failed: 0, pending: 0, skipped: 0 } } }, want: { issues: [], passed: ["review", "mergeable"] } },
+    { name: "merged: none", s: { pr: { state: "merged", mergedAtMs: NOW - HOUR } }, want: { issues: [], passed: [] } },
+    { name: "closed with a failing check: none", s: { pr: { state: "closed" }, d: { checks: [failed("x")] } }, want: { issues: [], passed: [] } },
+  ];
+  it.each(shapes)("$name", ({ s, want }) => {
+    expect(cards(s)).toEqual(want);
+  });
+
+  it("a checks card lists the checks in its own state, never a run waiting for approval", () => {
+    const checks = [failed("a"), running("b"), check("c"), awaiting("d"), failed("e")];
+    expect(cardChecks({ tone: "failure" }, checks).map((c) => c.name)).toEqual(["a", "e"]);
+    expect(cardChecks({ tone: "pending" }, checks).map((c) => c.name)).toEqual(["b"]);
   });
 });
