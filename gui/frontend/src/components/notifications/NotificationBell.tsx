@@ -69,7 +69,7 @@ export function NotificationBell() {
               // On the bell's top-right corner, in the flow so two and three digits widen the button rather than cover the bell.
               <span
                 className={cn(
-                  "-ml-3 flex h-3.5 min-w-3.5 -translate-y-1.5 items-center justify-center self-center rounded-full px-1 text-caption-sm leading-none font-semibold tabular-nums ring-2 ring-cf-chrome",
+                  "-ml-2 flex h-3.5 min-w-3.5 -translate-y-2 items-center justify-center self-center rounded-full px-1 text-caption-sm leading-none font-semibold tabular-nums ring-2 ring-cf-chrome",
                   unseenUrgent ? "bg-cf-warning text-cf-warning-foreground" : "bg-cf-accent text-cf-accent-foreground",
                 )}
                 data-testid="notification-bell-count"

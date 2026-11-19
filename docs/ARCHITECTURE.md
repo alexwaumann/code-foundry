@@ -141,8 +141,8 @@ internal/
                            epochs (consolidation by a one-shot claude -p, then a reseed), the
                            task board, its workers' models (docs/notes/ember-2-store.md)
     notification/          the bell's notifications: one per source and key, show_at and snooze
-                           on the wall clock, dismiss, withdraw, act
-                           (docs/notes/notifications-1-store.md)
+                           on the wall clock, dismiss, withdraw, act, seen since arrival
+                           (docs/notes/notifications-1-store.md, notification-seen.md)
     memory/                the app memory: the user's standing preferences (<home>/memory/,
                            one file per entry with provenance, and MEMORY.md), appended to
                            every thread's system prompt at spawn
@@ -554,7 +554,8 @@ Services (v1):
   are the `notification.*` commands, `notification.act` running an action through the verb
   its kind maps to. EventService's `notification` source carries the whole snapshot per
   change with the ids that arrived apart from those updated, since only an arrival toasts;
-  the snapshot counts the shown time-sensitive ones for the dock badge. A notification
+  the snapshot counts the shown time-sensitive ones for the dock badge and the shown unseen
+  ones for the bell's corner badge (`notification.seen`, `docs/notes/notification-seen.md`). A notification
   naming a thread is withdrawn when the thread is removed
   (`internal/daemon/notification_threads.go`; `docs/notes/notifications-1-store.md`).
 * `DictationService` — Watch (the whole state: on/off, the anywhere, hold key and sounds
