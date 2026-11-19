@@ -1,5 +1,5 @@
 import { memo, useContext, useMemo } from "react";
-import { ChevronDown, ChevronRight, GitBranch, House, Layers, PencilLine, ShieldQuestionMark, Square, X, type LucideIcon } from "lucide-react";
+import { GitBranch, House, Layers, PencilLine, ShieldQuestionMark, Square, X, type LucideIcon } from "lucide-react";
 import { ProjectKindIcon } from "@/components/icons/ProjectKindIcon";
 import { useProjectKind } from "@/components/icons/projectKind";
 import { useShallow } from "zustand/react/shallow";
@@ -26,7 +26,7 @@ import { useThreadsStore } from "@/stores/threads";
 import { useUiStore } from "@/stores/ui";
 import { useWorkspacesStore } from "@/stores/workspaces";
 import { linkedPrTag } from "../linkedPrTag";
-import { HoverSlot, MadeByThreadGlyph, PinGlyph, PlaceIcon, RenameField, RowCounts, RowStatus, SingleLineLabel, ThreadTooltip } from "../SidebarRow";
+import { HoverSlot, MadeByThreadGlyph, PinGlyph, PlaceIcon, RenameField, RowCounts, RowStatus, SectionHeaderBar, SingleLineLabel, ThreadTooltip } from "../SidebarRow";
 import { useLinkedPrFacts, useLinkKeys } from "../useLinkedPrs";
 import { RowTooltipsEnabled } from "../rowTooltips";
 import { NEEDS_LINE_ZONE, NeedsHoverCard } from "@/components/needs/NeedsCard";
@@ -38,7 +38,7 @@ import { MultiSelectEnabled, type ClickMods } from "./multiSelect";
 /**
  * The shell sidebar's rows (docs/notes/shell-model.md, "Sidebar"; docs/notes/shell-16-sidebar.md):
  * the thread row's three lines, a Needs you row, a composer draft, and the Needs you and Active
- * headers with the scope button. The footers' headers are the classic ones (SidebarRow); the
+ * headers (the footers' look, SidebarRow's SectionHeaderBar) with the scope button; the
  * Snoozed and Archived rows keep the classic one line (SingleLineLabel) and drag as the others do.
  */
 
@@ -551,43 +551,23 @@ export function NeedsScopeToggle() {
 }
 
 /**
- * Needs you's and Active's header: a toggle with a chevron and the title; Needs you's count is
- * always there (the inbox's number), Active's only while collapsed. Needs you's has the scope
- * button at its end. A press does not take focus from the list.
+ * Needs you's and Active's header: the footers' (SectionHeaderBar), label on the left, count and
+ * chevron on the right, the whole bar collapsing the section. Both counts are always there, Needs
+ * you's at 0 too (its header stays while another space has an ask, for its scope button). Needs
+ * you's has the scope button just before its count, a click of its own.
  */
 export function MainHeaderView({ row }: { row: MainHeaderRow }) {
-  const Chevron = row.collapsed ? ChevronRight : ChevronDown;
-  const showCount = row.section === "needs" ? row.count > 0 : row.collapsed;
+  const needs = row.section === "needs";
   return (
-    <div id={`row-${row.key}`} role="presentation" data-row-kind="header" data-row-key={row.key} data-section={row.section} className="flex h-full items-end gap-2 pr-0.5 select-none">
-      <button
-        type="button"
-        aria-expanded={!row.collapsed}
-        data-testid={`${row.section}-header`}
-        className="flex h-[22px] min-w-0 cursor-default items-center gap-1 rounded-md px-1 text-cf-sidebar-muted-foreground outline-none hover:bg-cf-sidebar-row-hover focus-visible:ring-1 focus-visible:ring-cf-focus"
-        onMouseDown={(e) => {
-          e.preventDefault();
-        }}
-        onClick={row.section === "needs" ? toggleNeedsCollapsed : toggleActiveCollapsed}
-      >
-        <Chevron className="size-3 shrink-0" aria-hidden />
-        <span className="truncate text-caption font-medium text-inherit" data-testid={`${row.section}-label`}>
-          {row.label}
-        </span>
-        {showCount && (
-          <>
-            {" "}
-            <span className="shrink-0 text-caption tabular-nums text-inherit opacity-70" data-testid={`${row.section}-count`}>
-              {row.count}
-            </span>
-          </>
-        )}
-      </button>
-      {row.section === "needs" && (
-        <span className="ml-auto flex shrink-0 items-center pb-px">
-          <NeedsScopeToggle />
-        </span>
-      )}
+    <div id={`row-${row.key}`} role="presentation" data-row-kind="header" data-row-key={row.key} data-section={row.section} className="flex h-full items-end select-none">
+      <SectionHeaderBar
+        section={row.section}
+        label={row.label}
+        count={row.count}
+        collapsed={row.collapsed}
+        onToggle={needs ? toggleNeedsCollapsed : toggleActiveCollapsed}
+        aside={needs ? <NeedsScopeToggle /> : undefined}
+      />
     </div>
   );
 }

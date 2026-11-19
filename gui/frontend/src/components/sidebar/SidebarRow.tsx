@@ -711,45 +711,65 @@ export function ThreadTooltip({ id, children }: { id: string; children: ReactEle
 }
 
 /**
- * A footer's header, Working, Snoozed or Archived: a title-case label (text-caption, medium),
- * the number of threads in the section pushed to the right, and a chevron after it saying
- * whether the section is open. A button (aria-expanded) inside
- * the row; the row itself is role="presentation", so the listbox's cursor never lands on
- * it. Pressing it with the mouse does not take focus from the list. Test ids
- * `<section>-header`, `-label`, `-count`.
+ * A section's header, the one look of the sidebar's five (Needs you and Active in the main list,
+ * Working, Snoozed and Archived in the footers): a title-case label (text-caption, medium) on the
+ * rows' 8px inset, then on the right the section's own control if it has one (`aside`, Needs
+ * you's scope button), the number of threads in the section, and a chevron saying whether the
+ * section is open. The chevron's box ends on the sidebar's right edge, the line the status row's
+ * last button (SidebarStatus) ends on: it is pulled through the bar's 8px right padding (px-2, so
+ * -mr-2). docs/notes/design-system-2-shell.md.
  *
- * The chevron's box ends on the sidebar's right edge, the line the status row's last
- * button (SidebarStatus) ends on just below: it is pulled through the button's 8px right
- * padding (px-2, so -mr-2). docs/notes/design-system-2-shell.md.
+ * The whole bar collapses and expands the section, the hover fill across its full width. A
+ * button cannot hold the aside's button, so the collapse target is a button laid over the bar
+ * (`absolute inset-0`, aria-expanded, named "<label> <count>" as its text would be) and the label,
+ * count and chevron are drawn beside it for the eye only; the aside sits above it (`z-10`), so
+ * its click is its own and never collapses the section. Pressing either with the mouse does not
+ * take focus from the list. Test ids `<section>-header` (the collapse button), `-label`, `-count`.
  */
-function SectionHeader({ row }: { row: HeaderRow }) {
-  const Chevron = row.collapsed ? ChevronRight : ChevronDown;
+export function SectionHeaderBar({ section, label, count, collapsed, onToggle, aside }: { section: string; label: string; count: number; collapsed: boolean; onToggle: () => void; aside?: ReactNode }) {
+  const Chevron = collapsed ? ChevronRight : ChevronDown;
   return (
-    <div id={`row-${row.key}`} role="presentation" data-row-kind="header" data-row-key={row.key} data-section={row.section} className="flex h-full items-end select-none">
+    <div className="relative flex h-[22px] w-full min-w-0 items-center gap-1.5 rounded-md px-2 text-cf-sidebar-muted-foreground hover:bg-cf-sidebar-row-hover">
       <button
         type="button"
-        aria-expanded={!row.collapsed}
-        data-testid={`${row.section}-header`}
-        className="flex h-[22px] w-full min-w-0 cursor-default items-center gap-1.5 rounded-md px-2 text-cf-sidebar-muted-foreground outline-none hover:bg-cf-sidebar-row-hover focus-visible:ring-1 focus-visible:ring-cf-focus"
+        aria-expanded={!collapsed}
+        aria-label={`${label} ${String(count)}`}
+        data-testid={`${section}-header`}
+        className="absolute inset-0 cursor-default rounded-md outline-none focus-visible:ring-1 focus-visible:ring-cf-focus"
         onMouseDown={(e) => {
           e.preventDefault();
         }}
-        onClick={() => {
+        onClick={onToggle}
+      />
+      <span className="pointer-events-none truncate text-caption font-medium text-inherit" aria-hidden data-testid={`${section}-label`}>
+        {label}
+      </span>
+      {/* A flex container drops this space visually; it keeps the row's text "Working 2". */}{" "}
+      {aside !== undefined && <span className="relative z-10 ml-auto flex shrink-0 items-center">{aside}</span>}
+      <span className={cn("pointer-events-none shrink-0 text-caption tabular-nums text-inherit opacity-70", aside === undefined && "ml-auto")} aria-hidden data-testid={`${section}-count`}>
+        {count}
+      </span>
+      <Chevron className="pointer-events-none -mr-2 size-3 shrink-0" aria-hidden />
+    </div>
+  );
+}
+
+/** A footer's header, Working, Snoozed or Archived (SectionHeaderBar). The row is role="presentation", so the listbox's cursor never lands on it. */
+function SectionHeader({ row }: { row: HeaderRow }) {
+  return (
+    <div id={`row-${row.key}`} role="presentation" data-row-kind="header" data-row-key={row.key} data-section={row.section} className="flex h-full items-end select-none">
+      <SectionHeaderBar
+        section={row.section}
+        label={row.label}
+        count={row.count}
+        collapsed={row.collapsed}
+        onToggle={() => {
           const ui = useUiStore.getState();
           if (row.section === "archived") ui.toggleArchivedCollapsed();
           else if (row.section === "snoozed") ui.toggleSnoozedCollapsed();
           else ui.toggleWorkingCollapsed();
         }}
-      >
-        <span className="truncate text-caption font-medium text-inherit" data-testid={`${row.section}-label`}>
-          {row.label}
-        </span>
-        {/* A flex container drops this space visually; it keeps the text and name "Working 2". */}{" "}
-        <span className="ml-auto shrink-0 text-caption tabular-nums text-inherit opacity-70" data-testid={`${row.section}-count`}>
-          {row.count}
-        </span>
-        <Chevron className="-mr-2 size-3 shrink-0" aria-hidden />
-      </button>
+      />
     </div>
   );
 }

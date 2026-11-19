@@ -13,10 +13,15 @@ rounds (real-app renders with injected DOM); this records what was built and why
   as the rail; nothing else migrates.
 - `components/sidebar/Sidebar.tsx` draws `SidebarExpanded` or `rail/SidebarRail`.
 - The rail, top to bottom: the menu pane (New thread, search), Ember's flame (when its row would
-  show) and a separator, Needs you (at most four icons tall), a separator when Needs you has rows,
-  Active (the height left), then pinned to the bottom a separator, Working / Snoozed / Archived
-  (each while its section would show), a separator, a pending update's tile, the palette, usage
-  and settings buttons and the daemon's dot.
+  show), Needs you (at most four icons tall), Active (the height left), then pinned to the bottom
+  Working / Snoozed / Archived (each while its section would show), a pending update's tile, the
+  palette, usage and settings buttons and the daemon's dot.
+- Separators: a hairline only between two of those groups (Ember, Needs you, Active, the bottom
+  sections, the footer's buttons) that both show; never two in a row, none before the first
+  group. A group with no rows is skipped and the separator belongs to the group after the gap
+  (`railSeparatorsBefore` in `rail/railLook.ts`), so with no Needs you or Active rows Ember's
+  flame and the bottom sections share the one above the sections, where it always sits. Before,
+  each group drew its own, and an empty list left two hairlines with only empty space between.
 - Sizes (`rail/railLook.ts`): the 12px shell gutter plus a 28px column. Icons are 26px tall, 28px
   wide, 2px apart, a 16px glyph. Separators are a 16px hairline in the divider colour. Layout px,
   so the page zoom scales the rail as it scales everything else.

@@ -137,7 +137,6 @@ const list = () => screen.getByTestId("rail-list");
 const keysIn = (testId: string) => [...screen.getByTestId(testId).querySelectorAll("[data-row-key]")].map((e) => e.getAttribute("data-row-key"));
 const icon = (key: string) => rail().querySelector<HTMLElement>(`[data-row-key="${CSS.escape(key)}"]`) as HTMLElement;
 const glyph = (key: string) => within(icon(key)).getByTestId("rail-row-icon");
-const separators = () => [...rail().querySelectorAll('[data-testid="rail-separator"]')];
 
 describe("the sidebar's toggle", () => {
   it("switches between the expanded list and the rail; nothing hides the sidebar any more", () => {
@@ -231,19 +230,38 @@ describe("the rail's icons", () => {
 });
 
 describe("the rail's separators", () => {
-  it("menu, Ember (absent here), Needs you, a separator, Active, a separator, Working, a separator, the footer", () => {
-    show();
-    // Needs you's, the bottom sections', the footer's.
-    expect(separators()).toHaveLength(3);
-    expect(screen.getByTestId("rail-needs").nextElementSibling?.getAttribute("data-testid")).toBe("rail-separator");
-  });
+  /** The rail under the menu pane, top to bottom: each group's name once (its icons fold into it), "|" for each separator. */
+  const GROUP_OF: Readonly<Record<string, string>> = {
+    "rail-ember": "ember",
+    "rail-needs": "needs",
+    "rail-active": "active",
+    "rail-working": "sections",
+    "rail-snoozed": "sections",
+    "rail-archived": "sections",
+    "rail-separator": "|",
+    "status-palette": "bottom",
+  };
+  const sequence = () =>
+    [...rail().querySelectorAll(Object.keys(GROUP_OF).map((id) => `[data-testid="${id}"]`).join(","))]
+      .map((e) => GROUP_OF[e.getAttribute("data-testid") ?? ""] ?? "")
+      .filter((g, i, all) => g === "|" || g !== all[i - 1])
+      .join(" ");
 
-  it("no Needs you: neither its group nor its separator", () => {
-    setThreads(thread({ id: "s-1" }));
+  const EMBER = thread({ id: "em", name: "Ember", resident: "ember" });
+
+  // Every mix of Ember, Needs you, Active and the bottom sections; the footer's buttons are always there.
+  const cases = [false, true].flatMap((ember) => [false, true].flatMap((needs) => [false, true].flatMap((active) => [false, true].map((sections) => ({ ember, needs, active, sections })))));
+  it.each(cases)("ember $ember, needs $needs, active $active, sections $sections: one separator between two groups that show, none elsewhere", async (o) => {
+    const ts = [...(o.needs ? [ask("s-2", "permission")] : []), ...(o.active ? [thread({ id: "s-1" })] : []), ...(o.sections ? [thread({ id: "w-1", name: "Busy", status: "busy" })] : [])];
+    act(() => {
+      useThreadsStore.setState({ byId: Object.fromEntries([...ts, EMBER].map((t) => [t.id, t])), order: ts.map((t) => t.id), owned: ["em"], loaded: true });
+      useSettingsStore.setState({ snapshot: { values: { "ember.enabled": String(o.ember) } } as never });
+    });
+    // No draft, so Active is only s-1.
+    await seedLayout({ ...layoutOf([space(pane("p-1", [tab("t-1", "thread", "s-1", { key: "thread:s-1" })], "t-1"), "p-1")]), rev: 2 });
     show();
-    expect(screen.queryByTestId("rail-needs")).toBeNull();
-    // Only the footer's: no Working, Snoozed or Archived either.
-    expect(separators()).toHaveLength(1);
+    const want = (["ember", "needs", "active", "sections", "bottom"] as const).filter((g) => g === "bottom" || o[g]).join(" | ");
+    expect(sequence()).toBe(want);
   });
 });
 
