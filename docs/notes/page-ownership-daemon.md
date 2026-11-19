@@ -89,8 +89,9 @@ What the GUI does with `consent`:
 - **`REFUSED`**: no bridge, no question; offer a way to allow it later (`page.allow`).
 - **`UNAVAILABLE`**: no bridge, nothing to ask.
 
-There is no event when an owner or an answer changes. Read `PreviewFile` again when the
-frame reloads (an edit, a reload); the answer after a `page.*` command is in its result.
+EventService's `page` source says when an owner or an answer changes (`page-access-live.md`):
+read `PreviewFile` again then, and when the frame reloads (an edit, a Refresh); the answer
+after a `page.*` command is in its result.
 
 ### `PageService` (new, `proto/codefoundry/v1/page.proto`)
 

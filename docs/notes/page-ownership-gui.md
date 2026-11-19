@@ -46,7 +46,8 @@ the owner is the tab's own thread (the tab's "File of <thread>" line already say
 - Allow / Don't allow run `page.allow` / `page.disallow` with `{path: page.path}` through
   `runCommandForResult` (`inView`: the band going is the feedback; a failure toasts). On
   success `pageAnswered(path)` bumps a counter that every `usePreviewGrant` of that page
-  follows, so every File tab on the page reads its grant again (the daemon sends no event).
+  follows, so every File tab on the page reads its grant again at once; the daemon's page
+  event then does the same in every window (`page-access-live.md`).
   The new grant changes `page`; `HtmlFrame` calls `host.setPage`, which sends the held ready
   under the new access and replays the held calls. The frame is not reloaded: the page comes
   alive in place.
@@ -125,7 +126,7 @@ owner, an answer or an unavailable reason; `GET /__mock/page/calls` lists the an
 
 ## Gotchas
 
-- `usePreviewGrant` re-reads on an answer only when the count changed since its grant came
+- `usePreviewGrant` re-reads on a change only when the count changed since its grant came
   (`seen`), so mounting a tab on a page answered earlier does not ask twice.
 - `HtmlFrame` follows `page` by its JSON (a new object each render); the host is created with
   the first value through a ref and told later ones with `setPage`.

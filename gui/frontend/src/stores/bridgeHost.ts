@@ -45,6 +45,12 @@
  * every `cf:store` goes to the daemon (ThreadService.SetPageStorage for a thread's page,
  * PageService.SetPageStorage for a page alone), one at a time per thread (or page file) in
  * the order sent; every other frame of that thread (or file) hears the map after.
+ *
+ * The daemon has the last word on a page's access (docs/notes/page-access-live.md): a page
+ * alone's run names its page (pageContext's pagePath), and Invoke refuses it unless the user
+ * allows the page now. A refusal for the page's access (that one, PageService's consent errors,
+ * a storage that cannot be read at ready) tells the page the truth and calls `onStale` once per
+ * access, so the frame reads its grant again and follows it (setPage, or a new host).
  */
 import { listCommands, type CommandView, type UiContextView } from "@/api/command";
 import { bridgeErrorOf } from "@/api/bridge";
