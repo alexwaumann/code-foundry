@@ -912,7 +912,7 @@ export class MockThreadLogs {
       return;
     }
     if (state === "short-turns") {
-      // Forty exchanges of one-line rows (folded, three rows of about 30 to 80 px each): the
+      // Forty exchanges of one-line rows (folded, four rows of about 26 to 80 px each): the
       // rows near the end are far shorter than the pane, so many of them fill it
       // (docs/notes/thread-switch-place.md).
       for (let n = 1; n <= 40; n++) {

@@ -5,7 +5,7 @@ import { openApp, resetMock, mockPost, row, infoCardOff } from "./fixtures";
 // what each painted frame of a long conversation shows as its tab opens (no frame without
 // rows, no Jump to bottom chip passing by), and where the list stands on coming back to it
 // (the row the reader left it at, or the bottom). Which row stands in for one that went:
-// vitest (src/lib/timelinePlace.test.ts). Over the mock's 120-row s-r1 and the short s-4.
+// vitest (src/lib/timelinePlace.test.ts). Over the mock's 160-row s-r1 and the short s-4.
 
 test.beforeEach(async () => {
   await resetMock();
@@ -16,6 +16,8 @@ test.beforeEach(async () => {
 const pane = (page: Page) => page.getByTestId("thread-pane");
 const timeline = (page: Page) => pane(page).getByTestId("thread-timeline");
 const chip = (page: Page) => page.getByTestId("thread-jump-bottom");
+/** s-r1's last row: forty finished turns of four rows (the question, the folded header, the reply, the gutter). */
+const LAST = 159;
 
 /** What one frame shows of thread `id`'s list: the rows in view, the first one's index and top, the chip, and the composer dock's height. */
 interface Frame {
@@ -74,7 +76,7 @@ async function open(page: Page, id: string): Promise<void> {
 async function openLong(page: Page): Promise<void> {
   await openApp(page);
   await open(page, "s-r1");
-  await expect(timeline(page).locator('[data-index="119"]')).toBeVisible();
+  await expect(timeline(page).locator(`[data-index="${String(LAST)}"]`)).toBeVisible();
   await expect(timeline(page)).toHaveAttribute("data-at-bottom", "true");
 }
 
@@ -86,7 +88,7 @@ test("a thread left at the bottom opens there again, with rows in its first fram
   // Its log is kept, so the rows are there from the first frame: the last one, every frame.
   expect(frames.filter((f) => f.inView === 0)).toEqual([]);
   expect(frames.filter((f) => f.chip)).toEqual([]);
-  await expect(timeline(page).locator('[data-index="119"]')).toBeVisible();
+  await expect(timeline(page).locator(`[data-index="${String(LAST)}"]`)).toBeVisible();
   await expect(timeline(page)).toHaveAttribute("data-at-bottom", "true");
 });
 
@@ -101,7 +103,7 @@ test("a thread left scrolled up opens at the same row, every frame, on each visi
   await expect.poll(async () => { const a = await place(); const b = await place(); return a.first === b.first && Math.abs(a.top - b.top) < 1; }).toBe(true);
   const left = await place();
   expect(left.first).toBeGreaterThan(0);
-  expect(left.first).toBeLessThan(119);
+  expect(left.first).toBeLessThan(LAST);
 
   for (let visit = 0; visit < 2; visit++) {
     await open(page, "s-4");
@@ -117,7 +119,7 @@ test("a thread left scrolled up opens at the same row, every frame, on each visi
   await expect(timeline(page)).toHaveAttribute("data-at-bottom", "true");
   await open(page, "s-4");
   await open(page, "s-r1");
-  await expect(timeline(page).locator('[data-index="119"]')).toBeVisible();
+  await expect(timeline(page).locator(`[data-index="${String(LAST)}"]`)).toBeVisible();
   await expect(timeline(page)).toHaveAttribute("data-at-bottom", "true");
   await expect(chip(page)).toHaveCount(0);
 });
