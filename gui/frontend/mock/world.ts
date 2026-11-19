@@ -32,6 +32,10 @@ import { MockUpdater, type RestartCost } from "./update";
 import { pageUsage, retiredUsage, sampleUsage, usageFields, type MockUsage } from "./usage";
 import { ENTER_ALT, prompt, RESET, topFrame } from "./screens";
 import { CommandError } from "./errors";
+import { snoozePresets } from "../src/lib/snooze";
+
+/** threads.default_snooze's values (internal/command SnoozeDefaults). */
+export const SNOOZE_DEFAULTS = ["1h", "3h", "tomorrow", "next-week", "save"] as const;
 import { agentCounts, agentsCommands, listRuns, type AgentRunInit } from "./agents";
 import { backgroundRun, waitingReason } from "./liveCount";
 import { isSetupStopped, SETUP_BRANCH, SETUP_PROMPT, setupMessage, setupRowState, setupScript, type SetupHold, type SetupMessage } from "./setup";
@@ -4990,7 +4994,7 @@ export class World {
           category: "Thread",
           description:
             "Archive a thread: Claude is closed, its terminals are removed and it is unpinned and listed apart. Unarchive puts it back in the thread list. Without archived, toggles. Pinning or sending a message unarchives a thread too (from a thread: only a thread it created).",
-          keybindings: [],
+          keybindings: ["cmd+shift+a"],
           args: [
             { name: "ids", type: ArgType.STRING, required: false, description: "Comma-separated thread ids, to act on several" },
             { name: "archived", type: ArgType.BOOL, required: false, description: "Archive (true) or unarchive (false); default: the opposite of now" },
@@ -5119,14 +5123,51 @@ export class World {
           category: "Thread",
           description: "Mark an idle thread unread: it shows Done again, as after a turn you have not seen, until you open or focus it, or a message or a new turn clears it. Only for a thread idle at its prompt (not working, asking, in error, archived, snoozed or saved).",
           keybindings: ["cmd+shift+u"],
-          args: [],
+          args: [{ name: "ids", type: ArgType.STRING, required: false, description: "Comma-separated thread ids, to act on several" }],
         },
         // Like the daemon: wherever a thread is; markUnread refuses any but an idle one.
         when: (ctx) => activeThread(ctx) !== undefined,
-        run: (ctx) => {
+        run: (ctx, args) => {
+          const ids = idsArg(args);
+          if (ids.length > 0) {
+            // Like the daemon given ids: each in turn, past one it refuses, which is named.
+            const done: string[] = [];
+            const failed: string[] = [];
+            for (const id of ids) {
+              try {
+                this.markUnread(this.thread(id).id);
+                done.push(id);
+              } catch (e) {
+                failed.push(`  ${id}: ${e instanceof Error ? e.message : String(e)}`);
+              }
+            }
+            const head = done.length > 0 ? [eachMessage("marked", done, " unread")] : [];
+            return [...head, ...(failed.length > 0 ? [`failed on ${String(failed.length)} thread${failed.length === 1 ? "" : "s"}:`, ...failed] : [])].join("\n");
+          }
           const s = activeThread(ctx);
           if (!s) throw new CommandError("unavailable", "no active thread");
           return this.markUnread(s.id);
+        },
+      },
+      {
+        cmd: {
+          name: "thread.snooze.default",
+          title: "Snooze to Default",
+          category: "Thread",
+          description: "Snooze a thread to your default snooze (Settings: Default snooze; tomorrow at 9:00 AM unless you change it), or save it for later when that is the default. As thread snooze with that time.",
+          keybindings: ["cmd+shift+s"],
+          args: [{ name: "to", type: ArgType.ENUM, required: false, description: "The preset; default: the setting threads.default_snooze", enumValues: [...SNOOZE_DEFAULTS] }],
+        },
+        // Like the daemon: thread.snooze to the setting's preset (the GUI's presenter runs thread.snooze itself).
+        when: (ctx) => activeThread(ctx) !== undefined,
+        run: (ctx, args) => {
+          const s = activeThread(ctx);
+          if (!s) throw new CommandError("unavailable", "no active thread");
+          const to = args.to || this.settings.value("threads.default_snooze") || "tomorrow";
+          if (to === "save") return this.saveThread(s.id);
+          const preset = snoozePresets(Date.now()).find((p) => p.id === to);
+          if (!preset) throw new CommandError("invalid", `invalid to: ${to}`);
+          return this.snoozeThread(s.id, new Date(preset.untilMs));
         },
       },
       {
@@ -5652,6 +5693,11 @@ export class World {
         cmd: { name: "thread.previous", title: "Previous Thread", category: "View", description: "Select the thread above the current one in the sidebar.", keybindings: [], args: [] },
         when: always,
         run: () => `delivered=${String(this.emit({ intent: { case: "showView", value: { name: "thread.previous" } } }))}`,
+      },
+      {
+        cmd: { name: "thread.needs.next", title: "Next Thread Needing You", category: "View", description: "Open the Needs you popup of the next thread waiting on you: a question, a permission or a plan to approve.", keybindings: ["cmd+shift+n"], args: [] },
+        when: always,
+        run: () => `delivered=${String(this.emit({ intent: { case: "showView", value: { name: "needs.next" } } }))}`,
       },
       {
         cmd: { name: "thread.next", title: "Next Thread", category: "View", description: "Select the thread below the current one in the sidebar.", keybindings: [], args: [] },

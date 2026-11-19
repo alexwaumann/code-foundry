@@ -25,6 +25,7 @@ import { presentSearch } from "@/stores/threadSearch";
 import { presentDictationToggle } from "@/stores/dictation";
 import { cancelSetup } from "@/stores/setupActions";
 import { presentSnooze } from "@/stores/snoozeDialog";
+import { presentSnoozeDefault } from "@/stores/snoozeDefault";
 import { getViewing, leaveSubagent } from "@/stores/subagentView";
 import { jumpToNeighbour } from "@/stores/threadNeighbours";
 import { toggleThreadInfo, useCardRoom } from "@/stores/threadInfoOverlay";
@@ -38,6 +39,7 @@ import { presentFullscreen } from "@/shell/fullscreen";
 import { switchSpaceAt } from "@/shell/spaceActions";
 import { shellDrawn } from "@/stores/shellView";
 import { openNextNeedsPopup } from "@/stores/needs";
+import { notify } from "@/lib/notify";
 import { chordFromEvent, normalizeChord, terminalYieldable } from "./chord";
 
 /**
@@ -60,9 +62,9 @@ function jumpTo(n: number): void {
 }
 
 /**
- * cmd+shift+a: the popup of the next thread in the Needs you list (stores/needs.ts; nothing
- * visible when none waits). Before the window's first draw (the first-load import) the popup
- * shows once it draws. True when it went somewhere.
+ * thread.needs.next (cmd+shift+n): the popup of the next thread in the Needs you list
+ * (stores/needs.ts; nothing visible when none waits). Before the window's first draw (the
+ * first-load import) the popup shows once it draws. True when it went somewhere.
  */
 export function nextAttention(): boolean {
   return openNextNeedsPopup();
@@ -101,7 +103,6 @@ function zoom(direction: 1 | -1 | null): void {
 export const viewActions: readonly ViewAction[] = [
   { chord: "cmd+k", title: "Command palette", command: "ui.palette.open", run: togglePalette },
   { chord: "cmd+b", title: "Toggle sidebar", run: toggleSidebar },
-  { chord: "cmd+shift+a", title: "Next thread needing attention", run: () => void nextAttention() },
   ...Array.from({ length: 9 }, (_, i) => ({
     chord: `cmd+${String(i + 1)}`,
     title: `Jump to thread ${String(i + 1)}`,
@@ -179,6 +180,7 @@ const notInSubagent: ReadonlySet<string> = new Set([
   "thread.set-model",
   "thread.snooze",
   "thread.snooze.clear",
+  "thread.snooze.default",
   "thread.stop-waiting",
   "thread.unread",
 ]);
@@ -323,10 +325,11 @@ function terminalYields(chord: string, code = false): CommandView | undefined {
  * settings sheet focuses on open; a filter box): back and forward, as in Safari, and the
  * settings toggle, so cmd+, closes the sheet it just opened; and dictation, so a chord bound
  * to it works in the pull request review dialog's comment box (a plain textarea); and search.open, which works from
- * anywhere (a thread's find bar included). Only cmd chords that do not move or delete text
+ * anywhere (a thread's find bar included); and thread.needs.next, so the next Needs you popup opens from
+ * the one before's reason field, as the view action it was did. Only cmd chords that do not move or delete text
  * (a user may rebind these to cmd+arrow).
  */
-const fieldYielded: ReadonlySet<string> = new Set(["view.back", "view.forward", "view.settings", "dictation.toggle", "search.open"]);
+const fieldYielded: ReadonlySet<string> = new Set(["view.back", "view.forward", "view.settings", "dictation.toggle", "search.open", "thread.needs.next"]);
 
 /** A chord that moves or deletes text in a field (cmd+arrows, cmd+backspace, …). */
 function editingChord(chord: string): boolean {
@@ -418,6 +421,9 @@ const commandPresenters: Readonly<Record<string, (args?: Readonly<Record<string,
   // Snooze: the custom date dialog for the active thread (the menus offer presets), or
   // unsnooze it when it is snoozed; both invoke thread.snooze.
   "thread.snooze": () => presentSnooze(getUiContext().activeThreadId),
+  // Snooze to Default (cmd+shift+s): the default preset's time as the menu computes it, through
+  // thread.snooze like a menu pick (stores/snoozeDefault.ts).
+  "thread.snooze.default": () => presentSnoozeDefault(getUiContext().activeThreadId),
   // The Add Project dialog; its tabs call ProjectService.Register (project.add's CLI form with
   // a folder), stream ProjectService.Clone (project.clone's CLI form), or invoke project.create.
   // project.add's optional path is never prompted for. project.clone opens it on the GitHub tab.
@@ -472,6 +478,12 @@ const commandPresenters: Readonly<Record<string, (args?: Readonly<Record<string,
   },
   "thread.next": () => {
     jumpToNeighbour(1);
+    return true;
+  },
+  // Window-local: this window's Needs you popups (the CLI's reaches every window through
+  // ShowView). Nothing visible when none waits, but before the first draw, where it says so.
+  "thread.needs.next": () => {
+    if (!nextAttention() && !shellDrawn()) notify({ level: "info", title: "No threads need attention" });
     return true;
   },
   // Window-local: this window leaves its subagent view (Escape, the
@@ -629,7 +641,7 @@ function isEditable(el: Element | null): boolean {
 
 /**
  * Key precedence:
- *  1. Global view actions (cmd+k, cmd+b, cmd+shift+a, cmd+1..9, ctrl+cmd+1..9,
+ *  1. Global view actions (cmd+k, cmd+b, cmd+1..9, ctrl+cmd+1..9,
  *     zoom) always win (cmd+1..9 belong to the project picker while it is open).
  *  2. A focused terminal, a thread prompt's text ([data-chord-yield]) or the File tab's code
  *     editor consumes everything else, except cmd chords bound to commands (see

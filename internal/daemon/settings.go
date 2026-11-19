@@ -67,6 +67,8 @@ func registryOverrides(s settings.Settings) command.Overrides {
 	for _, name := range threadStarters {
 		defaults[name] = map[string]string{"model": s.Threads.DefaultModel, "effort": s.Threads.DefaultEffort}
 	}
+	// threads.default_snooze: where cmd+shift+s (thread.snooze.default) puts a thread.
+	defaults["thread.snooze.default"] = map[string]string{"to": s.Threads.DefaultSnooze}
 	return command.Overrides{Keybindings: settings.KeybindingOverrides(s.Keybindings), ArgDefaults: defaults}
 }
 

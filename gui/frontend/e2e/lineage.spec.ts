@@ -86,9 +86,9 @@ test.describe("child threads", () => {
   // Not in the attention count while their creator exists, counted once orphaned:
   // src/stores/threads.test.ts ("attentionIds leaves out a child thread").
 
-  // cmd+shift+a opens the Needs-you popup of the next thread waiting on the user (shell-model.md, Keys);
+  // cmd+shift+n opens the Needs-you popup of the next thread waiting on the user (shell-model.md, Keys);
   // cmd+1..9 still open the list's rows.
-  test("cmd+shift+a and cmd+1..9 walk the shown rows only", async ({ page }) => {
+  test("cmd+shift+n and cmd+1..9 walk the shown rows only", async ({ page }) => {
     await openApp(page);
     await expect(row(page, `s:${P}`)).toBeVisible();
     const popup = page.getByTestId("needs-popup");
@@ -96,7 +96,7 @@ test.describe("child threads", () => {
     const popupId = () => page.evaluate(() => document.querySelector('[data-testid="needs-popup"]')?.getAttribute("data-thread-id") ?? null);
     const shownId = () => page.getByTestId("thread-pane").getAttribute("data-thread-id");
     for (let i = 0; i < 3; i++) {
-      await page.keyboard.press("Meta+Shift+a");
+      await page.keyboard.press("Meta+Shift+n");
       await expect(popup).toHaveAttribute("data-thread-id", "s-2");
     }
     await page.keyboard.press("Escape");
@@ -116,14 +116,14 @@ test.describe("child threads", () => {
     expect(n).toBeLessThan(10);
     await page.keyboard.press(`Meta+${String(n)}`);
     await expect.poll(shownId).toBe(C);
-    // The orphan asking for a permission joins Needs you and cmd+shift+a's round; s-l-allow's API
+    // The orphan asking for a permission joins Needs you and cmd+shift+n's round; s-l-allow's API
     // error is not an ask (shell-25c-keys-drafts.md: it goes to the top of Active), nor is C's
     // finished turn. Opening a thread's popup can drop it from the list (and the round), so walk
     // until both were reached.
     const visited = new Set<string>();
     for (let i = 0; i < 8 && visited.size < 2; i++) {
       const prev = await popupId();
-      await page.keyboard.press("Meta+Shift+a");
+      await page.keyboard.press("Meta+Shift+n");
       await expect.poll(popupId).not.toBe(prev);
       visited.add(String(await popupId()));
     }

@@ -43,9 +43,12 @@ func (s *Thread) ClearSnoozeEnded(_ context.Context, r *connect.Request[v1.Clear
 }
 
 // MarkUnread returns Current, needs attention "finished" when it was idle "at prompt";
-// FailedPrecondition otherwise, as the daemon.
+// FailedPrecondition otherwise, as the daemon. It fails for an id in FailIDs.
 func (s *Thread) MarkUnread(_ context.Context, r *connect.Request[v1.MarkUnreadRequest]) (*connect.Response[v1.MarkUnreadResponse], error) {
 	if err := s.do(r.Msg); err != nil {
+		return nil, err
+	}
+	if err := s.FailIDs[r.Msg.GetId()]; err != nil {
 		return nil, err
 	}
 	cur := s.current(r.Msg.GetId())

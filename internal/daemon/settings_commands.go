@@ -17,7 +17,7 @@ func setSettingsCommands(st *settings.Store, reg *command.Registry) {
 	for i, l := range listed {
 		cmds[i] = settings.CommandInfo{
 			Name: l.Name, Title: l.Title, Description: l.Description, Category: l.Category, Keybindings: l.DefaultKeybindings,
-			NoKeybinding: l.NoKeybinding,
+			NoKeybinding: l.NoKeybinding, KeybindingsYield: l.KeybindingsYield,
 		}
 	}
 	st.SetCommands(cmds)

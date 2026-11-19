@@ -274,7 +274,9 @@ describe("handleKeyDown precedence", () => {
     const e = press(terminal, { key: "k", code: "KeyK", metaKey: true });
     expect(e.defaultPrevented).toBe(true);
     expect(useUiStore.getState().palette.open).toBe(true);
-    expect(isGlobalChord("cmd+shift+a")).toBe(true);
+    expect(isGlobalChord("cmd+b")).toBe(true);
+    // cmd+shift+a is no view action since docs/notes/put-away-chords.md: thread.archive's chord, a command's.
+    expect(isGlobalChord("cmd+shift+a")).toBe(false);
   });
 
   it("cmd+shift+p is no longer the palette's: cmd+k is its only chord", () => {
@@ -381,10 +383,11 @@ describe("handleKeyDown precedence", () => {
     expect(useUiStore.getState().renamingThreadId).toBe("s1");
   });
 
-  describe("cmd+shift+a in the window shell: the popup of the next thread that needs the user", () => {
+  describe("cmd+shift+n (thread.needs.next) in the window shell: the popup of the next thread that needs the user", () => {
     beforeEach(() => {
       setShellMode("shell");
       resetNeeds();
+      useCommandsStore.setState((s) => ({ commands: [...s.commands, cmd({ name: "thread.needs.next", keybindings: ["cmd+shift+n"] })] }));
     });
     afterEach(() => {
       setShellMode("waiting");
@@ -402,7 +405,7 @@ describe("handleKeyDown precedence", () => {
         order: ["a", "b", "c", "d"],
       });
       const before = useUiStore.getState().selection;
-      const jump = () => press(terminal, { key: "a", code: "KeyA", metaKey: true, shiftKey: true });
+      const jump = () => press(terminal, { key: "n", code: "KeyN", metaKey: true, shiftKey: true });
       const seen: (string | null)[] = [];
       for (let i = 0; i < 3; i++) {
         jump();
@@ -422,7 +425,7 @@ describe("handleKeyDown precedence", () => {
         order: ["a", "c"],
       });
       openNeedsPopup("c", "sidebar:c#req-2", "req-2");
-      press(terminal, { key: "a", code: "KeyA", metaKey: true, shiftKey: true });
+      press(terminal, { key: "n", code: "KeyN", metaKey: true, shiftKey: true });
       expect(useNeedsStore.getState()).toMatchObject({ popup: "a", popupRequest: null });
     });
 
@@ -433,7 +436,7 @@ describe("handleKeyDown precedence", () => {
         thread("a", { status: "attention", statusReason: "permission: Bash ls", statusChangedAtMs: 10 }),
         thread("c", { status: "attention", statusReason: "question: Which?", statusChangedAtMs: 20 }),
       ]);
-      const jump = () => press(terminal, { key: "a", code: "KeyA", metaKey: true, shiftKey: true });
+      const jump = () => press(terminal, { key: "n", code: "KeyN", metaKey: true, shiftKey: true });
       jump();
       expect(useUiStore.getState().selection).toEqual({ kind: "thread", id: EMBER_THREAD });
       expect(useNeedsStore.getState().popup).toBeNull();
@@ -453,14 +456,41 @@ describe("handleKeyDown precedence", () => {
     it("before the window's first draw (the first-load import) it asks for the popup all the same", () => {
       setShellMode("waiting");
       useThreadsStore.setState({ byId: { a: thread("a", { status: "attention", statusReason: "permission: Bash ls", statusChangedAtMs: 10 }) }, order: ["a"] });
-      press(terminal, { key: "a", code: "KeyA", metaKey: true, shiftKey: true });
+      press(terminal, { key: "n", code: "KeyN", metaKey: true, shiftKey: true });
+      expect(useNeedsStore.getState().popup).toBe("a");
+    });
+
+    it("goes on from a focused text field (the popup's reason field), and not while the palette is open", () => {
+      useThreadsStore.setState({
+        byId: {
+          a: thread("a", { status: "attention", statusReason: "permission: Bash ls", statusChangedAtMs: 10 }),
+          c: thread("c", { status: "attention", statusReason: "question: Which?", statusChangedAtMs: 20 }),
+        },
+        order: ["a", "c"],
+      });
+      press(input, { key: "n", code: "KeyN", metaKey: true, shiftKey: true });
+      expect(useNeedsStore.getState().popup).toBe("c");
+      press(input, { key: "n", code: "KeyN", metaKey: true, shiftKey: true });
+      expect(useNeedsStore.getState().popup).toBe("a");
+      useUiStore.getState().openPalette();
+      press(outside, { key: "n", code: "KeyN", metaKey: true, shiftKey: true });
+      expect(useNeedsStore.getState().popup).toBe("a");
+      useUiStore.getState().closePalette();
+    });
+
+    it("a rebound chord moves it: cmd+shift+n then does nothing", () => {
+      useCommandsStore.setState((s) => ({ commands: s.commands.map((c) => (c.name === "thread.needs.next" ? { ...c, keybindings: ["cmd+alt+j"] } : c)) }));
+      useThreadsStore.setState({ byId: { a: thread("a", { status: "attention", statusReason: "permission: Bash ls", statusChangedAtMs: 10 }) }, order: ["a"] });
+      press(outside, { key: "n", code: "KeyN", metaKey: true, shiftKey: true });
+      expect(useNeedsStore.getState().popup).toBeNull();
+      press(outside, { key: "j", code: "KeyJ", metaKey: true, altKey: true });
       expect(useNeedsStore.getState().popup).toBe("a");
     });
 
     it("does nothing visible when no thread needs the user", () => {
       useThreadsStore.setState({ byId: { b: thread("b") }, order: ["b"] });
       const before = useUiStore.getState().selection;
-      press(terminal, { key: "a", code: "KeyA", metaKey: true, shiftKey: true });
+      press(terminal, { key: "n", code: "KeyN", metaKey: true, shiftKey: true });
       expect(useNeedsStore.getState().popup).toBeNull();
       expect(useUiStore.getState().selection).toEqual(before);
       expect(nextAttention()).toBe(false);

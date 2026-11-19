@@ -137,14 +137,14 @@ test("the sidebar row, the chat and the board panel share one WatchBoard stream"
 
 // Needs input on the row (amber, the flame) and on the board's worker and card, and back to Working once
 // answered: src/components/ember/EmberRow.test.tsx and BoardSurface.test.tsx.
-test("a worker waiting on the user: cmd+shift+a goes to Ember first (its row is the first that needs the user)", async ({ page }) => {
+test("a worker waiting on the user: cmd+shift+n goes to Ember first (its row is the first that needs the user)", async ({ page }) => {
   await enable();
   await openApp(page);
   const status = emberRow(page).getByTestId("ember-row-status");
   await mockPost(`thread/status?id=s-ember-team-put&status=attention&reason=${encodeURIComponent("question: 404 or 422 for a bad id?")}`);
   await expect(status).toHaveText("Needs input");
   if (process.env.SHOTS) await page.getByTestId("sidebar-body").screenshot({ path: `${process.env.SHOTS}/ember-row-needs-input.png` });
-  await page.keyboard.press("Meta+Shift+a");
+  await page.keyboard.press("Meta+Shift+n");
   await expect(pane(page)).toBeVisible();
   // Opening the chat does not clear it: only an answer does.
   await expect(status).toHaveText("Needs input");

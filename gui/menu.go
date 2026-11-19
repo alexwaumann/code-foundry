@@ -33,7 +33,7 @@ var settingsItem = menuCommand{"Settings…", "view.settings"}
 var threadMenu = [][]menuCommand{
 	{{"New Thread", "thread.new"}, {"Add Project…", "project.add"}},
 	{{"Rename Thread", "thread.rename"}, {"Fork Thread", "thread.fork"}, {"Snooze…", "thread.snooze"}, {"Archive", "thread.archive"}},
-	{{"Next Needing Attention", "attention.next"}},
+	{{"Next Thread Needing You", "thread.needs.next"}},
 }
 
 // helpMenu is the Help menu's command items, one slice per separated group. Report an

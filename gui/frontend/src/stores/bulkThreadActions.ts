@@ -1,7 +1,7 @@
 /**
  * What the sidebar's selection runs (docs/notes/sidebar-bulk-select.md): its bulk menu, its
  * snooze dialog and the Archived and Snoozed headers as drop targets. Each is one registry
- * command given `ids` (thread.snooze, thread.archive, thread.remove, thread.space.move), never a
+ * command given `ids` (thread.snooze, thread.unread, thread.archive, thread.remove, thread.space.move), never a
  * loop of single commands, so the daemon asks one question for all of them (its DynamicConfirm
  * names the count and the busy ones). The rows show the result (they move or go), so no success
  * toast. Once a command ran, the selection is dropped; a declined question keeps it.
@@ -28,6 +28,11 @@ export function snoozeThreads(ids: readonly string[], untilMs: number | null): P
 /** thread.snooze --ids --save: each saved for later (no alarm). */
 export function saveThreadsForLater(ids: readonly string[]): Promise<boolean> {
   return onIds(THREAD_COMMANDS.snooze, ids, { save: "true" });
+}
+
+/** thread.unread --ids: each goes back to Done, as after a turn not seen. */
+export function markThreadsUnread(ids: readonly string[]): Promise<boolean> {
+  return onIds(THREAD_COMMANDS.markUnread, ids, {});
 }
 
 /** thread.archive --ids: archive each, or unarchive each with false. */

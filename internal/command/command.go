@@ -36,6 +36,11 @@ type Command struct {
 	Args []ArgSpec
 	// Keybindings are default GUI chords, e.g. "cmd+t".
 	Keybindings []string
+	// KeybindingsYield marks default Keybindings given to a chord users could already bind
+	// themselves (docs/notes/put-away-chords.md): a user's override that binds one of them
+	// to another command keeps it, and this command goes without that chord (its keybinding
+	// reads "none"), where any other default wins over a colliding override.
+	KeybindingsYield bool
 	// NoKeybinding marks a command a GUI chord is no use for: a CLI query that prints
 	// (listings, settings.get, daemon.status), a wait, or a verb the CLI uses to drive
 	// the GUI (ui.notify, thread.focus). The settings page offers no keybinding for it,

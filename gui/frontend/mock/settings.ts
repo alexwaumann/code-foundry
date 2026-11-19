@@ -203,6 +203,18 @@ const staticFields: FieldInit[] = [
     enumLabels: ["A fresh copy of the project", "The project folder itself"],
     defaultValue: "current",
   },
+  {
+    key: "threads.default_snooze",
+    group: "threads",
+    page: "general",
+    section: "threads",
+    type: S.ENUM,
+    title: "Default snooze",
+    description: "Where Snooze to Default (⇧⌘S) puts the thread you're looking at. The snooze menus mark it.",
+    enumValues: ["1h", "3h", "tomorrow", "next-week", "save"],
+    enumLabels: ["1 hour", "3 hours", "Tomorrow, 9:00 AM", "Next week, Monday 9:00 AM", "Save for later"],
+    defaultValue: "tomorrow",
+  },
   { key: "threads.auto_name", group: "threads", page: "general", section: "threads", type: S.BOOL, title: "Name threads automatically", description: "Give each new thread a name based on its first message.", defaultValue: "true" },
   {
     key: "models.utility",
@@ -343,7 +355,7 @@ const staticFields: FieldInit[] = [
 ];
 
 const reserved = new Set([
-  "cmd+k", "cmd+b", "cmd+shift+a", "cmd+1", "cmd+2", "cmd+3", "cmd+4", "cmd+5", "cmd+6", "cmd+7", "cmd+8", "cmd+9",
+  "cmd+k", "cmd+b", "cmd+1", "cmd+2", "cmd+3", "cmd+4", "cmd+5", "cmd+6", "cmd+7", "cmd+8", "cmd+9",
   "cmd+ctrl+1", "cmd+ctrl+2", "cmd+ctrl+3", "cmd+ctrl+4", "cmd+ctrl+5", "cmd+ctrl+6", "cmd+ctrl+7", "cmd+ctrl+8", "cmd+ctrl+9",
   "cmd+=", "cmd+-", "cmd+0", "cmd+c", "cmd+v", "cmd+x", "cmd+a", "cmd+z", "cmd+shift+z", "cmd+shift+c", "cmd+q",
   "cmd+h", "cmd+alt+h", "cmd+m", "cmd+ctrl+f",

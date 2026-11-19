@@ -133,7 +133,8 @@ type Threads struct {
 	DefaultEffort     string // default "medium"
 	DefaultWorktree   string // WorktreeNew or WorktreeCurrent; read by the GUI's composer and by a thread move without a placement
 	AutoName          bool
-	CacheTTLSeconds   int // the API's prompt cache lifetime; default 3600
+	DefaultSnooze     string // command.SnoozeDefaults; thread.snooze.default's preset, default "tomorrow"
+	CacheTTLSeconds   int    // the API's prompt cache lifetime; default 3600
 	CloseGraceSeconds int
 }
 
@@ -361,12 +362,16 @@ func resolveThemes(raw map[string]string, cmds []CommandInfo, themes theme.Set) 
 		r.values[f.Key] = v
 		set(f.bind(&r.settings), v)
 	}
-	kb, kbValues, kbIssues := resolveKeybindings(raw, cmds)
-	r.settings.Keybindings = kb
-	maps.Copy(r.values, kbValues)
+	kb, yielded, kbValues, kbIssues := resolveKeybindings(raw, cmds)
 	for name, c := range kb {
 		r.accepted[KeybindingKey(name)] = c
 	}
+	// A yielded default is unbound in the registry, never in the file.
+	r.settings.Keybindings = maps.Clone(kb)
+	for _, name := range yielded {
+		r.settings.Keybindings[name] = KeybindingNone
+	}
+	maps.Copy(r.values, kbValues)
 	r.issues = append(r.issues, kbIssues...)
 	for k := range raw {
 		if _, ok := r.values[k]; !ok && !isKeybindingKey(k) {

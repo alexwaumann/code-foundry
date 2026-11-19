@@ -484,7 +484,7 @@ when the first working version is whole. Nothing partial is released.
 | cmd+1…9 | Jump to that thread of the list, as today |
 | cmd+shift+enter | Full screen the pane; escape leaves |
 | cmd+shift+m | Collapse the focused pane to a rail, or open it again when it is collapsed |
-| cmd+shift+a | The popup of the next thread that needs the user |
+| cmd+shift+n | The popup of the next thread that needs the user |
 | cmd+r | Rename the focused tab, where it can be renamed |
 | cmd+shift+r | Automatic name: a thread's is generated again, a terminal goes back to its automatic name |
 | cmd+b | Sidebar |

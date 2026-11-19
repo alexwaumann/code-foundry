@@ -112,12 +112,12 @@ test("the keyboard walks main → Working → Snoozed → Archived; collapsed se
   // Past the last row cmd+N does nothing.
   await page.keyboard.press("Meta+8");
   await expect(row(page, "s:s-7")).toHaveAttribute("aria-selected", "true");
-  // cmd+shift+a (the next Needs-you popup) never lands on a snoozed thread (s-8 waits, but is snoozed).
+  // cmd+shift+n (the next Needs-you popup) never lands on a snoozed thread (s-8 waits, but is snoozed).
   await page.getByTestId("snoozed-header").click();
   const popup = page.getByTestId("needs-popup");
-  await page.keyboard.press("Meta+Shift+a");
+  await page.keyboard.press("Meta+Shift+n");
   await expect(popup).toHaveAttribute("data-thread-id", "s-2");
-  await page.keyboard.press("Meta+Shift+a");
+  await page.keyboard.press("Meta+Shift+n");
   await expect(popup).toHaveAttribute("data-thread-id", "s-2");
 });
 

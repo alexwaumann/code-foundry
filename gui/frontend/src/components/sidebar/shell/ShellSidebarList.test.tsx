@@ -696,6 +696,16 @@ describe("selecting several rows (docs/notes/sidebar-bulk-select.md)", () => {
       want: ["Snooze", "Unsnooze", "Move to space", "Archive", "Remove"],
     },
     {
+      name: "all idle at their prompt: Mark as unread",
+      threads: [thread({ id: "s-7", name: "Seen", statusReason: "at prompt" }), thread({ id: "s-8", name: "Seen too", statusReason: "at prompt" })],
+      want: ["Snooze", "Mark as unread", "Move to space", "Archive", "Remove"],
+    },
+    {
+      name: "one of them working: no Mark as unread",
+      threads: [thread({ id: "s-7", name: "Seen", statusReason: "at prompt" }), thread({ id: "s-8", name: "Busy", status: "busy", statusReason: "working" })],
+      want: ["Snooze", "Move to space", "Archive", "Remove"],
+    },
+    {
       name: "one being set up: no Snooze",
       threads: [thread({ id: "s-7", name: "Setting up", setup: { phase: "running", startedAtMs: 1, endedAtMs: null, steps: [], error: "", background: true } as ThreadView["setup"] }), thread({ id: "s-8", name: "Idle" })],
       want: ["Move to space", "Archive", "Remove"],
@@ -732,6 +742,19 @@ describe("selecting several rows (docs/notes/sidebar-bulk-select.md)", () => {
     await settle();
     expect(runs.at(-1)).toEqual({ name: "thread.remove", args: { ids }, thread: first });
     // The rows moving or going are the result: no toast.
+    expect(notify).not.toHaveBeenCalled();
+  });
+
+  it("Mark as unread: one thread.unread with every id; the selection goes", async () => {
+    setThreads(thread({ id: "s-1" }), thread({ id: "s-7", name: "Seen", statusReason: "at prompt" }), thread({ id: "s-8", name: "Seen too", statusReason: "at prompt" }));
+    render(<ShellSidebarList bodyHeight={800} />);
+    cmd("s:s-7");
+    cmd("s:s-8");
+    fireEvent.click(within(await menuOn("s:s-8", "bulk-menu")).getByTestId("bulk-menu-unread"));
+    await settle();
+    const ids = threadKeys().filter((k) => k === "s:s-7" || k === "s:s-8").map((k) => k.slice(2)).join(",");
+    expect(runs).toEqual([{ name: "thread.unread", args: { ids }, thread: ids.split(",")[0] }]);
+    expect(picked()).toEqual([]);
     expect(notify).not.toHaveBeenCalled();
   });
 
