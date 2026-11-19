@@ -35,6 +35,7 @@ import { agentElapsedMs, agentName, parseAgentNote } from "@/lib/agents";
 import { useNow, useNowSelect } from "@/lib/clock";
 import { formatAge, formatDuration, type DurationUnits } from "@/lib/duration";
 import { parseCreatedByNote } from "@/lib/lineage";
+import { sentTime } from "@/lib/format";
 import { canonicalModelName } from "@/lib/models";
 import { questionsOf } from "@/lib/threadRequest";
 import { useCopied } from "@/lib/useCopied";
@@ -59,6 +60,7 @@ import { HtmlRow } from "./InlineHtml";
 import { ThemeCardRow } from "./ThemeCard";
 import { ToolPathChip } from "./PathChip";
 import { AgentReport, ToolDetail } from "./ToolDetail";
+import { useTurnActive } from "./turnActivity";
 import { UserBubble } from "./UserBubble";
 import { openThread } from "@/stores/openThread";
 
@@ -360,20 +362,24 @@ const ThinkingRow = memo(function ThinkingRow({ node }: { node: Extract<WorkNode
   );
 });
 
+/** The text of a thread's text items (`ids` joined by "\n"), joined by blank lines: what a reply's copy copies. */
+function replyText(threadId: string, ids: string): string {
+  const want = new Set(ids.split("\n"));
+  return getThreadItems(threadId)
+    .flatMap((x: ThreadItemView) => (want.has(x.id) && x.kind === "text" && !x.apiError ? [x.text] : []))
+    .join("\n\n");
+}
+
 /**
- * Copies a finished turn's answer (its final text items, `answer`'s ids, joined by blank
- * lines): a 24px button at the answer's top right, shown while the answer is hovered,
- * and while it shows its check after a copy (thread.css: [data-copied]).
+ * Copies Ember's reply (lib/ember: its text row's `answer`): a 24px button at the reply's
+ * top right, shown while the reply is hovered, and while it shows its check after a copy
+ * (thread.css: [data-copied]). A thread's turn copies from its gutter (GutterRow).
  */
 function CopyAnswer({ answer }: { answer: string }) {
   const { threadId } = useThreadCtx();
   const { copied, copy } = useCopied();
   const onClick = () => {
-    const ids = new Set(answer.split("\n"));
-    const text = getThreadItems(threadId)
-      .flatMap((x: ThreadItemView) => (ids.has(x.id) && x.kind === "text" && !x.apiError ? [x.text] : []))
-      .join("\n\n");
-    void copy(text);
+    void copy(replyText(threadId, answer));
   };
   const label = copied ? "Copied" : "Copy answer";
   return (
@@ -955,10 +961,11 @@ function stepsLabel(steps: number): string {
 
 /**
  * A turn's header, under its user message and above its work
- * (docs/notes/thread-fold-3-header.md). Finished: "Worked for 4m 8s · 12 steps · $1.12 ·
- * Opus" behind a chevron (right when folded, down when open); a click folds or unfolds the
- * turn's work below it, and the header keeps its place on screen (KeepRowContext). A turn
- * without work (no steps) has nothing to fold: the line is plain text. Live (the turn
+ * (docs/notes/thread-fold-3-header.md, turn-gutter.md). Finished: "Worked for 4m 8s"
+ * ("Interrupted after 40s", "Failed after 3s" in red) behind a chevron (right when folded,
+ * down when open); a click folds or unfolds the turn's work below it, and the header keeps
+ * its place on screen (KeepRowContext). Its steps, cost and model are in the turn's gutter.
+ * A turn whose fold would hide nothing has a plain line. Live (the turn
  * runs): a sky spinner, "Working" shimmering, the steps so far and the time since the
  * turn's message, always open. One component for both under one row key, so the live line
  * turns into the finished one in place.
@@ -974,7 +981,6 @@ const HeaderRow = memo(function HeaderRow({ row }: { row: Extract<TimelineRow, {
   const start = sent !== null && setupEnd !== null ? Math.max(sent, setupEnd) : sent;
   // A finished turn's header is fixed: only the live one ticks.
   const now = useNowSelect(1000, (n) => (live ? n : 0));
-  const models = useModelChoices();
   if (live) {
     const parts = ["Working"];
     if (row.steps > 0) parts.push(stepsLabel(row.steps));
@@ -987,25 +993,75 @@ const HeaderRow = memo(function HeaderRow({ row }: { row: Extract<TimelineRow, {
   const failedAs = it.subtype && it.subtype !== "success" ? ` (${it.subtype.replace(/_/g, " ")})` : "";
   const what = it.interrupted ? "Interrupted" : it.isError ? `Failed${failedAs}` : "Worked";
   const parts = [took ? `${what}${it.interrupted || it.isError ? " after" : " for"} ${took}` : what];
-  if (row.steps > 0) parts.push(stepsLabel(row.steps));
-  // The daemon's measure of the turn and the model that replied. Without them (the daemon
-  // could not tell the cost, the turn had no reply, an older daemon recorded it) the
-  // header says nothing rather than guess: cost_usd is a running total whose base a
-  // restart changes, and the thread's model may have changed since.
-  const cost = turnCostLabel(it.turnCostUsd);
-  if (cost) parts.push(cost);
-  if (it.model) parts.push(canonicalModelName(models, it.model));
   return (
     <TurnHead
       parts={parts}
       red={it.isError}
       folded={row.folded}
-      foldable={row.steps > 0}
+      foldable={row.foldable}
       onToggle={() => {
         keep(row.key);
         setTurnFolded(threadId, row.turn, !row.folded);
       }}
     />
+  );
+});
+
+/**
+ * A finished turn's gutter, under its last row (docs/notes/turn-gutter.md): Copy (the
+ * turn's reply, as Ember's reply copies), then in the caption style its steps, cost, model
+ * and the time it ended. The row is always laid out at a fixed height; only its contents
+ * show and hide, so nothing moves. They show at rest on the thread's latest turn, on an
+ * older one while the pointer is over the turn or one of its controls has the keyboard
+ * (turnActivity.ts), and while Copy shows its check.
+ */
+const GutterRow = memo(function GutterRow({ row }: { row: Extract<TimelineRow, { type: "gutter" }> }) {
+  const { threadId } = useThreadCtx();
+  const it = useThreadItem(threadId, row.id);
+  const active = useTurnActive(row.turn);
+  const models = useModelChoices();
+  const { copied, copy } = useCopied();
+  const shown = row.latest || active || copied;
+  const end = it?.kind === "turnEnd" ? it : undefined;
+  const info: string[] = [];
+  if (row.steps > 0) info.push(stepsLabel(row.steps));
+  // The daemon's measure of the turn and the model that replied. Without them (the daemon
+  // could not tell the cost, the turn had no reply, an older daemon recorded it) the gutter
+  // says nothing rather than guess: cost_usd is a running total whose base a restart
+  // changes, and the thread's model may have changed since.
+  const cost = end ? turnCostLabel(end.turnCostUsd) : "";
+  if (cost) info.push(cost);
+  if (end?.model) info.push(canonicalModelName(models, end.model));
+  const at = sentTime(end?.createdAtMs ?? null);
+  if (at) info.push(at);
+  const label = copied ? "Copied" : "Copy reply";
+  return (
+    <div className="tgut text-caption" data-testid="thread-turn-gutter" data-shown={shown || undefined}>
+      <div className="in">
+        {row.reply && (
+          <Tip label={label}>
+            <button
+              type="button"
+              className="ib"
+              aria-label={label}
+              data-copied={copied || undefined}
+              data-testid="thread-copy-reply"
+              onClick={() => {
+                void copy(replyText(threadId, row.reply));
+              }}
+            >
+              <CopyIcon copied={copied} />
+            </button>
+          </Tip>
+        )}
+        {/* Fork from here goes here, right after Copy (a later change). */}
+        {info.length > 0 && (
+          <span className="info">
+            <Parts parts={info} />
+          </span>
+        )}
+      </div>
+    </div>
   );
 });
 
@@ -1016,6 +1072,8 @@ export function TimelineRowView({ row }: { row: TimelineRow }) {
       return <UserRow id={row.id} />;
     case "header":
       return <HeaderRow row={row} />;
+    case "gutter":
+      return <GutterRow row={row} />;
     case "setup":
       return <SetupRow row={row} />;
     default:

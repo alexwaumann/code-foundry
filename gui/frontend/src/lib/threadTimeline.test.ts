@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildRows, buildTurns, decodeTimelineKey, foldingTurn, groupLabel, linkRepeatShows, stripRuns, timelineKey, turnCostLabel, type TimelineItem, type TimelineRow, type WorkNode } from "./threadTimeline";
+import { buildRows, buildTurns, decodeTimelineKey, foldingTurn, groupLabel, linkRepeatShows, rowTurns, stripRuns, timelineKey, turnCostLabel, type TimelineItem, type TimelineRow, type WorkNode } from "./threadTimeline";
 
 let n = 0;
 function item(kind: TimelineItem["kind"], over: Partial<TimelineItem> = {}): TimelineItem {
@@ -14,9 +14,9 @@ const user = (id: string) => item("user", { id });
 const text = (id: string) => item("text", { id });
 const end = (id: string) => item("turnEnd", { id });
 
-/** Row types with their ids, compactly. */
+/** Row types with their ids, compactly. A finished turn's gutter (always its last row) is left out: `gutters` and its own tests check it. */
 function shape(rows: readonly TimelineRow[]): string[] {
-  return rows.map((r) => {
+  return rows.flatMap((r) => (r.type === "gutter" ? [] : [r])).map((r) => {
     switch (r.type) {
       case "group":
         return `group(${r.names.join(",")})`;
@@ -105,7 +105,7 @@ describe("buildTurns / buildRows", () => {
     expect(shape(buildRows(buildTurns(items), open))).toEqual(["user:u1", "tool:Read", "tool:Read+perm"]);
   });
 
-  it("folds every finished turn, the latest included, under its header; every text and the notes stay", () => {
+  it("folds every finished turn, the latest included, under its header; the reply and the notes stay", () => {
     const items = [
       user("u1"),
       item("thinking"),
@@ -126,25 +126,21 @@ describe("buildTurns / buildRows", () => {
     const turns = buildTurns(items);
     expect(turns.map((t) => t.key)).toEqual(["u1", "u2"]);
     const rows = buildRows(turns, open);
-    expect(shape(rows)).toEqual(["user:u1", "header(folded 4)", "text:mid", "note:error", "final:a1", "final:a2", "user:u2", "header(folded 1)", "final:b1"]);
+    // The text before the reply (mid) folds with the work.
+    expect(shape(rows)).toEqual(["user:u1", "header(folded 4)", "note:error", "final:a1", "final:a2", "user:u2", "header(folded 1)", "final:b1"]);
     expect(rows.flatMap((r) => (r.type === "header" ? [r.finals] : []))).toEqual([["a1", "a2"], ["b1"]]);
     // Every finished turn's header counts its steps (open or folded) and carries its turn_end.
     expect(rows.flatMap((r) => (r.type === "header" ? [[r.key, r.id, r.turn, r.steps, r.folded]] : []))).toEqual([
       ["h:u1", "e1", "u1", 4, true],
       ["h:u2", "e2", "u2", 1, true],
     ]);
-    // The answer's copy action sits on its first final text row and copies all of it.
-    expect(rows.flatMap((r) => (r.type === "text" ? [[r.id, r.answer]] : []))).toEqual([
-      ["mid", ""],
-      ["a1", "a1\na2"],
-      ["a2", ""],
-      ["b1", "b1"],
-    ]);
+    // No text row copies: the turn's gutter does, all of its reply.
+    expect(rows.flatMap((r) => (r.type === "text" ? [r.answer] : []))).toEqual(["", "", ""]);
+    expect(rows.flatMap((r) => (r.type === "gutter" ? [r.reply] : []))).toEqual(["a1\na2", "b1"]);
     // The user's choice wins both ways: the latest turn reopened, then an older one.
     expect(shape(buildRows(turns, { fold: (k) => (k === "u2" ? false : undefined), working: false }))).toEqual([
       "user:u1",
       "header(folded 4)",
-      "text:mid",
       "note:error",
       "final:a1",
       "final:a2",
@@ -330,10 +326,10 @@ describe("buildTurns / buildRows", () => {
     expect(shape(buildRows(turns, open))).toEqual(["user:u1", "header(folded 3)", "steer:s1", "steer:s2", "final:a"]);
   });
 
-  it("a folded turn keeps every text in its place under the header; text is no step (thread-fold-5-text-and-html)", () => {
+  it("a folded turn shows only its reply; the text before it folds with the work, in order, and text is no step (turn-gutter)", () => {
     const items = [user("u1"), text("t1"), tool("Bash"), text("t2"), tool("Edit"), text("t3"), end("e1")];
     const rows = buildRows(buildTurns(items), open);
-    expect(shape(rows)).toEqual(["user:u1", "header(folded 2)", "text:t1", "text:t2", "final:t3"]);
+    expect(shape(rows)).toEqual(["user:u1", "header(folded 2)", "final:t3"]);
     expect(rows.flatMap((r) => (r.type === "header" ? [r.finals] : []))).toEqual([["t3"]]);
     // Folded by the reader: the same; unfolded: the work comes back between the texts.
     expect(shape(buildRows(buildTurns(items), { fold: () => true, working: false }))).toEqual(shape(rows));
@@ -343,11 +339,12 @@ describe("buildTurns / buildRows", () => {
   it("a steer followed by the final text: the text after it is the turn's answer", () => {
     const items = [user("u1"), text("mid"), tool("Bash"), user("s1"), text("a1"), item("thinking"), text("a2"), end("e1")];
     const rows = buildRows(buildTurns(items), open);
-    expect(shape(rows)).toEqual(["user:u1", "header(folded 2)", "text:mid", "steer:s1", "final:a1", "final:a2"]);
+    expect(shape(rows)).toEqual(["user:u1", "header(folded 2)", "steer:s1", "final:a1", "final:a2"]);
     expect(rows.flatMap((r) => (r.type === "header" ? [r.finals] : []))).toEqual([["a1", "a2"]]);
-    // A steer right before the turn_end does not make earlier text final.
+    // A steer right before the turn_end does not make earlier text final; that last text is still the reply the fold leaves.
     const late = buildRows(buildTurns([user("u1"), tool("Bash"), text("a"), user("s1"), end("e1")]), open);
     expect(shape(late)).toEqual(["user:u1", "header(folded 1)", "text:a", "steer:s1"]);
+    expect(late.flatMap((r) => (r.type === "gutter" ? [r.reply] : []))).toEqual(["a"]);
   });
 
   it("a message after a turn_end, a fork's note or a process that ended (an error) starts a turn", () => {
@@ -574,7 +571,7 @@ describe("inline pages (html items)", () => {
 
   it("do not end the answer: text after a page is the final text", () => {
     const items = [user("u1"), text("before"), item("html", { id: "h" }), text("after"), end("e1")];
-    expect(shape(buildRows(buildTurns(items), open))).toEqual(["user:u1", "header(folded 0)", "text:before", "html:h", "final:after"]);
+    expect(shape(buildRows(buildTurns(items), open))).toEqual(["user:u1", "header(folded 0)", "html:h", "final:after"]);
   });
 
   it("shown between turns: no turn, no header, never folded (inline-html-2-fixes)", () => {
@@ -643,13 +640,74 @@ describe("inline pages (html items)", () => {
   });
 });
 
+describe("a finished turn's gutter (turn-gutter)", () => {
+  /** Every row with the gutters in: `gutter(<turn>, <reply>, latest)`. */
+  const withGutters = (rows: readonly TimelineRow[]) =>
+    rows.map((r) => (r.type === "gutter" ? `gutter(${r.turn},${r.reply.replace(/\n/g, "+")}${r.latest ? ",latest" : ""})` : r.type === "header" ? `header${r.folded ? "(folded)" : ""}` : r.type === "tool" ? `tool:${r.name}` : `${r.type}:${"id" in r ? r.id : ""}`));
+
+  it("is the last row of every finished turn, folded or open, under its own key; only the latest turn's shows at rest", () => {
+    const items = [user("u1"), tool("Bash"), text("a"), end("e1"), user("u2"), text("mid"), tool("Edit"), text("b1"), item("thinking"), text("b2"), end("e2")];
+    const rows = buildRows(buildTurns(items), open);
+    expect(withGutters(rows)).toEqual(["user:u1", "header(folded)", "text:a", "gutter(u1,a)", "user:u2", "header(folded)", "text:b1", "text:b2", "gutter(u2,b1+b2,latest)"]);
+    expect(rows.flatMap((r) => (r.type === "gutter" ? [[r.key, r.id, r.steps]] : []))).toEqual([
+      ["f:u1", "e1", 1],
+      ["f:u2", "e2", 2],
+    ]);
+    // Open: after the turn's last row all the same.
+    expect(withGutters(buildRows(buildTurns(items), expanded)).slice(5)).toEqual(["user:u2", "header", "text:mid", "tool:Edit", "text:b1", "thinking:", "text:b2", "gutter(u2,b1+b2,latest)"]);
+  });
+
+  it("none while the turn runs; the finished turn before it is no longer the latest", () => {
+    const items = [user("u1"), text("a"), end("e1"), user("u2"), tool("Bash")];
+    expect(withGutters(buildRows(buildTurns(items), { fold: () => undefined, working: true }))).toEqual(["user:u1", "header(folded)", "text:a", "gutter(u1,a)", "user:u2", "header", "tool:Bash"]);
+    // Waiting on the user mid-turn (no live header): still none, and the earlier turn stays the latest with a header.
+    expect(withGutters(buildRows(buildTurns(items), open))).toEqual(["user:u1", "header(folded)", "text:a", "gutter(u1,a,latest)", "user:u2", "tool:Bash"]);
+  });
+
+  it("an interrupted turn shows its last text when it has no final one, and copies it; one with no text has no reply", () => {
+    const cut = [user("u1"), text("looking"), tool("Bash"), text("now running"), tool("Bash"), end("e1")];
+    const rows = buildRows(buildTurns(cut), open);
+    expect(withGutters(rows)).toEqual(["user:u1", "header(folded)", "text:now running", "gutter(u1,now running,latest)"]);
+    expect(withGutters(buildRows(buildTurns([user("u1"), tool("Bash"), end("e1")]), open))).toEqual(["user:u1", "header(folded)", "gutter(u1,,latest)"]);
+  });
+
+  it("a note after the reply stays, and the gutter follows it; a system note between turns is no turn's", () => {
+    const items = [user("u1"), tool("Bash"), text("a"), item("note", { id: "n1" }), end("e1"), item("note", { id: "note-fork-x" })];
+    expect(withGutters(buildRows(buildTurns(items), open))).toEqual(["user:u1", "header(folded)", "text:a", "system:n1", "gutter(u1,a,latest)", "system:note-fork-x"]);
+  });
+
+  it("no gutter for the turn end a setup that did not finish wrote (no Claude behind it)", () => {
+    const rows = buildRows(buildTurns([user("u1"), end("e1")]), { fold: () => undefined, working: false, setup: "stopped" });
+    expect(rows.some((r) => r.type === "gutter")).toBe(false);
+  });
+
+  it("the header folds a turn whose only hidden part is text before its reply (no steps)", () => {
+    const items = [user("u1"), text("first"), user("s1"), text("second"), end("e1")];
+    const rows = buildRows(buildTurns(items), open);
+    expect(withGutters(rows)).toEqual(["user:u1", "header(folded)", "steer:s1", "text:second", "gutter(u1,second,latest)"]);
+    expect(rows.flatMap((r) => (r.type === "header" ? [[r.steps, r.foldable]] : []))).toEqual([[0, true]]);
+    // Text alone, all of it the reply: nothing to fold.
+    const plain = buildRows(buildTurns([user("u1"), text("a"), end("e1")]), open);
+    expect(plain.flatMap((r) => (r.type === "header" ? [[r.steps, r.foldable]] : []))).toEqual([[0, false]]);
+  });
+
+  it("rowTurns: a turn's rows from its header to its gutter; its messages, notes between turns and the setup are none", () => {
+    const items = [user("u1"), tool("Bash"), user("s1"), text("a"), end("e1"), item("note", { id: "note-fork-x" }), user("u2"), tool("Read")];
+    const rows = buildRows(buildTurns(items), { fold: () => false, working: true });
+    expect(rows.map((r, i) => `${r.key}=${rowTurns(rows)[i] ?? "?"}`)).toEqual(["u1=", "h:u1=u1", `${items[1]?.id ?? ""}=u1`, "s1=u1", "a=u1", "f:u1=u1", "note-fork-x=", "u2=", "h:u2=u2", `${items[7]?.id ?? ""}=u2`]);
+  });
+});
+
 describe("foldingTurn", () => {
-  it("names the turn whose fold hides a question's row; text, steers and other turns' items are never hidden", () => {
+  it("names the turn whose fold hides a question's row or a text before the reply; the reply, a running turn's text, steers and other turns' items are never hidden", () => {
     const q = item("question", { id: "q1", name: "AskUserQuestion", requestState: "allowed" });
-    const turns = buildTurns([user("u1"), text("t1"), q, text("t2"), end("e1"), user("u2"), text("t3"), end("e2")]);
+    const turns = buildTurns([user("u1"), text("t1"), q, text("t2"), end("e1"), user("u2"), text("t3"), end("e2"), user("u3"), text("t4"), tool("Bash"), text("t5")]);
     expect(foldingTurn(turns, "q1")).toBe("u1");
-    expect(foldingTurn(turns, "t1")).toBe("");
+    expect(foldingTurn(turns, "t1")).toBe("u1");
+    expect(foldingTurn(turns, "t2")).toBe("");
     expect(foldingTurn(turns, "t3")).toBe("");
+    // The running turn: none of its text folds.
+    expect(foldingTurn(turns, "t4")).toBe("");
     expect(foldingTurn(turns, "u2")).toBe("");
     expect(foldingTurn(turns, "nope")).toBe("");
   });

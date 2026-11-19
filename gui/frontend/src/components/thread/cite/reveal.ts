@@ -66,9 +66,9 @@ export function scrollToQuote(threadId: string, pane: HTMLElement, pt: PlainText
 }
 
 /**
- * Brings a citation's quote into view in the timeline: in Ember's chat, opens the work row
- * its text folded into (a thread's folded turn still shows every text), scrolls the row
- * in, waits for it to render, finds the quote (lib/citation locateQuote), opens a long
+ * Brings a citation's quote into view in the timeline: opens what folds its text away (a
+ * thread's folded turn, for a text before the turn's reply; in Ember's chat, the work row
+ * its text folded into), scrolls the row in, waits for it to render, finds the quote (lib/citation locateQuote), opens a long
  * message whose fold hides it (it stays open: the user went there) and scrolls it to the
  * middle. Resolves with
  * the quote's offsets in the answer's plain text, or null when the answer is not in
@@ -78,8 +78,8 @@ export async function revealQuote(threadId: string, pane: HTMLElement, cite: Cit
   if (!hasItem(threadId, cite.itemId)) return null;
   const tl = getTimeline(threadId);
   if (!tl) return null;
-  // A thread's fold never hides Claude's text (docs/notes/thread-fold-5-text-and-html.md);
-  // only Ember's chat folds a turn's earlier texts into a work row, which `unfold` opens.
+  // A thread's folded turn hides its texts before the reply (docs/notes/turn-gutter.md), and
+  // Ember's chat folds a turn's earlier texts into a work row: `unfold` opens either.
   if (!tl.showRow(cite.itemId)) {
     if (!tl.unfold?.(cite.itemId)) return null;
     await frame();

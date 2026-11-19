@@ -231,6 +231,8 @@ test("find at 125% zoom: the fold's edge is in zoomed px, so a match under it st
 });
 
 test("Go to source: a quote under the fold opens the message and stays open; a selection across the fold has the whole text", async ({ page }) => {
+  // Tall enough for the folded message, the reply under it and the next turn, each with its gutter.
+  await page.setViewportSize({ width: 1280, height: 1100 });
   await openThread(page);
   await send(page, longMessage(12, "the quoted words at the end"));
   await send(page, "after it");

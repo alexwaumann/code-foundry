@@ -90,6 +90,8 @@ async function stubClipboard(page: Page): Promise<void> {
 const pane = (page: Page) => page.getByTestId("thread-pane");
 /** Finished turns' headers (the running turn's live header is "thread-working" inside it). */
 const headers = (page: Page) => page.locator('[data-testid="thread-turn-header"]:not([data-live])');
+/** The finished turns' gutters (Copy, steps, cost, model, time), in order. */
+const gutters = (page: Page) => page.getByTestId("thread-turn-gutter");
 
 const schemes = process.env.SHOTS ? (["dark", "light"] as const) : (["dark"] as const);
 
@@ -126,11 +128,11 @@ for (const scheme of schemes) {
     });
 
     // The live header heading the turn's work, the answer growing under it, the header turning
-    // into the folded finished one in place, the answer's Copy and Copied: unit-tested in
+    // into the folded finished one in place, the gutter's Copy and Copied: unit-tested in
     // src/components/thread/timeline.test.tsx, rows.test.tsx and src/lib/threadTimeline.test.ts.
-    // Left here: the caret (::after), following the bottom while it streams, and the Copy
-    // button's hover-only opacity (held while Copied).
-    test("streaming: a caret while the answer grows, the view following it; the answer's Copy shows on hover", async ({ page }) => {
+    // Left here: the caret (::after), following the bottom while it streams, and the latest
+    // turn's gutter showing at rest (computed opacity).
+    test("streaming: a caret while the answer grows, the view following it; the latest turn's gutter shows at rest", async ({ page }) => {
       await openThread(page, "streaming", scheme);
       const streaming = pane(page).locator('[data-testid="thread-text"][data-streaming]');
       await expect(streaming).toContainText("ReviewState: pr.Revi");
@@ -145,25 +147,17 @@ for (const scheme of schemes) {
 
       await mockPost("thread/finish");
       await expect(headers(page)).toHaveCount(1);
-      const answer = pane(page).locator('[data-testid="thread-text"][data-final]').last();
-      // The answer copies from a button shown while it is hovered.
-      const copy = answer.getByRole("button", { name: "Copy answer" });
-      await expect(copy).toHaveCSS("opacity", "0");
-      await answer.hover();
-      await expect(copy).toHaveCSS("opacity", "1");
-      // A copy flips it to "Copied", shown even once the pointer leaves.
-      await stubClipboard(page);
-      await copy.click();
-      const copied = answer.getByTestId("thread-copy-answer");
-      await expect(copied).toHaveAttribute("aria-label", "Copied");
+      // The latest turn's gutter shows at rest, the pointer away from it.
       await page.mouse.move(0, 0);
-      await expect(copied).toHaveCSS("opacity", "1");
-      await expect(copied).toHaveAttribute("aria-label", "Copy answer", { timeout: 3000 });
-      await expect(copied).toHaveCSS("opacity", "0");
+      const gutter = gutters(page).last();
+      await expect(gutter.locator(".in")).toHaveCSS("opacity", "1");
+      await stubClipboard(page);
+      await gutter.getByRole("button", { name: "Copy reply" }).click();
+      await expect(gutter.getByTestId("thread-copy-reply")).toHaveAttribute("aria-label", "Copied");
     });
 
     test("the latest turn folds when it ends and keeps its header and answer in view; only the user's scroll unpins the list", async ({ page }) => {
-      // Tall enough for the folded turn, which keeps its texts (thread-fold-5-text-and-html).
+      // Tall enough for the folded turn: its header, reply and gutter.
       await page.setViewportSize({ width: 1280, height: 1100 });
       await openThread(page, "streaming", scheme);
       const timeline = page.getByTestId("thread-timeline");
@@ -175,8 +169,9 @@ for (const scheme of schemes) {
       });
       await mockPost("thread/finish");
       const header = headers(page).last();
-      // The turn's own cost and the model that replied, from the daemon's turn_end.
-      await expect(header).toContainText(/Worked for .*·9 steps·\$0\.04·Opus 4\.8/);
+      await expect(header).toHaveText(/^Worked for (\d+m )?\d+s$/);
+      // The turn's own cost and the model that replied, from the daemon's turn_end, in its gutter.
+      await expect(gutters(page).last()).toContainText(/^9 steps·\$0\.04·Opus 4\.8·/);
       // Folded the moment it ended, the latest turn too: its work rows are gone.
       await expect(header).toHaveAttribute("data-folded", "true");
       await expect(pane(page).locator('[data-tool="Edit"]')).toHaveCount(0);
@@ -234,7 +229,8 @@ for (const scheme of schemes) {
       });
       await mockPost("thread/finish");
       const header = headers(page).last();
-      await expect(header).toContainText(/^Worked for .*·9 steps·\$0\.04·Opus 4\.8/);
+      await expect(header).toHaveText(/^Worked for (\d+m )?\d+s$/);
+      await expect(gutters(page).last()).toContainText(/^9 steps·\$0\.04·Opus 4\.8·/);
       await expect(header).not.toHaveAttribute("data-folded", "true");
       await expect(header.locator("button.fold")).toHaveAttribute("aria-expanded", "true");
       expect(await element.evaluate((el) => el.isConnected && !el.hasAttribute("data-live"))).toBe(true);
@@ -245,7 +241,7 @@ for (const scheme of schemes) {
       await shot(page, `thread-open-on-end-${scheme}`);
 
       // Jump to bottom pins the list again: the turn folds there, its header and answer in view
-      // (in a window tall enough for the folded turn, which keeps its texts).
+      // (in a window tall enough for the folded turn).
       await page.setViewportSize({ width: 1280, height: 1100 });
       await page.getByTestId("thread-jump-bottom").click();
       await expect(header).toHaveAttribute("data-folded", "true");
@@ -300,7 +296,7 @@ for (const scheme of schemes) {
       }
       await expect(timeline).toHaveAttribute("data-at-bottom", "true");
       const header = headers(page).last();
-      await expect(header).toContainText(/·\$0\.04·Opus 4\.8/);
+      await expect(gutters(page).last()).toContainText(/·\$0\.04·Opus 4\.8/);
       await expect(header).toHaveAttribute("data-folded", "true");
       await expect.poll(async () => timeline.evaluate((el) => el.scrollHeight)).toBeLessThan(height);
       await expect(timeline).toHaveAttribute("data-at-bottom", "true");
@@ -422,6 +418,32 @@ for (const scheme of ["dark", "light"] as const) {
   });
 }
 
+// Which gutter shows when (the latest at rest, an older one on hover or keyboard focus) is
+// unit-tested in src/components/thread/rows.test.tsx and turnActivity.test.tsx. Left here:
+// the geometry. Hovering an older turn shows its gutter's contents and moves no row, nor
+// changes any row's size (the gutter row is always laid out at its fixed height).
+test("hovering an older turn shows its gutter and moves nothing", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 1200 });
+  await openThread(page, "idle");
+  const timeline = page.getByTestId("thread-timeline");
+  await expect(timeline).toHaveAttribute("data-at-bottom", "true");
+  await expect(gutters(page)).toHaveCount(2);
+  const older = gutters(page).first().locator(".in");
+  await page.mouse.move(0, 0);
+  await page.waitForTimeout(200);
+  await expect(older).toHaveCSS("opacity", "0");
+  await expect(gutters(page).last().locator(".in")).toHaveCSS("opacity", "1");
+  const boxes = () => timeline.locator("[data-index]").evaluateAll((rows) => rows.map((r) => [r.getAttribute("data-index"), ...Object.values(r.getBoundingClientRect().toJSON() as Record<string, number>).map(Math.round)].join(" ")));
+  const before = await boxes();
+  // Over the older turn's reply: its gutter shows, and every row keeps its box.
+  await pane(page).locator('[data-testid="thread-text"][data-final]').first().hover();
+  await expect(older).toHaveCSS("opacity", "1");
+  expect(await boxes()).toEqual(before);
+  await page.mouse.move(0, 0);
+  await expect(older).toHaveCSS("opacity", "0");
+  expect(await boxes()).toEqual(before);
+});
+
 test("a click on a header folds or unfolds its turn without moving the header on screen", async ({ page }) => {
   // Tall enough for the whole folded thread under the window shell's top bar and tab strip: the
   // list sits at the bottom (pinned) with the first turn's header (9 steps) on screen.
@@ -431,7 +453,7 @@ test("a click on a header folds or unfolds its turn without moving the header on
   await expect(timeline).toHaveAttribute("data-at-bottom", "true");
   const header = headers(page).first();
   await expect(header).toHaveAttribute("data-folded", "true");
-  await expect(header).toContainText("9 steps");
+  await expect(gutters(page).first()).toContainText("9 steps");
   await page.waitForTimeout(200);
   const y = async () => Math.round((await header.boundingBox())?.y ?? -1);
   const before = await y();

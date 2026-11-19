@@ -2,7 +2,7 @@ import { type ReactNode, type SyntheticEvent, useCallback, useEffect, useLayoutE
 import { flushSync } from "react-dom";
 import { observeElementOffset, useVirtualizer, type VirtualItem } from "@tanstack/react-virtual";
 import { ArrowDown } from "lucide-react";
-import { buildRows, buildTurns, decodeTimelineKey, foldingTurn, type TimelineRow } from "@/lib/threadTimeline";
+import { buildRows, buildTurns, decodeTimelineKey, foldingTurn, rowTurns, type TimelineRow } from "@/lib/threadTimeline";
 import { deferTurnFolds, foldDeferredTurns, getThreadItems, setTurnFolded, structOf, useDeferredTurns, useSetupShown, useTimelineKeys, useTurnFolds, watchTurnEnds } from "@/stores/thread";
 import { setupRowPhase } from "@/lib/threadSetup";
 import { registerTimeline } from "@/stores/cite";
@@ -14,6 +14,7 @@ import { FoldInPlaceContext, HoldTopContext, KeepRowContext } from "./context";
 import { PromptRail } from "./PromptRail";
 import { RowBoundary } from "./RowError";
 import { TimelineRowView } from "./rows";
+import { createTurnActivity, TurnActivityContext, turnActivityHandlers } from "./turnActivity";
 import { cn } from "@/lib/utils";
 
 /** Within this many px of the bottom the list follows new content. */
@@ -60,6 +61,8 @@ function estimate(r: { type: string; later?: string } | undefined): number {
     case "text":
       return 64;
     case "header":
+      return 28;
+    case "gutter":
       return 28;
     case "strip":
       return 26;
@@ -135,6 +138,7 @@ export function Timeline({
     [threadId],
   );
   const unfold = useMemo(() => unfoldTurnOf(threadId), [threadId]);
+  const turnOf = useMemo(() => rowTurns(rows), [rows]);
   return (
     <TimelineList
       threadId={threadId}
@@ -142,6 +146,7 @@ export function Timeline({
       bottomInset={bottomInset}
       renderRow={renderTimelineRow}
       turns
+      turnOf={turnOf}
       place={threadId}
       unfold={unfold}
       inset={inset}
@@ -208,6 +213,7 @@ export function TimelineList<R extends ListRow>({
   place,
   citable = turns,
   unfold,
+  turnOf,
   inset = 40,
   overlay,
   pinnedLayer,
@@ -227,6 +233,12 @@ export function TimelineList<R extends ListRow>({
   citable?: boolean;
   /** Opens what folds the item away (Ember's work row, a thread's folded turn), for the cite layer and the find bar; false when nothing hides it. */
   unfold?: (rows: readonly R[], itemId: string) => boolean;
+  /**
+   * Each row's turn, by index ("" for none; lib/threadTimeline rowTurns): the row carries it
+   * as `data-turn`, and the pointer over it or the keyboard focus in it makes that turn
+   * active for its gutter (turnActivity.ts). Absent: no turns to track.
+   */
+  turnOf?: readonly string[];
   /** The rows' left and right inset in px (40 in a thread's tab, less in a plugin's thread node). */
   inset?: number | undefined;
   /** A layer over the list, outside the scroller (the thread's prompt rail in the left gutter). */
@@ -245,6 +257,9 @@ export function TimelineList<R extends ListRow>({
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const innerRef = useRef<HTMLDivElement>(null);
+  const [activity] = useState(createTurnActivity);
+  const tracksTurns = turnOf !== undefined;
+  const activityHandlers = useMemo(() => (tracksTurns ? turnActivityHandlers(activity) : undefined), [activity, tracksTurns]);
   const pinnedRef = useRef<HTMLDivElement>(null);
   // The place this list was left at, read once: it mounts there, unpinned, instead of at the bottom.
   const [left] = useState<TimelinePlace<R> | undefined>(() => (place === undefined ? undefined : timelinePlace<R>(place)));
@@ -673,7 +688,7 @@ export function TimelineList<R extends ListRow>({
               {pinnedLayer}
             </div>
           )}
-          <div ref={innerRef} className="col" role="log" aria-label="Conversation" style={{ position: "relative", height: v.getTotalSize() }}>
+          <div ref={innerRef} className="col" role="log" aria-label="Conversation" style={{ position: "relative", height: v.getTotalSize() }} {...activityHandlers}>
             {v.getVirtualItems().map((vi) => {
               const row = rows[vi.index];
               if (!row) return null;
@@ -687,11 +702,14 @@ export function TimelineList<R extends ListRow>({
                   data-index={vi.index}
                   data-row-type={row.type}
                   data-turn-end={turnEnd || undefined}
+                  data-turn={turnOf?.[vi.index] || undefined}
                   ref={v.measureElement}
                   style={{ position: "absolute", top: 0, left: inset, right: inset, transform: `translateY(${String(vi.start)}px)` }}
                 >
                   <RowBoundary threadId={threadId} row={row}>
-                    <FoldInPlaceContext.Provider value={foldInPlace}>{renderRow(row)}</FoldInPlaceContext.Provider>
+                    <TurnActivityContext.Provider value={tracksTurns ? activity : null}>
+                      <FoldInPlaceContext.Provider value={foldInPlace}>{renderRow(row)}</FoldInPlaceContext.Provider>
+                    </TurnActivityContext.Provider>
                   </RowBoundary>
                 </div>
               );

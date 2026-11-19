@@ -68,9 +68,13 @@ const (
 	// prompts in a project thread wrote unthemed pages into the repo, 1 of 15 routed against
 	// 14 of 20 with them (page-library-fixes-b). Anything new has to pay with a cut.
 	threadPromptBudget = 1_641
-	guideBudget        = 11_000
-	topicBudget        = 29_000
-	referenceBudget    = 32 << 10
+	// replyPromptBudget is ReplyPrompt's size on 2026-11-19 (turn-gutter.md): the reply rule
+	// every thread but a resident gets after ThreadPrompt. Apart from ThreadPrompt's budget,
+	// whose bytes route skills; every request pays for it all the same.
+	replyPromptBudget = 291
+	guideBudget       = 11_000
+	topicBudget       = 29_000
+	referenceBudget   = 32 << 10
 )
 
 // skillParts splits a SKILL.md into its description and its body under the frontmatter.
@@ -105,6 +109,7 @@ func TestBudgets(t *testing.T) {
 	}
 
 	check(budget{"ThreadPrompt", threadPromptBudget, everyRequest}, len(thread.ThreadPrompt))
+	check(budget{"ReplyPrompt", replyPromptBudget, everyRequest}, len(thread.ReplyPrompt))
 	for _, s := range skillBudgets {
 		p := s.skill + "/SKILL.md"
 		description, body := skillParts(t, p, files[p])
