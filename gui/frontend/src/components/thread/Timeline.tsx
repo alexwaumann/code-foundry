@@ -70,6 +70,8 @@ function estimate(r: { type: string; later?: string; lines?: readonly unknown[];
     case "workers":
       // A folded card is its title line; an open one a line per worker more.
       return r.lines && !r.folded ? 34 + 25 * r.lines.length : 34;
+    case "peer":
+      return 26;
     case "strip":
       return 26;
     case "system":
@@ -749,7 +751,9 @@ export function TimelineList<R extends ListRow>({
               // The last row of a turn before the next one gets the space between turns.
               const next = rows[vi.index + 1];
               // Not the setup's row: it takes no height until its lines show, and a space there would move the message below.
-              const turnEnd = row.type !== "user" && row.type !== "system" && row.type !== "setup" && (next?.type === "user" || next?.type === "system" || next?.type === "workers");
+              // A card and the other threads' lines under it are one block: the space goes above the first of them.
+              const block = (t: string | undefined) => t === "workers" || t === "peer";
+              const turnEnd = row.type !== "user" && row.type !== "system" && row.type !== "setup" && (next?.type === "user" || next?.type === "system" || (block(next?.type) && !block(row.type)));
               return (
                 <div
                   key={vi.key}

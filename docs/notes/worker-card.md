@@ -6,6 +6,10 @@ Five reports meant five of each. A user asked to consolidate this. The agreed de
 sketches 8, 6, 5 and 3, section 2 each; the brief where they differ) reads a run of those
 turns as one card with the lead's replies stacked under it, and tells the model so.
 
+Update 2026-11-19 (`other-thread-lines.md`): a run also holds the turns that messages from
+other lead threads started inside an exchange; those threads get a line each under the card,
+and a message from one outside an exchange is a From row.
+
 This corrects `agents-3-lineage-gui.md` ("Wake messages render as a lineage note"),
 `orch-wakes-content.md` (GUI: one "Woken by" line per wake of a batch) and `turn-gutter.md`
 (every finished turn has a header): inside a worker run, wakes and headers are not drawn. They
