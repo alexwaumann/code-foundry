@@ -51,8 +51,8 @@ func (m *Manager) Snooze(ctx context.Context, id string, until time.Time) (Threa
 	if err != nil {
 		return Thread{}, err
 	}
-	s, err := m.putAway(ctx, id, func(s *Thread) {
-		s.SnoozedUntil, s.SavedAt = until, time.Time{}
+	s, err := m.putAway(ctx, id, func(rec *record) {
+		rec.s.SnoozedUntil, rec.s.SavedAt = until, time.Time{}
 	})
 	if err != nil {
 		return Thread{}, err
@@ -67,10 +67,10 @@ func (m *Manager) Snooze(ctx context.Context, id string, until time.Time) (Threa
 // and clears SnoozedUntil, so wakeSnoozed never sees it. It lasts until a call that
 // unsnoozes.
 func (m *Manager) SaveForLater(ctx context.Context, id string) (Thread, error) {
-	s, err := m.putAway(ctx, id, func(s *Thread) {
-		s.SnoozedUntil = time.Time{}
-		if s.SavedAt.IsZero() {
-			s.SavedAt = m.opts.Now().Round(0).Truncate(time.Millisecond)
+	s, err := m.putAway(ctx, id, func(rec *record) {
+		rec.s.SnoozedUntil = time.Time{}
+		if rec.s.SavedAt.IsZero() {
+			rec.s.SavedAt = m.opts.Now().Round(0).Truncate(time.Millisecond)
 		}
 	})
 	if err != nil {
@@ -84,8 +84,9 @@ func (m *Manager) SaveForLater(ctx context.Context, id string) (Thread, error) {
 // thread asked of itself for its turn's end (the later put-away wins), applies set,
 // unarchives the thread, clears a "snooze ended" left by an earlier wake and commits; on a
 // running thread that attention is its process's, cleared there after the commit. Nothing is closed, removed or unpinned
-// (docs/notes/snooze-without-teardown.md).
-func (m *Manager) putAway(ctx context.Context, id string, set func(*Thread)) (Thread, error) {
+// (docs/notes/snooze-without-teardown.md). An event an earlier snooze waited on is dropped
+// before set runs (snooze_event.go): set may make the thread wait on a new one.
+func (m *Manager) putAway(ctx context.Context, id string, set func(*record)) (Thread, error) {
 	if err := m.refuseResident(id, "snoozed"); err != nil {
 		return Thread{}, err
 	}
@@ -103,7 +104,8 @@ func (m *Manager) putAway(ctx context.Context, id string, set func(*Thread)) (Th
 		return Thread{}, err
 	}
 	m.dropPutAwayLocked(rec, "the thread was snoozed") // an archive of itself it asked for
-	set(&rec.s)
+	m.dropSnoozeEventLocked(rec)
+	set(rec)
 	live := rec.run != nil
 	if !live {
 		clearSnoozeEnded(&rec.s, m.opts.Now()) // a re-snooze: the last wake is old news
@@ -122,13 +124,14 @@ func (m *Manager) putAway(ctx context.Context, id string, set func(*Thread)) (Th
 	return m.Get(ctx, id)
 }
 
-// unsnoozeLocked clears rec's SnoozedUntil and SavedAt and reports whether either was
+// unsnoozeLocked clears rec's SnoozedUntil and SavedAt (and an event it waited on) and reports whether either was
 // set, so the caller commits. Pin(true), the user's Send and Archive(true) unsnooze
 // implicitly; another thread's Send or a wake does not (holds.go). Callers hold m.mu.
 func (m *Manager) unsnoozeLocked(rec *record) bool {
 	if !rec.s.Snoozed() {
 		return false
 	}
+	m.dropSnoozeEventLocked(rec) // what an event snooze waited on (snooze_event.go)
 	rec.s.SnoozedUntil, rec.s.SavedAt = time.Time{}, time.Time{}
 	return true
 }

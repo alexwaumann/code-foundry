@@ -27,6 +27,8 @@ type Fake struct {
 	Err error
 	// SubscribeWarnings are Subscribe's warnings.
 	SubscribeWarnings []string
+	// Events is what SnoozeEvents answers.
+	Events thread.SnoozeEvents
 	// KeptWorktrees is what CancelSetup answers, and SetupDraft what DiscardSetup does.
 	KeptWorktrees []string
 	SetupDraft    thread.SetupDraft
@@ -404,7 +406,7 @@ func (f *Fake) Pin(_ context.Context, id string, pinned bool) (thread.Thread, er
 	return f.mutate(fmt.Sprintf("Pin %s %t", id, pinned), id, func(s *thread.Thread) error {
 		s.Pinned = pinned
 		if pinned {
-			s.ArchivedAt, s.SnoozedUntil, s.SavedAt = time.Time{}, time.Time{}, time.Time{}
+			s.ArchivedAt, s.SnoozedUntil, s.SavedAt, s.SnoozeEvent = time.Time{}, time.Time{}, time.Time{}, nil
 		}
 		return nil
 	})
@@ -448,7 +450,7 @@ func (f *Fake) Archive(_ context.Context, id string, archived bool) (thread.Thre
 		if s.State != thread.StateDisconnected {
 			s.State, s.DisconnectReason = thread.StateDisconnected, thread.ReasonClosed
 		}
-		s.Pinned, s.SnoozedUntil, s.SavedAt = false, time.Time{}, time.Time{}
+		s.Pinned, s.SnoozedUntil, s.SavedAt, s.SnoozeEvent = false, time.Time{}, time.Time{}, nil
 		if s.ArchivedAt.IsZero() {
 			s.ArchivedAt = f.Now()
 		}
@@ -468,7 +470,7 @@ func (f *Fake) Snooze(_ context.Context, id string, until time.Time) (thread.Thr
 	}
 	return f.mutate(call, id, func(s *thread.Thread) error {
 		if until.IsZero() {
-			s.SnoozedUntil, s.SavedAt = time.Time{}, time.Time{}
+			s.SnoozedUntil, s.SavedAt, s.SnoozeEvent = time.Time{}, time.Time{}, nil
 			return nil
 		}
 		if !until.After(f.Now()) {
@@ -477,7 +479,7 @@ func (f *Fake) Snooze(_ context.Context, id string, until time.Time) (thread.Thr
 		if err := f.refuseResident(id, "snoozed"); err != nil {
 			return err
 		}
-		s.ArchivedAt, s.SnoozedUntil, s.SavedAt = time.Time{}, until, time.Time{}
+		s.ArchivedAt, s.SnoozedUntil, s.SavedAt, s.SnoozeEvent = time.Time{}, until, time.Time{}, nil
 		return nil
 	})
 }
@@ -517,12 +519,48 @@ func (f *Fake) SaveForLater(_ context.Context, id string) (thread.Thread, error)
 		if err := f.refuseResident(id, "snoozed"); err != nil {
 			return err
 		}
-		s.ArchivedAt, s.SnoozedUntil = time.Time{}, time.Time{}
+		s.ArchivedAt, s.SnoozedUntil, s.SnoozeEvent = time.Time{}, time.Time{}, nil
 		if s.SavedAt.IsZero() {
 			s.SavedAt = f.Now()
 		}
 		return nil
 	})
+}
+
+// SnoozeUntilEvent records "SnoozeUntilEvent <id> <pr|plugin> <condition>" and saves the
+// thread for later (as SaveForLater) waiting on the event; it never ends: tests Put the
+// ended state.
+func (f *Fake) SnoozeUntilEvent(_ context.Context, id string, ev thread.EventSnooze) (thread.Thread, error) {
+	target, kind, cond := ev.PullRequest, thread.TargetPullRequest, ev.Condition
+	if ev.Plugin != "" {
+		target, kind, cond = ev.Plugin, thread.TargetPlugin, thread.CondFired
+	} else if cond == "" {
+		cond = thread.CondChecksDone
+	}
+	return f.mutate("SnoozeUntilEvent "+id+" "+target+" "+string(cond), id, func(s *thread.Thread) error {
+		if (ev.PullRequest == "") == (ev.Plugin == "") {
+			return fmt.Errorf("%w: give a pull request or a plugin's wake source", thread.ErrInvalidArgument)
+		}
+		if err := f.refuseResident(id, "snoozed"); err != nil {
+			return err
+		}
+		s.ArchivedAt, s.SnoozedUntil, s.SnoozeEndedBy = time.Time{}, time.Time{}, ""
+		if s.SavedAt.IsZero() {
+			s.SavedAt = f.Now()
+		}
+		s.SnoozeEvent = &thread.SnoozeEvent{SubscriptionID: "sub-snooze", Kind: kind, Target: target, Condition: cond, Args: ev.Args, Since: f.Now()}
+		return nil
+	})
+}
+
+// SnoozeEvents returns Events for a known thread.
+func (f *Fake) SnoozeEvents(_ context.Context, id string) (thread.SnoozeEvents, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if _, ok := f.byID[id]; !ok {
+		return thread.SnoozeEvents{}, fmt.Errorf("%w: %s", thread.ErrNotFound, id)
+	}
+	return f.Events, nil
 }
 
 // Close disconnects the thread with reason "closed".
@@ -851,7 +889,7 @@ func (f *Fake) Send(_ context.Context, id string, msg thread.Message) (thread.It
 	}
 	changed := started || !s.ArchivedAt.IsZero() || s.Snoozed()
 	if changed {
-		s.ArchivedAt, s.SnoozedUntil, s.SavedAt = time.Time{}, time.Time{}, time.Time{}
+		s.ArchivedAt, s.SnoozedUntil, s.SavedAt, s.SnoozeEvent = time.Time{}, time.Time{}, time.Time{}, nil
 		f.byID[id] = s
 		f.rebuild()
 	}

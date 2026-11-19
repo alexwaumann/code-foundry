@@ -159,6 +159,10 @@ service ThreadService {
   // "at prompt", as a re-snooze or an archive does, without putting it away again.
   // cleared is false, and nothing changes, when the thread is not woken. Persisted.
   rpc ClearSnoozeEnded(ClearSnoozeEndedRequest) returns (ClearSnoozeEndedResponse) {}
+  // SnoozeEvents lists the events a thread can be snoozed until now: its open, non-draft
+  // pull requests' pending conditions and running plugins' wake sources
+  // (docs/notes/snooze-until-event.md).
+  rpc SnoozeEvents(SnoozeEventsRequest) returns (SnoozeEventsResponse) {}
   // MarkUnread puts an idle thread at its prompt back into NEEDS_ATTENTION "finished",
   // the status of a turn that ended unseen (the sidebar's Done), cleared as that one is:
   // a new view, the thread gaining the focus, a message or a new turn. A view already

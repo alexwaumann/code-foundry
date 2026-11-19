@@ -350,6 +350,9 @@ type subRec struct {
 	// ordinal (a message its subscriber sent while it worked; subscriptions_until.go). In
 	// memory.
 	keep int64
+	// snooze marks a subscription the store owns to end its subscriber's snooze when the
+	// event happens (snooze_event.go): it queues no wake and is never listed.
+	snooze *snoozeMeta
 }
 
 // extraNote is a note for one wake only: the first wake whose target's HandledThrough
@@ -721,7 +724,7 @@ func (m *Manager) subscribe(sub Subscription, run ActionRun, pr *PullRequestInfo
 	}
 	for _, r := range s.byID {
 		if r.s.SubscriberID == sub.SubscriberID && r.s.TargetKind == sub.TargetKind && r.s.TargetID == sub.TargetID && r.s.Condition == sub.Condition &&
-			sameArgs(r.s.Args, sub.Args) {
+			sameArgs(r.s.Args, sub.Args) && r.snooze == nil {
 			switch {
 			case g.before:
 				return SubscribeResult{Subscription: r.s, Existed: true}, nil
@@ -1038,6 +1041,10 @@ func (m *Manager) unsubscribe(o UnsubscribeOptions) ([]Subscription, error) {
 		// left but that wake), or held.
 		way := s.dropWakesLocked("", []string{id})
 		r, ok := s.byID[id]
+		if ok && r.snooze != nil {
+			// A snooze's: thread snooze --clear ends it, with the snooze.
+			return nil, fmt.Errorf("%w: subscription %s", ErrNotFound, id)
+		}
 		if !ok {
 			if h, held := s.heldOnlyLocked("")[id]; held {
 				s.forgetHeldLocked("", []string{id})
@@ -1076,7 +1083,7 @@ func (m *Manager) unsubscribe(o UnsubscribeOptions) ([]Subscription, error) {
 	var out []Subscription
 	var ids []string
 	for id, r := range s.byID {
-		if r.s.SubscriberID == subscriber && r.s.TargetKind == kind && (r.s.TargetID == target || (kind == TargetTimer && target == "")) {
+		if r.s.SubscriberID == subscriber && r.s.TargetKind == kind && (r.s.TargetID == target || (kind == TargetTimer && target == "")) && r.snooze == nil {
 			out = append(out, r.s)
 			ids = append(ids, id)
 		}
@@ -1112,7 +1119,7 @@ func (m *Manager) Subscriptions(ctx context.Context, subscriber string) ([]Subsc
 	s.mu.Lock()
 	var out []Subscription
 	for _, r := range s.byID {
-		if subscriber == "" || r.s.SubscriberID == subscriber {
+		if (subscriber == "" || r.s.SubscriberID == subscriber) && r.snooze == nil {
 			out = append(out, r.s)
 		}
 	}

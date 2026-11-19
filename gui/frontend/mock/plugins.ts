@@ -102,6 +102,8 @@ interface MockPlugin {
   surfaces: SurfaceDef[];
   /** Where plugin install got it (mock/pluginRegistry.ts); none for hand-placed or dev plugins. */
   install?: { kind: string; source: string };
+  /** Its manifest's wake sources (docs/notes/plugins-wake-sources.md): a snooze can wait on them too. */
+  wakes?: { name: string; title: string }[];
 }
 
 /** The hello plugin's own thread and terminal in the default world (mock/world.ts seeds them; the demo's Assistant and Shell tabs show them). */
@@ -880,6 +882,7 @@ function seedPlugins(): MockPlugin[] {
         { id: "pinned", title: "Hello Pinned", icon: "pin", scope: "thread" },
         { id: "checks", title: "Actions Checks", icon: "workflow", scope: "thread", when: () => false },
       ],
+      wakes: [{ name: "tick", title: "Tick" }],
     },
     {
       // Installed from the fixture registry, which now lists 0.1.0 (mock/pluginRegistry.ts).
@@ -901,6 +904,7 @@ function seedPlugins(): MockPlugin[] {
       commands: [],
       surfaces: [{ id: "runs", title: "Test runs", icon: "flask-conical", scope: "global" }],
       install: { kind: "registry", source: "https://github.com/alexwaumann/code-foundry-plugins" },
+      wakes: [{ name: "tests-finished", title: "Tests finished" }],
     },
     // A longer list for Settings → Plugins: no commands or surfaces, so nothing else sees them.
     ...[
@@ -930,6 +934,9 @@ function seedPlugins(): MockPlugin[] {
       surfaces: [],
       // linear-sync came from the fixture registry, which lists a 1.4.0 that needs a newer Code Foundry (held).
       install: { kind: "registry", source: name === "linear-sync" ? "https://github.com/alexwaumann/code-foundry-plugins" : "https://plugins.acme.dev/index.json" },
+      // Wake sources a snooze can wait on (docs/notes/snooze-until-event.md).
+      ...(name === "doc-preview" ? { wakes: [{ name: "deploy", title: "Preview deployed" }] } : {}),
+      ...(name === "disk-watch" ? { wakes: [{ name: "low", title: "Disk low" }] } : {}),
     })),
   ];
 }
@@ -1127,9 +1134,21 @@ export class MockPlugins {
         available: this.surfaceAvailable(p, s, ctx),
       })),
       logPath: `/Users/dev/.code-foundry/logs/plugins/${p.name}.log`,
+      wakes: (p.wakes ?? []).map((w) => ({ name: w.name, title: w.title, description: "", scope: "global", args: [], subscribeLine: `code-foundry thread subscribe --plugin ${p.name}/${w.name}` })),
       ...(p.install ? { install: { kind: p.install.kind, source: p.install.source, version: p.version, sha256: "", installedAt: timestampFromDate(p.startedAt) } } : {}),
       ...this.registry.offer(p.name),
     };
+  }
+
+  /**
+   * The wake sources of running plugins, as the daemon's thread.snooze.events lists them
+   * (docs/notes/snooze-until-event.md): target, title, the plugin's display name.
+   */
+  wakeSources(): { target: string; title: string; pluginName: string }[] {
+    return [...this.plugins.values()]
+      .filter((p) => p.state === PluginState.RUNNING)
+      .flatMap((p) => (p.wakes ?? []).map((w) => ({ target: `${p.name}/${w.name}`, title: w.title, pluginName: p.displayName })))
+      .sort((a, b) => a.target.localeCompare(b.target));
   }
 
   snapshot(): PluginEventInit {

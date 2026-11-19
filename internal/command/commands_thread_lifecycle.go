@@ -433,6 +433,7 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter, opts ...Th
 		threadSnooze(b, idArg),
 		threadSnoozeDefault(b, idArg),
 		threadSnoozeClear(b, idArg),
+		threadSnoozeEvents(b, idArg),
 		threadUnread(b, idArg),
 		threadGet(b, idArg),
 		threadLabelCmd(b, idArg),

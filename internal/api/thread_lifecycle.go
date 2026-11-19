@@ -172,6 +172,9 @@ func (h *Thread) Archive(ctx context.Context, req *connect.Request[v1.ArchiveThr
 // it (neither). A thread doing either to itself goes through snoozeSelf.
 func (h *Thread) Snooze(ctx context.Context, req *connect.Request[v1.SnoozeThreadRequest]) (*connect.Response[v1.SnoozeThreadResponse], error) {
 	self := bySelf(req.Msg.GetByThreadId(), req.Msg.GetId())
+	if ev := req.Msg.GetEvent(); ev != nil {
+		return h.snoozeUntilEvent(ctx, req.Msg) // thread_snooze_event.go
+	}
 	if req.Msg.GetSave() {
 		if req.Msg.GetUntil() != nil {
 			return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("give until or save, not both"))
@@ -319,6 +322,7 @@ func threadToProto(s thread.Thread) *v1.Thread {
 	p.ArchivedAt = timestamp(s.ArchivedAt)
 	p.SnoozedUntil = timestamp(s.SnoozedUntil)
 	p.SavedAt = timestamp(s.SavedAt)
+	p.SnoozeEvent, p.SnoozeEndedBy = snoozeEventToProto(s.SnoozeEvent), s.SnoozeEndedBy // thread_snooze_event.go
 	for _, l := range s.LinkedPullRequests {
 		p.LinkedPullRequests = append(p.LinkedPullRequests, linkedPullRequestToProto(l))
 	}

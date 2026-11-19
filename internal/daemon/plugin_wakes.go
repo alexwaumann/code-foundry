@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"maps"
+	"slices"
 	"strings"
 
 	"github.com/alexwaumann/code-foundry/internal/store/plugin"
@@ -23,6 +24,7 @@ type wakeResolver interface {
 	ResolveWake(ctx context.Context, threadID, projectID, target string, args map[string]string) (map[string]string, error)
 	WakeChanged(s plugin.WakeSub, added bool)
 	DescribeWake(target string) (string, string)
+	Snapshot() *plugin.Snapshot
 }
 
 // threadPluginWakes adapts the plugin store to thread.PluginWakes.
@@ -53,6 +55,30 @@ func (w threadPluginWakes) Changed(s thread.Subscription, added bool) {
 
 func (w threadPluginWakes) Describe(target string) (string, string) {
 	return w.plugins.DescribeWake(target)
+}
+
+var _ thread.PluginSources = threadPluginWakes{}
+
+// Sources lists the wake sources of running plugins with the args each takes for t (the
+// Until event menu, docs/notes/snooze-until-event.md): a source whose args cannot be
+// resolved for t (a required arg with no value) is left out.
+func (w threadPluginWakes) Sources(ctx context.Context, t thread.Thread) []thread.PluginSource {
+	var out []thread.PluginSource
+	for _, p := range w.plugins.Snapshot().Plugins {
+		if p.State != plugin.StateRunning {
+			continue
+		}
+		for _, wk := range p.Manifest.Wakes {
+			target := p.Name + "/" + wk.Name
+			args, err := w.plugins.ResolveWake(ctx, t.ID, t.ProjectID, target, nil)
+			if err != nil {
+				continue
+			}
+			out = append(out, thread.PluginSource{Target: target, Title: wk.Title, PluginName: p.DisplayName(), Args: args})
+		}
+	}
+	slices.SortStableFunc(out, func(a, b thread.PluginSource) int { return strings.Compare(a.Target, b.Target) })
+	return out
 }
 
 // wakeSub is a thread store subscription as the plugin store knows it.

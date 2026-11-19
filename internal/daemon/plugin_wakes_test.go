@@ -5,15 +5,26 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
+	"strings"
 	"testing"
 
 	"github.com/alexwaumann/code-foundry/internal/store/plugin"
 	"github.com/alexwaumann/code-foundry/internal/store/thread"
+	"github.com/alexwaumann/code-foundry/pluginsdk"
 )
 
 type fakeResolver struct {
 	err     error
 	changed []string
+	snap    *plugin.Snapshot
+}
+
+func (f *fakeResolver) Snapshot() *plugin.Snapshot {
+	if f.snap == nil {
+		return &plugin.Snapshot{}
+	}
+	return f.snap
 }
 
 func (f *fakeResolver) ResolveWake(_ context.Context, threadID, projectID, target string, args map[string]string) (map[string]string, error) {
@@ -61,6 +72,36 @@ func TestThreadPluginWakes(t *testing.T) {
 	}
 	if name, status := w.Describe("hello/tick"); name != "Hello: hello/tick" || status != "running" {
 		t.Errorf("Describe = %q %q", name, status)
+	}
+}
+
+// Sources lists running plugins' wake sources with the args each takes for the thread,
+// sorted, leaving out a stopped plugin and a source whose args cannot be resolved.
+func TestThreadPluginWakeSources(t *testing.T) {
+	wakes := func(names ...string) pluginsdk.Manifest {
+		var m pluginsdk.Manifest
+		for _, n := range names {
+			m.Wakes = append(m.Wakes, pluginsdk.WakeSpec{Name: n, Title: strings.ToUpper(n[:1]) + n[1:]})
+		}
+		return m
+	}
+	f := &fakeResolver{snap: &plugin.Snapshot{Plugins: []plugin.Plugin{
+		{Name: "zeta", State: plugin.StateRunning, Manifest: wakes("deploy", "build")},
+		{Name: "off", State: plugin.StateStopped, Manifest: wakes("tick")},
+		{Name: "hello", State: plugin.StateRunning, Manifest: func() pluginsdk.Manifest { m := wakes("tick"); m.DisplayName = "Hello"; return m }()},
+	}}}
+	got := threadPluginWakes{plugins: f}.Sources(context.Background(), thread.Thread{ID: "s-1", ProjectID: "p-1"})
+	var lines []string
+	for _, s := range got {
+		lines = append(lines, s.Target+" "+s.Title+" "+s.PluginName+" "+s.Args["thread"])
+	}
+	want := []string{"hello/tick Tick Hello s-1", "zeta/build Build zeta s-1", "zeta/deploy Deploy zeta s-1"}
+	if !slices.Equal(lines, want) {
+		t.Errorf("Sources = %q, want %q", lines, want)
+	}
+	f.err = fmt.Errorf("%w: needs pr", plugin.ErrInvalidArgument)
+	if got := (threadPluginWakes{plugins: f}).Sources(context.Background(), thread.Thread{ID: "s-1"}); len(got) != 0 {
+		t.Errorf("unresolvable = %+v", got)
 	}
 }
 

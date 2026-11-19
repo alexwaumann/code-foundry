@@ -248,13 +248,22 @@ func matchPullRequest(c Condition, e PullRequestEvent) []PullRequestChange {
 // goes once it fired, so do merged and closed. One the event leaves unable to fire
 // (prCannotFire) gets a last wake saying so and goes too. A last wake the limit drops is
 // tried again (retryFinalWakesLocked), and the subscription stays until one gets through.
+// A snooze's subscription ends its thread's snooze instead of waking it (snooze_event.go).
 func (m *Manager) PullRequestChanged(e PullRequestEvent) {
-	target := e.PullRequest.Target()
 	m.mu.Lock()
-	defer m.mu.Unlock()
 	if m.subs == nil {
+		m.mu.Unlock()
 		return
 	}
+	live := m.endSnoozesLocked(m.pullRequestChangedLocked(e))
+	m.mu.Unlock()
+	m.markSnoozesEnded(live)
+}
+
+// pullRequestChangedLocked is PullRequestChanged under m.mu: it returns the snoozes the
+// event ended. Callers hold m.mu.
+func (m *Manager) pullRequestChangedLocked(e PullRequestEvent) []snoozeEnd {
+	target := e.PullRequest.Target()
 	s := m.subs
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -268,12 +277,19 @@ func (m *Manager) PullRequestChanged(e PullRequestEvent) {
 		return cmp.Or(a.s.CreatedAt.Compare(b.s.CreatedAt), strings.Compare(a.s.ID, b.s.ID))
 	})
 	var gone []string
+	var ends []snoozeEnd
 	for _, r := range hit {
 		r.final = nil // this event says what is true now: a reopening calls it off
 		c, p := r.s.Condition, e.PullRequest
 		matched := matchPullRequest(c, e)
 		met := prTerminal(c) && prAlreadyMet(c, p)
 		cannot := prCannotFire(c, p)
+		if r.snooze != nil {
+			if len(matched) > 0 || met || cannot {
+				ends = append(ends, s.snoozeHitLocked(r, prEndedBy(c, p, matched)))
+			}
+			continue
+		}
 		var build func(Subscription, time.Time) Message
 		switch {
 		case len(matched) > 0 || met:
@@ -299,6 +315,7 @@ func (m *Manager) PullRequestChanged(e PullRequestEvent) {
 			m.log.Info("wake subscriptions to a pull request ended", "pull_request", target, "state", e.PullRequest.State, "subscriptions", gone)
 		}
 	}
+	return ends
 }
 
 // retryFinalWakesLocked tries again the last wakes the limit dropped, on the timers' tick.

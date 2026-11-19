@@ -789,3 +789,22 @@ func TestIncludeIgnoredField(t *testing.T) {
 		})
 	}
 }
+
+// threads.snooze_events: the Until event menu's events (docs/notes/snooze-until-event.md).
+func TestSnoozeEventsField(t *testing.T) {
+	f := field(t, KeySnoozeEvents)
+	if f.Page != PageGeneral || f.Section != "snooze" || f.Default != "checks_done review merged" || f.Type != String {
+		t.Errorf("field = %+v", f)
+	}
+	for _, tt := range []struct {
+		in string
+		ok bool
+	}{
+		{"", true}, {"none", true}, {"checks_done review merged", true}, {"comment  closed plugin:hello/tick", true},
+		{"changed", false}, {"checks_passed", false}, {"plugin:hello", false}, {"plugin:Hello/tick", false}, {"tick", false},
+	} {
+		if _, err := f.parse(tt.in); (err == nil) != tt.ok {
+			t.Errorf("parse(%q) err = %v, want ok %v", tt.in, err, tt.ok)
+		}
+	}
+}

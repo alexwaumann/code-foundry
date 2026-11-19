@@ -10,6 +10,7 @@ import { ActionIcon, ActionRunMode } from "../src/gen/codefoundry/v1/action_pb";
 import { EventSource, type EventSchema } from "../src/gen/codefoundry/v1/events_pb";
 import type { ProjectEventSchema, ProjectSchema, WorktreeSchema } from "../src/gen/codefoundry/v1/project_pb";
 import { PermissionMode, PlacementOutcome, ThreadKind, ThreadSetupPhase, ThreadState, ThreadStatus, type ThreadListEventSchema, type ThreadSchema } from "../src/gen/codefoundry/v1/thread_lifecycle_pb";
+import { PullRequestState, ReviewDecision } from "../src/gen/codefoundry/v1/gh_pb";
 import { TerminalState, type AttachEventSchema, type TerminalEventSchema, type TerminalSchema } from "../src/gen/codefoundry/v1/terminal_pb";
 import { UiIntent_Notify_Level, UiIntentSchema } from "../src/gen/codefoundry/v1/ui_pb";
 import type { WorkspaceEventSchema, WorkspaceSchema } from "../src/gen/codefoundry/v1/workspace_pb";
@@ -111,6 +112,30 @@ interface MockCheckout {
   moved: boolean;
 }
 
+/** A snooze's event (Thread.snooze_event). */
+interface MockSnoozeEvent {
+  kind: "pull_request" | "plugin";
+  target: string;
+  condition: string;
+  args: Record<string, string>;
+  title: string;
+  pluginName: string;
+  label: string;
+  waitingFor: string;
+  since: Date;
+}
+
+/** The pull request events in the daemon's menu order, with their few words for a row and the end of "Snoozed until …" ("#812" is the number). */
+const SNOOZE_PR_EVENTS: readonly { condition: string; label: string; waiting: (n: string) => string; ended: (n: string) => string }[] = [
+  { condition: "checks_done", label: "checks", waiting: (n) => `checks finish on ${n}`, ended: (n) => `Checks passed on ${n} (12 of 12)` },
+  { condition: "review", label: "review", waiting: (n) => `${n} is reviewed`, ended: (n) => `${n} was reviewed (approved by teammate-kim)` },
+  { condition: "merged", label: "merged", waiting: (n) => `${n} is merged`, ended: (n) => `${n} was merged` },
+  { condition: "comment", label: "comment", waiting: (n) => `${n} gets a comment`, ended: (n) => `${n} got a new comment` },
+  { condition: "head_pushed", label: "push", waiting: (n) => `${n} gets a push`, ended: (n) => `New commits were pushed to ${n}` },
+  { condition: "closed", label: "closed", waiting: (n) => `${n} is closed`, ended: (n) => `${n} was closed` },
+  { condition: "review_requested", label: "review request", waiting: (n) => `a review is requested on ${n}`, ended: (n) => `A review was requested on ${n}` },
+];
+
 interface MockThread {
   id: string;
   claudeSessionId: string;
@@ -191,6 +216,10 @@ interface MockThread {
   snoozedUntil: Date | null;
   /** Saved for later: a snooze with no wake time (snoozedUntil stays null). */
   savedAt: Date | null;
+  /** What a thread snoozed until an event waits on (docs/notes/snooze-until-event.md); savedAt is set too. Listed only while saved. */
+  snoozeEvent: MockSnoozeEvent | null;
+  /** Why the last event snooze ended ("#812 was merged"). */
+  snoozeEndedBy: string;
   /** An effort change waiting for the turn to end (thread.set-effort). */
   effortPending: boolean;
   /** Mock-only: a new thread's first message, sent once it connects (the daemon sends it after the handshake). */
@@ -2504,6 +2533,8 @@ export class World {
       archivedAt: null,
       snoozedUntil: null,
       savedAt: null,
+      snoozeEvent: null,
+      snoozeEndedBy: "",
       effortPending: false,
       firstMessage: null,
       onReady: [],
@@ -2641,6 +2672,8 @@ export class World {
       ...(s.archivedAt ? { archivedAt: timestampFromDate(s.archivedAt) } : {}),
       ...(s.snoozedUntil ? { snoozedUntil: timestampFromDate(s.snoozedUntil) } : {}),
       ...(s.savedAt ? { savedAt: timestampFromDate(s.savedAt) } : {}),
+      ...(s.savedAt && s.snoozeEvent ? { snoozeEvent: { ...s.snoozeEvent, since: timestampFromDate(s.snoozeEvent.since) } } : {}),
+      snoozeEndedBy: s.snoozeEndedBy,
       effortPending: s.effortPending,
       linkedPullRequests: s.linkedPullRequests.map((l) => ({ slug: l.slug, number: l.number, url: l.url, linkedAt: timestampFromDate(l.linkedAt) })),
       ...usageFields(s.usage),
@@ -3190,6 +3223,7 @@ export class World {
   snoozeThread(id: string, until: Date | null): string {
     const s = this.thread(id);
     const label = s.name ? `${s.name} (${s.id})` : s.id;
+    s.snoozeEvent = null;
     if (until === null) {
       s.snoozedUntil = null;
       s.savedAt = null;
@@ -3199,6 +3233,7 @@ export class World {
     s.archivedAt = null;
     s.snoozedUntil = until;
     s.savedAt = null;
+    s.snoozeEndedBy = "";
     this.clearWake(s);
     this.publishThread(s);
     return `snoozed thread ${label} until ${until.toISOString()}`;
@@ -3221,10 +3256,96 @@ export class World {
     const s = this.thread(id);
     s.archivedAt = null;
     s.snoozedUntil = null;
+    if (s.snoozeEvent) s.savedAt = null;
+    s.snoozeEvent = null;
+    s.snoozeEndedBy = "";
     s.savedAt ??= new Date();
     this.clearWake(s);
     this.publishThread(s);
     return `saved thread ${s.name ? `${s.name} (${s.id})` : s.id} for later`;
+  }
+
+  /** The plugin sources the user snoozed on, newest first (the daemon's snooze_recent_events). */
+  private recentSnoozePlugins: string[] = [];
+
+  /**
+   * thread.snooze.events (docs/notes/snooze-until-event.md): the thread's linked pull requests
+   * that are open and not drafts, newest first, each with the events still pending (no checks
+   * finish once its checks are done, no reviewed once approved); the running plugins' wake
+   * sources; the recent plugin sources. A linked pull request the GitHub mock does not hold is
+   * taken as open with checks running.
+   */
+  snoozeEventsOf(id: string): { pullRequests: { target: string; number: number; title: string; conditions: string[] }[]; plugins: { target: string; title: string; pluginName: string; args: Record<string, string> }[]; recentPlugins: string[] } {
+    const s = this.thread(id);
+    const pullRequests = s.linkedPullRequests
+      .map((l) => {
+        const pr = this.gh.findPr(l.slug, l.number);
+        const open = pr === undefined || (pr.state === PullRequestState.OPEN && !pr.draft);
+        const checks = pr?.checks;
+        const checksDone = checks !== undefined && checks.pending === 0 && checks.total > 0;
+        const approved = pr?.reviewDecision === ReviewDecision.APPROVED;
+        const conditions = open ? SNOOZE_PR_EVENTS.map((e) => e.condition).filter((c) => !(c === "checks_done" && checksDone) && !(c === "review" && approved)) : [];
+        return { target: `${l.slug.toLowerCase()}#${String(l.number)}`, number: l.number, title: pr?.title ?? `Pull request ${String(l.number)}`, conditions };
+      })
+      .filter((p) => p.conditions.length > 0)
+      .sort((a, b) => b.number - a.number);
+    const plugins = this.plugins.wakeSources().map((p) => ({ ...p, args: {} }));
+    return { pullRequests, plugins, recentPlugins: [...this.recentSnoozePlugins] };
+  }
+
+  /**
+   * thread.snooze with until-pr/on or until-plugin (docs/notes/snooze-until-event.md): a save for
+   * later that the event ends. What the thread cannot wait on now is refused as the daemon
+   * refuses it (an event already true, a closed pull request, an unknown source). Returns the
+   * message.
+   */
+  snoozeUntilEvent(id: string, args: Record<string, string>): string {
+    const s = this.thread(id);
+    const label = s.name ? `${s.name} (${s.id})` : s.id;
+    const pr = args["until-pr"] ?? "";
+    const plugin = args["until-plugin"] ?? "";
+    if ((pr === "") === (plugin === "")) throw new CommandError("invalid", "invalid until-pr: give until-pr or until-plugin, not both");
+    const evs = this.snoozeEventsOf(id);
+    let ev: MockSnoozeEvent;
+    if (pr !== "") {
+      const condition = args.on || "checks_done";
+      const want = pr.startsWith("#") ? pr : `#${pr.split("#").pop() ?? ""}`;
+      const p = evs.pullRequests.find((x) => x.target === pr.toLowerCase() || `#${String(x.number)}` === want);
+      const words = SNOOZE_PR_EVENTS.find((e) => e.condition === condition);
+      if (!p || !words) throw new CommandError("unavailable", `failed precondition: ${pr} is not an open pull request of this thread`);
+      if (!p.conditions.includes(condition)) throw new CommandError("unavailable", `failed precondition: checks on #${String(p.number)} already finished; there is nothing to wait for`);
+      const n = `#${String(p.number)}`;
+      ev = { kind: "pull_request", target: p.target, condition, args: {}, title: p.title, pluginName: "", label: `${n} ${words.label}`, waitingFor: words.waiting(n), since: new Date() };
+    } else {
+      const p = evs.plugins.find((x) => x.target === plugin);
+      if (!p) throw new CommandError("notfound", `not found: no running plugin's wake source ${plugin}`);
+      const argPairs = Object.fromEntries((args.arg ?? "").split("\n").filter((l) => l.includes("=")).map((l) => [l.slice(0, l.indexOf("=")), l.slice(l.indexOf("=") + 1)]));
+      ev = { kind: "plugin", target: p.target, condition: "fired", args: argPairs, title: p.title, pluginName: p.pluginName, label: p.target.split("/")[1] ?? p.target, waitingFor: `${p.title} (${p.pluginName})`, since: new Date() };
+      this.recentSnoozePlugins = [p.target, ...this.recentSnoozePlugins.filter((t) => t !== p.target)].slice(0, 10);
+    }
+    s.archivedAt = null;
+    s.snoozedUntil = null;
+    s.savedAt ??= new Date();
+    s.snoozeEvent = ev;
+    s.snoozeEndedBy = "";
+    this.clearWake(s);
+    this.publishThread(s);
+    return `snoozed thread ${label} until ${ev.waitingFor}`;
+  }
+
+  /**
+   * The event of an event snooze happening (POST /__mock/thread/snooze-event-fire?id=…[&by=…]):
+   * the snooze ends as a time ends one, with what happened in plain words.
+   */
+  endEventSnooze(id: string, by?: string): void {
+    const s = this.thread(id);
+    const ev = s.snoozeEvent;
+    if (!ev || !s.savedAt) return;
+    const n = ev.label.split(" ")[0] ?? "";
+    s.snoozeEndedBy = by ?? (ev.kind === "plugin" ? `${ev.pluginName}: ${ev.title.toLowerCase()}` : (SNOOZE_PR_EVENTS.find((e) => e.condition === ev.condition)?.ended(n) ?? `${n} changed`));
+    s.snoozeEvent = null;
+    s.savedAt = null;
+    this.wakeThread(id);
   }
 
   /**
@@ -5210,6 +5331,10 @@ export class World {
           args: [
             { name: "until", type: ArgType.STRING, required: false, description: "When the thread wakes: 1h, 90m, tomorrow, next-week, mon..sun, 2026-10-20, 2026-10-20 14:00 or RFC 3339" },
             { name: "save", type: ArgType.BOOL, required: false, description: "Save it for later: it never wakes" },
+            { name: "until-pr", type: ArgType.STRING, required: false, description: "Snooze until an event on this pull request: owner/name#123, its URL, or #123 (one of the thread's)" },
+            { name: "on", type: ArgType.ENUM, required: false, description: "With until-pr, the event (default checks_done)", enumValues: ["checks_done", "checks_passed", "checks_failed", "review", "comment", "review_requested", "head_pushed", "merged", "closed"] },
+            { name: "until-plugin", type: ArgType.STRING, required: false, description: "Snooze until a plugin's wake source fires: <plugin>/<source>" },
+            { name: "arg", type: ArgType.STRING, required: false, description: "With until-plugin, a source arg as name=value" },
             { name: "clear", type: ArgType.BOOL, required: false, description: "Unsnooze instead" },
             { name: "ids", type: ArgType.STRING, required: false, description: "Comma-separated thread ids, to act on several" },
           ],
@@ -5230,11 +5355,34 @@ export class World {
           }
           const s = activeThread(ctx);
           if (!s) throw new CommandError("unavailable", "no active thread");
+          if (args["until-pr"] !== undefined || args["until-plugin"] !== undefined) {
+            if (args.until !== undefined || args.save === "true" || args.clear === "true") throw new CommandError("invalid", "invalid until-pr: give one of until, save, clear, until-pr or until-plugin");
+            return this.snoozeUntilEvent(s.id, args);
+          }
           if (args.save === "true") {
             if (args.until !== undefined || args.clear === "true") throw new CommandError("invalid", "invalid save: give until, save or clear, not two");
             return this.saveThread(s.id);
           }
           return this.snoozeThread(s.id, snoozeUntil(args));
+        },
+      },
+      {
+        cmd: {
+          name: "thread.snooze.events",
+          title: "List Snooze Events",
+          category: "Thread",
+          noPalette: true,
+          readOnly: true,
+          description: "List the events a thread can be snoozed until now: its open pull requests' pending events and plugins' wake sources.",
+          keybindings: [],
+          args: [{ name: "id", type: ArgType.STRING, required: false, description: "The thread" }],
+        },
+        when: () => true,
+        run: (ctx, args) => {
+          const id = args.id || activeThread(ctx)?.id;
+          if (!id) throw new CommandError("invalid", "invalid id: give a thread");
+          const evs = this.snoozeEventsOf(id);
+          return Promise.resolve({ message: `${String(evs.pullRequests.length)} pull requests, ${String(evs.plugins.length)} plugin events`, resultJson: JSON.stringify(evs) });
         },
       },
       {

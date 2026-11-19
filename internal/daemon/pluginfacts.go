@@ -3,6 +3,7 @@ package daemon
 import (
 	"context"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/alexwaumann/code-foundry/internal/store/gh"
@@ -80,6 +81,24 @@ func (f pluginFacts) threadPullRequests(ctx context.Context, t thread.Thread, ps
 		add(plugin.PullRequestRef{Slug: l.Slug, Number: l.Number, URL: l.URL})
 	}
 	return out
+}
+
+// threadPullRequestTargets is thread.Options.ThreadPullRequests: a thread's pull requests
+// as pluginFacts finds them, as "owner/name#123" with the slug in lower case.
+func threadPullRequestTargets(projects *project.Git, prs gh.Service) func(ctx context.Context, t thread.Thread) []string {
+	return func(ctx context.Context, t thread.Thread) []string {
+		f := pluginFacts{project: projects, gh: prs}
+		ps := projects.Snapshot()
+		branch := t.Branch
+		if w, ok := ps.Worktree(t.ProjectID, t.WorktreePath); ok && w.Branch != "" {
+			branch = w.Branch
+		}
+		var out []string
+		for _, r := range f.threadPullRequests(ctx, t, ps, branch) {
+			out = append(out, strings.ToLower(r.Slug)+"#"+strconv.Itoa(r.Number))
+		}
+		return out
+	}
 }
 
 // Project implements plugin.FactSource.

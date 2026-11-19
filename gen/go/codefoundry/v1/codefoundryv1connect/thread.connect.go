@@ -92,6 +92,9 @@ const (
 	// ThreadServiceClearSnoozeEndedProcedure is the fully-qualified name of the ThreadService's
 	// ClearSnoozeEnded RPC.
 	ThreadServiceClearSnoozeEndedProcedure = "/codefoundry.v1.ThreadService/ClearSnoozeEnded"
+	// ThreadServiceSnoozeEventsProcedure is the fully-qualified name of the ThreadService's
+	// SnoozeEvents RPC.
+	ThreadServiceSnoozeEventsProcedure = "/codefoundry.v1.ThreadService/SnoozeEvents"
 	// ThreadServiceMarkUnreadProcedure is the fully-qualified name of the ThreadService's MarkUnread
 	// RPC.
 	ThreadServiceMarkUnreadProcedure = "/codefoundry.v1.ThreadService/MarkUnread"
@@ -324,6 +327,10 @@ type ThreadServiceClient interface {
 	// "at prompt", as a re-snooze or an archive does, without putting it away again.
 	// cleared is false, and nothing changes, when the thread is not woken. Persisted.
 	ClearSnoozeEnded(context.Context, *connect.Request[v1.ClearSnoozeEndedRequest]) (*connect.Response[v1.ClearSnoozeEndedResponse], error)
+	// SnoozeEvents lists the events a thread can be snoozed until now: its open, non-draft
+	// pull requests' pending conditions and running plugins' wake sources
+	// (docs/notes/snooze-until-event.md).
+	SnoozeEvents(context.Context, *connect.Request[v1.SnoozeEventsRequest]) (*connect.Response[v1.SnoozeEventsResponse], error)
 	// MarkUnread puts an idle thread at its prompt back into NEEDS_ATTENTION "finished",
 	// the status of a turn that ended unseen (the sidebar's Done), cleared as that one is:
 	// a new view, the thread gaining the focus, a message or a new turn. A view already
@@ -681,6 +688,12 @@ func NewThreadServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 			connect.WithSchema(threadServiceMethods.ByName("ClearSnoozeEnded")),
 			connect.WithClientOptions(opts...),
 		),
+		snoozeEvents: connect.NewClient[v1.SnoozeEventsRequest, v1.SnoozeEventsResponse](
+			httpClient,
+			baseURL+ThreadServiceSnoozeEventsProcedure,
+			connect.WithSchema(threadServiceMethods.ByName("SnoozeEvents")),
+			connect.WithClientOptions(opts...),
+		),
 		markUnread: connect.NewClient[v1.MarkUnreadRequest, v1.MarkUnreadResponse](
 			httpClient,
 			baseURL+ThreadServiceMarkUnreadProcedure,
@@ -926,6 +939,7 @@ type threadServiceClient struct {
 	setWorkspace      *connect.Client[v1.SetThreadWorkspaceRequest, v1.SetThreadWorkspaceResponse]
 	snooze            *connect.Client[v1.SnoozeThreadRequest, v1.SnoozeThreadResponse]
 	clearSnoozeEnded  *connect.Client[v1.ClearSnoozeEndedRequest, v1.ClearSnoozeEndedResponse]
+	snoozeEvents      *connect.Client[v1.SnoozeEventsRequest, v1.SnoozeEventsResponse]
 	markUnread        *connect.Client[v1.MarkUnreadRequest, v1.MarkUnreadResponse]
 	label             *connect.Client[v1.LabelThreadRequest, v1.LabelThreadResponse]
 	report            *connect.Client[v1.ReportThreadRequest, v1.ReportThreadResponse]
@@ -1082,6 +1096,11 @@ func (c *threadServiceClient) Snooze(ctx context.Context, req *connect.Request[v
 // ClearSnoozeEnded calls codefoundry.v1.ThreadService.ClearSnoozeEnded.
 func (c *threadServiceClient) ClearSnoozeEnded(ctx context.Context, req *connect.Request[v1.ClearSnoozeEndedRequest]) (*connect.Response[v1.ClearSnoozeEndedResponse], error) {
 	return c.clearSnoozeEnded.CallUnary(ctx, req)
+}
+
+// SnoozeEvents calls codefoundry.v1.ThreadService.SnoozeEvents.
+func (c *threadServiceClient) SnoozeEvents(ctx context.Context, req *connect.Request[v1.SnoozeEventsRequest]) (*connect.Response[v1.SnoozeEventsResponse], error) {
+	return c.snoozeEvents.CallUnary(ctx, req)
 }
 
 // MarkUnread calls codefoundry.v1.ThreadService.MarkUnread.
@@ -1407,6 +1426,10 @@ type ThreadServiceHandler interface {
 	// "at prompt", as a re-snooze or an archive does, without putting it away again.
 	// cleared is false, and nothing changes, when the thread is not woken. Persisted.
 	ClearSnoozeEnded(context.Context, *connect.Request[v1.ClearSnoozeEndedRequest]) (*connect.Response[v1.ClearSnoozeEndedResponse], error)
+	// SnoozeEvents lists the events a thread can be snoozed until now: its open, non-draft
+	// pull requests' pending conditions and running plugins' wake sources
+	// (docs/notes/snooze-until-event.md).
+	SnoozeEvents(context.Context, *connect.Request[v1.SnoozeEventsRequest]) (*connect.Response[v1.SnoozeEventsResponse], error)
 	// MarkUnread puts an idle thread at its prompt back into NEEDS_ATTENTION "finished",
 	// the status of a turn that ended unseen (the sidebar's Done), cleared as that one is:
 	// a new view, the thread gaining the focus, a message or a new turn. A view already
@@ -1760,6 +1783,12 @@ func NewThreadServiceHandler(svc ThreadServiceHandler, opts ...connect.HandlerOp
 		connect.WithSchema(threadServiceMethods.ByName("ClearSnoozeEnded")),
 		connect.WithHandlerOptions(opts...),
 	)
+	threadServiceSnoozeEventsHandler := connect.NewUnaryHandler(
+		ThreadServiceSnoozeEventsProcedure,
+		svc.SnoozeEvents,
+		connect.WithSchema(threadServiceMethods.ByName("SnoozeEvents")),
+		connect.WithHandlerOptions(opts...),
+	)
 	threadServiceMarkUnreadHandler := connect.NewUnaryHandler(
 		ThreadServiceMarkUnreadProcedure,
 		svc.MarkUnread,
@@ -2026,6 +2055,8 @@ func NewThreadServiceHandler(svc ThreadServiceHandler, opts ...connect.HandlerOp
 			threadServiceSnoozeHandler.ServeHTTP(w, r)
 		case ThreadServiceClearSnoozeEndedProcedure:
 			threadServiceClearSnoozeEndedHandler.ServeHTTP(w, r)
+		case ThreadServiceSnoozeEventsProcedure:
+			threadServiceSnoozeEventsHandler.ServeHTTP(w, r)
 		case ThreadServiceMarkUnreadProcedure:
 			threadServiceMarkUnreadHandler.ServeHTTP(w, r)
 		case ThreadServiceLabelProcedure:
@@ -2201,6 +2232,10 @@ func (UnimplementedThreadServiceHandler) Snooze(context.Context, *connect.Reques
 
 func (UnimplementedThreadServiceHandler) ClearSnoozeEnded(context.Context, *connect.Request[v1.ClearSnoozeEndedRequest]) (*connect.Response[v1.ClearSnoozeEndedResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ThreadService.ClearSnoozeEnded is not implemented"))
+}
+
+func (UnimplementedThreadServiceHandler) SnoozeEvents(context.Context, *connect.Request[v1.SnoozeEventsRequest]) (*connect.Response[v1.SnoozeEventsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ThreadService.SnoozeEvents is not implemented"))
 }
 
 func (UnimplementedThreadServiceHandler) MarkUnread(context.Context, *connect.Request[v1.MarkUnreadRequest]) (*connect.Response[v1.MarkUnreadResponse], error) {
