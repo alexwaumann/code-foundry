@@ -233,7 +233,7 @@ func TestCapabilitiesGroups(t *testing.T) {
 				"only from a click or key press", "a quick read awaited first still counts", "unavailable: an unknown verb",
 				"invalid: a wrong or missing arg", "values are strings, numbers or booleans", "current snapshot first",
 				"the whole new snapshot after each change", "not --json's shape", "only while Ember's board is open",
-				"a message to show the user", "kept by Code Foundry (256 KiB)", "starts empty", "a wake (thread subscribe) or a plugin",
+				"a message to show the user", "kept by Code Foundry (256 KiB)", "every thread showing the file sees the same data", "a wake (thread subscribe) or a plugin",
 				"ask the user for a token", "cf.fetch(url, {method, headers, body, timeout})", "CORS rules never block it",
 				"resolves for every status", "private networks are allowed", "send it in a header with cf.fetch",
 				// The page library, a line per specifier and file.

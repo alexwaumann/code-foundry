@@ -61,8 +61,8 @@ var renderings = []Rendering{
 		"while Ember's board is open in the app, else the subscription is refused with unavailable and a message to show the user); " +
 		"the code-foundry-pages skill's reference/sources.md lists every field. " +
 		"cf.onTheme(fn) hears theme changes (the script applies them and acks); the card follows the page's height by itself " +
-		"(cf.resize() forces it). cf.storage(prefix) is this thread's page storage, kept by Code Foundry (256 KiB): it persists across " +
-		"reloads and app restarts, every page of the thread shares it (one prefix each) and the same page in another thread starts empty; " +
+		"(cf.resize() forces it). cf.storage(prefix) is the page file's storage, kept by Code Foundry (256 KiB): it persists across " +
+		"reloads and app restarts, every thread showing the file sees the same data, and another page file has its own; " +
 		"get/keys answer at once, set/remove/clear return a Promise; raw localStorage lasts only until the app quits. " +
 		"A page runs only while it is on screen, so no background " +
 		"work: a wake (thread subscribe) or a plugin. " +

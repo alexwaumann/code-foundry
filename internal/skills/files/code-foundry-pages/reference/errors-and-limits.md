@@ -34,8 +34,11 @@ show `e.message` in the page where it happened (that row, that button); `alert()
   null: ask in the page (`Dialog` from `@cf/ui`). A `download` link or a file made in script saves
   nothing: save it with `file.export` from the click (`verbs.md`) and show the path it answers.
   Each one shows in the page's error badge.
-- **Storage is per thread.** A page belongs to the thread that last showed or wrote it (its
-  bridge acts as that thread in any tab); shown by another thread, it starts empty there.
+- **Storage is per page file.** Every thread that showed or wrote the file sees the same
+  `cf.storage`, in a card or a tab. The page's own other files, opened in its frame, share it; any
+  other page has its own: to share data, make one page (several views, hash routes).
+- **Whom it acts for** (`cf.thread`, `cf.run`): a card acts for its thread; a tab for its own
+  thread when that thread showed or wrote the page, else for the first that did.
 - **A page no thread owns** (the user opened a file a script wrote) asks the user once whether it
   may use Code Foundry; `cf.ready` waits for the answer. Allowed: `cf.thread` is null, `cf.storage`
   is its own (per file), `cf.fetch` works, a verb runs with no thread (pass ids: `thread.get` needs
