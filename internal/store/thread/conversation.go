@@ -66,7 +66,8 @@ func (m *Manager) Send(ctx context.Context, id string, msg Message) (Item, error
 	}
 	it, err := m.send(ctx, id, msg)
 	if err == nil {
-		if msg.Reply != ReplyNone { // no reply wanted: no wake for the turn that reads it
+		m.noteLeadSent(id, msg.ByThreadID) // its lead answered its ask (passup.go)
+		if msg.Reply != ReplyNone {        // no reply wanted: no wake for the turn that reads it
 			m.renotify(ctx, id, msg, it)
 		}
 		m.afterThreadSend(ctx, id, msg, it)
@@ -206,6 +207,9 @@ func (m *Manager) fileRefRoots(s Thread) func(projectID string) (string, bool) {
 func (m *Manager) Respond(ctx context.Context, id, requestID string, d Decision) (Item, error) {
 	if requestID == "" {
 		return Item{}, fmt.Errorf("%w: a request id is required", ErrInvalidArgument)
+	}
+	if p := m.passUpOf(id, requestID); p != nil {
+		return m.answerPassUp(ctx, p, d) // a worker's question passed up to the user (passup.go)
 	}
 	r, _, err := m.liveOrStopped(ctx, id)
 	if err != nil {

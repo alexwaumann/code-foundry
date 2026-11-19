@@ -39,7 +39,7 @@ ones you create stay out of it: they are yours to answer.
      --prompt "The whole task: goal, files it owns, how to verify, push."
    ```
 
-   It prints `created thread <name> (<id>) in <worktree>`; its branch follows settings
+   Its branch follows settings
    (`feat/<slug>`, `-2` if taken; `--branch` sets it): take it from the child's wake, never
    from its name. A child inherits your projects (`code-foundry thread checkouts`),
    workspace, mode and checkouts: without `--new-worktree` (or `--new-branch`) it works in
@@ -79,7 +79,8 @@ ones you create stay out of it: they are yours to answer.
    A wake says the child's state, quotes its last message whole, gives what git says about
    its branch, and when it needs you, the pending permission prompt or question with the
    command that answers it; or a child's `thread ask`, which it does not stop for: answer
-   only if its assumption is wrong. Wake turn replies stack under your last:
+   only if its assumption is wrong. Pass a question up (`thread pass-up`) only as
+   `reference/wakes.md` says. Wake turn replies stack under your last:
    a new line or `[nothing new]` alone. No analysis, no promised check. Before
    you act on a wake, read `reference/wakes.md`: pending prompts, stale reports, batches,
    restarts, interrupts, following up from a wake turn (never `send --wait` there).
@@ -124,7 +125,7 @@ To discard a child's work: `reference/patterns.md` §7.
   to your own thread**: always pass `--id <child>` to `thread send`/`respond`/`interrupt`.
 - `thread send` to another thread takes `--reply wanted` (you need its answer: it wakes
   you) or `--reply none` (it neither confirms nor reports back): `reference/messages.md`.
-- Ids (`s-...`, `r-...`, `sub-...`) take a unique suffix of 4+ characters (`thread read 7d10`).
+- Ids (`s-...`, `r-...`, `sub-...`) take a unique suffix of 4+ characters.
 - `--request-id <task-key>` makes `thread new` safe to retry: the same key returns the
   first thread (for 24 hours) and starts nothing. `--budget 5` caps a child's cost in USD.
 - `--json` gives a structured answer. Exit 0 done, 1 failed or timed out, 2 a usage mistake

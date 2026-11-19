@@ -29,7 +29,7 @@ var pageRuns = []string{
 var pageDrives = []string{
 	"ember.remember", "ember.reseed", "ember.task.add", "ember.task.start", "ember.task.update",
 	"memory.add", "pr.ask", "pr.explain", "pr.fix.findings", "pr.task", "search.agent", "theme.ask",
-	"thread.ask", "thread.compact", "thread.interrupt", "thread.mcp", "thread.mcp-reconnect", "thread.move",
+	"thread.ask", "thread.pass-up", "thread.compact", "thread.interrupt", "thread.mcp", "thread.mcp-reconnect", "thread.move",
 	"thread.new", "thread.new-like", "thread.project.add", "thread.project.remove", "thread.reseed",
 	"thread.respond", "thread.restart", "thread.run-in", "thread.send", "thread.set-effort",
 	"thread.set-mode", "thread.set-model", "thread.stop-waiting", "thread.subscribe",

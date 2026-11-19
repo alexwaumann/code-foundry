@@ -101,6 +101,8 @@ const (
 	ThreadServiceReportProcedure = "/codefoundry.v1.ThreadService/Report"
 	// ThreadServiceAskProcedure is the fully-qualified name of the ThreadService's Ask RPC.
 	ThreadServiceAskProcedure = "/codefoundry.v1.ThreadService/Ask"
+	// ThreadServicePassUpProcedure is the fully-qualified name of the ThreadService's PassUp RPC.
+	ThreadServicePassUpProcedure = "/codefoundry.v1.ThreadService/PassUp"
 	// ThreadServiceSetBudgetProcedure is the fully-qualified name of the ThreadService's SetBudget RPC.
 	ThreadServiceSetBudgetProcedure = "/codefoundry.v1.ThreadService/SetBudget"
 	// ThreadServiceClearFlagsProcedure is the fully-qualified name of the ThreadService's ClearFlags
@@ -338,6 +340,14 @@ type ThreadServiceClient interface {
 	// A created thread asks its creator something and keeps working: the creator gets a
 	// wake (docs/notes/thread-ask.md), and answers with Send.
 	Ask(context.Context, *connect.Request[v1.AskThreadRequest]) (*connect.Response[v1.AskThreadResponse], error)
+	// PassUp passes a worker's question up to the user for its lead (a thread above it):
+	// the worker's pending question-tool prompt or its thread ask becomes a question on the
+	// lead (ThreadRequestItem.passed_up), which Needs you lists as the lead's. Respond on it
+	// answers the worker as if the user had answered it there (a thread ask: a message from
+	// the lead), and the lead gets a wake saying what the user answered. FAILED_PRECONDITION
+	// for a permission prompt, a thread the lead did not create, a question no longer open
+	// or already passed up. docs/notes/pass-up-question.md.
+	PassUp(context.Context, *connect.Request[v1.PassUpQuestionRequest]) (*connect.Response[v1.PassUpQuestionResponse], error)
 	// SetBudget sets the thread's spending limit (Thread.budget_usd; 0 clears it). A
 	// budget above the thread's cost re-arms the budget stop. Any state. Persisted.
 	SetBudget(context.Context, *connect.Request[v1.SetThreadBudgetRequest]) (*connect.Response[v1.SetThreadBudgetResponse], error)
@@ -695,6 +705,12 @@ func NewThreadServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 			connect.WithSchema(threadServiceMethods.ByName("Ask")),
 			connect.WithClientOptions(opts...),
 		),
+		passUp: connect.NewClient[v1.PassUpQuestionRequest, v1.PassUpQuestionResponse](
+			httpClient,
+			baseURL+ThreadServicePassUpProcedure,
+			connect.WithSchema(threadServiceMethods.ByName("PassUp")),
+			connect.WithClientOptions(opts...),
+		),
 		setBudget: connect.NewClient[v1.SetThreadBudgetRequest, v1.SetThreadBudgetResponse](
 			httpClient,
 			baseURL+ThreadServiceSetBudgetProcedure,
@@ -914,6 +930,7 @@ type threadServiceClient struct {
 	label             *connect.Client[v1.LabelThreadRequest, v1.LabelThreadResponse]
 	report            *connect.Client[v1.ReportThreadRequest, v1.ReportThreadResponse]
 	ask               *connect.Client[v1.AskThreadRequest, v1.AskThreadResponse]
+	passUp            *connect.Client[v1.PassUpQuestionRequest, v1.PassUpQuestionResponse]
 	setBudget         *connect.Client[v1.SetThreadBudgetRequest, v1.SetThreadBudgetResponse]
 	clearFlags        *connect.Client[v1.ClearThreadFlagsRequest, v1.ClearThreadFlagsResponse]
 	subscribe         *connect.Client[v1.SubscribeThreadRequest, v1.SubscribeThreadResponse]
@@ -1085,6 +1102,11 @@ func (c *threadServiceClient) Report(ctx context.Context, req *connect.Request[v
 // Ask calls codefoundry.v1.ThreadService.Ask.
 func (c *threadServiceClient) Ask(ctx context.Context, req *connect.Request[v1.AskThreadRequest]) (*connect.Response[v1.AskThreadResponse], error) {
 	return c.ask.CallUnary(ctx, req)
+}
+
+// PassUp calls codefoundry.v1.ThreadService.PassUp.
+func (c *threadServiceClient) PassUp(ctx context.Context, req *connect.Request[v1.PassUpQuestionRequest]) (*connect.Response[v1.PassUpQuestionResponse], error) {
+	return c.passUp.CallUnary(ctx, req)
 }
 
 // SetBudget calls codefoundry.v1.ThreadService.SetBudget.
@@ -1401,6 +1423,14 @@ type ThreadServiceHandler interface {
 	// A created thread asks its creator something and keeps working: the creator gets a
 	// wake (docs/notes/thread-ask.md), and answers with Send.
 	Ask(context.Context, *connect.Request[v1.AskThreadRequest]) (*connect.Response[v1.AskThreadResponse], error)
+	// PassUp passes a worker's question up to the user for its lead (a thread above it):
+	// the worker's pending question-tool prompt or its thread ask becomes a question on the
+	// lead (ThreadRequestItem.passed_up), which Needs you lists as the lead's. Respond on it
+	// answers the worker as if the user had answered it there (a thread ask: a message from
+	// the lead), and the lead gets a wake saying what the user answered. FAILED_PRECONDITION
+	// for a permission prompt, a thread the lead did not create, a question no longer open
+	// or already passed up. docs/notes/pass-up-question.md.
+	PassUp(context.Context, *connect.Request[v1.PassUpQuestionRequest]) (*connect.Response[v1.PassUpQuestionResponse], error)
 	// SetBudget sets the thread's spending limit (Thread.budget_usd; 0 clears it). A
 	// budget above the thread's cost re-arms the budget stop. Any state. Persisted.
 	SetBudget(context.Context, *connect.Request[v1.SetThreadBudgetRequest]) (*connect.Response[v1.SetThreadBudgetResponse], error)
@@ -1754,6 +1784,12 @@ func NewThreadServiceHandler(svc ThreadServiceHandler, opts ...connect.HandlerOp
 		connect.WithSchema(threadServiceMethods.ByName("Ask")),
 		connect.WithHandlerOptions(opts...),
 	)
+	threadServicePassUpHandler := connect.NewUnaryHandler(
+		ThreadServicePassUpProcedure,
+		svc.PassUp,
+		connect.WithSchema(threadServiceMethods.ByName("PassUp")),
+		connect.WithHandlerOptions(opts...),
+	)
 	threadServiceSetBudgetHandler := connect.NewUnaryHandler(
 		ThreadServiceSetBudgetProcedure,
 		svc.SetBudget,
@@ -1998,6 +2034,8 @@ func NewThreadServiceHandler(svc ThreadServiceHandler, opts ...connect.HandlerOp
 			threadServiceReportHandler.ServeHTTP(w, r)
 		case ThreadServiceAskProcedure:
 			threadServiceAskHandler.ServeHTTP(w, r)
+		case ThreadServicePassUpProcedure:
+			threadServicePassUpHandler.ServeHTTP(w, r)
 		case ThreadServiceSetBudgetProcedure:
 			threadServiceSetBudgetHandler.ServeHTTP(w, r)
 		case ThreadServiceClearFlagsProcedure:
@@ -2179,6 +2217,10 @@ func (UnimplementedThreadServiceHandler) Report(context.Context, *connect.Reques
 
 func (UnimplementedThreadServiceHandler) Ask(context.Context, *connect.Request[v1.AskThreadRequest]) (*connect.Response[v1.AskThreadResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ThreadService.Ask is not implemented"))
+}
+
+func (UnimplementedThreadServiceHandler) PassUp(context.Context, *connect.Request[v1.PassUpQuestionRequest]) (*connect.Response[v1.PassUpQuestionResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ThreadService.PassUp is not implemented"))
 }
 
 func (UnimplementedThreadServiceHandler) SetBudget(context.Context, *connect.Request[v1.SetThreadBudgetRequest]) (*connect.Response[v1.SetThreadBudgetResponse], error) {

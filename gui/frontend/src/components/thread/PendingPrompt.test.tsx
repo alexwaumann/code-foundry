@@ -446,3 +446,54 @@ describe("the question prompt", () => {
     expect(Object.values(JSON.parse(responds()[0]?.answer ?? "{}") as Record<string, string>)).toEqual(["Push to a new branch", "Yes"]);
   });
 });
+
+/**
+ * A worker's question this thread passed up to the user (docs/notes/pass-up-question.md): it
+ * docks where the thread's own questions do, titled with the worker's name, and the answer
+ * runs thread.respond on this thread with its request id (the daemon sends it to the worker).
+ */
+describe("a passed-up question", () => {
+  const ASKED = "Should the body of a collapsed pane also drag, or only the gutters?";
+  function passedUp(threadAsk: boolean): World {
+    ord = 0;
+    const input = JSON.stringify({ questions: [{ question: ASKED, header: "", multiSelect: false, options: threadAsk ? [] : [{ label: "Only the gutters", description: "" }, { label: "The body too", description: "" }] }] });
+    const item = question("q-pu", { requestId: "pu-1", inputJson: input, passedUp: { threadId: "s-w", name: "Resize", threadAsk, assuming: threadAsk ? "only the gutters" : "" } });
+    return { items: [text("t0", "Three workers are running."), item], pending: [{ requestId: "pu-1", itemId: item.id, question: true, toolName: "AskUserQuestion", summary: `From Resize: ${ASKED}`, fromThreadId: "s-w" }] };
+  }
+
+  it("a thread ask: the worker's name, the line with its assumption, and Other's answer sent as this thread's respond", async () => {
+    useThreadsStore.setState((s) => ({ byId: { ...s.byId, "s-w": thread("s-w", { name: "Resize across collapsed panes", createdBy: "s-r1" }) } }));
+    mount(passedUp(true));
+    expect(q().querySelector(".pend-h")?.textContent).toBe("Resize across collapsed panes has a question");
+    expect(q().getAttribute("aria-label")).toBe("Question from Resize across collapsed panes");
+    expect(screen.getByTestId("thread-question-passed-up").textContent).toBe("Passed up by this thread. Until you answer, it assumes: only the gutters.");
+    const other = within(q()).getByLabelText("Other answer");
+    fireEvent.focus(other);
+    fireEvent.change(other, { target: { value: "The body too" } });
+    fireEvent.keyDown(other, { key: "Enter" });
+    await waitFor(() => {
+      expect(responds()).toHaveLength(1);
+    });
+    const sent = responds()[0];
+    expect(sent).toMatchObject({ id: "s-r1", decision: "allow", request: "pu-1" });
+    expect(JSON.parse(sent?.answer ?? "{}")).toEqual({ [ASKED]: "The body too" });
+  });
+
+  it("a question tool's prompt: options as usual, only the passed-up line; Skip denies it", async () => {
+    mount(passedUp(false));
+    expect(q().querySelector(".pend-h")?.textContent).toBe("Resize has a question");
+    expect(screen.getByTestId("thread-question-passed-up").textContent).toBe("Passed up by this thread.");
+    expect(within(q()).getAllByRole("radio")).toHaveLength(3);
+    fireEvent.click(screen.getByTestId("thread-question-skip"));
+    await waitFor(() => {
+      expect(responds()).toHaveLength(1);
+    });
+    expect(responds()[0]).toMatchObject({ id: "s-r1", decision: "deny", request: "pu-1" });
+  });
+
+  it("the thread's own question keeps Claude's title and no line", () => {
+    mount(world("question"));
+    expect(q().querySelector(".pend-h")?.textContent).toContain("Claude has 2 questions");
+    expect(screen.queryByTestId("thread-question-passed-up")).toBeNull();
+  });
+});

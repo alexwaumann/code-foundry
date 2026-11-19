@@ -260,7 +260,9 @@ Services (v1):
   (a link by hand) and PullRequestOwner (the thread a copied link comes from;
   `docs/notes/pr-daemon-actions.md`, `docs/notes/pr-task-forward.md`), CheckPlacement (where a
   new thread would go, nothing made; `docs/notes/thread-info-facts.md`) and Ask (a created
-  thread asks its creator, who gets a wake; `docs/notes/thread-ask.md`).
+  thread asks its creator, who gets a wake; `docs/notes/thread-ask.md`) and PassUp (a lead hands
+  its worker's question to the user as a question on the lead; the answer goes to the worker
+  and wakes the lead; `docs/notes/pass-up-question.md`).
   The daemon starts a thread's process when a message is sent and stops it once the
   thread has idled at its prompt past its prompt cache expiry
   (`docs/notes/thread-lifecycle.md`); the thread list reaches clients through

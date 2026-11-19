@@ -59,6 +59,19 @@ export interface ThreadRequestView {
   message: string;
   /** A question's answers: question -> chosen label(s), several joined with ", ". */
   answers: Readonly<Record<string, string>>;
+  /** Set on a lead's question that is its worker's, passed up to the user (docs/notes/pass-up-question.md). */
+  passedUp?: PassedUpView;
+}
+
+/** A worker's question its lead passed up to the user: the item is on the lead, its answer goes to the worker. */
+export interface PassedUpView {
+  /** The worker. */
+  threadId: string;
+  /** Its name when it was passed up (the threads store has the current one). */
+  name: string;
+  /** A thread ask (it keeps working on `assuming`); else its question tool's prompt (it waits). */
+  threadAsk: boolean;
+  assuming: string;
 }
 
 interface ItemBase {
@@ -195,8 +208,10 @@ export interface ThreadPendingView {
   itemId: string;
   question: boolean;
   toolName: string;
-  /** One line: "Write hello.txt", or the question. */
+  /** One line: "Write hello.txt", or the question ("From <worker>: <question>" for one passed up). */
   summary: string;
+  /** A worker's question this lead passed up to the user: the worker. */
+  fromThreadId?: string;
 }
 
 /** A thread's pending requests at seq. */
@@ -266,6 +281,7 @@ function toRequestView(r: ThreadRequestItem): ThreadRequestView {
     decision: r.decision,
     message: r.message,
     answers: { ...r.answers },
+    ...(r.passedUp ? { passedUp: { threadId: r.passedUp.fromThreadId, name: r.passedUp.fromName, threadAsk: r.passedUp.threadAsk, assuming: r.passedUp.assuming } } : {}),
   };
 }
 
@@ -355,7 +371,7 @@ export function toThreadItemView(it: ThreadItem): ThreadItemView | null {
 }
 
 function toPendingView(p: ThreadPendingRequest): ThreadPendingView {
-  return { requestId: p.requestId, itemId: p.itemId, question: p.question, toolName: p.toolName, summary: p.summary };
+  return { requestId: p.requestId, itemId: p.itemId, question: p.question, toolName: p.toolName, summary: p.summary, ...(p.fromThreadId ? { fromThreadId: p.fromThreadId } : {}) };
 }
 
 function items(list: readonly ThreadItem[]): ThreadItemView[] {

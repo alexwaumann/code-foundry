@@ -105,3 +105,19 @@ func (f *Fake) SetBudget(_ context.Context, id string, usd float64) (thread.Thre
 		return nil
 	})
 }
+
+// PassUp records "PassUp <lead> <worker> <request>" and answers the worker. It refuses as
+// the store does when lead did not create worker.
+func (f *Fake) PassUp(_ context.Context, lead, worker, requestID string) (thread.PassUpResult, error) {
+	var w thread.Thread
+	if _, err := f.mutate("PassUp "+lead+" "+worker+" "+requestID, worker, func(s *thread.Thread) error {
+		if s.CreatedBy != lead || lead == "" {
+			return fmt.Errorf("%w: thread %s did not create thread %s", thread.ErrFailedPrecondition, lead, worker)
+		}
+		w = *s
+		return nil
+	}); err != nil {
+		return thread.PassUpResult{}, err
+	}
+	return thread.PassUpResult{Worker: w, Kind: thread.PassUpAsk}, nil
+}

@@ -680,7 +680,8 @@ func (s threadListSource) snapshot(context.Context) []*v1.Event {
 // Attach): forwarding every thread's text deltas to every client would cost more than
 // it shows, and this source's resync after dropped events restores pending requests
 // only, so nothing else may be built from it. A disconnected thread has nothing
-// pending (its requests are cancelled when its process ends).
+// pending (its requests are cancelled when its process ends), unless it is a lead with a
+// worker's question passed up to the user (Thread.PassedUp), which outlives its process.
 type threadSource struct {
 	store thread.Store
 	bus   *bus.Bus
@@ -706,7 +707,7 @@ func (s threadSource) snapshot(ctx context.Context) []*v1.Event {
 	snap := &v1.ThreadPendingSnapshot{}
 	if ss := s.store.Snapshot(); ss != nil {
 		for _, x := range ss.Threads {
-			if x.State == thread.StateDisconnected {
+			if x.State == thread.StateDisconnected && x.PassedUp == 0 { // a lead's passed-up question outlives its process
 				continue
 			}
 			seq, pending, err := s.store.Pending(ctx, x.ID)

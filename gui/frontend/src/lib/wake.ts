@@ -5,7 +5,8 @@
  * (`{"kind": "batch", "wakes": [...]}`, docs/notes/orch-wakes-content.md) is one line per
  * wake. A daemon restart's notice (`{"kind": "restart", ...}`, alone or first in a batch,
  * docs/notes/orch-restart-wakes.md) is a line of its own, and so is a child's question
- * (`{"kind": "ask", ...}`, `thread ask`). Pure.
+ * (`{"kind": "ask", ...}`, `thread ask`), and so is the user's answer to a question this thread passed
+ * up (`{"kind": "answer", ...}`). Pure.
  */
 import type { WakeView } from "@/api/thread";
 
@@ -78,6 +79,18 @@ function askLine(p: Obj, json: string): WakeLine {
   return { tone: "attention", threadId: id, name: str(p.name) || id, detail: "asks", summary: firstLine(str(p.question)), json, createdBy: "" };
 }
 
+/**
+ * What the user answered to a worker's question this thread passed up (`{"kind": "answer", ...}`,
+ * docs/notes/pass-up-question.md): the worker's line, "answered" with the answer, or "skipped".
+ */
+function answerLine(p: Obj, json: string): WakeLine {
+  const id = str(p.thread);
+  const answers = obj(p.answers);
+  const said = answers ? Object.values(answers).filter((v): v is string => typeof v === "string") : [];
+  const skipped = p.skipped === true;
+  return { tone: "ok", threadId: id, name: str(p.name) || id, detail: skipped ? "skipped" : "answered", summary: skipped ? firstLine(str(p.question)) : firstLine(said.join("; ")), json, createdBy: "" };
+}
+
 function runLine(r: Obj, json: string): WakeLine {
   const code = typeof r.exit_code === "number" ? r.exit_code : null;
   const tail = str(r.output_tail)
@@ -134,5 +147,6 @@ function lineOf(p: Obj | null, w: WakeView): WakeLine {
   if (run) return runLine(run, json);
   if (p?.kind === "restart") return restartLine(p, json);
   if (p?.kind === "ask") return askLine(p, json);
+  if (p?.kind === "answer") return answerLine(p, json);
   return { tone: "ok", threadId: "", name: "", detail: "", summary: w.title, json, createdBy: "" };
 }

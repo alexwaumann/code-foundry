@@ -6,6 +6,7 @@
 import type { ThreadItemView, ThreadPendingView, ThreadRequestView } from "@/api/thread";
 import { nextAfter } from "@/lib/tree";
 import { parseObject, relPath, str } from "@/lib/toolSummary";
+import { isNothingNew } from "@/lib/workerRuns";
 
 /** What a permission asks to touch: a command, a file or page, or the tool's input as JSON. */
 export type AskTarget = { kind: "command"; text: string } | { kind: "path"; text: string } | { kind: "input"; text: string } | null;
@@ -39,7 +40,8 @@ export function lastLine(text: string): string {
 export function contextLine(items: readonly ThreadItemView[], askOrdinal: number | null): string {
   let best: { ordinal: number; text: string } | null = null;
   for (const it of items) {
-    if (it.kind !== "text" || it.parentToolUseId !== "" || it.apiError) continue;
+    // "[nothing new]" ends a turn between threads with nothing for the user: no context.
+    if (it.kind !== "text" || it.parentToolUseId !== "" || it.apiError || isNothingNew(it.text)) continue;
     if (askOrdinal !== null && it.ordinal >= askOrdinal) continue;
     if (!best || it.ordinal > best.ordinal) best = { ordinal: it.ordinal, text: it.text };
   }
@@ -114,6 +116,8 @@ export function requestKind(p: Pick<ThreadPendingView, "question" | "toolName">)
 export function requestLine(p: ThreadPendingView): RequestLine {
   const kind = requestKind(p);
   let what = p.summary.replace(/\s+/g, " ").trim();
+  // A worker's question passed up (docs/notes/pass-up-question.md): "From <worker>: <question>" says what it is.
+  if (p.fromThreadId && what) return { requestId: p.requestId, kind, text: what };
   if (kind === "plan") what = "ready for review";
   else if (kind === "permission" && p.toolName === "Bash" && what.startsWith("Bash ")) what = what.slice(5);
   return { requestId: p.requestId, kind, text: `${KIND_WORD[kind]}: ${what || p.toolName}` };
@@ -131,11 +135,12 @@ export interface RequestLines {
 
 /**
  * A Needs you row's lines (oldest first, as the thread source lists them): none for one open
- * request (the row looks as it did), one per request for two to MAX_REQUEST_LINES, else the
- * first MAX_REQUEST_LINES - 1 and "+N more", so a row never takes more than MAX_REQUEST_LINES lines.
+ * request (the row looks as it did) unless it is a worker's question passed up (its line says
+ * which thread it came from), one per request for two to MAX_REQUEST_LINES, else the first
+ * MAX_REQUEST_LINES - 1 and "+N more", so a row never takes more than MAX_REQUEST_LINES lines.
  */
 export function requestLines(open: readonly ThreadPendingView[]): RequestLines {
-  if (open.length < 2) return { lines: [], more: null };
+  if (open.length < 2 && !open.some((p) => p.fromThreadId)) return { lines: [], more: null };
   if (open.length <= MAX_REQUEST_LINES) return { lines: open.map(requestLine), more: null };
   const shown = MAX_REQUEST_LINES - 1;
   const first = open[shown];

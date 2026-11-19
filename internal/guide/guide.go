@@ -40,7 +40,6 @@ func Write(w io.Writer, cmds []*v1.Command, self string) {
 	}
 	p("  It is the default for `--id` (\"the thread\" of thread commands), for `--context-thread`, and for")
 	p("  `thread new --created-by` (pass `--created-by=` to opt out).")
-	p("- Invoke a command by its dotted name or with spaces: `code-foundry thread.new ...` = `code-foundry thread new ...`.")
 	p("- Every command takes `--json` for a structured answer (protobuf JSON, camelCase fields).")
 	p("- Ids (threads `s-...`, action runs `r-...`, subscriptions `sub-...`, terminals `t-...`) may be given as a unique")
 	p("  suffix of at least 4 characters: `code-foundry thread get 8f3a`.")

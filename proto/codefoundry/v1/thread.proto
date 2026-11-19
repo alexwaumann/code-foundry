@@ -175,6 +175,14 @@ service ThreadService {
   // A created thread asks its creator something and keeps working: the creator gets a
   // wake (docs/notes/thread-ask.md), and answers with Send.
   rpc Ask(AskThreadRequest) returns (AskThreadResponse) {}
+  // PassUp passes a worker's question up to the user for its lead (a thread above it):
+  // the worker's pending question-tool prompt or its thread ask becomes a question on the
+  // lead (ThreadRequestItem.passed_up), which Needs you lists as the lead's. Respond on it
+  // answers the worker as if the user had answered it there (a thread ask: a message from
+  // the lead), and the lead gets a wake saying what the user answered. FAILED_PRECONDITION
+  // for a permission prompt, a thread the lead did not create, a question no longer open
+  // or already passed up. docs/notes/pass-up-question.md.
+  rpc PassUp(PassUpQuestionRequest) returns (PassUpQuestionResponse) {}
   // SetBudget sets the thread's spending limit (Thread.budget_usd; 0 clears it). A
   // budget above the thread's cost re-arms the budget stop. Any state. Persisted.
   rpc SetBudget(SetThreadBudgetRequest) returns (SetThreadBudgetResponse) {}
@@ -582,6 +590,19 @@ message ThreadRequestItem {
   string message = 14;
   // A question's answers: question -> chosen label(s), several joined with ", ".
   map<string, string> answers = 15;
+  // Set on a lead's question that is its worker's, passed up to the user (PassUp).
+  PassedUpQuestion passed_up = 16;
+}
+
+// A worker's question its lead passed up to the user: the question item is on the lead,
+// and its answer goes to the worker.
+message PassedUpQuestion {
+  string from_thread_id = 1;
+  // The worker's name when it was passed up.
+  string from_name = 2;
+  // A thread ask (the worker keeps working on `assuming`); else its question tool's prompt.
+  bool thread_ask = 3;
+  string assuming = 4;
 }
 
 // The end of a turn (Claude's result).
@@ -680,8 +701,11 @@ message ThreadPendingRequest {
   string item_id = 2;
   bool question = 3;
   string tool_name = 4;
-  // One line: "Write hello.txt", or the question.
+  // One line: "Write hello.txt", or the question ("From <worker>: <question>" for one
+  // passed up).
   string summary = 5;
+  // A worker's question its lead passed up to the user: the worker.
+  string from_thread_id = 6;
 }
 
 message ThreadItemsSnapshot {
@@ -1286,4 +1310,25 @@ message ClearThreadFlagsResponse {
   Thread thread = 1;
   // How many flags were removed.
   int32 cleared = 2;
+}
+
+message PassUpQuestionRequest {
+  // The lead: a thread above the worker (it created it, or created its creator, ...).
+  string lead_thread_id = 1;
+  // The worker whose question goes up to the user.
+  string worker_id = 2;
+  // A pending question of the worker's; empty: its oldest pending question, else its
+  // latest thread ask the lead has not answered. Never a permission prompt.
+  string request_id = 3;
+}
+
+message PassUpQuestionResponse {
+  Thread worker = 1;
+  // The question was the worker's thread ask (it keeps working); else its question tool's
+  // prompt (it waits).
+  bool thread_ask = 2;
+  // Its first question's text.
+  string question = 3;
+  // The question item on the lead, which the user answers (Respond on the lead).
+  ThreadItem item = 4;
 }

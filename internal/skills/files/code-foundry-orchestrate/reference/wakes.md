@@ -40,19 +40,29 @@ claims against it; run git only for what it does not say.
 
 Each permission prompt or question wakes you on its own, with the tool's input (judge
 that, not the child's description), a question's options and the `thread respond` line
-that answers it. Answer every pending
-request you can before relaying a child's question to the user as plain text at the end
-of your turn (the child still asks with its own question tool; a blocking question tool
-in YOUR turn holds back your other children). Supervised children:
-`reference/patterns.md` §5.
+that answers it. Supervised children: `reference/patterns.md` §5.
+
+## A worker's question
+
+A worker's question is yours to answer. Answer it when you know the answer or can infer
+what the user wants. Pass it up (`code-foundry thread pass-up <worker>`) only for a product
+decision you are genuinely unsure of; then keep working. Never pass up a permission prompt:
+approve or deny it yourself.
+
+Passed up, it is your question to the user, in Needs you: their answer goes straight to the
+worker (its question tool answered, or a `thread ask` answered as your message), and a wake
+tells you what they said. Do not pass the answer on; reply `[nothing new]` unless it changes
+your plan. Never ask the user with a question tool of your own: it holds back your other
+children.
 
 ## A child asks while it works
 
 "asks you something and keeps working" is a child's `thread ask`: it did not stop, and goes on
 with the assumption the wake quotes. If that assumption is right, say nothing: it expects no
 reply then. If not, answer once, at once, with `thread send --id <child> --reply none "..."`,
-without `--wait`: it reads that at its next tool call. Only if you cannot answer, relay it to the user. A `thread wait` ends early for it and
-prints the same; wait again after you answered.
+without `--wait`: it reads that at its next tool call. A product decision you are genuinely
+unsure of: pass it up (above). A `thread wait` ends early for it and prints the same; wait
+again after you answered.
 
 ## Budget stops
 

@@ -40,6 +40,8 @@ describe("the line of context", () => {
     expect(contextLine(items, 8)).toBe("the one");
     expect(contextLine(items, null)).toBe("after the ask");
     expect(contextLine([], 8)).toBe("");
+    // A turn between threads that had nothing for the user (a lead passing a question up) is no context.
+    expect(contextLine([...items, text(7, "[nothing new]")], 8)).toBe("the one");
   });
 });
 
@@ -113,6 +115,13 @@ describe("a Needs you row's lines", () => {
     ["no summary: the tool", { toolName: "WebFetch", summary: "" }, "permission", "Permission: WebFetch"],
   ])("%s", (_, o, kind, text) => {
     expect(requestLine(pend(1, o))).toEqual({ requestId: "r1", kind, text });
+  });
+
+  it("a worker's question passed up: its line says which thread it came from, even when it is the only request", () => {
+    const passed = pend(1, { question: true, toolName: "AskUserQuestion", summary: "From Resize: Should the body drag too?", fromThreadId: "s-w" });
+    expect(requestLine(passed)).toEqual({ requestId: "r1", kind: "question", text: "From Resize: Should the body drag too?" });
+    expect(requestLines([passed])).toEqual({ lines: [requestLine(passed)], more: null });
+    expect(requestLines([pend(2), passed]).lines.map((l) => l.text)).toEqual(["Permission: cmd 2", "From Resize: Should the body drag too?"]);
   });
 
   it("none for a thread with one open request or none: its row looks as it did", () => {

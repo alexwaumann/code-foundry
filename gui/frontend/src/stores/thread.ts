@@ -142,7 +142,7 @@ export function sameItem(a: ThreadItemView, b: ThreadItemView): boolean {
 }
 
 function samePending(a: readonly ThreadPendingView[], b: readonly ThreadPendingView[]): boolean {
-  return sameArray(a, b, (x, y) => x.requestId === y.requestId && x.itemId === y.itemId && x.question === y.question && x.toolName === y.toolName && x.summary === y.summary);
+  return sameArray(a, b, (x, y) => x.requestId === y.requestId && x.itemId === y.itemId && x.question === y.question && x.toolName === y.toolName && x.summary === y.summary && x.fromThreadId === y.fromThreadId);
 }
 
 /**
@@ -793,6 +793,20 @@ export function useOpenRequests(threadId: string): readonly ThreadPendingView[] 
       return answering ? all.filter((p) => !answering[p.requestId]) : all;
     }),
   );
+}
+
+/**
+ * The workers whose questions this lead passed up to the user and that are still open
+ * (docs/notes/pass-up-question.md), as one sorted string of ids ("\n" between), from the
+ * lead's own pending list: no stream on the worker. "" for none.
+ */
+export function usePassedUpFrom(threadId: string): string {
+  return useThreadStore((s) => {
+    const answering = s.answering[threadId];
+    const ids = new Set<string>();
+    for (const p of pendingOf(s, threadId)) if (p.fromThreadId && !answering?.[p.requestId]) ids.add(p.fromThreadId);
+    return [...ids].sort().join("\n");
+  });
 }
 
 /** Marks a request answered (its prompt leaves) or, when its answer failed, open again. */
