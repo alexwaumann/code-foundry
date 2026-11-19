@@ -10,9 +10,13 @@ const THREAD_KEY = "thread:";
  * the thread whose panel holds the tab, when that thread showed this very file as a page
  * (an html item: view.inline, its card's Open in a tab, `--panel`), or opened it as
  * its own with no card (view.panel.page: `own`, the tab's page flag, which only that verb's
- * intent sets). Any other HTML file, in any panel, has none: its bridge refuses every call.
+ * intent sets), or the file lies in that thread's own pages directory (`pageThread`, what
+ * the daemon's grant says: FilePreview.pageThread). The last needs no log, so the page keeps
+ * its bridge in a tab shown without the thread's view (a pane of its own, a restored
+ * window), where no Watch has loaded the log (docs/notes/page-bridge-without-log.md). Any
+ * other HTML file, in any panel, has none: its bridge refuses every call.
  */
-export function usePageThread(abs: string, own?: { title: string }): PageOf | null {
+export function usePageThread(abs: string, own?: { title: string }, pageThread = ""): PageOf | null {
   const key = usePanelKey();
   const threadId = key.startsWith(THREAD_KEY) ? key.slice(THREAD_KEY.length) : "";
   // The log's items change as the thread streams; the scan runs only when they do.
@@ -30,10 +34,11 @@ export function usePageThread(abs: string, own?: { title: string }): PageOf | nu
   }, [byId, abs, threadId]);
   // The tab's own title wins: it is what the user sees on the tab.
   const ownTitle = own?.title;
+  const inPages = pageThread !== "" && pageThread === threadId;
   return useMemo(() => {
-    if (ownTitle === undefined || !threadId || !abs) return shown;
+    if (!threadId || !abs || (ownTitle === undefined && !inPages)) return shown;
     return { thread: threadId, title: ownTitle || shown?.title || "" };
-  }, [ownTitle, threadId, abs, shown]);
+  }, [ownTitle, inPages, threadId, abs, shown]);
 }
 
 /** The thread a File tab's page belongs to, and the title it was shown with ("" for none). */

@@ -224,3 +224,61 @@ func TestPreviewReadError(t *testing.T) {
 		})
 	}
 }
+
+// PreviewFile names the thread whose pages directory holds the file, so the GUI can give
+// the page that thread's bridge without the thread's log.
+func TestFilesystemPreviewFilePageThread(t *testing.T) {
+	root, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	pages := filepath.Join(root, "cf-pages")
+	for _, f := range []string{"cf-pages/s-1/tracker.html", "cf-pages/s-1/sub/deep.html", "cf-pages/welcome.html", "loose/s-1/tracker.html"} {
+		p := filepath.Join(root, f)
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, []byte("<p>x</p>"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// A link from elsewhere to a thread's page is still that thread's page; a link in a
+	// thread's pages directory to a file elsewhere is not.
+	for link, target := range map[string]string{
+		"loose/link.html":        filepath.Join(pages, "s-1/tracker.html"),
+		"cf-pages/s-1/away.html": filepath.Join(root, "loose/s-1/tracker.html"),
+	} {
+		if err := os.Symlink(target, filepath.Join(root, link)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, withRoot := range []bool{true, false} {
+		h := NewFilesystem(root, projecttest.New(nil), testGrants(root))
+		if withRoot {
+			h.WithPagesRoot(pages)
+		}
+		srv := httptest.NewServer(h.Route().Handler)
+		t.Cleanup(srv.Close)
+		c := codefoundryv1connect.NewFilesystemServiceClient(srv.Client(), srv.URL)
+		for _, tc := range []struct{ path, want string }{
+			{"cf-pages/s-1/tracker.html", "s-1"},
+			{"cf-pages/s-1/sub/deep.html", "s-1"},
+			{"cf-pages/welcome.html", ""},
+			{"loose/s-1/tracker.html", ""},
+			{"loose/link.html", "s-1"},
+			{"cf-pages/s-1/away.html", ""},
+		} {
+			res, err := c.PreviewFile(context.Background(), connect.NewRequest(&v1.PreviewFileRequest{Path: filepath.Join(root, tc.path)}))
+			if err != nil {
+				t.Fatalf("%s: %v", tc.path, err)
+			}
+			want := tc.want
+			if !withRoot {
+				want = ""
+			}
+			if got := res.Msg.GetPageThread(); got != want {
+				t.Errorf("pages root %v: %s: page thread %q, want %q", withRoot, tc.path, got, want)
+			}
+		}
+	}
+}

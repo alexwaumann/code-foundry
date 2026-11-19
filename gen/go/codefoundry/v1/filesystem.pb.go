@@ -2184,7 +2184,11 @@ type PreviewFileResponse struct {
 	// The grant serves only this file, not its directory: the directory is home, holds the
 	// config home, or is otherwise too broad to hand a page (so its relative links to other
 	// files do not load).
-	SingleFile    bool `protobuf:"varint,3,opt,name=single_file,json=singleFile,proto3" json:"single_file,omitempty"`
+	SingleFile bool `protobuf:"varint,3,opt,name=single_file,json=singleFile,proto3" json:"single_file,omitempty"`
+	// The thread whose pages directory holds the file (<home>/pages/<thread id>/...): the
+	// page is that thread's own, so the GUI gives it the thread's bridge in a tab linked to
+	// it without reading the thread's log. Empty for any other file.
+	PageThread    string `protobuf:"bytes,4,opt,name=page_thread,json=pageThread,proto3" json:"page_thread,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2238,6 +2242,13 @@ func (x *PreviewFileResponse) GetSingleFile() bool {
 		return x.SingleFile
 	}
 	return false
+}
+
+func (x *PreviewFileResponse) GetPageThread() string {
+	if x != nil {
+		return x.PageThread
+	}
+	return ""
 }
 
 var File_codefoundry_v1_filesystem_proto protoreflect.FileDescriptor
@@ -2417,12 +2428,14 @@ const file_codefoundry_v1_filesystem_proto_rawDesc = "" +
 	"\tmime_type\x18\x02 \x01(\tR\bmimeType\x12\x12\n" +
 	"\x04size\x18\x03 \x01(\x03R\x04size\x12\x1f\n" +
 	"\vmodified_at\x18\x04 \x01(\x03R\n" +
-	"modifiedAt\"^\n" +
+	"modifiedAt\"\x7f\n" +
 	"\x13PreviewFileResponse\x12\x10\n" +
 	"\x03url\x18\x01 \x01(\tR\x03url\x12\x14\n" +
 	"\x05scope\x18\x02 \x01(\tR\x05scope\x12\x1f\n" +
 	"\vsingle_file\x18\x03 \x01(\bR\n" +
-	"singleFile*X\n" +
+	"singleFile\x12\x1f\n" +
+	"\vpage_thread\x18\x04 \x01(\tR\n" +
+	"pageThread*X\n" +
 	"\n" +
 	"SkillScope\x12\x1b\n" +
 	"\x17SKILL_SCOPE_UNSPECIFIED\x10\x00\x12\x14\n" +

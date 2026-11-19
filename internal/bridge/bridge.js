@@ -465,7 +465,8 @@
   }
 
   function storage(prefix) {
-    if (!readyMsg || !cf.thread) throw cfError("unavailable", "cf.storage needs the page's thread: await cf.ready first");
+    if (!readyMsg) throw cfError("unavailable", "cf.storage needs the page's thread: await cf.ready first");
+    if (!cf.thread) throw cfError("unavailable", "cf.storage needs the page's thread: this page is not shown in one");
     var base = prefix ? String(prefix) + ":" : "";
     function own() {
       return Object.keys(stored).filter(function (k) { return k.indexOf(base) === 0; });

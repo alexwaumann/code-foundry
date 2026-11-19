@@ -22,8 +22,8 @@ import { FileEmptyState, FileLoading } from "./states";
  */
 export function HtmlPreview({ path, text, name, page: own, reloads = 0 }: { path: string; text: string; name: string; page?: { title: string } | undefined; /** The user's Refresh presses: each loads the page again, as written. */ reloads?: number }) {
   const grant = usePreviewGrant("", path);
-  // A page its panel's thread showed (or opened as its own) has that thread's bridge; any other file none.
-  const page = usePageThread(path, own);
+  // A page its panel's thread showed (or opened as its own, or keeps in its pages directory) has that thread's bridge; any other file none.
+  const page = usePageThread(path, own, grant.preview?.pageThread);
   // A new key remounts the frame when the text changes (derived state, not an effect, so the first render loads once).
   const [prevText, setPrevText] = useState(text);
   const [version, setVersion] = useState(0);
