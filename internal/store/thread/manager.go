@@ -356,9 +356,11 @@ type Manager struct {
 	closed bool
 	// viewers counts each thread's item watchers (WatchItems).
 	viewers map[string]int
-	// seenHook hears each time the user sees a thread (SetSeenHook, flags.go).
-	seenHook func(threadID string)
-	snap     atomic.Pointer[Snapshot]
+	// seenHooks hear each time the user sees a thread (AddSeenHook, flags.go), by the id
+	// AddSeenHook gave each.
+	seenHooks  map[uint64]func(threadID string)
+	seenHookID uint64
+	snap       atomic.Pointer[Snapshot]
 	// retired is the retired usage ledger (Snapshot.RetiredUsage). Copy on write.
 	retired []UsageBucket
 	// cacheTTL is the prompt cache lifetime (SetCacheTTL); guarded by mu.

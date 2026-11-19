@@ -93,28 +93,28 @@ func TestThreadSubscriptionCommands(t *testing.T) {
 		wantJSON       string // the --json answer, spaces removed
 	}{
 		{name: "subscribe the context thread", cmd: "thread.subscribe", ctx: inThread, args: map[string]string{"thread": "s-c", "repeat": "true"},
-			wantMsg:  "subscribed sub-1: s-me wakes when thread s-c is settled (repeat)",
+			wantMsg:  "subscribed sub-1: s-me wakes when thread s-c is settled (repeat)" + waitHint("s-me"),
 			wantReqs: []proto.Message{&v1.SubscribeThreadRequest{SubscriberThreadId: "s-me", TargetThreadId: "s-c", Repeat: true}}},
 		{name: "subscribe until attention", cmd: "thread.subscribe", args: map[string]string{"id": "s-p", "thread": "s-c", "until": "attention"},
-			wantMsg:  "subscribed sub-1: s-p wakes when thread s-c needs attention (once)",
+			wantMsg:  "subscribed sub-1: s-p wakes when thread s-c needs attention (once)" + waitHint("s-p"),
 			wantReqs: []proto.Message{&v1.SubscribeThreadRequest{SubscriberThreadId: "s-p", TargetThreadId: "s-c", Condition: attention}}},
 		{name: "a one-shot that fired at once", cmd: "thread.subscribe", ctx: inThread, args: map[string]string{"thread": "s-c", "until": "idle"}, fired: true,
 			wantMsg:  "woke s-me at once: thread s-c already met the condition (idle); the one-shot subscription sub-1 is done",
 			wantReqs: []proto.Message{&v1.SubscribeThreadRequest{SubscriberThreadId: "s-me", TargetThreadId: "s-c", Condition: idle}}},
 		{name: "a repeat that fired at once", cmd: "thread.subscribe", ctx: inThread, args: map[string]string{"thread": "s-c", "repeat": "true"}, fired: true,
-			wantMsg: "subscribed sub-1: s-me wakes when thread s-c is settled (repeat); woke it at once: the target already met the condition"},
+			wantMsg: "subscribed sub-1: s-me wakes when thread s-c is settled (repeat); woke it at once: the target already met the condition" + waitHint("s-me")},
 		{name: "already subscribed", cmd: "thread.subscribe", ctx: inThread, args: map[string]string{"thread": "s-c"}, existed: true,
 			wantMsg: "already subscribed sub-1: s-me wakes when thread s-c is settled (once)"},
 		{name: "subscribe to a run", cmd: "thread.subscribe", ctx: inThread, args: map[string]string{"run": "r-1"},
-			wantMsg:  "subscribed sub-1: s-me wakes when run r-1 finishes (once)",
+			wantMsg:  "subscribed sub-1: s-me wakes when run r-1 finishes (once)" + waitHint("s-me"),
 			wantReqs: []proto.Message{&v1.SubscribeThreadRequest{SubscriberThreadId: "s-me", TargetRunId: "r-1"}}},
 		{name: "subscribe to a pull request", cmd: "thread.subscribe", ctx: inThread, args: map[string]string{"pr": "acme/web#7"},
-			wantMsg:  "subscribed sub-1: s-me wakes when pr acme/web#7 finishes its checks (once)",
+			wantMsg:  "subscribed sub-1: s-me wakes when pr acme/web#7 finishes its checks (once)" + waitHint("s-me"),
 			wantReqs: []proto.Message{&v1.SubscribeThreadRequest{SubscriberThreadId: "s-me", TargetPullRequest: "acme/web#7"}},
 			wantJSON: `{"subscription":{"id":"sub-1","subscriberThreadId":"s-me","target":"THREAD_SUBSCRIPTION_TARGET_PULL_REQUEST",` +
 				`"targetId":"acme/web#7","condition":"THREAD_SUBSCRIPTION_CONDITION_CHECKS_DONE"}}`},
 		{name: "a pull request's reviews", cmd: "thread.subscribe", ctx: inThread, args: map[string]string{"pr": "https://github.com/acme/web/pull/7", "until": "review", "repeat": "true"},
-			wantMsg:  "subscribed sub-1: s-me wakes when pr https://github.com/acme/web/pull/7 gets a review (repeat)",
+			wantMsg:  "subscribed sub-1: s-me wakes when pr https://github.com/acme/web/pull/7 gets a review (repeat)" + waitHint("s-me"),
 			wantReqs: []proto.Message{&v1.SubscribeThreadRequest{SubscriberThreadId: "s-me", TargetPullRequest: "https://github.com/acme/web/pull/7", Condition: review, Repeat: true}}},
 		{name: "a pull request merged at once", cmd: "thread.subscribe", ctx: inThread, args: map[string]string{"pr": "acme/web#7", "until": "merged"}, fired: true,
 			wantMsg: "woke s-me at once: pr acme/web#7 already met the condition (merged); the one-shot subscription sub-1 is done"},
@@ -131,10 +131,10 @@ func TestThreadSubscriptionCommands(t *testing.T) {
 		{name: "no subscriber", cmd: "thread.subscribe", args: map[string]string{"thread": "s-c"}, wantErr: command.ErrInvalidArgs},
 		{name: "subscribe to a plugin's wake source", cmd: "thread.subscribe", ctx: inThread,
 			args:     map[string]string{"plugin": "hello/tick", "arg": "every=2s\n\n pr = a/b#1 ", "repeat": "true"},
-			wantMsg:  "subscribed sub-1: s-me wakes when plugin hello/tick fires (every=2s pr=a/b#1) (repeat)",
+			wantMsg:  "subscribed sub-1: s-me wakes when plugin hello/tick fires (every=2s pr=a/b#1) (repeat)" + waitHint("s-me"),
 			wantReqs: []proto.Message{&v1.SubscribeThreadRequest{SubscriberThreadId: "s-me", TargetPlugin: "hello/tick", Args: map[string]string{"every": "2s", "pr": "a/b#1"}, Condition: unset, Repeat: true}}},
 		{name: "a plugin without args", cmd: "thread.subscribe", ctx: inThread, args: map[string]string{"plugin": "hello/tick"},
-			wantMsg:  "subscribed sub-1: s-me wakes when plugin hello/tick fires (once)",
+			wantMsg:  "subscribed sub-1: s-me wakes when plugin hello/tick fires (once)" + waitHint("s-me"),
 			wantReqs: []proto.Message{&v1.SubscribeThreadRequest{SubscriberThreadId: "s-me", TargetPlugin: "hello/tick", Condition: unset}}},
 		{name: "an arg value with =", cmd: "thread.subscribe", ctx: inThread, args: map[string]string{"plugin": "x/y", "arg": "q=a=b"},
 			wantReqs: []proto.Message{&v1.SubscribeThreadRequest{SubscriberThreadId: "s-me", TargetPlugin: "x/y", Args: map[string]string{"q": "a=b"}, Condition: unset}}},
@@ -144,15 +144,15 @@ func TestThreadSubscriptionCommands(t *testing.T) {
 		{name: "a plugin until idle", cmd: "thread.subscribe", ctx: inThread, args: map[string]string{"plugin": "hello/tick", "until": "idle"}, wantErr: command.ErrInvalidArgs},
 		{name: "a plugin and a thread", cmd: "thread.subscribe", ctx: inThread, args: map[string]string{"plugin": "hello/tick", "thread": "s-c"}, wantErr: command.ErrInvalidArgs},
 		{name: "a timer every 30m", cmd: "thread.subscribe", ctx: inThread, args: map[string]string{"every": "30m"},
-			wantMsg:  "subscribed sub-1: s-me wakes every 30m (repeat)",
+			wantMsg:  "subscribed sub-1: s-me wakes every 30m (repeat)" + waitHint("s-me"),
 			wantReqs: []proto.Message{&v1.SubscribeThreadRequest{SubscriberThreadId: "s-me", TargetEvery: durationpb.New(30 * time.Minute), Condition: unset}}},
 		{name: "a timer at a time", cmd: "thread.subscribe", ctx: inThread, args: map[string]string{"at": "2099-10-20T14:00:00-05:00"},
-			wantMsg: "subscribed sub-1: s-me wakes at " + at2099 + " (once)",
+			wantMsg: "subscribed sub-1: s-me wakes at " + at2099 + " (once)" + waitHint("s-me"),
 			wantReqs: []proto.Message{&v1.SubscribeThreadRequest{SubscriberThreadId: "s-me",
 				TargetAt: timestamppb.New(time.Date(2099, 10, 20, 19, 0, 0, 0, time.UTC)), Condition: unset}}},
 		{name: "a timer in two hours", cmd: "thread.subscribe", ctx: inThread, args: map[string]string{"at": "2h"}},
 		{name: "a timer with a note", cmd: "thread.subscribe", ctx: inThread, args: map[string]string{"every": "2m", "note": "ping the user (t-aa39dec3)"},
-			wantMsg:  "subscribed sub-1: s-me wakes every 2m (repeat) · ping the user (t-aa39dec3)",
+			wantMsg:  "subscribed sub-1: s-me wakes every 2m (repeat) · ping the user (t-aa39dec3)" + waitHint("s-me"),
 			wantReqs: []proto.Message{&v1.SubscribeThreadRequest{SubscriberThreadId: "s-me", TargetEvery: durationpb.New(2 * time.Minute), Condition: unset, Note: "ping the user (t-aa39dec3)"}}},
 		{name: "a note too long", cmd: "thread.subscribe", ctx: inThread, args: map[string]string{"every": "2m", "note": strings.Repeat("x", 201)}, wantErr: command.ErrInvalidArgs},
 		{name: "a timer until settled", cmd: "thread.subscribe", ctx: inThread, args: map[string]string{"every": "1h", "until": "settled"},
@@ -295,4 +295,11 @@ func TestThreadSendWaitDoesNotRenewNotify(t *testing.T) {
 	if send, ok := reqs[0].(*v1.SendThreadMessageRequest); !ok || !send.GetNoNotify() {
 		t.Errorf("first request = %v, want a send with no_notify", reqs[0])
 	}
+}
+
+// waitHint is the line thread.subscribe adds when it added a subscription
+// (docs/notes/waiting-thread-look.md).
+func waitHint(id string) string {
+	return "\n" + id + " is now waiting and may be out of the user's sight; if they need to look at something meanwhile, run " +
+		"code-foundry thread look \"<what to look at>\" (it does nothing when the thread is on their screen)."
 }

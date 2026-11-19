@@ -105,7 +105,8 @@ type Deps struct {
 	// Unimplemented.
 	Memory command.MemoryBackend
 	// Notification backs notification.* (the bell's notifications; act runs actions through
-	// the registry's own verbs). Nil registers them failing with Unimplemented.
+	// the registry's own verbs) and thread.look (with Layout). Nil registers them failing
+	// with Unimplemented.
 	Notification notification.Store
 	// Themes backs the user-theme verbs (theme.show, save, duplicate, delete) and the
 	// user's themes in theme.list and the slot commands; nil: the catalog only.
@@ -240,6 +241,7 @@ func Register(r *command.Registry, d Deps) error {
 		command.RegisterSearch(r, command.SearchDeps{Search: d.Search, Wait: d.SearchWait}),
 		command.RegisterMemory(r, command.MemoryDeps{Memory: d.Memory, Threads: d.Thread, Emitter: d.Emitter}),
 		command.RegisterNotification(r, command.NotificationDeps{Store: d.Notification}),
+		command.RegisterThreadLook(r, command.ThreadLookDeps{Notes: d.Notification, Layout: d.Layout}),
 		command.RegisterLayout(r, command.LayoutDeps{Layout: d.Layout, Thread: d.Thread, Settings: d.Settings}),
 		command.RegisterCapabilities(r, command.CapabilitiesDeps{
 			Version: d.Daemon.Version, Settings: d.Settings, Memory: d.Memory, Plugins: d.Plugin,

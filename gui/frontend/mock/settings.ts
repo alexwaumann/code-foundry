@@ -134,7 +134,7 @@ export const NO_KEYBINDING = new Set([
   "theme.check", "theme.list", "theme.restore", "theme.save", "theme.show",
   "thread.agent.open", "thread.agents", "thread.info", "thread.open", "thread.space.move", "thread.checkouts", "thread.commands", "thread.flag.clear", "thread.focus", "thread.items", "thread.list", "thread.mcp",
   "thread.move.open", "thread.new-like", "thread.respond", "thread.setup.cancel", "thread.setup.discard", "thread.setup.retry", "thread.shell.stop",
-  "thread.snooze.clear", "thread.stop-waiting", "thread.unsubscribe", "thread.wait",
+  "thread.look", "thread.snooze.clear", "thread.stop-waiting", "thread.unsubscribe", "thread.wait",
   "ui.focus.project", "ui.focus.terminal", "ui.notify", "ui.palette.open", "usage.show",
   "view.open.diff", "view.open.file", "view.open.gallery", "view.open.page", "view.open.pr", "view.open.url", "view.panel.gallery", "view.panel.page", "workspace.list",
 ]);

@@ -961,6 +961,13 @@ export class World {
       this.logs.send(id, text, []);
     },
     invoke: (name, args, ctx) => this.invoke(name, ctx, args, true),
+    onScreen: (id) => {
+      // As the daemon's command.ThreadOnScreen: unknown (no window loaded the layout) is not on screen.
+      if (!this.layout.legacyImported) return false;
+      const st = this.layout.state();
+      const sp = st.spaces.find((x) => x.id === st.current_space);
+      return !!sp && layoutPanes(sp.root).some((p) => (p.tabs ?? []).some((t) => t.kind === "thread" && t.thread === id));
+    },
   });
   /** The window shell's layout (mock/layout.ts); LayoutService and the EventService layout source. */
   readonly layout = new MockLayout({

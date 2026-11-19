@@ -48,10 +48,15 @@ func (f *fakeFlagThreads) Seen(id string) bool {
 	return f.seen[id]
 }
 
-func (f *fakeFlagThreads) SetSeenHook(h func(string)) {
+func (f *fakeFlagThreads) AddSeenHook(h func(string)) func() {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.hook = h
+	return func() {
+		f.mu.Lock()
+		defer f.mu.Unlock()
+		f.hook = nil
+	}
 }
 
 func (f *fakeFlagThreads) archive(id string) thread.Thread {

@@ -368,9 +368,20 @@ func threadSubscribe(b ThreadBackend) Command {
 			case res.Msg.GetFired():
 				msg += "; woke it at once: the target already met the condition"
 			}
+			if !res.Msg.GetExisted() && (!res.Msg.GetFired() || s.GetRepeat()) {
+				msg += "\n" + lookHint(s.GetSubscriberThreadId())
+			}
 			return Result{Message: msg, JSON: res.Msg, Warnings: res.Msg.GetWarnings()}, nil
 		},
 	}
+}
+
+// lookHint is the line thread.subscribe adds when it adds a subscription: the subscriber
+// now waits, sorted under Working, where the user rarely looks, and thread.look is how it
+// asks them to look meanwhile (docs/notes/waiting-thread-look.md).
+func lookHint(id string) string {
+	return id + " is now waiting and may be out of the user's sight; if they need to look at something meanwhile, run " +
+		"code-foundry thread look \"<what to look at>\" (it does nothing when the thread is on their screen)."
 }
 
 func threadUnsubscribe(b ThreadBackend) Command {
