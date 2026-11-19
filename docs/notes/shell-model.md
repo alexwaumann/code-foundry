@@ -38,10 +38,15 @@ when the first working version is whole. Nothing partial is released.
   is drawn, not from the stored proportions (a pane held at its minimum is drawn wider than its
   share): the divider does not jump when it is grabbed, and when it is let go the split's open
   sides keep the proportions they were drawn at (a side that is all folded keeps its stored one).
+  A run of rails (folded or collapsed) between two open panes acts as one divider: every divider
+  in the run, on either side of a rail or between two, moves room between the nearest open pane
+  on each side, and the rails ride along with the edge, keeping their stored sizes for when they
+  open. The rail itself is not a handle: it opens its pane. A divider with rails only on one side
+  (a rail at the edge of its split) never moves.
   The cursor says how it can move: the resize cursor when it can go both ways, the one-way resize
   cursor (pointing the way it can still go) when one side is at its minimum, and `not-allowed`
-  when it cannot move at all (both sides at their minimums, or a side that is all rails, folded or
-  collapsed); then a drag does nothing and the divider shows no handle.
+  when it cannot move at all (both sides at their minimums, or no open pane on one side); then a
+  drag does nothing and the divider shows no handle.
 - **Any surface can be a tab in any pane.** Tabs drag to reorder, to another strip, or to a pane's
   edge to split. A whole pane drags by its strip: onto an edge, onto another strip to merge, onto the
   outer edge of the grid, or onto a space tab. Any tab is draggable, active or not. Over a pane's

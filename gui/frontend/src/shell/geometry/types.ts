@@ -56,7 +56,8 @@ export interface PaneRect extends Rect {
 
 /**
  * The gap after kid `i` of a split: a column gap in a row, a row gap in a column. `fixed` when a
- * side of it is all rails, so it does not resize.
+ * side of it has no open kid (every kid that way is all rails), so it does not resize; between two
+ * open kids it resizes them across any rails between (rects.ts gutterPair).
  */
 export interface GutterRect extends Rect {
   split: string;

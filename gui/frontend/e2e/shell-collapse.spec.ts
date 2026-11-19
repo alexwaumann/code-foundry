@@ -178,7 +178,7 @@ test("a tab dropped on a collapsed pane opens it, and the highlight is where it 
   expect([b?.x, b?.y, b?.width, b?.height].map((v) => Math.round(v ?? -1))).toEqual([preview.x, preview.y, preview.width, preview.height].map(Math.round));
 });
 
-test("a divider's cursor says which ways it can move, it stops at the minimum, and beside a collapsed pane it cannot move", async ({ page }) => {
+test("a divider's cursor says which ways it can move, and it stops at the minimum", async ({ page }) => {
   // The thread's pane held at its 480px minimum (its share is a tenth), a diff beside it.
   const two: Node = { t: "split", id: "s-r", dir: "row", kids: [pane("p-m", [thread("s-1")]), pane("p-r", [diff("s-1")])], sizes: [0.1, 0.9] };
   await seed(two, "p-m");
@@ -209,22 +209,32 @@ test("a divider's cursor says which ways it can move, it stops at the minimum, a
   if (!g2) throw new Error("no gutter");
   expect(await cursorAt(page, g2.x + g2.width / 2, g2.y + g2.height / 2)).toBe("col-resize");
 
-  // Beside a collapsed pane: not-allowed, and a drag changes nothing.
-  await seed({ ...ROW, kids: [pane("p-l", [prs, projects]), collapsed(pane("p-m", [thread("s-1")])), pane("p-r", [diff("s-1")])] }, "p-l");
-  await page.reload();
-  const fixed = page.locator('[data-testid="shell-gutter-fixed"]').first();
-  const f = await fixed.boundingBox();
-  if (!f) throw new Error("no fixed gutter");
-  const fx = f.x + f.width / 2;
-  const fy = f.y + f.height / 2;
-  expect(await cursorAt(page, fx, fy)).toBe("not-allowed");
+});
+
+test("a gutter between two collapsed panes drags the open panes on either side, and the rails ride along", async ({ page }) => {
+  const sizes = [0.3, 0.2, 0.2, 0.3];
+  await seed({ ...ROW, kids: [pane("p-l", [prs]), collapsed(pane("p-m", [thread("s-1")])), collapsed(pane("p-x", [projects])), pane("p-r", [diff("s-1")])], sizes }, "p-l");
+  await openShell(page);
+  const gutter = page.locator('[data-testid="shell-gutter"][data-split="s-r"][data-index="1"]');
+  const g = await gutter.boundingBox();
+  if (!g) throw new Error("no gutter");
+  const at = { x: g.x + g.width / 2, y: g.y + g.height / 2 };
   const left = await box(page, '[data-testid="shell-pane"][data-pane-id="p-l"]');
-  await page.mouse.move(fx, fy);
+  const right = await box(page, '[data-testid="shell-pane"][data-pane-id="p-r"]');
+  const rails = await Promise.all(["p-m", "p-x"].map((id) => box(page, `[data-testid="shell-rail"][data-pane-id="${id}"]`)));
+  await page.mouse.move(at.x, at.y);
   await page.mouse.down();
-  await page.mouse.move(fx + 120, fy, { steps: 4 });
+  await page.mouse.move(at.x + 120, at.y, { steps: 4 });
   await page.mouse.up();
-  expect(await box(page, '[data-testid="shell-pane"][data-pane-id="p-l"]')).toEqual(left);
-  expect((await invocations()).filter((i) => i.name === "pane.resize")).toHaveLength(1);
+  await expect.poll(async () => (await box(page, '[data-testid="shell-pane"][data-pane-id="p-l"]')).w).toBe(left.w + 120);
+  expect((await box(page, '[data-testid="shell-pane"][data-pane-id="p-r"]')).w).toBe(right.w - 120);
+  for (const [i, id] of ["p-m", "p-x"].entries()) {
+    expect(await box(page, `[data-testid="shell-rail"][data-pane-id="${id}"]`)).toEqual({ ...rails[i], x: (rails[i]?.x ?? 0) + 120 });
+  }
+  const resized = (await invocations()).filter((i) => i.name === "pane.resize");
+  expect(resized).toHaveLength(1);
+  // The collapsed panes' stored sizes are untouched.
+  expect((resized[0]?.args.sizes ?? "").split(",").slice(1, 3).map(Number)).toEqual([0.2, 0.2]);
 });
 
 /** SHOTS=<dir>: a pane collapsed in a row and in a column (before: open), the strip's button, dark and light. */
@@ -255,5 +265,31 @@ for (const scheme of ["dark", "light"] as const) {
     await expect(railEl(page, "p-a")).toBeVisible();
     await page.mouse.move(1390, 750);
     await page.screenshot({ path: at("col-after") });
+  });
+}
+
+/**
+ * SHOTS=<dir>: a gutter between two collapsed panes hovered (its handle) and dragged 200px right,
+ * dark and light. Its locator takes a fixed gutter too, so it shoots the same steps before the fix.
+ */
+for (const scheme of ["dark", "light"] as const) {
+  test(`resize across collapsed screenshots (${scheme})`, async ({ page }, info) => {
+    const shots = process.env.SHOTS;
+    test.skip(!shots || info.project.name !== "webkit", "SHOTS=<dir> with WebKit only");
+    const at = (name: string) => `${shots ?? ""}/across-${name}${scheme === "light" ? "-light" : ""}.png`;
+    await page.emulateMedia({ colorScheme: scheme });
+    await seed({ ...ROW, kids: [pane("p-l", [prs]), collapsed(pane("p-m", [thread("s-1")])), collapsed(pane("p-x", [projects])), pane("p-r", [diff("s-1")])], sizes: [0.3, 0.2, 0.2, 0.3] }, "p-l");
+    await openShell(page, 1800, 760);
+    const g = await page.locator('[data-split="s-r"][data-index="1"]').boundingBox();
+    if (!g) throw new Error("no gutter");
+    const x = g.x + g.width / 2;
+    const y = g.y + g.height / 2;
+    await page.mouse.move(x, y);
+    await page.screenshot({ path: at("hover") });
+    await page.mouse.down();
+    await page.mouse.move(x + 200, y, { steps: 4 });
+    await page.mouse.up();
+    await page.mouse.move(1790, 750);
+    await page.screenshot({ path: at("dragged") });
   });
 }
