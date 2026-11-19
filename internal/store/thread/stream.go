@@ -91,6 +91,8 @@ type streamState struct {
 	viewSig  chan struct{}
 	// seenSig: presence became attended while the thread is viewed (attended.go).
 	seenSig chan struct{}
+	// focusSig: the thread gained the focus in the layout (unread.go).
+	focusSig chan struct{}
 
 	// pending holds the can_use_tool requests waiting for the user, by request id.
 	// They arrive on the Conn's ordered events, so a request's item lands right after
@@ -156,6 +158,7 @@ type threadCmd struct {
 	restart   bool     // Restart (restart.go)
 	reseed    *seed    // Reseed (reseed.go)
 	wakeLimit bool     // the wake limit was reached (subscriptions_fire.go)
+	unread    bool     // MarkUnread (unread.go)
 	verb      *Item    // ShowHTML, ShowTheme: an item a verb adds (html.go verbItem)
 	putAway   *PutAway // PutAwaySelf (putaway.go)
 	// reuse, with verb, may answer with an item already in the log instead.
@@ -203,6 +206,7 @@ func (m *Manager) spawnStream(ctx context.Context, s Thread, r *runner, argv, en
 		cmds:     make(chan threadCmd),
 		viewSig:  make(chan struct{}, 1),
 		seenSig:  make(chan struct{}, 1),
+		focusSig: make(chan struct{}, 1),
 		pending:  map[string]*claudestream.PermissionRequest{},
 		effort:   s.Effort, wantEffort: s.Effort,
 	}
@@ -305,6 +309,8 @@ func (r *runner) run() {
 			r.onViewers()
 		case <-st.seenSig:
 			r.onAttended()
+		case <-st.focusSig:
+			r.onFocused()
 		case <-r.tail.events():
 			r.pollTranscript()
 		case err := <-r.tail.errors():
@@ -810,6 +816,8 @@ func (r *runner) onThreadCmd(cmd threadCmd) {
 		rep.thread, rep.restarted = r.onReseed(*cmd.reseed)
 	case cmd.wakeLimit:
 		rep.item = r.onWakeLimit()
+	case cmd.unread:
+		rep.thread, rep.err = r.onMarkUnread()
 	case cmd.verb != nil:
 		rep.item = r.onVerbItem(*cmd.verb, cmd.reuse)
 	case cmd.putAway != nil:
@@ -873,6 +881,9 @@ func (r *runner) respond(id string, d Decision) (Item, error) {
 func (r *runner) onViewers() {
 	prev := r.viewers
 	r.viewers = r.m.viewerCount(r.id)
+	if r.viewers > prev {
+		r.st.sd.held = false // a new view sees a thread marked unread (unread.go)
+	}
 	if r.viewers > prev && r.m.attended() {
 		r.acknowledge()
 		r.checkStatus()

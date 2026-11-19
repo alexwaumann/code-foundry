@@ -188,8 +188,10 @@ func timerC(t *time.Timer) <-chan time.Time {
 // runner is acknowledged by the store instead (Manager.seenStoppedLocked).
 func (r *runner) acknowledge() { r.st.sd.Acknowledge() }
 
+// acknowledgeIfViewed acknowledges while a viewer watches and presence is attended,
+// unless the user marked the thread unread with that viewer there (unread.go).
 func (r *runner) acknowledgeIfViewed() {
-	if r.viewers > 0 && r.m.attended() {
+	if r.viewers > 0 && r.m.attended() && !r.st.sd.held {
 		r.acknowledge()
 	}
 }

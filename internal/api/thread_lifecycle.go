@@ -211,6 +211,15 @@ func (h *Thread) ClearSnoozeEnded(ctx context.Context, req *connect.Request[v1.C
 	return connect.NewResponse(&v1.ClearSnoozeEndedResponse{Thread: threadToProto(s), Cleared: cleared}), nil
 }
 
+// MarkUnread puts an idle thread back into "finished" (internal/store/thread/unread.go).
+func (h *Thread) MarkUnread(ctx context.Context, req *connect.Request[v1.MarkUnreadRequest]) (*connect.Response[v1.MarkUnreadResponse], error) {
+	s, err := h.store.MarkUnread(ctx, req.Msg.GetId())
+	if err != nil {
+		return nil, threadError(err)
+	}
+	return connect.NewResponse(&v1.MarkUnreadResponse{Thread: threadToProto(s)}), nil
+}
+
 // bySelf reports whether a request about thread id comes from that thread (by is empty
 // for the user).
 func bySelf(by, id string) bool { return by != "" && by == id }

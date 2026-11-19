@@ -494,6 +494,18 @@ func (f *Fake) ClearSnoozeEnded(_ context.Context, id string) (thread.Thread, bo
 	return s, cleared, err
 }
 
+// MarkUnread records "MarkUnread <id>" and turns an idle "at prompt" thread
+// needs-attention "finished"; any other is thread.ErrFailedPrecondition, unchanged.
+func (f *Fake) MarkUnread(_ context.Context, id string) (thread.Thread, error) {
+	return f.mutate("MarkUnread "+id, id, func(s *thread.Thread) error {
+		if s.Status != thread.StatusIdle || s.StatusReason != "at prompt" || !s.ArchivedAt.IsZero() || s.Snoozed() {
+			return fmt.Errorf("%w: thread %s is not idle at its prompt", thread.ErrFailedPrecondition, id)
+		}
+		s.Status, s.StatusReason, s.StatusChangedAt = thread.StatusNeedsAttention, "finished", f.Now()
+		return nil
+	})
+}
+
 // SaveForLater records "SaveForLater <id>". Like a snooze it disconnects a live thread
 // (reason "closed"), unpins and unarchives it; it clears SnoozedUntil and sets SavedAt to
 // Now unless already set.

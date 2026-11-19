@@ -4,6 +4,7 @@ import { lastInputWasKeyboard } from "@/lib/inputModality";
 import { keyTarget } from "@/lib/keyTarget";
 import { statusLine } from "@/lib/statusLine";
 import { canNewLike, canRunElsewhere } from "@/lib/threadRow";
+import { canMarkUnread } from "@/lib/markUnread";
 import { refreshCommands, runCommandForResult, useCommandsStore, whenListed } from "@/stores/commands";
 import { contextKey, getUiContext } from "@/stores/context";
 import { sidebarThreadOrder } from "@/stores/shellList";
@@ -179,6 +180,7 @@ const notInSubagent: ReadonlySet<string> = new Set([
   "thread.snooze",
   "thread.snooze.clear",
   "thread.stop-waiting",
+  "thread.unread",
 ]);
 
 /** Whether the GUI can start this command here (see contextSupplied, notInSubagent). */
@@ -192,7 +194,8 @@ export function isStartable(c: CommandView): boolean {
  * NoPalette (Command.no_palette: queries, model and CLI verbs, opaque-id prompts, Ember's
  * task board; internal/command/palette_test.go keeps the list). thread.run-in only for a
  * thread with somewhere else to run, thread.new-like only for one with a project or
- * workspace, thread.snooze.clear only for one the daemon woke (lib/threadRow; the daemon's availability is the same rule, this keeps a list
+ * workspace, thread.snooze.clear only for one the daemon woke, thread.unread only for one idle at its prompt (lib/threadRow,
+ * lib/markUnread; the daemon's availability is the same rule, this keeps a list
  * fetched before the thread changed honest), thread.move.open only for one the move picker
  * takes (lib/move canMove), file.save only over a tab that is editing.
  */
@@ -201,6 +204,8 @@ export function inPalette(c: CommandView): boolean {
   if (c.name === "thread.new-like" && !canNewLike(activeThread())) return false;
   // thread.snooze.clear: only while the thread reads Woke (the daemon's rule; the list may predate the wake or the clear).
   if (c.name === "thread.snooze.clear" && statusLine(activeThread()).kind !== "snoozeEnded") return false;
+  // thread.unread: only for a thread idle at its prompt (lib/markUnread; the daemon's rule, for a list fetched before it changed).
+  if (c.name === "thread.unread" && !canMarkUnread(activeThread())) return false;
   // thread.move.open: not for an archived, resident or moving thread either (lib/move canMove).
   if (c.name === "thread.move.open" && !canMoveThread(getUiContext().activeThreadId)) return false;
   // file.save: only with a File tab editing in front of it.

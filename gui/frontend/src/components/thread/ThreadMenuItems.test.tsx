@@ -429,3 +429,40 @@ describe("ThreadMenuItems: one list for the sidebar row and the thread header's 
     expect(useUiStore.getState().renamingThreadId).toBe("s-1");
   });
 });
+
+describe("Mark as unread", () => {
+  const idle: Partial<ThreadView> = { status: "idle", statusReason: "at prompt", state: "connected", savedAtMs: null, setup: null };
+
+  it("follows Snooze for a thread idle at its prompt, in every menu, and runs thread.unread on the menu's thread: silent from the row's, toasted from the header's and the tab's", () => {
+    for (const [open, inView] of [
+      [openRowMenu, true],
+      [openTitleMenu, false],
+      [openTabMenu, false],
+    ] as const) {
+      setThread(idle);
+      const menu = open();
+      const items = entries(menu);
+      expect(items.slice(items.indexOf("Pin"), items.indexOf("Pin") + 4)).toEqual(["Pin", "Snooze", "Mark as unread", "—"]);
+      fireEvent.click(within(menu).getByTestId("menu-mark-unread"));
+      expect(runCommand).toHaveBeenLastCalledWith("thread.unread", {}, expect.objectContaining({ activeThreadId: "s-1" }), { inView });
+      cleanup();
+    }
+  });
+
+  it.each<[string, Partial<ThreadView>, boolean]>([
+    ["a stopped thread idle at its prompt", { state: "disconnected" }, true],
+    ["a working thread", { status: "busy", statusReason: "working" }, false],
+    ["a starting thread", { state: "starting" }, false],
+    ["a thread asking", { status: "attention", statusReason: "question: Which one?" }, false],
+    ["a thread already Done", { status: "attention", statusReason: "finished" }, false],
+    ["a thread in error", { status: "error", statusReason: "interrupted" }, false],
+    ["a thread waiting on a child", { statusReason: "waiting on 1 child thread" }, false],
+    ["an archived thread", { archivedAtMs: 1 }, false],
+    ["a snoozed thread", { snoozedUntilMs: Date.now() + 3_600_000 }, false],
+    ["a thread saved for later", { savedAtMs: 1 }, false],
+    ["a thread setting up", { setup: { phase: "running" } as ThreadView["setup"] }, false],
+  ])("%s", (_, o, offered) => {
+    setThread({ ...idle, ...o });
+    expect(entries(openRowMenu()).includes("Mark as unread")).toBe(offered);
+  });
+});

@@ -2,7 +2,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { ActionRunMode, ActionRunState } from "../src/gen/codefoundry/v1/action_pb";
 import type { UiContext } from "../src/gen/codefoundry/v1/command_pb";
-import { PermissionMode } from "../src/gen/codefoundry/v1/thread_lifecycle_pb";
+import { PermissionMode, ThreadStatus } from "../src/gen/codefoundry/v1/thread_lifecycle_pb";
 import { panes } from "./layout";
 import { World } from "./world";
 
@@ -59,6 +59,17 @@ describe("the mock world", () => {
     woken();
     w.archiveThread("s-1", true);
     expect(w.threads.get("s-1")?.statusReason).toBe("at prompt");
+  });
+
+  it("thread.unread: an idle thread is Done again; any other is refused as the daemon refuses it", async () => {
+    const w = new World();
+    const ctx = { activeThreadId: "s-1", activeView: "thread" };
+    w.setThreadStatus("s-1", ThreadStatus.IDLE, "at prompt");
+    expect(await run(w, "thread.unread", ctx, {})).toMatch(/^marked thread .* unread$/);
+    expect(w.threads.get("s-1")).toMatchObject({ status: ThreadStatus.NEEDS_ATTENTION, statusReason: "finished" });
+    await expect(run(w, "thread.unread", ctx, {})).rejects.toThrow(/only an idle thread at its prompt can be marked unread/);
+    w.setThreadStatus("s-1", ThreadStatus.BUSY, "working");
+    await expect(run(w, "thread.unread", ctx, {})).rejects.toThrow(/only an idle thread at its prompt can be marked unread/);
   });
 
   it("thread.new without a model, effort or permission takes the settings' defaults and auto", async () => {

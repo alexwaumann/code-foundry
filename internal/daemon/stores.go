@@ -150,6 +150,9 @@ type stores struct {
 	// stopNotificationThreads stops the glue that withdraws a removed thread's
 	// notifications (notification_threads.go).
 	stopNotificationThreads func()
+	// stopThreadFocus stops the glue that tells the thread store which thread gains the
+	// focus in the layout (thread_focus.go).
+	stopThreadFocus func()
 	// flags are plugins' thread flags as notifications (plugin_flags.go);
 	// stopFlagNotifications stops their glue.
 	flags                 pluginFlags
@@ -396,6 +399,7 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, threadEnv 
 	}); err != nil {
 		return nil, err
 	}
+	s.stopThreadFocus = startThreadFocus(ctx, s.thread, s.layout, s.bus)
 	s.stopActions = startActionCleanup(ctx, log.With("store", "action"), s.action, s.bus)
 	s.stopEditorApps = startEditorAppsRefresh(ctx, s.gitops, s.bus)
 	s.stopWake = startWakeRuns(ctx, log.With("store", "thread"), s.thread, s.bus)
@@ -491,6 +495,9 @@ func (s *stores) close() error {
 	}
 	if s.stopShells != nil {
 		s.stopShells()
+	}
+	if s.stopThreadFocus != nil {
+		s.stopThreadFocus()
 	}
 	if s.stopLayout != nil {
 		s.stopLayout()

@@ -38,7 +38,7 @@ func TestStaleKeybindingOverrides(t *testing.T) {
 "view.help" = "cmd+alt+\\"
 "thread.rename" = "f2+cmd"
 "view.projects" = "cmd+ctrl+1"
-"view.usage" = "cmd+shift+u"
+"view.usage" = "cmd+shift+k"
 `
 	if err := os.WriteFile(path, []byte(file), 0o600); err != nil {
 		t.Fatal(err)
@@ -95,7 +95,7 @@ func TestStaleKeybindingOverrides(t *testing.T) {
 		"view.projects":     nil,
 		// A free retired chord may be bound again; an unrelated override applies.
 		"view.help":  {"cmd+alt+\\"},
-		"view.usage": {"cmd+shift+u"},
+		"view.usage": {"cmd+shift+k"},
 	} {
 		if got := chords(name); !slices.Equal(got, want) && (len(got) != 0 || len(want) != 0) {
 			t.Errorf("%s keybindings = %v, want %v", name, got, want)
