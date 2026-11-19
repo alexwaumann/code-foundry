@@ -9,6 +9,11 @@ export interface ShellPane {
   paneId: string;
   /** The pane has the space's focus. */
   focused: boolean;
+  /**
+   * The pane draws one header row for its thread in place of its strip (Threads open as Panes
+   * or Single: components/shell/ThreadPaneHeader.tsx), so the thread draws no header of its own.
+   */
+  headed?: boolean;
 }
 
 export const ShellPaneContext = createContext<ShellPane | null>(null);

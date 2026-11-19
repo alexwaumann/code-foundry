@@ -21,6 +21,10 @@
  * the middle; a pane that the dragged tabs would raise past the room (a pane of terminals) is no
  * target at all, its strip and middle included. The scene's `tree` is what this is computed on;
  * without one every drop fits.
+ *
+ * Under Threads open as Panes or Single (`scene.modes`) a thread pane's middle and row take only a
+ * thread (which replaces its thread) or a thread pane, and under Single a thread is offered no
+ * edge: it would replace the space's one thread pane's thread anyway (docs/notes/threads-open-as-2-gui.md).
  * See docs/notes/shell-14-drag.md and docs/notes/shell-25f-sizes.md.
  */
 import type { Frame, GeoNode, Rect } from "@/shell/geometry/types";
@@ -63,6 +67,44 @@ export interface DragScene {
   stripHeight: number;
   /** The space's pane tree as drawn: drops whose result would not fit its area are not offered. */
   tree?: GeoNode | null;
+  /** Under Threads open as Panes or Single: what the drop rules read (modeDrop.ts). Absent: Tabs. */
+  modes?: SceneModes;
+}
+
+/**
+ * The space under Threads open as Panes or Single (docs/notes/threads-open-as-2-gui.md): a thread
+ * pane holds one thread (or composer) and nothing else, and under Single a space has one.
+ */
+export interface SceneModes {
+  mode: "panes" | "single";
+  /** The panes that hold a thread or a composer, each with that thread's name. */
+  threadPanes: Readonly<Record<string, string>>;
+  /** The thread tabs and composers of the space. */
+  threadTabs: ReadonlySet<string>;
+  /** The target thread pane (where an open replaces): "" when the space has none. */
+  target: string;
+}
+
+/** Whether the dragged thing is a thread: a sidebar row's, or a thread's tab or a composer. */
+export function threadLikeSource(scene: Pick<DragScene, "modes">, source: DragSource): boolean {
+  return source.kind === "thread" || (source.kind === "tab" && (scene.modes?.threadTabs.has(source.tab) ?? false));
+}
+
+/**
+ * Whether a pane's middle or strip takes the source under the scene's mode: a thread pane takes no
+ * other tab and no pane of them (the daemon would only move them out again); a thread takes any
+ * pane (on a thread pane it replaces its thread, on another it opens beside it, docs/notes/shell-model.md).
+ */
+function joinOffered(scene: DragScene, source: DragSource, pane: string): boolean {
+  const m = scene.modes;
+  if (!m || !Object.hasOwn(m.threadPanes, pane)) return true;
+  if (source.kind === "pane") return Object.hasOwn(m.threadPanes, source.pane);
+  return threadLikeSource(scene, source);
+}
+
+/** Whether edges (a pane's and the grid's) take the source: not a thread under Single, where every open replaces the one thread pane. */
+function edgesOffered(scene: DragScene, source: DragSource): boolean {
+  return scene.modes?.mode !== "single" || !threadLikeSource(scene, source);
 }
 
 export interface Point {
@@ -141,15 +183,19 @@ function fits(scene: DragScene, source: DragSource, t: DropTarget): boolean {
 
 /** The raw target under the pointer, before asking whether the drop would do anything. */
 function zoneAt(scene: DragScene, source: DragSource, p: Point): DropTarget | null {
-  const outer = outerEdge(scene.frame, p);
+  const edges = edgesOffered(scene, source);
+  const outer = edges ? outerEdge(scene.frame, p) : null;
   if (outer && fits(scene, source, { kind: "outer", edge: outer })) return { kind: "outer", edge: outer };
   for (const [pane, r] of Object.entries(scene.frame.rects)) {
     if (!inside(r, p)) continue;
-    // A pane the dragged tabs would raise past the room is no target: not its strip, not its middle.
-    const joins = fits(scene, source, { kind: "pane", pane });
+    // A pane the dragged tabs would raise past the room is no target: not its strip, not its middle;
+    // nor a thread pane for what it does not hold (joinOffered).
+    const joins = fits(scene, source, { kind: "pane", pane }) && joinOffered(scene, source, pane);
     // A rail (a folded pane) is one target as a whole: a tab joins the end of its tabs.
     if (r.rail) return joins ? { kind: "pane", pane } : null;
     const strip = Math.min(scene.stripHeight, r.h);
+    // A thread pane's row has no places: it is the pane, as its middle.
+    if (p.y < r.y + strip && scene.modes && Object.hasOwn(scene.modes.threadPanes, pane)) return joins ? { kind: "pane", pane } : null;
     if (p.y < r.y + strip)
       return joins
         ? {
@@ -159,7 +205,7 @@ function zoneAt(scene: DragScene, source: DragSource, p: Point): DropTarget | nu
           }
         : null;
     const body = { x: r.x, y: r.y + strip, w: r.w, h: r.h - strip };
-    const edge = bodyEdge(body, p, (e) => fits(scene, source, { kind: "edge", pane, edge: e }));
+    const edge = bodyEdge(body, p, (e) => edges && fits(scene, source, { kind: "edge", pane, edge: e }));
     if (edge) return { kind: "edge", pane, edge };
     return joins ? { kind: "pane", pane } : null;
   }
@@ -183,7 +229,8 @@ function allowed(scene: DragScene, source: DragSource, t: DropTarget): boolean {
   const own = tabsOf(scene, source.pane).length;
   if (t.kind === "outer") return panes.length > 1 || own > 1;
   if (t.pane !== source.pane) return true;
-  if (t.kind === "strip") return true;
+  // A thread pane's one tab has no other place in its row (Panes and Single).
+  if (t.kind === "strip") return own > 1 || !scene.modes;
   if (t.kind === "edge") return own > 1;
   return false;
 }

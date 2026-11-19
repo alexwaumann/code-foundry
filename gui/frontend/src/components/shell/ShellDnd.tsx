@@ -11,7 +11,10 @@ import { dropPlan, groupDropPlan } from "@/shell/drag/dropPlan";
 import { groupDropsInGrid, groupSpaceCommands, headerDropIds, rowDragGroup, type HeaderSection } from "@/shell/drag/groupDrop";
 import { fullscreenOn } from "@/shell/fullscreen";
 import { resetShellDrag, useShellDragStore } from "@/shell/drag/state";
-import { dropTarget, insertionBar, sameTarget, type DragScene, type DragSource, type DropTarget, type StripTab } from "@/shell/drag/targets";
+import { dropTarget, insertionBar, sameTarget, type DragScene, type DragSource, type DropTarget, type SceneModes, type StripTab } from "@/shell/drag/targets";
+import { modeDrop, modeDropDone, modeDropLabel, modeDropOver, type ModeDrop } from "@/shell/drag/modeDrop";
+import { THREADS_OPEN_AS_KEY, targetThreadPane, threadLikeKind, threadsOpenAsOf } from "@/shell/threadsOpenAs";
+import { useSettingsStore } from "@/stores/settings";
 import { rowDragSource, threadDropsInGrid } from "@/shell/drag/threadSource";
 import { panesOf, type GeoNode } from "@/shell/geometry/types";
 import { paneFitsInSpace } from "@/shell/drag/room";
@@ -84,13 +87,14 @@ function measureStrips(grid: HTMLElement): Record<string, StripTab[]> {
   // A rail's tabs too: their names and count (a rail is one target as a whole, so their places are not used).
   for (const pane of Array.from(grid.querySelectorAll<HTMLElement>('[data-testid="shell-pane"], [data-testid="shell-rail"]'))) {
     const id = pane.dataset.paneId ?? "";
-    out[id] = Array.from(pane.querySelectorAll<HTMLElement>('[data-testid="shell-tab"], [data-testid="shell-rail-tab"]')).map((t) => {
+    // A thread pane's header row (Threads open as Panes or Single) is its one tab: its title.
+    out[id] = Array.from(pane.querySelectorAll<HTMLElement>('[data-testid="shell-tab"], [data-testid="shell-rail-tab"], [data-testid="thread-pane-header-title"]')).map((t) => {
       const r = t.getBoundingClientRect();
       return {
         id: t.dataset.tabId ?? "",
         x: (r.left - g.left) / z,
         w: r.width / z,
-        title: t.querySelector('[data-testid="shell-tab-label"]')?.textContent ?? "",
+        title: t.querySelector('[data-testid="shell-tab-label"], [data-testid="thread-pane-header-name"]')?.textContent ?? "",
       };
     });
   }
@@ -110,6 +114,27 @@ function gridless(spaceId: string): Snapshot {
   };
 }
 
+/**
+ * The space as the drop rules of Threads open as Panes and Single read it (shell/drag/targets.ts
+ * SceneModes); undefined under Tabs. A thread pane is named by its thread, as its row shows it.
+ */
+function sceneModes(spaceId: string, title: (tab: string) => string): SceneModes | undefined {
+  const mode = threadsOpenAsOf(useSettingsStore.getState().snapshot?.values[THREADS_OPEN_AS_KEY]);
+  if (mode === "tabs") return undefined;
+  const layout = useLayoutStore.getState();
+  const threadPanes: Record<string, string> = {};
+  const threadTabs = new Set<string>();
+  for (const p of Object.values(layout.panes)) {
+    if (p.spaceId !== spaceId) continue;
+    for (const id of p.tabIds) {
+      if (!threadLikeKind(layout.tabs[id]?.kind)) continue;
+      threadTabs.add(id);
+      threadPanes[p.id] ??= title(id);
+    }
+  }
+  return { mode, threadPanes, threadTabs, target: targetThreadPane(layout, spaceId) };
+}
+
 function snapshot(grid: HTMLElement | null, spaceId: string, row = false): Snapshot | null {
   const frame = useShellViewStore.getState().frame;
   if (!grid || !frame) return row ? gridless(spaceId) : null;
@@ -125,10 +150,11 @@ function snapshot(grid: HTMLElement | null, spaceId: string, row = false): Snaps
   const g = grid.getBoundingClientRect();
   const z = zoomFactor();
   const tree = geoTree(layout, spaceId);
+  const modes = sceneModes(spaceId, (id) => titles.get(id) || "untitled");
   return {
     origin: { x: g.left / z, y: g.top / z },
     // The tree: a drop whose result would not fit the grid is not offered (shell/drag/room.ts).
-    scene: { frame, strips, stripHeight: PANE_HEADER_HEIGHT, tree },
+    scene: { frame, strips, stripHeight: PANE_HEADER_HEIGHT, tree, ...(modes && { modes }) },
     tree,
     lay: shellDropLayout(layout.spaces[spaceId]?.mru),
     names,
@@ -153,8 +179,9 @@ function spaceName(id: string): string {
   return useLayoutStore.getState().spaces[id]?.name ?? id;
 }
 
-/** The label on a preview: what the drop makes. */
-function previewLabel(source: DragSource, target: DropTarget): string {
+/** The label on a preview: what the drop makes; under Threads open as Panes or Single, for a thread, what it does to the thread shown (`effect`). */
+function previewLabel(source: DragSource, target: DropTarget, effect: ModeDrop | null | undefined): string {
+  if (effect) return modeDropLabel(effect);
   switch (target.kind) {
     case "outer":
       return target.edge === "left" || target.edge === "right" ? "Full-height column" : "Full-width row";
@@ -174,6 +201,7 @@ function DropPreview() {
   const bar = useShellDragStore((s) => s.bar);
   const target = useShellDragStore((s) => s.target);
   const source = useShellDragStore((s) => s.source);
+  const effect = useShellDragStore((s) => s.effect);
   const outer = target?.kind === "outer";
   return (
     <>
@@ -189,7 +217,7 @@ function DropPreview() {
           style={{ left: origin.x + preview.x, top: origin.y + preview.y, width: preview.w, height: preview.h }}
         >
           <span className={cn("rounded-md bg-cf-surface-overlay px-2 py-0.5 text-caption font-medium shadow-sm ring-1", outer ? "text-cf-accent ring-cf-accent" : "text-cf-focus ring-cf-focus")}>
-            {previewLabel(source, target)}
+            {previewLabel(source, target, effect)}
           </span>
         </div>
       )}
@@ -359,6 +387,7 @@ export function ShellDnd({ children }: { children: ReactNode }) {
     useShellDragStore.setState({
       client,
       target,
+      effect: target ? modeDrop(s.scene, st.source, target) : null,
       preview: target ? dropPreview(s.tree, s.scene.frame, st.source, target, s.lay) : null,
       bar: target?.kind === "strip" ? insertionBar(s.scene, target.pane, target.index) : null,
     });
@@ -478,7 +507,8 @@ export function ShellDnd({ children }: { children: ReactNode }) {
         if (section) return headerOverText(what(src, group), section, headerDropIds(section, draggedThreads(st), useThreadsStore.getState().byId).length);
         if (space) return `${what(src, group)} is over the space ${spaceName(space)}.`;
         if (group.length > 1) return target ? `${what(src, group)} is over ${targetText(src, target, names())}.` : `${what(src, group)} is over no place to drop.`;
-        return overText(src, target, names());
+        const effect = target ? modeDrop(snap.current?.scene ?? {}, src, target) : null;
+        return overText(src, target, names(), effect ? modeDropOver(effect) : "");
       },
       onDragOver: () => undefined,
       onDragEnd: () => {
@@ -487,7 +517,8 @@ export function ShellDnd({ children }: { children: ReactNode }) {
         if (e.section) return headerDroppedText(what(e.source, e.group), e.section);
         if (endedSpace.current) return `${what(e.source, e.group)} was moved to the space ${spaceName(endedSpace.current)}.`;
         if (e.group.length > 1) return e.target ? `${what(e.source, e.group)} was dropped on ${targetText(e.source, e.target, names())}.` : `${what(e.source, e.group)} was not opened.`;
-        return droppedText(e.source, e.target, names());
+        const effect = e.target ? modeDrop(snap.current?.scene ?? {}, e.source, e.target) : null;
+        return droppedText(e.source, e.target, names(), effect ? modeDropDone(effect) : "");
       },
       onDragCancel: () => {
         const e = ended.current;

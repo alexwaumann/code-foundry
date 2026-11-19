@@ -50,15 +50,17 @@ export function pickedUpText(source: DragSource, names: DragNames): string {
   return `Picked up ${lower(sourceText(source, names))}. Move it over a strip or an edge and release to drop it there, or press Escape to cancel.`;
 }
 
-export function overText(source: DragSource, target: DropTarget | null, names: DragNames): string {
+/** `effect`: what letting go does, when the place does not say (Threads open as Panes or Single: shell/drag/modeDrop.ts). */
+export function overText(source: DragSource, target: DropTarget | null, names: DragNames, effect = ""): string {
   const what = sourceText(source, names);
-  return target ? `${what} is over ${targetText(source, target, names)}.` : `${what} is over no place to drop.`;
+  return target ? `${what} is over ${targetText(source, target, names)}${effect ? `; ${effect}` : ""}.` : `${what} is over no place to drop.`;
 }
 
-export function droppedText(source: DragSource, target: DropTarget | null, names: DragNames): string {
+/** `effect`: what the drop did, when the place does not say (overText's). */
+export function droppedText(source: DragSource, target: DropTarget | null, names: DragNames, effect = ""): string {
   const what = sourceText(source, names);
   if (!target) return source.kind === "thread" ? `${what} was not opened.` : `${what} was put back.`;
-  return `${what} was dropped on ${targetText(source, target, names)}.`;
+  return `${what} was dropped on ${targetText(source, target, names)}${effect ? `; ${effect}` : ""}.`;
 }
 
 export function cancelledText(source: DragSource, names: DragNames): string {

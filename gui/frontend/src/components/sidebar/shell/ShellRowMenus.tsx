@@ -7,9 +7,11 @@ import { runLinked } from "@/shell/linkedRun";
 import { discardDraft, openDraft } from "@/shell/drafts";
 import { spaceOfThread, useLayoutStore } from "@/stores/layout";
 import { RowMenu } from "../RowMenu";
+import { OpenBesideItem } from "./OpenBesideItem";
 
 /**
- * A shell thread row's context menu: Open ▸ first (the thread's diff per checkout, its pull
+ * A shell thread row's context menu: Open ▸ first (under Threads open as Panes, Open beside first:
+ * OpenBesideItem; then the thread's diff per checkout, its pull
  * requests, its terminal tabs and New terminal tab: the thread header's items, ThreadSurfaceItems),
  * Move to space ▸ (the header's MoveToSpaceItems: thread.space.move, its linked tabs go along; or
  * New space), then the classic row's items (RowMenu: rename, pin, snooze, archive, …, fork, remove) without its old
@@ -40,6 +42,7 @@ export function ShellRowMenu({ id }: { id: string }) {
           <ContextMenuSub>
             <ContextMenuSubTrigger data-testid="row-menu-open">Open</ContextMenuSubTrigger>
             <ContextMenuSubContent className="min-w-52" data-testid="row-menu-open-surfaces">
+              <OpenBesideItem threadId={id} onPick={pick} />
               <ThreadSurfaceItems threadId={id} spaceId={spaceId} kit={contextMenuKit} onPick={pick} />
             </ContextMenuSubContent>
           </ContextMenuSub>

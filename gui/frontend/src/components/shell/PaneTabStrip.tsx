@@ -1,9 +1,10 @@
-import { useEffect, useLayoutEffect, useRef, useState, type HTMLAttributes, type KeyboardEvent, type ReactElement, type Ref, type SyntheticEvent } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type HTMLAttributes, type KeyboardEvent, type ReactElement, type Ref } from "react";
 import { Maximize2, Minimize2, X } from "lucide-react";
 import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from "@/components/ui/context-menu";
 import { Tip } from "@/components/ui/tooltip";
 import { PANE_HEADER_HEIGHT } from "@/components/window/titleBand";
 import { rowToneDotClasses, statusRegistry } from "@/lib/statusRegistry";
+import { mergeHandlers } from "@/lib/mergeHandlers";
 import { cn } from "@/lib/utils";
 import { zoomFactor } from "@/lib/zoom";
 import { focusTabNow } from "@/shell/commands";
@@ -149,27 +150,6 @@ export function LinkedTip({ tab, tabName, cut }: { tab: TabEntry; tabName: strin
   );
 }
 
-type Handler = (e: SyntheticEvent) => void;
-
-/** Each of `extra`'s handlers (dnd-kit's listeners) called after the one `props` has for the same event. */
-function mergeHandlers(props: object, extra: object | undefined): Record<string, Handler> {
-  const out: Record<string, Handler> = {};
-  const own = props as Record<string, unknown>;
-  for (const [name, fn] of Object.entries(extra ?? {}) as [string, unknown][]) {
-    if (typeof fn !== "function") continue;
-    const next = fn as Handler;
-    const first = own[name];
-    out[name] =
-      typeof first === "function"
-        ? (e) => {
-            (first as Handler)(e);
-            next(e);
-          }
-        : next;
-  }
-  return out;
-}
-
 /**
  * A tab's context menu around its element (the strip's tab, the rail's icon), for a surface with
  * `tabMenu`; the element alone without one. The element must take a context menu trigger's props
@@ -299,7 +279,7 @@ function ShellTabBox({ tab, active, paneFocused, fit, focusable, ref: triggerRef
  * The strip's right end: full screen for this pane, or, while it is full screen, a labelled exit
  * with its key (Escape) so leaving is never a guess.
  */
-function FullscreenButton({ paneId, on, pushed }: { paneId: string; on: boolean; pushed: boolean }) {
+export function FullscreenButton({ paneId, on, pushed }: { paneId: string; on: boolean; pushed: boolean }) {
   if (on) {
     return (
       <button
