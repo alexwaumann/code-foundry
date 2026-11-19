@@ -14,6 +14,7 @@ import { applyIntent } from "./intents";
 import { applyLayoutEvent } from "./layout";
 import { applyMemoryEvent } from "./memory";
 import { applyNotificationEvent } from "./notifications";
+import { noteNotificationArrivals } from "./arrivals";
 import { raiseArrivalToasts } from "./notificationToasts";
 import { applySearchActivity } from "./searchActivity";
 import { applyThemeEvent } from "./themes";
@@ -109,6 +110,7 @@ const handlers: Handlers = {
   notification: (ev) => {
     applyNotificationEvent(ev);
     raiseArrivalToasts(ev);
+    noteNotificationArrivals(ev);
   },
 };
 

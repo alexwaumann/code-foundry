@@ -48,6 +48,9 @@
      * turn, forever; transform only, so nothing around it lays out or repaints. */
     --animate-status-working: cf-status-turn 5s linear infinite;
     --animate-status-waiting: cf-status-turn 11s linear infinite;
+    /* The arrival tilt (lib/arrivals.ts, docs/notes/arrival-tilt.md): once, when something that
+     * needs the user arrives. */
+    --animate-arrival-tilt: cf-arrival-tilt 1400ms ease-in-out 1;
     /* The shadcn colour names, for components/ui (vendored shadcn) only: everything else uses
      * the --color-cf-* utilities below (src/design/guards.test.ts, colour guard). */
     --color-background: var(--background);
@@ -568,6 +571,40 @@
 @keyframes cf-status-turn {
   to {
     transform: rotate(360deg);
+  }
+}
+
+/* The arrival tilt (--animate-arrival-tilt in @theme): eight swings dying away, 20° at most. It
+ * plays even under prefers-reduced-motion: it says something arrived, it is not decoration
+ * (docs/notes/arrival-tilt.md). */
+@keyframes cf-arrival-tilt {
+  0%,
+  100% {
+    transform: rotate(0);
+  }
+  8% {
+    transform: rotate(20deg);
+  }
+  20% {
+    transform: rotate(-18deg);
+  }
+  32% {
+    transform: rotate(15deg);
+  }
+  44% {
+    transform: rotate(-12deg);
+  }
+  56% {
+    transform: rotate(9deg);
+  }
+  68% {
+    transform: rotate(-6deg);
+  }
+  80% {
+    transform: rotate(4deg);
+  }
+  90% {
+    transform: rotate(-2deg);
   }
 }
 
