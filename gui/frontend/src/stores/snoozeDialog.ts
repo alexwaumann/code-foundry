@@ -6,16 +6,19 @@ import { useThreadsStore } from "./threads";
 /**
  * The custom snooze dialog ("Pick a date and time…" in the snooze menus,
  * components/snooze/SnoozeDialog.tsx): which thread it snoozes. The dialog invokes
- * thread.snooze itself (snoozeThread); it adds no user action of its own.
+ * thread.snooze itself (snoozeThread; given several threads from the sidebar's selection, one
+ * thread.snooze --ids: stores/bulkThreadActions.ts); it adds no user action of its own.
  */
 interface SnoozeDialogState {
   open: boolean;
   threadId: string;
+  /** The sidebar's selection when it snoozes several threads at once (the first is `threadId`); [] for one. */
+  ids: readonly string[];
   /** Incremented on every open, so the dialog's body starts fresh. */
   seq: number;
 }
 
-export const useSnoozeDialogStore = create<SnoozeDialogState>()(() => ({ open: false, threadId: "", seq: 0 }));
+export const useSnoozeDialogStore = create<SnoozeDialogState>()(() => ({ open: false, threadId: "", ids: [], seq: 0 }));
 
 /**
  * Opens the dialog for a thread. Deferred, so the menu that picked "Pick a date and time…"
@@ -23,7 +26,20 @@ export const useSnoozeDialogStore = create<SnoozeDialogState>()(() => ({ open: f
  */
 export function openSnoozeDialog(threadId: string): void {
   queueMicrotask(() => {
-    useSnoozeDialogStore.setState((s) => ({ open: true, threadId, seq: s.seq + 1 }));
+    useSnoozeDialogStore.setState((s) => ({ open: true, threadId, ids: [], seq: s.seq + 1 }));
+  });
+}
+
+/** Opens the dialog for several threads (the sidebar's bulk menu), deferred as openSnoozeDialog. */
+export function openSnoozeDialogFor(ids: readonly string[]): void {
+  const first = ids[0];
+  if (first === undefined) return;
+  if (ids.length === 1) {
+    openSnoozeDialog(first);
+    return;
+  }
+  queueMicrotask(() => {
+    useSnoozeDialogStore.setState((s) => ({ open: true, threadId: first, ids: [...ids], seq: s.seq + 1 }));
   });
 }
 

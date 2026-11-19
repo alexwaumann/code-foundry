@@ -9,8 +9,11 @@ import { openThread } from "@/stores/openThread";
 import { needsKeyLeave, needsKeyMove, openNeedsPopup } from "@/stores/needs";
 import { renameInSidebar, useUiStore } from "@/stores/ui";
 import type { Row } from "@/lib/tree";
+import { clearSidebarSelection, rangeSidebarRows, selectedSidebarThreads, setSidebarOrder, toggleSidebarRow, useEscapeClearsSidebarSelection, useSidebarSelectionStore } from "@/stores/sidebarSelection";
 import { RowTooltipsEnabled } from "../rowTooltips";
+import { BulkRowMenu } from "./BulkRowMenu";
 import { useSelectedRowKey } from "./listRows";
+import { MultiSelectEnabled, type ClickMods } from "./multiSelect";
 import { DraftRowMenu, ShellRowMenu } from "./ShellRowMenus";
 
 /**
@@ -20,7 +23,8 @@ import { DraftRowMenu, ShellRowMenu } from "./ShellRowMenus";
 export interface ListboxRows {
   selectedKey: string | null;
   cursorKey: string | null;
-  activate: (row: ShellRow) => void;
+  /** A row's click; with `mods` (a pointer click) cmd and shift select instead (the expanded list). */
+  activate: (row: ShellRow, mods?: ClickMods) => void;
 }
 
 /** The last sidebarFocusSeq a list acted on, whichever of the two presentations was drawn. */
@@ -50,6 +54,11 @@ interface ThreadListboxProps {
   claimsFocus?: boolean;
   /** Told as a row's context menu opens and closes (a rail card stays open while it is up). */
   onMenuOpenChange?: (open: boolean) => void;
+  /**
+   * Thread rows select several with cmd- and shift-click, and a selected row's menu acts on
+   * all of them (docs/notes/sidebar-bulk-select.md): the expanded list only.
+   */
+  multiSelect?: boolean;
   children: (list: ListboxRows) => ReactNode;
 }
 
@@ -60,15 +69,40 @@ interface ThreadListboxProps {
  * row under a right click (ShellRowMenu, DraftRowMenu), with the rows' hover cards shut while it is
  * open. The expanded list (ShellSidebarList) and the collapsed rail (sidebar/rail) draw the rows,
  * and so do the rail's Working, Snoozed and Archived cards (rail/RailSectionCard.tsx).
+ *
+ * With `multiSelect` (the expanded list), Finder's rules (docs/notes/sidebar-bulk-select.md):
+ * cmd-click toggles a thread row in the selection, shift-click selects the shown rows from the
+ * anchor (else the open thread) to it, a plain click opens as always and drops the selection,
+ * Escape drops it, and a right click on a selected row while two or more are selected opens
+ * the bulk menu (BulkRowMenu); on any other row it drops the selection and opens that row's.
  */
-export function ThreadListbox({ rows, scrollToRow, testId, label = "Threads", className, claimsFocus = true, onMenuOpenChange, children }: ThreadListboxProps) {
+export function ThreadListbox({ rows, scrollToRow, testId, label = "Threads", className, claimsFocus = true, onMenuOpenChange, multiSelect = false, children }: ThreadListboxProps) {
   const listRef = useRef<HTMLDivElement>(null);
   const selectedKey = useSelectedRowKey();
   const cursorKey = useUiStore((s) => s.cursorKey);
   const focusSeq = useUiStore((s) => s.sidebarFocusSeq);
   const emberId = useShownEmberThreadId();
   const emberSelected = useUiStore((s) => emberId !== "" && s.selection.kind === "thread" && s.selection.id === emberId);
-  const [menuRow, setMenuRow] = useState<ShellThreadRow | Row | DraftRow | null>(null);
+  const [menuRow, setMenuRow] = useState<ShellThreadRow | Row | DraftRow | { kind: "bulk"; ids: string[] } | null>(null);
+
+  // The shown thread rows, in order: what a shift-click ranges over; a selected thread that left goes.
+  const threadOrder = useMemo(() => rows.flatMap((r) => (r.kind === "thread" ? [r.threadId] : [])), [rows]);
+  // The open thread's row: a shift-click's anchor while nothing is selected.
+  const openId = useMemo(() => {
+    const r = rows.find((x) => x.key === selectedKey);
+    return r?.kind === "thread" ? r.threadId : null;
+  }, [rows, selectedKey]);
+  useEffect(() => {
+    if (multiSelect) setSidebarOrder(threadOrder, openId);
+  }, [multiSelect, threadOrder, openId]);
+  useEffect(() => {
+    if (!multiSelect) return;
+    return () => {
+      clearSidebarSelection();
+      setSidebarOrder([], null);
+    };
+  }, [multiSelect]);
+  useEscapeClearsSidebarSelection(multiSelect);
 
   const cursorIndex = useMemo(() => {
     const at = (key: string | null) => (key ? rows.findIndex((r) => r.key === key && isPickable(r)) : -1);
@@ -96,17 +130,26 @@ export function ThreadListbox({ rows, scrollToRow, testId, label = "Threads", cl
    * (select() through the selection bridge: thread.open; an Archived or Snoozed row's with
    * --preview); a draft row focuses or reopens its composer (composer.draft.open).
    */
-  const activate = useCallback((row: ShellRow) => {
-    if (!isPickable(row)) return;
-    const ui = useUiStore.getState();
-    ui.setCursor(row.key);
-    if (row.kind === "draft") {
+  const activate = useCallback(
+    (row: ShellRow, mods?: ClickMods) => {
+      if (!isPickable(row)) return;
+      const ui = useUiStore.getState();
+      ui.setCursor(row.key);
+      if (multiSelect && row.kind === "thread" && (mods?.metaKey || mods?.shiftKey)) {
+        if (mods.shiftKey) rangeSidebarRows(row.threadId);
+        else toggleSidebarRow(row.threadId);
+        return;
+      }
+      clearSidebarSelection();
+      if (row.kind === "draft") {
       void openDraft(row.draftId);
       return;
     }
-    // An Archived or Snoozed row opens the thread as the space's preview tab (shell-model.md, "Preview tabs").
-    openThread(row.threadId, { preview: row.section === "archived" || row.section === "snoozed" });
-  }, []);
+      // An Archived or Snoozed row opens the thread as the space's preview tab (shell-model.md, "Preview tabs").
+      openThread(row.threadId, { preview: row.section === "archived" || row.section === "snoozed" });
+    },
+    [multiSelect],
+  );
 
   const moveCursor = (i: number) => {
     const row = rows[i];
@@ -159,7 +202,8 @@ export function ThreadListbox({ rows, scrollToRow, testId, label = "Threads", cl
         renameInSidebar(row.threadId);
         break;
       case "Escape":
-        if (ui.selection.kind === "thread") useUiStore.setState((s) => ({ promptFocusSeq: s.promptFocusSeq + 1 }));
+        if (multiSelect && useSidebarSelectionStore.getState().ids.length > 0) clearSidebarSelection();
+        else if (ui.selection.kind === "thread") useUiStore.setState((s) => ({ promptFocusSeq: s.promptFocusSeq + 1 }));
         break;
       default:
         return;
@@ -174,6 +218,15 @@ export function ThreadListbox({ rows, scrollToRow, testId, label = "Threads", cl
       e.preventDefault();
       setMenuRow(null);
       return;
+    }
+    if (multiSelect) {
+      const picked = useSidebarSelectionStore.getState().ids;
+      if (row.kind === "thread" && picked.length >= 2 && picked.includes(row.threadId)) {
+        setMenuRow({ kind: "bulk", ids: selectedSidebarThreads() });
+        onMenuOpenChange?.(true);
+        return;
+      }
+      clearSidebarSelection();
     }
     setMenuRow(row);
     onMenuOpenChange?.(true);
@@ -201,17 +254,25 @@ export function ThreadListbox({ rows, scrollToRow, testId, label = "Threads", cl
             data-testid={testId}
             data-shell-list
             aria-activedescendant={onEmber ? `row-${EMBER_ROW_KEY}` : activeRow ? `row-${activeRow.key}` : undefined}
+            aria-multiselectable={multiSelect || undefined}
             className={cn("group flex min-h-0 flex-1 flex-col outline-none", className)}
             onKeyDown={onKeyDown}
             onBlur={needsKeyLeave}
             onPointerDown={needsKeyLeave}
+            onMouseDown={(e) => {
+              // A shift-click selects rows, never text: the press would stretch a text selection.
+              if (!multiSelect || !e.shiftKey || e.button !== 0) return;
+              e.preventDefault();
+              listRef.current?.focus();
+            }}
             onContextMenu={onContextMenu}
           >
-            {children({ selectedKey, cursorKey: shownCursor, activate })}
+            <MultiSelectEnabled value={multiSelect}>{children({ selectedKey, cursorKey: shownCursor, activate })}</MultiSelectEnabled>
           </div>
         </ContextMenuTrigger>
         {menuRow?.kind === "thread" && <ShellRowMenu id={menuRow.threadId} />}
         {menuRow?.kind === "draft" && <DraftRowMenu id={menuRow.draftId} />}
+        {menuRow?.kind === "bulk" && <BulkRowMenu ids={menuRow.ids} />}
       </ContextMenu>
     </RowTooltipsEnabled>
   );

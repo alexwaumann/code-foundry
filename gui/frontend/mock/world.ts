@@ -306,6 +306,22 @@ interface LayoutSeen {
 }
 
 /** thread.archive archives (rather than unarchives): its `archived` arg, else the opposite of now. */
+/** A command's ids arg (thread.archive, .remove, .snooze given several threads): its entries, blanks and repeats dropped; [] when not given. */
+function idsArg(args: Record<string, string>): string[] {
+  return [...new Set((args.ids ?? "").split(",").map((x) => x.trim()).filter(Boolean))];
+}
+
+/** The daemon's eachThread message: "<verb> 2 threads<tail>: a, b". */
+function eachMessage(verb: string, ids: readonly string[], tail = ""): string {
+  return `${verb} ${String(ids.length)} thread${ids.length === 1 ? "" : "s"}${tail}: ${ids.join(", ")}`;
+}
+
+/** The daemon's snoozeManyConfirm / archiveManyConfirm question for several threads, of which `busy` ("name (why)") are mid-turn. */
+function manyConfirm(verb: string, what: string, doing: string, busy: readonly string[]): string {
+  if (busy.length === 1) return `${verb} ${what}? 1 of them is busy: ${busy[0] ?? ""}. ${doing} ends its turn or stops its background work.`;
+  return `${verb} ${what}? ${String(busy.length)} of them are busy: ${busy.join(", ")}. ${doing} ends their turns and stops their background work.`;
+}
+
 function archiving(s: { archivedAt: Date | null }, args: Record<string, string>): boolean {
   return args.archived === undefined || args.archived === "" ? s.archivedAt === null : args.archived === "true";
 }
@@ -3049,6 +3065,15 @@ export class World {
   }
 
   /** archiveInterrupts over the thread's own background agents and shells. */
+  /** Of ids, the threads archiving or snoozing would cut off, as "name (why)" (the daemon's busy list for several threads). */
+  private busyNames(ids: readonly string[]): string[] {
+    return ids.flatMap((id) => {
+      const s = this.threads.get(id);
+      const why = s ? this.interrupts(s).why : "";
+      return s && why ? [`${s.name || s.id} (${why})`] : [];
+    });
+  }
+
   private interrupts(s: MockThread): { why: string; ends: string } {
     const { backgroundAgentsRunning } = agentCounts(this.logs.agentRunsOf(s.id));
     return archiveInterrupts(s, backgroundAgentsRunning, this.logs.shellsOf(s.id));
@@ -4928,15 +4953,23 @@ export class World {
           description:
             "Archive a thread: Claude is closed, its terminals are removed and it is unpinned and listed apart. Unarchive puts it back in the thread list. Without archived, toggles. Pinning or sending a message unarchives a thread too.",
           keybindings: [],
-          args: [{ name: "archived", type: ArgType.BOOL, required: false, description: "Archive (true) or unarchive (false); default: the opposite of now" }],
+          args: [
+            { name: "ids", type: ArgType.STRING, required: false, description: "Comma-separated thread ids, to act on several" },
+            { name: "archived", type: ArgType.BOOL, required: false, description: "Archive (true) or unarchive (false); default: the opposite of now" },
+          ],
           // Like the daemon: only archiving a thread that is mid-turn or running background
-          // work asks, or one that takes a working hidden child along (archiveOneConfirm).
+          // work asks, or one that takes a working hidden child along (archiveOneConfirm);
+          // given several ids, one question naming the busy ones (archiveManyConfirm).
           confirmIf: (ctx, args) => {
-            const s = activeThread(ctx);
+            const ids = idsArg(args);
+            if (ids.length > 1) return args.archived !== "false" && ids.some((id) => this.threads.has(id) && this.interrupts(this.thread(id)).why !== "");
+            const s = ids.length === 1 ? this.threads.get(ids[0] ?? "") : activeThread(ctx);
             return s !== undefined && archiving(s, args) && (this.interrupts(s).why !== "" || this.hiddenWorking(s.id).length > 0);
           },
-          confirm: (ctx) => {
-            const s = activeThread(ctx);
+          confirm: (ctx, args) => {
+            const ids = idsArg(args);
+            if (ids.length > 1) return manyConfirm("Archive", `${String(ids.length)} threads`, "Archiving", this.busyNames(ids));
+            const s = ids.length === 1 ? this.threads.get(ids[0] ?? "") : activeThread(ctx);
             const name = s?.name || (s?.id ?? "");
             const { why, ends } = s ? this.interrupts(s) : { why: "", ends: "" };
             const kids = s ? this.hiddenWorking(s.id).length : 0;
@@ -4946,6 +4979,13 @@ export class World {
         },
         when: (ctx) => activeThread(ctx) !== undefined,
         run: (ctx, args) => {
+          const ids = idsArg(args);
+          if (ids.length > 0) {
+            // Like the daemon given ids: archive each (archived=false unarchives each); no toggle.
+            const archived = args.archived !== "false";
+            for (const id of ids) this.archiveThread(this.thread(id).id, archived);
+            return eachMessage(archived ? "archived" : "unarchived", ids);
+          }
           const s = activeThread(ctx);
           if (!s) throw new CommandError("unavailable", "no active thread");
           return this.archiveThread(s.id, archiving(s, args));
@@ -4963,10 +5003,14 @@ export class World {
             { name: "until", type: ArgType.STRING, required: false, description: "When the thread wakes: 1h, 90m, tomorrow, next-week, mon..sun, 2026-10-20, 2026-10-20 14:00 or RFC 3339" },
             { name: "save", type: ArgType.BOOL, required: false, description: "Save it for later: it never wakes" },
             { name: "clear", type: ArgType.BOOL, required: false, description: "Unsnooze instead" },
+            { name: "ids", type: ArgType.STRING, required: false, description: "Comma-separated thread ids, to act on several" },
           ],
-          // Like the daemon: only snoozing (a valid time, or save) a thread that is mid-turn asks.
+          // Like the daemon: only snoozing (a valid time, or save) a thread that is mid-turn asks;
+          // given several ids, one question naming the busy ones (snoozeManyConfirm).
           confirmIf: (ctx, args) => {
-            const s = activeThread(ctx);
+            const ids = idsArg(args);
+            if (ids.length > 1) return args.clear !== "true" && this.busyNames(ids).length > 0;
+            const s = ids.length === 1 ? this.threads.get(ids[0] ?? "") : activeThread(ctx);
             if (s === undefined || args.clear === "true" || this.interrupts(s).why === "") return false;
             if (args.save === "true") return args.until === undefined;
             try {
@@ -4976,7 +5020,12 @@ export class World {
             }
           },
           confirm: (ctx, args) => {
-            const s = activeThread(ctx);
+            const ids = idsArg(args);
+            if (ids.length > 1) {
+              const save = args.save === "true";
+              return manyConfirm(save ? "Save" : "Snooze", `${String(ids.length)} threads${save ? " for later" : ""}`, save ? "Saving" : "Snoozing", this.busyNames(ids));
+            }
+            const s = ids.length === 1 ? this.threads.get(ids[0] ?? "") : activeThread(ctx);
             const { why, ends } = s ? this.interrupts(s) : { why: "", ends: "" };
             const name = s?.name || (s?.id ?? "");
             if (args.save === "true") return `Save thread ${name} for later? ${why}; saving ${ends}.`;
@@ -4985,6 +5034,17 @@ export class World {
         },
         when: (ctx) => activeThread(ctx) !== undefined,
         run: (ctx, args) => {
+          const ids = idsArg(args);
+          if (ids.length > 0) {
+            if ([args.save === "true", args.until !== undefined, args.clear === "true"].filter(Boolean).length !== 1) throw new CommandError("invalid", "invalid until: give until, save or clear");
+            const until = args.save === "true" ? null : snoozeUntil(args);
+            for (const id of ids) {
+              const t = this.thread(id);
+              if (args.save === "true") this.saveThread(t.id);
+              else this.snoozeThread(t.id, until);
+            }
+            return eachMessage(args.save === "true" ? "saved" : until ? "snoozed" : "unsnoozed", ids, args.save === "true" ? " for later" : "");
+          }
           const s = activeThread(ctx);
           if (!s) throw new CommandError("unavailable", "no active thread");
           if (args.save === "true") {
@@ -5033,16 +5093,31 @@ export class World {
       },
       {
         cmd: {
-          name: "thread.remove", title: "Remove Thread", category: "Thread", description: "Forget the thread (closes it first if connected)", keybindings: [], args: [],
+          name: "thread.remove", title: "Remove Thread", category: "Thread", description: "Forget the thread (closes it first if connected)", keybindings: [],
+          args: [{ name: "ids", type: ArgType.STRING, required: false, description: "Comma-separated thread ids, to act on several" }],
           // Like the daemon's DynamicConfirm: a thread in a worktree Code Foundry made says its clean worktrees go.
-          confirm: (ctx) => {
-            const s = activeThread(ctx);
+          confirm: (ctx, args) => {
+            const ids = idsArg(args);
+            if (ids.length > 1) {
+              const made = ids.some((id) => this.threads.get(id)?.createdWorktree === true && this.threads.get(id)?.branch !== "") ? " Their clean worktrees are removed; branches stay." : "";
+              return `Remove ${String(ids.length)} threads? Claude stops in each that runs, and they are forgotten: ${ids.join(", ")}.${made}`;
+            }
+            const s = ids.length === 1 ? this.threads.get(ids[0] ?? "") : activeThread(ctx);
             const made = s?.createdWorktree === true && s.branch !== "" ? " Its clean worktrees are removed; branches stay." : "";
-            return `Remove thread ${ctx?.activeThreadId ?? ""}? Claude stops if it runs, and the thread is forgotten.${made}`;
+            return `Remove thread ${s?.id ?? ""}? Claude stops if it runs, and the thread is forgotten.${made}`;
           },
         },
         when: (ctx) => activeThread(ctx) !== undefined,
-        run: (ctx) => {
+        run: (ctx, args) => {
+          const ids = idsArg(args);
+          if (ids.length > 0) {
+            for (const id of ids) {
+              const t = this.thread(id);
+              for (const c of this.archiveCascade(t.id)) this.removeOne(c);
+              this.removeOne(t);
+            }
+            return eachMessage("removed", ids);
+          }
           const s = activeThread(ctx);
           if (!s) throw new CommandError("unavailable", "no active thread");
           // Like the daemon: the threads below it go first, in tree order, then the thread.

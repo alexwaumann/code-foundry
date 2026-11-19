@@ -40,6 +40,7 @@ const { useThreadStore } = await import("@/stores/thread");
 const { applyNotificationEvent, resetNotifications } = await import("@/stores/notifications");
 const { note, noteEvent } = await import("@/test/notificationFakes");
 const { resetShellDrag, useShellDragStore } = await import("@/shell/drag/state");
+const { clearSidebarSelection, useSidebarSelectionStore } = await import("@/stores/sidebarSelection");
 // The Needs-you card reads its ask without a Watch: nothing comes back here.
 vi.mock("@/api/threadSearch", async (orig) => ({ ...(await orig<typeof import("@/api/threadSearch")>()), readAskItems: () => new Promise(() => undefined) }));
 
@@ -525,6 +526,299 @@ describe("a thread's notifications on its row (docs/notes/notifications-4-row-ma
     expect(markOf("s:s-1")?.dataset.tone).toBe("muted");
     show(note("n-1", { threadId: "s-1", status: "snoozed" }));
     expect(markOf("s:s-1")).toBeNull();
+  });
+});
+
+describe("selecting several rows (docs/notes/sidebar-bulk-select.md)", () => {
+  beforeEach(() => {
+    clearSidebarSelection();
+  });
+  afterEach(() => {
+    clearSidebarSelection();
+  });
+
+  const picked = () => [...list().querySelectorAll<HTMLElement>("[data-picked]")].map((e) => e.dataset.rowKey);
+  /** The thread rows as shown, in order. */
+  const threadKeys = () => rowKeys().filter((k): k is string => k?.startsWith("s:") ?? false);
+  const cmd = (key: string) => {
+    fireEvent.click(rowOf(key), { metaKey: true });
+  };
+  const shift = (key: string) => {
+    fireEvent.click(rowOf(key), { shiftKey: true });
+  };
+  /** Opens the context menu on a row; the bulk one or the row's. */
+  const menuOn = async (key: string, testId: "bulk-menu" | "row-menu") => {
+    fireEvent.contextMenu(rowOf(key));
+    return screen.findByTestId(testId);
+  };
+  const items = (menu: HTMLElement) => [...menu.querySelectorAll('[role="menuitem"]')].map((e) => e.textContent);
+
+  it("cmd-click adds or removes a row without opening it; the list says it is multi-selectable", async () => {
+    render(<ShellSidebarList bodyHeight={800} />);
+    expect(list().getAttribute("aria-multiselectable")).toBe("true");
+    cmd("s:s-3");
+    cmd("s:s-4");
+    await settle();
+    expect(runs).toEqual([]);
+    expect(picked().sort()).toEqual(["s:s-3", "s:s-4"]);
+    expect(rowOf("s:s-3").getAttribute("aria-selected")).toBe("true");
+    // The theme's accent tint, never the open thread's neutral step.
+    expect(rowOf("s:s-3").className).toContain("bg-cf-accent-surface");
+    expect(rowOf("s:s-3").className).not.toContain("bg-cf-sidebar-row-selected");
+    cmd("s:s-3");
+    expect(picked()).toEqual(["s:s-4"]);
+    expect(rowOf("s:s-3").getAttribute("aria-selected")).toBe("false");
+  });
+
+  it("a plain click opens the thread as always and drops the selection", async () => {
+    render(<ShellSidebarList bodyHeight={800} />);
+    cmd("s:s-3");
+    cmd("s:s-4");
+    fireEvent.click(rowOf("s:s-5"));
+    await settle();
+    expect(runs).toEqual([{ name: "thread.open", args: { id: "s-5", focus: "true" } }]);
+    expect(picked()).toEqual([]);
+  });
+
+  it("shift-click selects every shown row from the anchor to it, and a second one re-stretches from the same anchor", () => {
+    render(<ShellSidebarList bodyHeight={800} />);
+    const keys = threadKeys();
+    expect(keys.length).toBeGreaterThanOrEqual(5);
+    cmd(keys[1] ?? "");
+    shift(keys[4] ?? "");
+    expect(picked()).toEqual(keys.slice(1, 5));
+    shift(keys[2] ?? "");
+    expect(picked()).toEqual(keys.slice(1, 3));
+    // Upwards past the anchor.
+    shift(keys[0] ?? "");
+    expect(picked()).toEqual(keys.slice(0, 2));
+    // A cmd-click moves the anchor; the next range starts there and keeps what was picked.
+    cmd(keys[4] ?? "");
+    shift(keys[3] ?? "");
+    expect(picked()).toEqual([...keys.slice(0, 2), ...keys.slice(3, 5)]);
+  });
+
+  it("with nothing selected, shift-click ranges from the open thread; with no open thread, it picks the row", async () => {
+    render(<ShellSidebarList bodyHeight={800} />);
+    const keys = threadKeys();
+    shift(keys[2] ?? "");
+    // The focused tab is a draft's composer: no thread is open.
+    expect(picked()).toEqual([keys[2]]);
+    clearSidebarSelection();
+    // The open thread is s-1's (the focused tab).
+    await seedLayout({ ...layoutOf([space(pane("p-1", [tab("t-1", "thread", "s-1", { key: "thread:s-1" })], "t-1"), "p-1")]), rev: 3 });
+    await settle();
+    const open = keys.indexOf("s:s-1");
+    const last = keys.length - 1;
+    shift(keys[last] ?? "");
+    expect(picked()).toEqual(keys.slice(open, last + 1));
+  });
+
+  it("shift-click never starts a text selection", () => {
+    render(<ShellSidebarList bodyHeight={800} />);
+    const down = new MouseEvent("mousedown", { bubbles: true, cancelable: true, shiftKey: true, button: 0 });
+    rowOf("s:s-3").dispatchEvent(down);
+    expect(down.defaultPrevented).toBe(true);
+    const plain = new MouseEvent("mousedown", { bubbles: true, cancelable: true, button: 0 });
+    rowOf("s:s-3").dispatchEvent(plain);
+    expect(plain.defaultPrevented).toBe(false);
+  });
+
+  it("Escape in the list drops the selection, and so does Escape with nothing else taking it", () => {
+    render(<ShellSidebarList bodyHeight={800} />);
+    cmd("s:s-3");
+    cmd("s:s-4");
+    list().focus();
+    fireEvent.keyDown(list(), { key: "Escape" });
+    expect(picked()).toEqual([]);
+    cmd("s:s-3");
+    (document.activeElement as HTMLElement | null)?.blur();
+    fireEvent.keyDown(document.body, { key: "Escape" });
+    expect(picked()).toEqual([]);
+    // A field's Escape is the field's.
+    cmd("s:s-3");
+    const input = document.createElement("input");
+    document.body.append(input);
+    fireEvent.keyDown(input, { key: "Escape" });
+    expect(picked()).toEqual(["s:s-3"]);
+    input.remove();
+  });
+
+  it("a selected thread that leaves the list leaves the selection", () => {
+    render(<ShellSidebarList bodyHeight={800} />);
+    cmd("s:s-3");
+    cmd("s:s-4");
+    act(() => {
+      const { byId, order } = useThreadsStore.getState();
+      const { ["s-4"]: _gone, ...rest } = byId;
+      useThreadsStore.setState({ byId: rest, order: order.filter((id) => id !== "s-4") });
+    });
+    expect(picked()).toEqual(["s:s-3"]);
+    expect(useSidebarSelectionStore.getState().ids).toEqual(["s-3"]);
+  });
+
+  it("a right click on a selected row while two are selected opens the bulk menu; on another row it drops them and opens that row's", async () => {
+    render(<ShellSidebarList bodyHeight={800} />);
+    cmd("s:s-4");
+    cmd("s:s-3");
+    const bulk = await menuOn("s:s-3", "bulk-menu");
+    expect(within(bulk).getByTestId("bulk-menu-count").textContent).toBe("2 threads");
+    expect(items(bulk)).toEqual(["Snooze", "Move to space", "Archive", "Remove"]);
+    fireEvent.keyDown(bulk, { key: "Escape" });
+    await settle();
+    expect(picked().sort()).toEqual(["s:s-3", "s:s-4"]);
+    const menu = await menuOn("s:s-5", "row-menu");
+    expect(menu.dataset.thread).toBe("s-5");
+    expect(picked()).toEqual([]);
+  });
+
+  it("one row selected: its right click is the row's own menu", async () => {
+    render(<ShellSidebarList bodyHeight={800} />);
+    cmd("s:s-3");
+    const menu = await menuOn("s:s-3", "row-menu");
+    expect(menu.dataset.thread).toBe("s-3");
+  });
+
+  it.each([
+    {
+      name: "archived and snoozed together: no Archive or Unarchive, no Unsnooze",
+      threads: [thread({ id: "s-7", name: "Old", archivedAtMs: 1 }), thread({ id: "s-8", name: "Later", snoozedUntilMs: Date.now() + 3_600_000 })],
+      want: ["Snooze", "Move to space", "Remove"],
+    },
+    {
+      name: "all archived: Unarchive",
+      threads: [thread({ id: "s-7", name: "Old", archivedAtMs: 1 }), thread({ id: "s-8", name: "Older", archivedAtMs: 2 })],
+      want: ["Snooze", "Move to space", "Unarchive", "Remove"],
+    },
+    {
+      name: "all snoozed: Unsnooze",
+      threads: [thread({ id: "s-7", name: "Later", savedAtMs: 1 }), thread({ id: "s-8", name: "Much later", snoozedUntilMs: Date.now() + 3_600_000 })],
+      want: ["Snooze", "Unsnooze", "Move to space", "Archive", "Remove"],
+    },
+    {
+      name: "one being set up: no Snooze",
+      threads: [thread({ id: "s-7", name: "Setting up", setup: { phase: "running", startedAtMs: 1, endedAtMs: null, steps: [], error: "", background: true } as ThreadView["setup"] }), thread({ id: "s-8", name: "Idle" })],
+      want: ["Move to space", "Archive", "Remove"],
+    },
+  ])("the bulk menu offers what applies to every one: $name", async ({ threads, want }) => {
+    useUiStore.setState({ snoozedCollapsed: false, archivedCollapsed: false });
+    setThreads(thread({ id: "s-1" }), ...threads);
+    render(<ShellSidebarList bodyHeight={800} />);
+    cmd("s:s-7");
+    cmd("s:s-8");
+    expect(items(await menuOn("s:s-8", "bulk-menu"))).toEqual(want);
+  });
+
+  /** Selects s-4 then s-3 (the list shows s-3 first) and opens the bulk menu on s-4. */
+  const bulkOpen = async () => {
+    render(<ShellSidebarList bodyHeight={800} />);
+    cmd("s:s-4");
+    cmd("s:s-3");
+    return menuOn("s:s-4", "bulk-menu");
+  };
+  const order = () => threadKeys().filter((k) => k === "s:s-3" || k === "s:s-4").map((k) => k.slice(2)).join(",");
+
+  it("Archive and Remove: one command with every id, in list order, in the first one's context; the selection goes", async () => {
+    const menu = await bulkOpen();
+    fireEvent.click(within(menu).getByTestId("bulk-menu-archive"));
+    await settle();
+    const ids = order();
+    const first = ids.split(",")[0];
+    expect(runs).toEqual([{ name: "thread.archive", args: { archived: "true", ids }, thread: first }]);
+    expect(picked()).toEqual([]);
+    cmd("s:s-3");
+    cmd("s:s-4");
+    fireEvent.click(within(await menuOn("s:s-3", "bulk-menu")).getByTestId("bulk-menu-remove"));
+    await settle();
+    expect(runs.at(-1)).toEqual({ name: "thread.remove", args: { ids }, thread: first });
+    // The rows moving or going are the result: no toast.
+    expect(notify).not.toHaveBeenCalled();
+  });
+
+  it("Snooze ▸: a preset, Save for later and Pick a date and time are each for all of them", async () => {
+    const { useSnoozeDialogStore } = await import("@/stores/snoozeDialog");
+    const menu = await bulkOpen();
+    fireEvent.keyDown(within(menu).getByTestId("bulk-menu-snooze"), { key: "ArrowRight" });
+    const presets = await screen.findByTestId("menu-snooze-presets");
+    expect(within(presets).getByTestId("snooze-save")).toBeTruthy();
+    fireEvent.click(within(presets).getAllByTestId("snooze-preset")[0] as HTMLElement);
+    await settle();
+    const ids = order();
+    expect(runs).toHaveLength(1);
+    expect(runs[0]?.name).toBe("thread.snooze");
+    expect(runs[0]?.args.ids).toBe(ids);
+    expect(Date.parse(runs[0]?.args.until ?? "")).toBeGreaterThan(Date.now());
+    cmd("s:s-3");
+    cmd("s:s-4");
+    fireEvent.keyDown(within(await menuOn("s:s-3", "bulk-menu")).getByTestId("bulk-menu-snooze"), { key: "ArrowRight" });
+    fireEvent.click(within(await screen.findByTestId("menu-snooze-presets")).getByTestId("snooze-save"));
+    await settle();
+    expect(runs.at(-1)).toEqual({ name: "thread.snooze", args: { save: "true", ids }, thread: ids.split(",")[0] });
+    cmd("s:s-3");
+    cmd("s:s-4");
+    fireEvent.keyDown(within(await menuOn("s:s-3", "bulk-menu")).getByTestId("bulk-menu-snooze"), { key: "ArrowRight" });
+    fireEvent.click(within(await screen.findByTestId("menu-snooze-presets")).getByTestId("snooze-pick"));
+    await settle();
+    expect(useSnoozeDialogStore.getState()).toMatchObject({ open: true, ids: ids.split(",") });
+    act(() => {
+      useSnoozeDialogStore.setState({ open: false, ids: [] });
+    });
+  });
+
+  it("Move to space ▸ moves every one with one thread.space.move", async () => {
+    await seedLayout({ ...layoutOf([space(pane("p-1", [tab("t-1", "thread", "s-1")]), "p-1"), space(null, "", { id: "sp-b", name: "Review" })]), rev: 2 });
+    const menu = await bulkOpen();
+    fireEvent.keyDown(within(menu).getByTestId("bulk-menu-move-to-space"), { key: "ArrowRight" });
+    const sub = await screen.findByTestId("bulk-menu-spaces");
+    expect(items(sub)).toEqual(["Mainhere", "Review", "New space"]);
+    fireEvent.click(within(sub).getByText("Review"));
+    await settle();
+    const ids = order();
+    expect(runs).toEqual([{ name: "thread.space.move", args: { ids, space: "sp-b" }, thread: ids.split(",")[0] }]);
+    expect(picked()).toEqual([]);
+  });
+
+  it("a declined question (the daemon's one confirmation for all of them) keeps the selection", async () => {
+    runCommandForResult.mockImplementation((name: string, args: Record<string, string>) => {
+      runs.push({ name, args });
+      return Promise.resolve(null);
+    });
+    const menu = await bulkOpen();
+    fireEvent.click(within(menu).getByTestId("bulk-menu-archive"));
+    await settle();
+    expect(runs).toHaveLength(1);
+    expect(picked().sort()).toEqual(["s:s-3", "s:s-4"]);
+  });
+
+  it("every selected row dims while the selection is dragged; the others do not", () => {
+    render(<ShellSidebarList bodyHeight={800} />);
+    act(() => {
+      useShellDragStore.setState({ source: { kind: "thread", thread: "s-3" }, rowThread: "s-3", group: ["s-3", "s-4"] });
+    });
+    expect(rowOf("s:s-3").className).toContain("opacity-60");
+    expect(rowOf("s:s-4").className).toContain("opacity-60");
+    expect(rowOf("s:s-5").className).not.toContain("opacity-60");
+    act(() => {
+      resetShellDrag();
+    });
+  });
+
+  it("the Archived and Snoozed headers are drop targets and light up while a drop there would act", () => {
+    useUiStore.setState({ snoozedCollapsed: true, archivedCollapsed: true });
+    setThreads(thread({ id: "s-1" }), thread({ id: "s-7", name: "Old", archivedAtMs: 1 }), thread({ id: "s-8", name: "Later", savedAtMs: 1 }));
+    render(<ShellSidebarList bodyHeight={800} />);
+    const box = (section: string) => screen.getByTestId(`sidebar-${section}`).querySelector<HTMLElement>("[data-drop-section]");
+    // Collapsed, they are still there to drop on.
+    expect(box("archived")?.dataset.dropSection).toBe("archived");
+    expect(box("snoozed")?.dataset.dropSection).toBe("snoozed");
+    act(() => {
+      useShellDragStore.setState({ source: { kind: "thread", thread: "s-1" }, rowThread: "s-1", section: "archived" });
+    });
+    expect(box("archived")?.dataset.dropTarget).toBe("true");
+    expect(box("snoozed")?.dataset.dropTarget).toBeUndefined();
+    act(() => {
+      resetShellDrag();
+    });
   });
 });
 

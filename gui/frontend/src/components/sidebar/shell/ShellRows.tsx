@@ -31,6 +31,8 @@ import { RowTooltipsEnabled } from "../rowTooltips";
 import { NEEDS_LINE_ZONE, NeedsHoverCard } from "@/components/needs/NeedsCard";
 import { openNeedsPopup, useNeedsStore } from "@/stores/needs";
 import { useOpenRequests } from "@/stores/thread";
+import { useRowMultiSelected } from "@/stores/sidebarSelection";
+import { MultiSelectEnabled, type ClickMods } from "./multiSelect";
 
 /**
  * The shell sidebar's rows (docs/notes/shell-model.md, "Sidebar"; docs/notes/shell-16-sidebar.md):
@@ -39,21 +41,34 @@ import { useOpenRequests } from "@/stores/thread";
  * Snoozed and Archived rows keep the classic one line (SingleLineLabel) and drag as the others do.
  */
 
+/**
+ * A thread row's fill: in the multi-selection (docs/notes/sidebar-bulk-select.md) the theme's accent
+ * tint, which the open thread's neutral step never is; the open thread's; else the hover's.
+ */
+function threadFill(selected: boolean, picked: boolean): string {
+  if (picked) return "bg-cf-accent-surface text-cf-sidebar-foreground";
+  return selected ? "bg-cf-sidebar-row-selected text-cf-sidebar-foreground" : "text-cf-sidebar-foreground/90 hover:bg-cf-sidebar-row-hover";
+}
+
 /** A row's box: the classic row's colours, the lines stacked. */
-function rowClass(selected: boolean, cursor: boolean, draft = false): string {
+function rowClass(selected: boolean, cursor: boolean, draft = false, picked = false): string {
   return cn(
     "group/row flex h-full cursor-default flex-col rounded-md px-2 py-1 text-body-sm select-none",
     // A draft keeps a light amber tint at all times, stronger on hover and when selected (docs/notes/shell-model.md, "Drafts").
-    draft
-      ? selected
-        ? "bg-cf-warning/20 text-cf-sidebar-foreground"
-        : "bg-cf-warning-surface text-cf-sidebar-foreground/90 hover:bg-cf-warning/15"
-      : selected
-        ? "bg-cf-sidebar-row-selected text-cf-sidebar-foreground"
-        : "text-cf-sidebar-foreground/90 hover:bg-cf-sidebar-row-hover",
+    draft ? (selected ? "bg-cf-warning/20 text-cf-sidebar-foreground" : "bg-cf-warning-surface text-cf-sidebar-foreground/90 hover:bg-cf-warning/15") : threadFill(selected, picked),
     cursor && "group-focus:ring-1 group-focus:ring-cf-focus group-focus:ring-inset",
   );
 }
+
+/** Whether this thread's row is in the sidebar's multi-selection (never on the rail, which has none). */
+function usePicked(id: string): boolean {
+  const enabled = useContext(MultiSelectEnabled);
+  const picked = useRowMultiSelected(id);
+  return enabled && picked;
+}
+
+/** Whether a click carries cmd or shift: it selects the row (the row's own click), so a part of the row that opens something on click lets it through. */
+const selecting = (e: React.MouseEvent) => e.metaKey || e.shiftKey;
 
 /** Line 1's left: the made-by-thread glyph, the place's icon and the project (or "No project"), the pin. */
 function PlaceLabel({ id }: { id: string }) {
@@ -217,6 +232,7 @@ function RequestLineView({ id, anchor, line }: { id: string; anchor: string; lin
         data-request-id={line.requestId}
         data-kind={line.kind}
         onClick={(e) => {
+          if (selecting(e)) return;
           e.stopPropagation();
           openNeedsPopup(id, lineAnchor, line.requestId);
         }}
@@ -248,6 +264,7 @@ function RequestLines({ id, anchor }: { id: string; anchor: string }) {
           data-testid="needs-line-more"
           data-request-id={more.requestId}
           onClick={(e) => {
+            if (selecting(e)) return;
             e.stopPropagation();
             openNeedsPopup(id, anchor, more.requestId);
           }}
@@ -276,6 +293,7 @@ function NeedsLines({ id, anchor }: { id: string; anchor: string }) {
         className="flex min-w-0 cursor-pointer"
         data-testid="needs-title"
         onClick={(e) => {
+          if (selecting(e)) return;
           e.stopPropagation();
           openNeedsPopup(id, anchor);
         }}
@@ -291,7 +309,8 @@ interface RowProps<R> {
   row: R;
   selected: boolean;
   cursor: boolean;
-  onActivate: (row: R) => void;
+  /** The row's click; a thread row passes its modifier keys (cmd and shift select: ThreadListbox). */
+  onActivate: (row: R, mods?: ClickMods) => void;
 }
 
 /**
@@ -308,22 +327,24 @@ export const ShellThreadRowView = memo(function ShellThreadRowView({ row, select
   const elsewhere = useLayoutStore((s) => spaceOfThread(s, id) !== s.currentSpaceId);
   // A thread of another space drags too: only a space tab in the top bar takes it (ShellDnd).
   const { setNodeRef, listeners, describedBy, dragging } = useThreadDrag(id);
+  const picked = usePicked(id);
   const body = (
     <div
       ref={setNodeRef}
       {...listeners}
       id={`row-${row.key}`}
       role="option"
-      aria-selected={selected}
+      aria-selected={selected || picked}
       aria-describedby={describedBy}
       data-row-kind="thread"
       data-row-key={row.key}
       data-section={row.section}
       data-cursor={cursor || undefined}
       data-elsewhere={elsewhere || undefined}
-      className={cn(rowClass(selected, cursor), dragging && "opacity-60")}
-      onClick={() => {
-        onActivate(row);
+      data-picked={picked || undefined}
+      className={cn(rowClass(selected, cursor, false, picked), dragging && "opacity-60")}
+      onClick={(e) => {
+        onActivate(row, e);
       }}
       onDoubleClick={() => {
         useUiStore.getState().setRenaming(id);
@@ -351,6 +372,7 @@ export const ShellThreadRowView = memo(function ShellThreadRowView({ row, select
 export const ShellQuietRowView = memo(function ShellQuietRowView({ row, selected, cursor, onActivate }: RowProps<ShellThreadRow>) {
   const id = row.threadId;
   const { setNodeRef, listeners, describedBy, dragging } = useThreadDrag(id);
+  const picked = usePicked(id);
   return (
     <ThreadTooltip id={id}>
       <div
@@ -358,20 +380,21 @@ export const ShellQuietRowView = memo(function ShellQuietRowView({ row, selected
         {...listeners}
         id={`row-${row.key}`}
         role="option"
-        aria-selected={selected}
+        aria-selected={selected || picked}
         aria-describedby={describedBy}
         data-row-kind="thread"
         data-row-key={row.key}
         data-section={row.section}
         data-cursor={cursor || undefined}
+        data-picked={picked || undefined}
         className={cn(
           "group/row flex h-full cursor-default items-center gap-1.5 rounded-md px-2 text-body-sm select-none",
-          selected ? "bg-cf-sidebar-row-selected text-cf-sidebar-foreground" : "text-cf-sidebar-foreground/90 hover:bg-cf-sidebar-row-hover",
+          threadFill(selected, picked),
           cursor && "group-focus:ring-1 group-focus:ring-cf-focus group-focus:ring-inset",
           dragging && "opacity-60",
         )}
-        onClick={() => {
-          onActivate(row);
+        onClick={(e) => {
+          onActivate(row, e);
         }}
         onDoubleClick={() => {
           useUiStore.getState().setRenaming(id);

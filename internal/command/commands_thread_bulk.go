@@ -101,6 +101,17 @@ func eachThread(ctx context.Context, ids []string, verb string, do func(ctx cont
 	return Result{Message: strings.Join(lines, "\n"), JSON: res, ExitCode: 1}
 }
 
+// afterCount puts tail after eachThread's first line's count ("moved 2 threads" + " to
+// space Two": "moved 2 threads to space Two: a, b"), for a verb whose object follows it.
+func afterCount(res Result, verb, tail string) Result {
+	out, _ := res.JSON.(ThreadsResult)
+	if n := len(out.Done); n > 0 && tail != "" {
+		head := verb + " " + plural(n, "thread")
+		res.Message = head + tail + strings.TrimPrefix(res.Message, head)
+	}
+	return res
+}
+
 // confirmListMax is how many ids a confirmation lists before "and N more".
 const confirmListMax = 10
 

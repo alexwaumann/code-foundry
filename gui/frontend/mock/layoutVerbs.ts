@@ -566,9 +566,23 @@ function verbs(world: LayoutVerbsWorld): Entry[] {
       },
     },
     {
-      cmd: { name: "thread.space.move", title: "Move Thread to Space", category: CATEGORY, description: "Move a thread to another space, with its linked tabs there.", keybindings: [], args: [str("id", "The thread (default: the active one)", { positional: true }), str("space", "The space", { required: true })] },
+      cmd: { name: "thread.space.move", title: "Move Thread to Space", category: CATEGORY, description: "Move a thread to another space, with its linked tabs there.", keybindings: [], args: [str("id", "The thread (default: the active one)", { positional: true }), str("ids", "Comma-separated thread ids, to move several"), str("space", "The space", { required: true })] },
       when: always,
       run: (c, a) => {
+        const ids = [...new Set((a.ids ?? "").split(",").map((x) => x.trim()).filter(Boolean))];
+        if (ids.length > 0) {
+          // Like the daemon given ids: one move per thread, in order; the answer has the last rev.
+          const sp = resolveSpace(L.state(), a.space ?? "");
+          const before = L.rev;
+          for (const thread of ids) {
+            try {
+              L.apply({ op: "move_thread", thread, space: sp.id });
+            } catch (err) {
+              throw layoutRpcError(err) as Error;
+            }
+          }
+          return { message: `moved ${String(ids.length)} threads to space ${sp.id} "${sp.name}": ${ids.join(", ")}`, resultJson: JSON.stringify({ rev: L.rev, changed: L.rev !== before }) };
+        }
         const thread = a.id || c?.activeThreadId || "";
         if (!thread) refuse("invalid argument: name a thread");
         const sp = resolveSpace(L.state(), a.space ?? "");

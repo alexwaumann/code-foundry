@@ -4,9 +4,10 @@
  * `thread.open` with the place (threadDrop.ts), and a tab or a pane moves in one `tab.move` or
  * `pane.move` (drop.ts). Null when the drop does nothing.
  */
-import { spaceDropCommands, type SpaceCommand } from "@/shell/spaces";
+import { spaceDropCommands } from "@/shell/spaces";
 import type { LayoutState } from "@/stores/layout";
 import { dropCommand } from "./drop";
+import { groupGridSteps, groupSpaceCommands, type DropStep } from "./groupDrop";
 import type { DragSource, DropTarget } from "./targets";
 import { threadDropArgs } from "./threadDrop";
 
@@ -14,7 +15,7 @@ export interface DropPlan {
   /** The space whose tab took the drop; "" for a drop in the grid. */
   space: string;
   /** Run in order, each after the last one's commit (shell/spaceActions.ts runSpaceDrop). */
-  commands: SpaceCommand[];
+  commands: DropStep[];
 }
 
 /**
@@ -32,4 +33,25 @@ export function dropPlan(source: DragSource, target: DropTarget | null, space: s
   if (source.kind === "tab" ? !s.tabs[source.tab] : !s.panes[source.pane]) return null;
   const cmd = dropCommand(source, target, s.panes[source.pane]?.tabIds ?? []);
   return cmd ? { space: "", commands: [cmd] } : null;
+}
+
+/**
+ * The commands a drop of the sidebar's selection runs (`ids`, two or more threads in display
+ * order; docs/notes/sidebar-bulk-select.md): on the space tab `space`, one thread.space.move with
+ * them; in the grid, each placed after the one before (groupDrop.ts). Null when it does nothing.
+ */
+export function groupDropPlan(
+  ids: readonly string[],
+  target: DropTarget | null,
+  space: string,
+  s: Pick<LayoutState, "panes" | "tabs" | "threads" | "defaultSpaceId">,
+  spaceId: string,
+  archived: (id: string) => boolean,
+): DropPlan | null {
+  if (space) {
+    const commands = groupSpaceCommands(ids, space, s, archived);
+    return commands ? { space, commands } : null;
+  }
+  if (!target) return null;
+  return { space: "", commands: groupGridSteps(ids, target, s, spaceId) };
 }

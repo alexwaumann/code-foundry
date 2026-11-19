@@ -2,6 +2,8 @@ package command
 
 import (
 	"context"
+	"fmt"
+	"strings"
 	"time"
 
 	"connectrpc.com/connect"
@@ -20,6 +22,8 @@ import (
 // thread.archive; unsnoozing never asks. A thread snoozing itself mid-turn is snoozed
 // when the turn ends, and not asked either (Deferred). See
 // docs/notes/snooze-threads-1-daemon.md and docs/notes/self-put-away.md.
+// With ids it acts on several threads (commands_thread_bulk.go): the sidebar's bulk
+// menu and its Snoozed header as a drop target (docs/notes/sidebar-bulk-select.md).
 func threadSnooze(b ThreadBackend, idArg ArgSpec) Command {
 	return Command{
 		Name:  "thread.snooze",
@@ -31,13 +35,14 @@ func threadSnooze(b ThreadBackend, idArg ArgSpec) Command {
 			"On itself mid-turn: at turn's end.",
 		Category: "Thread",
 		Args: []ArgSpec{
-			positional(idArg),
+			positional(optionalID(idArg)),
+			threadIDsArg,
 			// The forms only here: the guide has no room for them twice.
 			{Name: "until", Type: String, Description: "When the thread wakes: " + SnoozeUntilHelp},
 			{Name: "save", Type: Bool, Description: "Save it for later: it never wakes"},
 			{Name: "clear", Type: Bool, Description: "Unsnooze instead"},
 		},
-		When:    hasThread,
+		When:    hasThreadOrCLI,
 		Confirm: "Snooze thread {id}? Claude is still working; snoozing ends the turn.",
 		ConfirmIf: func(ctx context.Context, c Context, a Args) bool {
 			return snoozeConfirm(ctx, b, c, a) != ""
@@ -47,10 +52,18 @@ func threadSnooze(b ThreadBackend, idArg ArgSpec) Command {
 		},
 		Run: func(ctx context.Context, c Context, a Args) (Result, error) {
 			now := time.Now()
+			ids, err := targetThreads(a)
+			if err != nil {
+				return Result{}, err
+			}
 			req, err := snoozeRequest(a, now)
 			if err != nil {
 				return Result{}, err
 			}
+			if a.Has("ids") {
+				return snoozeThreads(ctx, b, c, ids, req), nil
+			}
+			req.Id = ids[0]
 			req.ByThreadId = askingThread(c)
 			res, err := b.Snooze(ctx, connect.NewRequest(req))
 			if err != nil {
@@ -112,7 +125,14 @@ func snoozeConfirm(ctx context.Context, b ThreadBackend, c Context, a Args) stri
 	if err != nil || (req.GetUntil() == nil && !req.GetSave()) {
 		return ""
 	}
-	res, err := b.Get(ctx, connect.NewRequest(&v1.GetThreadRequest{Id: a.String("id")}))
+	ids, err := targetThreads(a)
+	if err != nil {
+		return ""
+	}
+	if len(ids) > 1 {
+		return snoozeManyConfirm(ctx, b, c, ids, req.GetSave())
+	}
+	res, err := b.Get(ctx, connect.NewRequest(&v1.GetThreadRequest{Id: ids[0]}))
 	if err != nil {
 		return ""
 	}
@@ -129,4 +149,76 @@ func snoozeConfirm(ctx context.Context, b ThreadBackend, c Context, a Args) stri
 		return "Save thread " + name + " for later? " + why + "; saving " + ends + "."
 	}
 	return "Snooze thread " + name + "? " + why + "; snoozing " + ends + "."
+}
+
+// snoozeThreads is thread.snooze given ids: each is snoozed until the same time, saved
+// for later, or unsnoozed, as req says, past one that fails (eachThread). The thread
+// this runs in, among them mid-turn, is put away when its turn ends: it counts as done
+// and a line, and --json's deferred, say so (as archiveThreads).
+func snoozeThreads(ctx context.Context, b ThreadBackend, c Context, ids []string, req *v1.SnoozeThreadRequest) Result {
+	verb, tail := "unsnoozed", ""
+	switch {
+	case req.GetSave():
+		verb, tail = "saved", " for later"
+	case req.GetUntil() != nil:
+		verb, tail = "snoozed", " until "+formatSnoozeTime(req.GetUntil().AsTime(), time.Now(), time.Local)
+	}
+	var later []string
+	res := eachThread(ctx, ids, verb, func(ctx context.Context, id string) error {
+		one := &v1.SnoozeThreadRequest{Id: id, Until: req.GetUntil(), Save: req.GetSave(), ByThreadId: askingThread(c)}
+		r, err := b.Snooze(ctx, connect.NewRequest(one))
+		if err == nil && r.Msg.GetDeferred() {
+			later = append(later, id)
+		}
+		return err
+	})
+	res = afterCount(res, verb, tail)
+	if len(later) > 0 {
+		out, _ := res.JSON.(ThreadsResult)
+		out.Deferred = later
+		res.JSON = out
+		res.Message += "\n" + strings.Join(later, ", ") + ": " + whenTurnEnds
+	}
+	return res
+}
+
+// snoozeManyConfirm is thread.snooze's confirmation given ids (snoozing or saving: save),
+// or "" when none of them is mid-turn or runs background work (archiveInterrupts, the
+// rule for one thread): one question that names the count and the busy ones. It reads
+// them in one list; a thread not in it needs none (Run reports it).
+func snoozeManyConfirm(ctx context.Context, b ThreadBackend, c Context, ids []string, save bool) string {
+	res, err := b.List(ctx, connect.NewRequest(&v1.ListThreadsRequest{Filter: &v1.ThreadFilter{All: true}}))
+	if err != nil {
+		return ""
+	}
+	byID := make(map[string]*v1.Thread, len(res.Msg.GetThreads()))
+	for _, s := range res.Msg.GetThreads() {
+		byID[s.GetId()] = s
+	}
+	var busy []string
+	for _, id := range ids {
+		s, ok := byID[id]
+		if !ok {
+			continue
+		}
+		if why, _ := archiveInterrupts(s); why != "" && !waitsForTurn(c, s) {
+			busy = append(busy, threadNameOrID(s)+" ("+why+")")
+		}
+	}
+	verb, doing := "Snooze", "Snoozing"
+	if save {
+		verb, doing = "Save", "Saving"
+	}
+	what := plural(len(ids), "thread")
+	if save {
+		what += " for later"
+	}
+	switch len(busy) {
+	case 0:
+		return ""
+	case 1:
+		return fmt.Sprintf("%s %s? 1 of them is busy: %s. %s ends its turn or stops its background work.", verb, what, busy[0], doing)
+	default:
+		return fmt.Sprintf("%s %s? %d of them are busy: %s. %s ends their turns and stops their background work.", verb, what, len(busy), listSome(busy), doing)
+	}
 }

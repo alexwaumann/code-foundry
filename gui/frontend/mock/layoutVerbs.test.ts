@@ -206,6 +206,21 @@ describe("the mock's layout verbs", () => {
   });
 });
 
+describe("the mock's thread.space.move given ids (docs/notes/sidebar-bulk-select.md)", () => {
+  it("moves every one in order and answers the last rev", async () => {
+    const w = world();
+    await w.run("space.new", { name: "Two" });
+    const target = w.st().spaces[1]?.id ?? "";
+    expect(target).not.toBe("");
+    const out = await w.run("thread.space.move", { ids: "s-1,s-2", space: target });
+    const after = w.st();
+    expect(after.threads?.["s-1"]?.space).toBe(target);
+    expect(after.threads?.["s-2"]?.space).toBe(target);
+    expect(out.rev).toBe(w.layout.rev);
+    expect(out.changed).toBe(true);
+  });
+});
+
 describe("the mock's reopen history (internal/layout reopen.go, simplified)", () => {
   it("tab.reopen brings back the closed tab into its pane at its place, then the closed pane's tabs", async () => {
     const w = world();
