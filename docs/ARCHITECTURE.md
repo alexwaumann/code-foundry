@@ -153,6 +153,9 @@ internal/
     search/                the search dialog's history and Agent search's hidden runs
                            (claude over stream-json, not threads), quote-verified hits, Promote
                            (docs/notes/search-5-agent-daemon.md)
+    page/                  who owns each HTML page file (the thread that last showed or wrote it), the
+                           user's answers for pages no thread owns, and their storage
+                           (docs/notes/page-ownership-daemon.md)
     settings/              $CONFIG/settings.toml: schema, validation, reload on hand edits
     skill/                 the Skills marketplace: Claude Code's marketplaces, installs (§10)
     usertheme/             the user's theme files in <home>/themes (§13)
@@ -1532,6 +1535,14 @@ tab's preview) run in sandboxed frames that never touch the API
   (`docs/notes/page-frame-links.md`). A frame that went to another site anyway is covered with
   Reload, and the bridge follows a page to its own other files (`docs/notes/leftovers-pages.md`). A page saves a file with `file.export`
   instead, into its thread's checkout, after the user allows it (`docs/notes/page-save.md`).
+* **Who owns a page** (`internal/store/page`, `docs/notes/page-ownership-daemon.md`): the
+  daemon records the thread that last showed a page file (`view.inline`, `view.open.page`)
+  or whose Claude last wrote it (Write, Edit, MultiEdit), keyed by its resolved path; a
+  thread's pages directory is its own. `PreviewFile` answers the owner, whose bridge the page
+  gets in any tab, and for a page no thread owns the user's answer, asked once per file and
+  set with `page.allow` / `page.disallow`. An allowed page with no owner gets the bridge
+  without a thread: `PageService` storage and fetch keyed by the file, which the daemon
+  refuses for a page not allowed. A removed thread's records go with its row.
 * **Page storage**: WebKit keeps a cross-site frame's localStorage for the session only, so
   `cf.storage` writes go through the GUI to `ThreadService.SetPageStorage`, one JSON file per
   thread (at most 256 KiB), handed back to a page as it loads (`PageStorage`;

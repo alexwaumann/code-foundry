@@ -2188,7 +2188,12 @@ type PreviewFileResponse struct {
 	// The thread whose pages directory holds the file (<home>/pages/<thread id>/...): the
 	// page is that thread's own, so the GUI gives it the thread's bridge in a tab linked to
 	// it without reading the thread's log. Empty for any other file.
-	PageThread    string `protobuf:"bytes,4,opt,name=page_thread,json=pageThread,proto3" json:"page_thread,omitempty"`
+	PageThread string `protobuf:"bytes,4,opt,name=page_thread,json=pageThread,proto3" json:"page_thread,omitempty"`
+	// Who owns the page and whether it may use the bridge (PageService.GetPage's answer,
+	// docs/notes/page-ownership-daemon.md), read with the grant so the frame's host is made
+	// right from the start. UNAVAILABLE for a file that is not such a page. Unset from an
+	// older daemon: page_thread alone then.
+	Page          *PageAccess `protobuf:"bytes,5,opt,name=page,proto3" json:"page,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2251,11 +2256,18 @@ func (x *PreviewFileResponse) GetPageThread() string {
 	return ""
 }
 
+func (x *PreviewFileResponse) GetPage() *PageAccess {
+	if x != nil {
+		return x.Page
+	}
+	return nil
+}
+
 var File_codefoundry_v1_filesystem_proto protoreflect.FileDescriptor
 
 const file_codefoundry_v1_filesystem_proto_rawDesc = "" +
 	"\n" +
-	"\x1fcodefoundry/v1/filesystem.proto\x12\x0ecodefoundry.v1\"0\n" +
+	"\x1fcodefoundry/v1/filesystem.proto\x12\x0ecodefoundry.v1\x1a\x19codefoundry/v1/page.proto\"0\n" +
 	"\x16ListDirectoriesRequest\x12\x16\n" +
 	"\x06prefix\x18\x01 \x01(\tR\x06prefix\"o\n" +
 	"\x0eDirectoryEntry\x12\x12\n" +
@@ -2428,14 +2440,15 @@ const file_codefoundry_v1_filesystem_proto_rawDesc = "" +
 	"\tmime_type\x18\x02 \x01(\tR\bmimeType\x12\x12\n" +
 	"\x04size\x18\x03 \x01(\x03R\x04size\x12\x1f\n" +
 	"\vmodified_at\x18\x04 \x01(\x03R\n" +
-	"modifiedAt\"\x7f\n" +
+	"modifiedAt\"\xaf\x01\n" +
 	"\x13PreviewFileResponse\x12\x10\n" +
 	"\x03url\x18\x01 \x01(\tR\x03url\x12\x14\n" +
 	"\x05scope\x18\x02 \x01(\tR\x05scope\x12\x1f\n" +
 	"\vsingle_file\x18\x03 \x01(\bR\n" +
 	"singleFile\x12\x1f\n" +
 	"\vpage_thread\x18\x04 \x01(\tR\n" +
-	"pageThread*X\n" +
+	"pageThread\x12.\n" +
+	"\x04page\x18\x05 \x01(\v2\x1a.codefoundry.v1.PageAccessR\x04page*X\n" +
 	"\n" +
 	"SkillScope\x12\x1b\n" +
 	"\x17SKILL_SCOPE_UNSPECIFIED\x10\x00\x12\x14\n" +
@@ -2500,6 +2513,7 @@ var file_codefoundry_v1_filesystem_proto_goTypes = []any{
 	(*StreamFileRequest)(nil),             // 26: codefoundry.v1.StreamFileRequest
 	(*StreamFileResponse)(nil),            // 27: codefoundry.v1.StreamFileResponse
 	(*PreviewFileResponse)(nil),           // 28: codefoundry.v1.PreviewFileResponse
+	(*PageAccess)(nil),                    // 29: codefoundry.v1.PageAccess
 }
 var file_codefoundry_v1_filesystem_proto_depIdxs = []int32{
 	2,  // 0: codefoundry.v1.ListDirectoriesResponse.entries:type_name -> codefoundry.v1.DirectoryEntry
@@ -2514,29 +2528,30 @@ var file_codefoundry_v1_filesystem_proto_depIdxs = []int32{
 	15, // 9: codefoundry.v1.TextFileMatch.lines:type_name -> codefoundry.v1.TextLineMatch
 	16, // 10: codefoundry.v1.TextLineMatch.ranges:type_name -> codefoundry.v1.TextRange
 	19, // 11: codefoundry.v1.SuggestIncludeIgnoredResponse.suggestions:type_name -> codefoundry.v1.IgnoredSuggestion
-	1,  // 12: codefoundry.v1.FilesystemService.ListDirectories:input_type -> codefoundry.v1.ListDirectoriesRequest
-	5,  // 13: codefoundry.v1.FilesystemService.ListSkills:input_type -> codefoundry.v1.ListSkillsRequest
-	9,  // 14: codefoundry.v1.FilesystemService.SearchFiles:input_type -> codefoundry.v1.SearchFilesRequest
-	12, // 15: codefoundry.v1.FilesystemService.SearchText:input_type -> codefoundry.v1.SearchTextRequest
-	18, // 16: codefoundry.v1.FilesystemService.SuggestIncludeIgnored:input_type -> codefoundry.v1.SuggestIncludeIgnoredRequest
-	21, // 17: codefoundry.v1.FilesystemService.ReadFile:input_type -> codefoundry.v1.ReadFileRequest
-	23, // 18: codefoundry.v1.FilesystemService.WriteFile:input_type -> codefoundry.v1.WriteFileRequest
-	25, // 19: codefoundry.v1.FilesystemService.PreviewFile:input_type -> codefoundry.v1.PreviewFileRequest
-	26, // 20: codefoundry.v1.FilesystemService.StreamFile:input_type -> codefoundry.v1.StreamFileRequest
-	3,  // 21: codefoundry.v1.FilesystemService.ListDirectories:output_type -> codefoundry.v1.ListDirectoriesResponse
-	7,  // 22: codefoundry.v1.FilesystemService.ListSkills:output_type -> codefoundry.v1.ListSkillsResponse
-	11, // 23: codefoundry.v1.FilesystemService.SearchFiles:output_type -> codefoundry.v1.SearchFilesResponse
-	13, // 24: codefoundry.v1.FilesystemService.SearchText:output_type -> codefoundry.v1.SearchTextResponse
-	20, // 25: codefoundry.v1.FilesystemService.SuggestIncludeIgnored:output_type -> codefoundry.v1.SuggestIncludeIgnoredResponse
-	22, // 26: codefoundry.v1.FilesystemService.ReadFile:output_type -> codefoundry.v1.ReadFileResponse
-	24, // 27: codefoundry.v1.FilesystemService.WriteFile:output_type -> codefoundry.v1.WriteFileResponse
-	28, // 28: codefoundry.v1.FilesystemService.PreviewFile:output_type -> codefoundry.v1.PreviewFileResponse
-	27, // 29: codefoundry.v1.FilesystemService.StreamFile:output_type -> codefoundry.v1.StreamFileResponse
-	21, // [21:30] is the sub-list for method output_type
-	12, // [12:21] is the sub-list for method input_type
-	12, // [12:12] is the sub-list for extension type_name
-	12, // [12:12] is the sub-list for extension extendee
-	0,  // [0:12] is the sub-list for field type_name
+	29, // 12: codefoundry.v1.PreviewFileResponse.page:type_name -> codefoundry.v1.PageAccess
+	1,  // 13: codefoundry.v1.FilesystemService.ListDirectories:input_type -> codefoundry.v1.ListDirectoriesRequest
+	5,  // 14: codefoundry.v1.FilesystemService.ListSkills:input_type -> codefoundry.v1.ListSkillsRequest
+	9,  // 15: codefoundry.v1.FilesystemService.SearchFiles:input_type -> codefoundry.v1.SearchFilesRequest
+	12, // 16: codefoundry.v1.FilesystemService.SearchText:input_type -> codefoundry.v1.SearchTextRequest
+	18, // 17: codefoundry.v1.FilesystemService.SuggestIncludeIgnored:input_type -> codefoundry.v1.SuggestIncludeIgnoredRequest
+	21, // 18: codefoundry.v1.FilesystemService.ReadFile:input_type -> codefoundry.v1.ReadFileRequest
+	23, // 19: codefoundry.v1.FilesystemService.WriteFile:input_type -> codefoundry.v1.WriteFileRequest
+	25, // 20: codefoundry.v1.FilesystemService.PreviewFile:input_type -> codefoundry.v1.PreviewFileRequest
+	26, // 21: codefoundry.v1.FilesystemService.StreamFile:input_type -> codefoundry.v1.StreamFileRequest
+	3,  // 22: codefoundry.v1.FilesystemService.ListDirectories:output_type -> codefoundry.v1.ListDirectoriesResponse
+	7,  // 23: codefoundry.v1.FilesystemService.ListSkills:output_type -> codefoundry.v1.ListSkillsResponse
+	11, // 24: codefoundry.v1.FilesystemService.SearchFiles:output_type -> codefoundry.v1.SearchFilesResponse
+	13, // 25: codefoundry.v1.FilesystemService.SearchText:output_type -> codefoundry.v1.SearchTextResponse
+	20, // 26: codefoundry.v1.FilesystemService.SuggestIncludeIgnored:output_type -> codefoundry.v1.SuggestIncludeIgnoredResponse
+	22, // 27: codefoundry.v1.FilesystemService.ReadFile:output_type -> codefoundry.v1.ReadFileResponse
+	24, // 28: codefoundry.v1.FilesystemService.WriteFile:output_type -> codefoundry.v1.WriteFileResponse
+	28, // 29: codefoundry.v1.FilesystemService.PreviewFile:output_type -> codefoundry.v1.PreviewFileResponse
+	27, // 30: codefoundry.v1.FilesystemService.StreamFile:output_type -> codefoundry.v1.StreamFileResponse
+	22, // [22:31] is the sub-list for method output_type
+	13, // [13:22] is the sub-list for method input_type
+	13, // [13:13] is the sub-list for extension type_name
+	13, // [13:13] is the sub-list for extension extendee
+	0,  // [0:13] is the sub-list for field type_name
 }
 
 func init() { file_codefoundry_v1_filesystem_proto_init() }
@@ -2544,6 +2559,7 @@ func file_codefoundry_v1_filesystem_proto_init() {
 	if File_codefoundry_v1_filesystem_proto != nil {
 		return
 	}
+	file_codefoundry_v1_page_proto_init()
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{

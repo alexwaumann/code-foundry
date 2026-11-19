@@ -291,8 +291,9 @@ func waitEnded(t *testing.T, ended <-chan struct{}) {
 	}
 }
 
-// At most PerThread requests of a thread are in flight; another thread is not held up.
-func TestDoPerThreadCap(t *testing.T) {
+// At most PerKey requests of a key (a thread's pages, one page) are in flight; another key is
+// not held up.
+func TestDoPerKeyCap(t *testing.T) {
 	var inFlight, most atomic.Int32
 	release := make(chan struct{})
 	c, base := upstream(t, func(w http.ResponseWriter, r *http.Request) {
@@ -308,34 +309,34 @@ func TestDoPerThreadCap(t *testing.T) {
 			<-release
 		}
 	})
-	done := make(chan error, PerThread)
-	for range PerThread {
+	done := make(chan error, PerKey)
+	for range PerKey {
 		go func() {
-			_, err := c.Do(context.Background(), Request{Thread: "a", URL: base + "/hold"})
+			_, err := c.Do(context.Background(), Request{Key: "a", URL: base + "/hold"})
 			done <- err
 		}()
 	}
 	deadline := time.Now().Add(2 * time.Second)
-	for inFlight.Load() < PerThread && time.Now().Before(deadline) {
+	for inFlight.Load() < PerKey && time.Now().Before(deadline) {
 		time.Sleep(5 * time.Millisecond)
 	}
 	// The ninth of thread a waits for a place and times out there.
-	if _, err := c.Do(context.Background(), Request{Thread: "a", URL: base + "/now", Timeout: 100 * time.Millisecond}); kindOf(err) != Timeout {
+	if _, err := c.Do(context.Background(), Request{Key: "a", URL: base + "/now", Timeout: 100 * time.Millisecond}); kindOf(err) != Timeout {
 		t.Errorf("ninth: %v, want Timeout", err)
 	}
-	if _, err := c.Do(context.Background(), Request{Thread: "b", URL: base + "/now", Timeout: time.Second}); err != nil {
+	if _, err := c.Do(context.Background(), Request{Key: "b", URL: base + "/now", Timeout: time.Second}); err != nil {
 		t.Errorf("another thread: %v", err)
 	}
 	close(release)
-	for range PerThread {
+	for range PerKey {
 		if err := <-done; err != nil {
 			t.Error(err)
 		}
 	}
-	if m := most.Load(); m > PerThread+1 {
+	if m := most.Load(); m > PerKey+1 {
 		t.Errorf("%d in flight at once", m)
 	}
-	if _, err := c.Do(context.Background(), Request{Thread: "a", URL: base + "/now"}); err != nil {
+	if _, err := c.Do(context.Background(), Request{Key: "a", URL: base + "/now"}); err != nil {
 		t.Errorf("after: %v", err)
 	}
 	c.mu.Lock()

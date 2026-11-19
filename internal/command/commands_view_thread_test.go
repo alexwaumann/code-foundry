@@ -45,6 +45,8 @@ type panelDeps struct {
 	layout   *layouttest.Fake
 	terms    *commandtest.Terminal
 	notes    notification.Store
+	// pageShown is told of the pages view.open.page shows (all.Deps.PageShown).
+	pageShown func(ctx context.Context, threadID, path string)
 }
 
 // panelRegistry registers every command, with threads read from th and one window open.
@@ -150,6 +152,7 @@ func panelRegistryWith(t *testing.T, th *commandtest.Thread, d panelDeps) (*comm
 	if d.notes != nil {
 		deps.Notification = d.notes
 	}
+	deps.PageShown = d.pageShown
 	if err := all.Register(reg, deps); err != nil {
 		t.Fatal(err)
 	}

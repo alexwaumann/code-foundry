@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package codefoundry.v1;
 
+import "codefoundry/v1/page.proto";
+
 // FilesystemService answers questions about the local filesystem that the GUI cannot
 // (the frontend has no filesystem access). Every path it accepts or returns is under
 // the user's home directory.
@@ -563,4 +565,9 @@ message PreviewFileResponse {
   // page is that thread's own, so the GUI gives it the thread's bridge in a tab linked to
   // it without reading the thread's log. Empty for any other file.
   string page_thread = 4;
+  // Who owns the page and whether it may use the bridge (PageService.GetPage's answer,
+  // docs/notes/page-ownership-daemon.md), read with the grant so the frame's host is made
+  // right from the start. UNAVAILABLE for a file that is not such a page. Unset from an
+  // older daemon: page_thread alone then.
+  PageAccess page = 5;
 }

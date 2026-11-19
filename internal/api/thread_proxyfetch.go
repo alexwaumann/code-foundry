@@ -29,7 +29,7 @@ func (h *Thread) ProxyFetch(ctx context.Context, req *connect.Request[v1.ProxyFe
 		return nil, threadError(err)
 	}
 	res, err := h.fetch.Do(ctx, proxyfetch.Request{
-		Thread: m.GetThreadId(), URL: m.GetUrl(), Method: m.GetMethod(), Header: m.GetHeaders(), Body: m.GetBody(),
+		Key: "thread:" + m.GetThreadId(), URL: m.GetUrl(), Method: m.GetMethod(), Header: m.GetHeaders(), Body: m.GetBody(),
 		Timeout: time.Duration(m.GetTimeoutMs()) * time.Millisecond,
 	})
 	if err != nil {

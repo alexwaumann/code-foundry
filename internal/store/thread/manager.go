@@ -384,6 +384,8 @@ type Manager struct {
 	pageStore sync.Mutex
 	// spawnExtras is what every spawn adds (spawnextras.go); nil: nothing.
 	spawnExtras atomic.Pointer[SpawnExtrasFunc]
+	// pageRecorder keeps the pages the threads show and write (pageowners.go); nil: none.
+	pageRecorder atomic.Pointer[PageRecorder]
 	// createDefaults picks the model and effort of threads some threads create
 	// (residenthooks.go); nil: none.
 	createDefaults atomic.Pointer[CreateDefaultsFunc]

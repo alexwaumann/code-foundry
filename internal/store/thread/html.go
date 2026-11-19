@@ -139,6 +139,9 @@ func (m *Manager) ShowHTML(ctx context.Context, id, path, title string, o ShowHT
 		return prev, true
 	})
 	res.Item = it
+	if err == nil {
+		m.recordPage(id, abs, pageShown) // reused too: showing it again is the latest show
+	}
 	return res, err
 }
 

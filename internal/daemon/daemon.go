@@ -46,6 +46,7 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/proxyfetch"
 	"github.com/alexwaumann/code-foundry/internal/shot"
 	"github.com/alexwaumann/code-foundry/internal/skills"
+	"github.com/alexwaumann/code-foundry/internal/store/page"
 	"github.com/alexwaumann/code-foundry/internal/store/plugin"
 	"github.com/alexwaumann/code-foundry/internal/store/project"
 	"github.com/alexwaumann/code-foundry/internal/store/terminal"
@@ -223,8 +224,20 @@ func Run(ctx context.Context, opts Options) (retErr error) {
 	shots := shot.New()
 	// Terminals answer color queries from the theme; dark until the GUI publishes one.
 	st.terminal.SetColors(ctx, terminalColors(theme.DefaultFrame(theme.SchemeDark)))
+	// Who owns each page, the user's answers for pages no thread owns and their storage
+	// (docs/notes/page-ownership-daemon.md). The preview's floor is theirs too: a file the
+	// preview refuses never gets an owner or an answer.
+	pages, err := page.New(ctx, page.Options{
+		DB: st.db, Home: st.home, PagesRoot: p.Pages(), StorageRoot: p.PageFileStorage(), Guarded: grants.Guarded,
+		ThreadExists: func(id string) bool { _, ok := st.thread.Snapshot().Thread(id); return ok },
+		Log:          log.With("store", "page"),
+	})
+	if err != nil {
+		return err
+	}
+	st.thread.SetPageRecorder(pages)
 	filesystemAPI := api.NewFilesystem(st.home, st.project, grants).WithTemp(tempRoots).WithPagesOrigin(pagesOrigin(pagesPort)).WithPagesRoot(p.Pages()).
-		WithIncludeIgnored(includeIgnored(st.settings)).WithRipgrep(st.ripgrep)
+		WithIncludeIgnored(includeIgnored(st.settings)).WithRipgrep(st.ripgrep).WithPages(pages)
 	commands := command.NewRegistry()
 	facts := pluginFacts{thread: st.thread, project: st.project, gh: st.gh}
 	// Plugins start once every command is registered (below), so a starting plugin's
@@ -329,6 +342,12 @@ func Run(ctx context.Context, opts Options) (retErr error) {
 		},
 		ShippedSkills: shippedSkills(log, p.Claude()),
 		Layout:        st.layout,
+		Pages:         pages,
+		PageShown: func(ctx context.Context, id, path string) {
+			if err := pages.Record(ctx, id, path, page.Shown); err != nil {
+				log.Debug("a page's owner not recorded", "thread", id, "path", path, "err", err)
+			}
+		},
 		// plugin new pins the SDK as the plugin skill does (skills.go).
 		PluginScaffolder: pluginscaffold.Scaffolder{
 			Home: st.home, Pin: skills.SDKPin(opts.Version.Commit, opts.Version.PluginSDKTag), Go: pluginscaffold.ShellGo,
@@ -389,6 +408,7 @@ func Run(ctx context.Context, opts Options) (retErr error) {
 		dictationAPI.Route(),
 		searchAPI.Route(),
 		filesystemAPI.Route(),
+		api.NewPage(pages, st.home, pageFetch).Route(),
 		api.NewLayout(st.layout).WithImporter(legacyImport{
 			log: log.With("store", "layout"), layout: st.layout, terminals: st.terminal, threads: st.thread.Snapshot,
 			projects: st.project.Snapshot, plugins: plugins.Snapshot,

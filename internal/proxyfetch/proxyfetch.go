@@ -50,8 +50,9 @@ const (
 	MaxTimeout = 120 * time.Second
 	// MaxRedirects is how many redirects a request follows.
 	MaxRedirects = 5
-	// PerThread is how many requests a thread's pages have in flight at once; more wait.
-	PerThread = 8
+	// PerKey is how many requests one Request.Key (a thread's pages, or one page no thread
+	// owns) has in flight at once; more wait.
+	PerKey = 8
 )
 
 // Kind is what went wrong, as the bridge reports it.
@@ -85,15 +86,16 @@ func errorf(k Kind, err error, format string, args ...any) *Error {
 
 // Request is one request a page asks for.
 type Request struct {
-	// Thread is the page's thread: the PerThread cap counts by it.
-	Thread string
-	URL    string
+	// Key is what the PerKey cap counts by: the page's thread, or the page's file when no
+	// thread owns it (the caller keeps the two apart, "thread:<id>", "page:<path>").
+	Key string
+	URL string
 	// Method is GET when empty.
 	Method string
 	Header map[string]string
 	Body   []byte
 	// Timeout is DefaultTimeout when zero, MaxTimeout at most. It covers the wait for a
-	// place under PerThread too.
+	// place under PerKey too.
 	Timeout time.Duration
 }
 
@@ -246,7 +248,7 @@ func (c *Client) Do(ctx context.Context, r Request) (Response, error) {
 		}
 		return errorf(Timeout, err, "%s did not answer in %s", u.Host, seconds(timeout))
 	}
-	release, err := c.acquire(tctx, r.Thread)
+	release, err := c.acquire(tctx, r.Key)
 	if err != nil {
 		return Response{}, timedOut(err)
 	}
@@ -318,20 +320,20 @@ func (c *Client) logged(method, host string, status int, start time.Time, failur
 	c.o.Log.Debug("page fetch", args...)
 }
 
-// acquire takes one of the thread's PerThread places, waiting while ctx lasts.
-func (c *Client) acquire(ctx context.Context, thread string) (func(), error) {
+// acquire takes one of key's PerKey places, waiting while ctx lasts.
+func (c *Client) acquire(ctx context.Context, key string) (func(), error) {
 	c.mu.Lock()
-	s := c.slots[thread]
+	s := c.slots[key]
 	if s == nil {
-		s = &slot{ch: make(chan struct{}, PerThread)}
-		c.slots[thread] = s
+		s = &slot{ch: make(chan struct{}, PerKey)}
+		c.slots[key] = s
 	}
 	s.users++
 	c.mu.Unlock()
 	leave := func() {
 		c.mu.Lock()
 		if s.users--; s.users == 0 {
-			delete(c.slots, thread)
+			delete(c.slots, key)
 		}
 		c.mu.Unlock()
 	}
