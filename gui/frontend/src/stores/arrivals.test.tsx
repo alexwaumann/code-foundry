@@ -141,7 +141,7 @@ describe("useTilt", () => {
   });
 
   it("its ref callback stays the same across re-renders of one arrival, so React does not set the delay again", () => {
-    const { result, rerender } = renderHook(({ at }) => useTilt(at, null, clock), { initialProps: { at: 1 as number | null } });
+    const { result, rerender } = renderHook(({ at }) => useTilt(at, null, clock), { initialProps: { at: 1 } });
     const first = result.current.place;
     rerender({ at: 1 });
     expect(result.current.place).toBe(first);
