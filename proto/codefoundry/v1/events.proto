@@ -9,6 +9,7 @@ import "codefoundry/v1/heartbeat.proto";
 import "codefoundry/v1/layout.proto";
 import "codefoundry/v1/memory.proto";
 import "codefoundry/v1/notification.proto";
+import "codefoundry/v1/page.proto";
 import "codefoundry/v1/theme.proto";
 import "codefoundry/v1/plugin.proto";
 import "codefoundry/v1/project.proto";
@@ -28,7 +29,7 @@ import "codefoundry/v1/workspace.proto";
 // verb reads the same stream.
 service EventService {
   // Watch streams all events. Each store's snapshot event is sent first, in the order
-  // project, workspace, terminal, thread list, thread, gh, gitops, theme, settings, update, action, plugin, skill, memory, search, layout, notification, so a
+  // project, workspace, terminal, thread list, thread, gh, gitops, theme, settings, update, action, plugin, skill, memory, search, layout, notification, page, so a
   // client can replace its state wholesale on connect.
   rpc Watch(WatchEventsRequest) returns (stream Event) {}
   // SetClientState updates what a GUI client's open Watch stream reported about itself
@@ -135,6 +136,10 @@ enum EventSource {
   // then the whole of them again per change, with the ids that arrived or were updated
   // (NotificationService, notification.proto).
   EVENT_SOURCE_NOTIFICATION = 20;
+  // Pages' owners and the user's answers for them (PageService, page.proto): a PageEvent
+  // with `all` (after notification), then one per change. It names the pages to read again,
+  // never their answer (docs/notes/page-access-live.md).
+  EVENT_SOURCE_PAGE = 21;
 }
 
 message Event {
@@ -172,6 +177,8 @@ message Event {
     LayoutEvent layout = 22;
     // The bell's notifications: all active ones, on connect and per change.
     NotificationEvent notification = 23;
+    // Pages whose owner or answer changed: read them again (PageEvent).
+    PageEvent page = 24;
   }
   // Position of a live event in the daemon's one event sequence: 1, 2, 3, ... per
   // daemon lifetime, shared by every client and source (the same event has the same

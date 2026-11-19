@@ -76,7 +76,7 @@ afterEach(() => {
   cleanup();
   previewFile.mockReset();
   runCommandForResult.mockReset();
-  usePageAnswers.setState({ byPath: {} });
+  usePageAnswers.setState({ byPath: {}, byThread: {}, all: 0 });
   vi.restoreAllMocks();
 });
 

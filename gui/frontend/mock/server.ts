@@ -350,6 +350,7 @@ const mockFiles = new MockFiles((path) => {
   return { projectId: d.projectId ?? "", baseRef: d.baseRef, files: (d.files ?? []).map((f) => ({ path: f.path ?? "", status: f.status ?? "", oldPath: f.oldPath, binary: f.binary, uncommitted: f.uncommitted })) };
 });
 world.exportDisk = mockFiles;
+world.pages.publish = (v) => world.events.publish({ source: EventSource.PAGE, event: { event: { case: "page", value: v } } });
 world.pages.world = {
   resolve: (path) => {
     try {
@@ -585,6 +586,8 @@ function routes(router: ConnectRouter): void {
       // Held until the caller aborts it (mock/bridge.ts holdWait).
       if (req.name === "thread.wait") return holdWait(req.args, ctx.signal);
       try {
+        // A page no thread owns runs nothing unless the user allowed it, as the daemon's Invoke.
+        world.pages.checkInvoke(req.context?.pagePath ?? "");
         const out = await world.invoke(req.name, req.context, req.args, req.confirmed);
         return typeof out === "string" ? { message: out, resultJson: "" } : out;
       } catch (err) {
@@ -916,6 +919,7 @@ function routes(router: ConnectRouter): void {
         // A daemon from before the shell has no layout source (POST /__mock/layout/service?off=1).
         ...(world.layout.serviceOff ? [] : [{ source: EventSource.LAYOUT, event: { event: { case: "layout" as const, value: world.layout.snapshotEvent() } } }]),
         { source: EventSource.NOTIFICATION, event: { event: { case: "notification", value: world.notifications.event() } } },
+        { source: EventSource.PAGE, event: { event: { case: "page", value: { all: true } } } },
       ];
       const ui = want.has(EventSource.UI);
       return tracked("EventService/Watch", filterEvents(world.events.subscribe(ctx.signal, initial), want), () => {

@@ -45,10 +45,16 @@
  * every `cf:store` goes to the daemon (ThreadService.SetPageStorage for a thread's page,
  * PageService.SetPageStorage for a page alone), one at a time per thread (or page file) in
  * the order sent; every other frame of that thread (or file) hears the map after.
+ *
+ * The daemon has the last word on a page's access (docs/notes/page-access-live.md): a page
+ * alone's run names its page (pageContext's pagePath), and Invoke refuses it unless the user
+ * allows the page now. A refusal for the page's access (that one, PageService's consent errors,
+ * a storage that cannot be read at ready) tells the page the truth and calls `onStale` once per
+ * access, so the frame reads its grant again and follows it (setPage, or a new host).
  */
 import { listCommands, type CommandView, type UiContextView } from "@/api/command";
 import { bridgeErrorOf } from "@/api/bridge";
-import { getPageFileStorage, proxyPageFetch, setPageFileStorage } from "@/api/page";
+import { getPageFileStorage, proxyPageFetch, refusedPageOf, setPageFileStorage } from "@/api/page";
 import { getPageStorage, setPageStorage, type PageStorageValues } from "@/api/pageStorage";
 import { proxyFetch, type ProxyFetchAnswer, type ProxyFetchCall } from "@/api/proxyFetch";
 import {
@@ -129,9 +135,10 @@ function quotedName(name: string): string {
  * cannot change it: the host builds this. A verb on a worktree or terminal takes it in its
  * args, as from the CLI.
  */
-export function pageContext(threadId: string): UiContextView {
-  // "" for a page no thread owns: the context of the CLI outside any thread.
-  return { ...emptyContext, activeView: "", activeThreadId: threadId, origin: "page" };
+export function pageContext(threadId: string, pagePath = ""): UiContextView {
+  // "" for a page no thread owns: the context of the CLI outside any thread, naming the page,
+  // whose call the daemon runs only while the user allows it (docs/notes/page-access-live.md).
+  return { ...emptyContext, activeView: "", activeThreadId: threadId, origin: "page", ...(pagePath ? { pagePath } : {}) };
 }
 
 /** The codes of a fetch's answer the strip reports: not `unavailable` (no bridge, which the page shows itself). */
@@ -193,15 +200,19 @@ function storageKey(m: Mode): string | null {
 }
 
 /**
- * A PageService error as a page alone sees it: the daemon's consent refusals (the answer
- * changed elsewhere since this frame was told) say the user has not allowed the page;
- * anything else as a thread's (bridgeErrorOf).
+ * Whether a PageService error is the daemon's consent refusal: the answer changed elsewhere
+ * since this frame was told.
+ */
+function isConsentError(err: unknown): boolean {
+  return err instanceof ConnectError && (err.code === Code.PermissionDenied || (err.code === Code.FailedPrecondition && err.findDetails(CommandFailedSchema).length === 0));
+}
+
+/**
+ * A PageService error as a page alone sees it: a consent refusal says the user has not
+ * allowed the page; anything else as a thread's (bridgeErrorOf).
  */
 function pageErrorOf(err: unknown): BridgeError {
-  if (err instanceof ConnectError && (err.code === Code.PermissionDenied || (err.code === Code.FailedPrecondition && err.findDetails(CommandFailedSchema).length === 0))) {
-    return NOT_ALLOWED;
-  }
-  return bridgeErrorOf(err);
+  return isConsentError(err) ? NOT_ALLOWED : bridgeErrorOf(err);
 }
 
 /** The daemon's refusal of a verb whose thread arg defaults to the caller's thread, which a page alone has not got. */
@@ -249,6 +260,12 @@ export interface BridgeFrame {
   onError?: (e: Omit<PageError, "count">) => void;
   /** A document said hello while the page is `ask`: it wants Code Foundry, so the user is asked. */
   onAsk?: () => void;
+  /**
+   * The daemon refused a call for what the host acts under (the page's answer changed in
+   * another window or the CLI, its thread's storage is gone): the frame's grant should be
+   * read again, and setPage (or a new host) follows it. Once per access.
+   */
+  onStale?: () => void;
 }
 
 export function createBridgeHost(frame: BridgeFrame): BridgeHost {
@@ -273,6 +290,13 @@ export function createBridgeHost(frame: BridgeFrame): BridgeHost {
   /** Whether the document now in the frame waits for its ready (`ask`), and the calls it made meanwhile. */
   let heldReady = false;
   let held: PageMessage[] = [];
+  /** Whether onStale was called under the access the host has now. */
+  let staleSaid = false;
+  const stale = () => {
+    if (disposed || staleSaid) return;
+    staleSaid = true;
+    frame.onStale?.();
+  };
   const hearStorage = (values: PageStorageValues) => {
     post(doc, { type: "cf:storage", values });
   };
@@ -366,8 +390,12 @@ export function createBridgeHost(frame: BridgeFrame): BridgeHost {
       (cmds) => cmds.filter((c) => c.readOnly).map((c) => c.name),
       () => [],
     );
-    // A storage the daemon cannot read now reads as empty; a write still goes through.
-    const storage = readStorage(m).catch(() => ({}));
+    // A storage the daemon cannot read now reads as empty; a write still goes through. The
+    // grant is read again: the page may have lost its thread or its answer meanwhile.
+    const storage = readStorage(m).catch(() => {
+      stale();
+      return {};
+    });
     void Promise.all([verbs, storage]).then(([readOnly, values]) => {
       post(forDoc, readyMessage(access, publishedTheme(), readOnly, values));
     });
@@ -387,6 +415,7 @@ export function createBridgeHost(frame: BridgeFrame): BridgeHost {
         for (const hear of storageFrames.get(sk) ?? []) if (hear !== hearStorage) hear(values);
       },
       async (err: unknown) => {
+        if (m.kind === "page" && isConsentError(err)) stale();
         post(forDoc, errorResult(id, m.kind === "page" ? pageErrorOf(err) : bridgeErrorOf(err)));
         // The page applied the write already: put back what is stored.
         const values = await readStorage(m).catch(() => null);
@@ -489,7 +518,7 @@ export function createBridgeHost(frame: BridgeFrame): BridgeHost {
       const cwd = tid ? (useThreadsStore.getState().byId[tid]?.worktreePath ?? "") : "";
       const callArgs = spec ? fillPageArgs(args, spec.args, { threadId: tid, cwd }) : args;
       if (abort.signal.aborted) return;
-      const res = await invokeConfirmed(verb, callArgs, pageContext(tid), undefined, {
+      const res = await invokeConfirmed(verb, callArgs, pageContext(tid, mode.kind === "page" ? mode.path : ""), undefined, {
         signal: abort.signal,
         ask: async (req) => {
           // A later stage of a run is the same question going on, not a new one.
@@ -515,6 +544,13 @@ export function createBridgeHost(frame: BridgeFrame): BridgeHost {
     } catch (err) {
       // An aborted call's page gave up on it, or is gone: nobody to answer.
       if (abort.signal.aborted && isAbort(err)) return;
+      // The daemon would not run a call of a page the user no longer allows (another window
+      // stopped allowing it, the CLI): say so, and read the grant again so the frame follows.
+      if (refusedPageOf(err)) {
+        stale();
+        fail(forDoc, id, verb, NOT_ALLOWED, null, QUIET);
+        return;
+      }
       const e = bridgeErrorOf(err);
       // A verb that acts on the caller's thread by default, from a page that has none.
       if (!tid && e.message.includes(NO_ACTIVE_THREAD)) fail(forDoc, id, verb, { code: "unavailable", message: `${needsThread(verb).message} unless its args name the thread: ${e.message}` });
@@ -547,7 +583,9 @@ export function createBridgeHost(frame: BridgeFrame): BridgeHost {
       else throw new Error("unreachable");
       post(forDoc, fetchResult(m.id, res));
     } catch (err) {
-      if (!(abort.signal.aborted && isAbort(err))) fail(forDoc, m.id, call, at.kind === "page" ? pageErrorOf(err) : bridgeErrorOf(err), null, FETCH_REPORTED);
+      if (abort.signal.aborted && isAbort(err)) return;
+      if (at.kind === "page" && isConsentError(err)) stale();
+      fail(forDoc, m.id, call, at.kind === "page" ? pageErrorOf(err) : bridgeErrorOf(err), null, FETCH_REPORTED);
     } finally {
       if (running.get(m.id) === abort) running.delete(m.id);
     }
@@ -693,6 +731,7 @@ export function createBridgeHost(frame: BridgeFrame): BridgeHost {
       if (sameMode(mode, next)) return false;
       mode = next;
       commands = null;
+      staleSaid = false;
       joinStorage();
       if (heldReady) {
         if (next.kind === "ask") return false;

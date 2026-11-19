@@ -134,6 +134,7 @@ export function HtmlFrame({
   page,
   pagePath,
   onAsk,
+  onStale,
   onPageErrors,
   onKey,
 }: {
@@ -147,6 +148,8 @@ export function HtmlFrame({
   pagePath?: string;
   /** A document of a page that is asked about said hello: it wants Code Foundry. */
   onAsk?: () => void;
+  /** The daemon refused a call because what the page acts under is no longer true (its answer changed, its thread is gone): read the grant again. */
+  onStale?: () => void;
   className?: string;
   style?: CSSProperties;
   onResize?: (height: number) => void;
@@ -247,10 +250,12 @@ export function HtmlFrame({
   const nameRef = useRef(name);
   const pagePathRef = useRef(pagePath);
   const askRef = useRef(onAsk);
+  const staleRef = useRef(onStale);
   useEffect(() => {
     nameRef.current = name;
     pagePathRef.current = pagePath;
     askRef.current = onAsk;
+    staleRef.current = onStale;
   });
   // The page's access as one value an effect can follow (PageBridge is a fresh object each render).
   const access = page ? JSON.stringify(page) : "";
@@ -271,6 +276,7 @@ export function HtmlFrame({
         return pagePathRef.current ?? "";
       },
       onAsk: () => askRef.current?.(),
+      onStale: () => staleRef.current?.(),
       userPresent: attention.present,
       post: (msg) => {
         const win = frameRef.current?.contentWindow;

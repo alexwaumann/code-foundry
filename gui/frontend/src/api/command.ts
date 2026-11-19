@@ -93,6 +93,8 @@ export interface UiContextView {
   activeWorkspaceId: string;
   /** What asked, when not the app's own controls (CallOrigin): a page, or a plugin's panel. */
   origin?: "page" | "plugin";
+  /** The page a page with no thread is (its PageAccess.path): the daemon runs its call only while the page may use Code Foundry. */
+  pagePath?: string;
 }
 
 export interface InvokeResultView {
@@ -170,6 +172,7 @@ export function toUiContext(ctx: UiContextView): UiContext {
     activeView: ctx.activeView,
     activeWorkspaceId: ctx.activeWorkspaceId,
     origin: ctx.origin === "page" ? CallOrigin.PAGE : ctx.origin === "plugin" ? CallOrigin.PLUGIN : CallOrigin.UNSPECIFIED,
+    pagePath: ctx.pagePath ?? "",
   });
 }
 

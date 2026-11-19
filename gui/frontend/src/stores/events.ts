@@ -14,6 +14,7 @@ import { applyIntent } from "./intents";
 import { applyLayoutEvent } from "./layout";
 import { applyMemoryEvent } from "./memory";
 import { applyNotificationEvent } from "./notifications";
+import { applyPageEvent } from "./pageAnswers";
 import { noteNotificationArrivals } from "./arrivals";
 import { raiseArrivalToasts } from "./notificationToasts";
 import { applySearchActivity } from "./searchActivity";
@@ -112,6 +113,8 @@ const handlers: Handlers = {
     raiseArrivalToasts(ev);
     noteNotificationArrivals(ev);
   },
+  // Pages whose owner or answer changed: their File tabs read their grant again (stores/pageAnswers.ts).
+  page: applyPageEvent,
 };
 
 const taps = new Set<(ev: EventView) => void>();

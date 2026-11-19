@@ -11,19 +11,29 @@ import (
 	"github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
 	"github.com/alexwaumann/code-foundry/internal/capability"
 	"github.com/alexwaumann/code-foundry/internal/command"
+	"github.com/alexwaumann/code-foundry/internal/store/page"
 	"github.com/alexwaumann/code-foundry/internal/store/plugin"
 	"github.com/alexwaumann/code-foundry/internal/store/thread"
 )
 
 // Command implements codefoundryv1connect.CommandServiceHandler over a command.Registry.
 type Command struct {
-	reg *command.Registry
+	reg   *command.Registry
+	pages PageStore
+	home  string
 }
 
 var _ codefoundryv1connect.CommandServiceHandler = (*Command)(nil)
 
 // NewCommand returns a CommandService handler for reg.
 func NewCommand(reg *command.Registry) *Command { return &Command{reg: reg} }
+
+// WithPages makes Invoke refuse a call from a page no thread owns that the user has not
+// allowed (UiContext.page_path; checkPage). home expands a "~/" path.
+func (h *Command) WithPages(pages PageStore, home string) *Command {
+	h.pages, h.home = pages, home
+	return h
+}
 
 // Route mounts the service.
 func (h *Command) Route(opts ...connect.HandlerOption) Route {
@@ -50,6 +60,9 @@ func (h *Command) Invoke(ctx context.Context, req *connect.Request[v1.InvokeComm
 			return nil, connect.NewError(connect.CodePermissionDenied, err)
 		}
 	}
+	if err := h.checkPage(ctx, req.Msg.GetContext().GetPagePath()); err != nil {
+		return nil, err
+	}
 	res, err := h.reg.Invoke(ctx, callerContext(req.Msg.GetContext()), req.Msg.GetName(), req.Msg.GetArgs(),
 		command.Confirmed(req.Msg.GetConfirmed()))
 	if err != nil {
@@ -60,6 +73,35 @@ func (h *Command) Invoke(ctx context.Context, req *connect.Request[v1.InvokeComm
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
 	return connect.NewResponse(&v1.InvokeCommandResponse{Message: res.Message, ResultJson: js, ExitCode: int32(res.ExitCode), Warnings: res.Warnings}), nil
+}
+
+// checkPage refuses a call from the page at path (UiContext.page_path, sent for a page no
+// thread owns) unless it may use the bridge now: a thread owns it or the user allowed it
+// (docs/notes/page-access-live.md). The GUI gates the page too, but an answer given in
+// another window or from the CLI reaches it only with the page event, so the daemon is the
+// one that holds. A page refused or not asked about is PermissionDenied with the page's
+// access as a detail (not FailedPrecondition, which an Invoke answers for a command
+// unavailable in its context); another path error is PageService's. "" is not checked: a
+// thread's page, and a GUI older than the field.
+func (h *Command) checkPage(ctx context.Context, path string) error {
+	if path == "" || h.pages == nil {
+		return nil
+	}
+	path = ExpandPagePath(h.home, path)
+	_, err := h.pages.Allow(ctx, path)
+	if err == nil {
+		return nil
+	}
+	if !errors.Is(err, page.ErrNotAsked) && !errors.Is(err, page.ErrRefused) {
+		return pageError(err)
+	}
+	out := connect.NewError(connect.CodePermissionDenied, err)
+	if a, aerr := h.pages.Access(ctx, path); aerr == nil {
+		if d, derr := connect.NewErrorDetail(PageAccessProto(a)); derr == nil {
+			out.AddDetail(d)
+		}
+	}
+	return out
 }
 
 // commandError maps registry and command errors to Connect errors. Errors that already

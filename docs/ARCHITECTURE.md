@@ -432,7 +432,7 @@ Services (v1):
   brings a classic window's stored panels over once (§14).
 * `EventService` — Watch: one server stream that multiplexes every store's events and UI
   intents (sources project, workspace, terminal, thread list, thread, gh, gitops, theme,
-  settings, update, action, plugin, skill, memory, search, layout, notification, ui; the thread source carries threads' pending requests only, a
+  settings, update, action, plugin, skill, memory, search, layout, notification, page, ui; the thread source carries threads' pending requests only, a
   snapshot then changes, never items; filterable). On connect it sends each source's snapshot in that order, then live events; a source that drops events for a
   slow client resends only its own snapshot. This is the GUI's only long-lived sync
   stream, and `code-foundry events --source …` reads the same one. Live events pass
@@ -1542,7 +1542,11 @@ tab's preview) run in sandboxed frames that never touch the API
   gets in any tab, and for a page no thread owns the user's answer, asked once per file and
   set with `page.allow` / `page.disallow`. An allowed page with no owner gets the bridge
   without a thread: `PageService` storage and fetch keyed by the file, which the daemon
-  refuses for a page not allowed. A removed thread's records go with its row.
+  refuses for a page not allowed. A removed thread's records go with its row. EventService's
+  `page` source names the pages whose owner or answer changed (and a removed thread), so
+  every open frame follows the daemon's answer now; a call from a page no thread owns names
+  it (`UiContext.page_path`) and Invoke refuses it unless the page is allowed
+  (`docs/notes/page-access-live.md`).
 * **Page storage**: WebKit keeps a cross-site frame's localStorage for the session only, so
   `cf.storage` writes go through the GUI to `ThreadService.SetPageStorage`, one JSON file per
   thread (at most 256 KiB), handed back to a page as it loads (`PageStorage`;

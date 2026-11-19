@@ -533,7 +533,7 @@ function requireGit(project: MockProject, what = "this"): void {
 
 export interface Invocation {
   name: string;
-  context: Omit<UiContext, "$typeName" | "$unknown" | "origin"> | null;
+  context: Omit<UiContext, "$typeName" | "$unknown" | "origin" | "pagePath"> | null;
   args: Record<string, string>;
   confirmed: boolean;
   at: string;
@@ -834,7 +834,11 @@ export class World {
   readonly termEvents = new Hub<TerminalEventInit>((v) => this.events.publish({ source: EventSource.TERMINAL, event: { event: { case: "terminal", value: v } } }));
   readonly projectEvents = new Hub<ProjectEventInit>((v) => this.events.publish({ source: EventSource.PROJECT, event: { event: { case: "project", value: v } } }));
   readonly workspaceEvents = new Hub<WorkspaceEventInit>((v) => this.events.publish({ source: EventSource.WORKSPACE, event: { event: { case: "workspace", value: v } } }));
-  readonly threadListEvents = new Hub<ThreadListEventInit>((v) => this.events.publish({ source: EventSource.THREAD_LIST, event: { event: { case: "threadList", value: v } } }));
+  readonly threadListEvents = new Hub<ThreadListEventInit>((v) => {
+    this.events.publish({ source: EventSource.THREAD_LIST, event: { event: { case: "threadList", value: v } } });
+    // The pages it owned have no owner now: the page source says so, as the daemon's (api/page_events.go).
+    if (v.event?.case === "removedId") this.pages.publish({ removedThread: v.event.value });
+  });
   readonly intents = new Hub<UiIntentInit>((v) => this.events.publish({ source: EventSource.UI, event: { event: { case: "ui", value: v } } }));
   readonly gitopsEvents = new Hub<GitOpsEventInit>((v) => this.events.publish({ source: EventSource.GITOPS, event: { event: { case: "gitops", value: v } } }));
   /** Who owns each page file and the user's answers (mock/pages.ts); server.ts gives it the files. */

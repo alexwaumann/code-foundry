@@ -155,8 +155,14 @@ type UiContext struct {
 	// a composer or page is for. Empty for project threads and from the CLI.
 	ActiveWorkspaceId string     `protobuf:"bytes,6,opt,name=active_workspace_id,json=activeWorkspaceId,proto3" json:"active_workspace_id,omitempty"`
 	Origin            CallOrigin `protobuf:"varint,8,opt,name=origin,proto3,enum=codefoundry.v1.CallOrigin" json:"origin,omitempty"`
-	unknownFields     protoimpl.UnknownFields
-	sizeCache         protoimpl.SizeCache
+	// The page a call from a page with no thread comes from (PageAccess.path; the GUI's bridge
+	// host sets it, never the page): Invoke refuses the call PermissionDenied, with a
+	// PageAccess detail saying the page's answer now, unless a thread owns the page or the
+	// user allowed it (docs/notes/page-access-live.md). Empty (a thread's page, a GUI older
+	// than the field): not checked.
+	PagePath      string `protobuf:"bytes,9,opt,name=page_path,json=pagePath,proto3" json:"page_path,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *UiContext) Reset() {
@@ -236,6 +242,13 @@ func (x *UiContext) GetOrigin() CallOrigin {
 		return x.Origin
 	}
 	return CallOrigin_CALL_ORIGIN_UNSPECIFIED
+}
+
+func (x *UiContext) GetPagePath() string {
+	if x != nil {
+		return x.PagePath
+	}
+	return ""
 }
 
 type ArgSpec struct {
@@ -959,7 +972,7 @@ var File_codefoundry_v1_command_proto protoreflect.FileDescriptor
 
 const file_codefoundry_v1_command_proto_rawDesc = "" +
 	"\n" +
-	"\x1ccodefoundry/v1/command.proto\x12\x0ecodefoundry.v1\"\xe5\x02\n" +
+	"\x1ccodefoundry/v1/command.proto\x12\x0ecodefoundry.v1\"\x82\x03\n" +
 	"\tUiContext\x12,\n" +
 	"\x12active_terminal_id\x18\x01 \x01(\tR\x10activeTerminalId\x12(\n" +
 	"\x10active_thread_id\x18\x02 \x01(\tR\x0eactiveThreadId\x12*\n" +
@@ -968,7 +981,8 @@ const file_codefoundry_v1_command_proto_rawDesc = "" +
 	"\vactive_view\x18\x05 \x01(\tR\n" +
 	"activeView\x12.\n" +
 	"\x13active_workspace_id\x18\x06 \x01(\tR\x11activeWorkspaceId\x122\n" +
-	"\x06origin\x18\b \x01(\x0e2\x1a.codefoundry.v1.CallOriginR\x06originJ\x04\b\a\x10\bR\x17active_session_rendered\"\xd4\x03\n" +
+	"\x06origin\x18\b \x01(\x0e2\x1a.codefoundry.v1.CallOriginR\x06origin\x12\x1b\n" +
+	"\tpage_path\x18\t \x01(\tR\bpagePathJ\x04\b\a\x10\bR\x17active_session_rendered\"\xd4\x03\n" +
 	"\aArgSpec\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12+\n" +
 	"\x04type\x18\x02 \x01(\x0e2\x17.codefoundry.v1.ArgTypeR\x04type\x12\x1a\n" +
