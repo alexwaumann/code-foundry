@@ -1015,6 +1015,155 @@ html[data-thread-width="full"] {
   white-space: nowrap;
   text-align: right;
 }
+/* ---------- another thread's line (PeerLine.tsx, docs/notes/other-thread-lines.md): one
+   line per other thread this thread exchanged messages with in a run, under the worker card
+   when there is one: the dot, the name (it takes the width), the words, the time at the
+   right. It opens that thread. A frozen line reads dimmer. */
+.cf-thread .pline {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  height: 26px;
+  padding: 0 6px;
+  margin: 0 -6px;
+  box-sizing: content-box;
+  border-radius: 6px;
+  text-align: left;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.cf-thread button.pline:hover {
+  background: var(--t-hover);
+}
+.cf-thread button.pline:focus-visible {
+  outline: 2px solid color-mix(in oklab, var(--cf-focus) 60%, transparent);
+  outline-offset: -2px;
+}
+.cf-thread .pline:not([data-live]) {
+  opacity: 0.75;
+}
+.cf-thread .pline .dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 9999px;
+}
+.cf-thread .pline .nm {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--cf-text);
+  font-weight: 500;
+}
+.cf-thread .pline.gone .nm {
+  color: var(--cf-text-muted);
+  font-weight: 400;
+}
+.cf-thread .pline .st {
+  flex: 0 100 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cf-thread .pline .tm {
+  flex: none;
+  margin-left: auto;
+  padding-left: 8px;
+}
+/* A message from another thread (FromRow.tsx): one line where the user's bubble would be,
+   "From <thread>", "wants a reply", its first line and its time; open, the whole message
+   under a hairline. */
+.cf-thread .fromrow {
+  margin: 0 0 12px;
+  border: 1px solid var(--cf-border);
+  border-radius: 10px;
+}
+.cf-thread .fromrow[data-steer] {
+  margin: 4px 0 8px;
+}
+.cf-thread .fromrow .fl {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 30px;
+  padding: 2px 10px;
+  border-radius: 9px;
+  color: var(--cf-text-muted);
+  white-space: nowrap;
+  cursor: default;
+}
+.cf-thread .fromrow .fl:hover {
+  background: var(--t-hover);
+}
+.cf-thread .fromrow .fl:focus-visible {
+  outline: 2px solid color-mix(in oklab, var(--cf-focus) 60%, transparent);
+  outline-offset: -2px;
+}
+.cf-thread .fromrow .ic {
+  flex: none;
+  width: 14px;
+  height: 14px;
+}
+.cf-thread .fromrow .lead {
+  flex: none;
+}
+.cf-thread .fromrow .nm {
+  flex: 0 0 auto;
+  min-width: 0;
+  max-width: 45%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--cf-text);
+  font-weight: 500;
+  cursor: default;
+}
+.cf-thread .fromrow button.nm:hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.cf-thread .fromrow .nm.gone {
+  color: var(--cf-text-muted);
+  font-weight: 400;
+}
+.cf-thread .fromrow .tag {
+  flex: none;
+  padding: 0 5px;
+  border: 1px solid color-mix(in oklab, var(--cf-warning) 40%, transparent);
+  border-radius: 4px;
+}
+.cf-thread .fromrow .sum {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cf-thread .fromrow .ago {
+  flex: none;
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+}
+.cf-thread .fromrow .chev {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  opacity: 0.6;
+  transition: transform 0.12s;
+}
+.cf-thread .fromrow[data-open] .chev {
+  transform: rotate(90deg);
+}
+.cf-thread .fromrow[data-open] .fl {
+  border-bottom: 1px solid var(--cf-border);
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+.cf-thread .fromrow .fbody {
+  padding: 8px 12px 10px 31px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
 /* Ember's reply (lib/ember: a text row with `answer`) copies from a button in the gutter at
    its top right, shown while the reply is hovered (or the button has the keyboard, or
    shows its check after a copy: useCopied). Outside the text, so it never covers a code

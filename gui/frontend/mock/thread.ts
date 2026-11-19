@@ -512,6 +512,12 @@ export class MockThreadLogs {
     );
   }
 
+  /** An item replaced in place by `f` (a sent note the daemon updates: mock/peerLines.ts), published to the thread's watchers. */
+  patch(id: string, itemId: string, f: (it: ItemInit) => ItemInit): void {
+    const it = this.log(id).items.find((x) => x.id === itemId);
+    if (it) this.update(id, f(it));
+  }
+
   /** A new streaming text item (e.g. a subagent's reply arriving while a prompt waits); /delta extends it. */
   stream(id: string, text: string): void {
     this.append(id, this.item(id, { case: "assistantText", value: { text } }, { streaming: true }));

@@ -32,6 +32,9 @@
  *   POST /__mock/workers?state=live|needs|frozen  (a lead with three workers for the worker card: s-wl-lead and
  *                                                 s-wl-1..3; mock/workerCard.ts, World.addWorkerCard)
  *   POST /__mock/workers/step                     (its working worker finishes now and the lead's turn for it lands)
+ *   POST /__mock/peers?state=waiting|replied|asked-back|workers|frozen  (two lead threads talking, both sides:
+ *                                                 s-pl-a sender, s-pl-b receiver; mock/peerLines.ts, World.addPeerLines)
+ *   POST /__mock/peers/step                       (s-pl-b answers now: s-pl-a's line changes in place)
  *   POST /__mock/lineage                          (thread lineage: a creator, the child s-l-child with
  *        six siblings, one archived, and a child of its own; every child out of the
  *        sidebar while its creator exists; World.addLineage)
@@ -319,6 +322,7 @@ import { refuseSlashCommand } from "./slashCommands";
 import { MOCK_ATTACHMENT, MOCK_ATTACHMENT_PNG, MockThreadLogs, THREAD_STATES, type ThreadState as ScriptedThreadState } from "./thread";
 import { CommandError, ConfirmNeeded, snoozeUntil, World, type EventInit } from "./world";
 import { WORKER_CARD_STATES, type WorkerCardState } from "./workerCard";
+import { PEER_LINES_STATES, type PeerLinesState } from "./peerLines";
 
 type AttachEventInit = MessageInitShape<typeof AttachEventSchema>;
 
@@ -1444,6 +1448,19 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       json(res, 200, world.addWorkerCard(state));
       break;
     }
+    case "POST /__mock/peers": {
+      const state = (q.get("state") ?? "waiting") as PeerLinesState;
+      if (!PEER_LINES_STATES.includes(state)) {
+        json(res, 400, { error: `state: one of ${PEER_LINES_STATES.join(", ")}` });
+        break;
+      }
+      json(res, 200, world.addPeerLines(state));
+      break;
+    }
+    case "POST /__mock/peers/step":
+      world.stepPeerLines();
+      json(res, 200, {});
+      break;
     case "POST /__mock/workers/step":
       world.stepWorkerCard();
       json(res, 200, {});

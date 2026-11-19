@@ -54,6 +54,7 @@ import { EMBER_THREAD, emberWorkers, MockEmber } from "./ember";
 import { MockDictation } from "./dictation";
 import { MockSearches } from "./agentSearch";
 import { LEAD as WORKER_LEAD, WORKERS, scriptLead, scriptStep, workerPlans, type WorkerCardState } from "./workerCard";
+import { A as PEER_A, B as PEER_B, C as PEER_C, W as PEER_W, scriptReceiver, scriptSender, stepReceiver, stepSender, type PeerLinesState } from "./peerLines";
 import { CRASH_STDERR, MockThreadLogs, type SeedHistory, type ThreadState as ScriptedThreadState } from "./thread";
 import { contextFields, recordCompaction, recordResult, type MockContext } from "./context";
 import { intoUsersDiff, panelItemCommands, type PlaceTab } from "./panelItemVerbs";
@@ -1540,6 +1541,53 @@ export class World {
       this.publishThread(w);
     }
     this.logs.script(WORKER_LEAD, scriptStep, true);
+  }
+
+  /**
+   * Scenario: two lead threads talking (mock/peerLines.ts, docs/notes/other-thread-lines.md):
+   * the sender s-pl-a, the receiver s-pl-b, a third lead s-pl-c and (state "workers") A's
+   * worker s-pl-w, in `state`. POST /__mock/peers?state=waiting|replied|asked-back|workers|frozen.
+   * Replaces them when they exist; returns both ids. Held, so the clock leaves them alone.
+   */
+  addPeerLines(state: PeerLinesState): { sender: string; receiver: string } {
+    const ago = (min: number) => new Date(Date.now() - min * 60_000);
+    const make = (t: { id: string; name: string }, o: { busy?: boolean; createdMin: number; createdBy?: string; createdByName?: string }) => {
+      this.threads.delete(t.id);
+      const th = this.addThread({ id: t.id, projectId: "repo-cf", worktreePath: CF, name: t.name, model: "claude-sonnet-5-5[1m]", effort: "medium",
+        status: o.busy ? ThreadStatus.BUSY : ThreadStatus.IDLE, statusReason: o.busy ? "working" : "at prompt", statusChangedAt: ago(o.busy ? 25 : 1), createdAt: ago(o.createdMin), lastActivityAt: ago(1),
+        ...(o.createdBy ? { createdBy: o.createdBy, createdByName: o.createdByName ?? "" } : {}), held: true });
+      this.publishThread(th);
+      return th;
+    };
+    make(PEER_C, { createdMin: 90 });
+    if (this.threads.delete(PEER_W.id)) this.threadListEvents.publish({ event: { case: "removedId", value: PEER_W.id } });
+    if (state === "workers") make(PEER_W, { busy: true, createdMin: 25.9, createdBy: PEER_A.id, createdByName: PEER_A.name });
+    const b = make(PEER_B, { busy: state === "waiting" || state === "workers", createdMin: 61 });
+    this.logs.script(PEER_B.id, (sc) => {
+      scriptReceiver(sc, state);
+    });
+    this.publishThread(b);
+    const a = make(PEER_A, { createdMin: 27 });
+    this.logs.script(PEER_A.id, (sc) => {
+      scriptSender(sc, state);
+    });
+    this.publishThread(a);
+    return { sender: PEER_A.id, receiver: PEER_B.id };
+  }
+
+  /** The step after "waiting": B answers now (POST /__mock/peers/step), so A's line changes in place and a reply stacks under it. */
+  stepPeerLines(): void {
+    this.logs.script(PEER_A.id, (sc) => {
+      stepSender(sc, (itemId, f) => {
+        this.logs.patch(PEER_A.id, itemId, f);
+      });
+    }, true);
+    this.logs.script(PEER_B.id, stepReceiver, true);
+    const b = this.threads.get(PEER_B.id);
+    if (b) {
+      this.setStatus(b, ThreadStatus.IDLE, "at prompt");
+      this.publishThread(b);
+    }
   }
 
   addSnoozeHolds(): string[] {

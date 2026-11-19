@@ -28,7 +28,8 @@ import type { ThreadView } from "@/api/threads";
 import { lineageStatus } from "./lineage";
 import type { RowTone } from "./statusRegistry";
 import { statusLine } from "./statusLine";
-import type { TimelineRow, WorkerLine, WorkerState, WorkersRow } from "./threadTimeline";
+import { decodeSent, peerStart, peerWords, type PeerEvent } from "./peerLines";
+import type { PeerRow, TimelineRow, WorkerLine, WorkerState, WorkersRow } from "./threadTimeline";
 import { wakeLines } from "./wake";
 
 /**
@@ -57,13 +58,14 @@ export function isNothingNew(text: string): boolean {
   return text.trim().replace(/^`|`$/g, "").replace(/\.$/, "").trim().toLowerCase() === NOTHING_NEW;
 }
 
-/** A user message's sender, decoded. */
-type Sender = { kind: "user" } | { kind: "thread"; id: string } | { kind: "wake"; parts: WakePart[]; other: boolean };
+/** A user message's sender, decoded. `wanted`: a thread's message that wants a reply. */
+type Sender = { kind: "user" } | { kind: "thread"; id: string; wanted: boolean } | { kind: "wake"; parts: WakePart[]; other: boolean };
 
 /**
  * A user message's sender as one string for its timeline item (lib/threadTimeline
  * TimelineItem.from), so the timeline's structural key changes only when it does: "" the
- * user's own; "m:<id>" another thread's message; "w:" and the wake's parts, ";" between
+ * user's own; "m:<id>" another thread's message, "m:<id>/w" one that wants a reply
+ * (lib/peerLines); "w:" and the wake's parts, ";" between
  * them: "t/<thread>/<state>/<created_by>" for a thread's wake or ask, "x" for a wake that
  * is no thread's (a run, a pull request, a timer, a plugin, a restart notice).
  */
@@ -74,7 +76,7 @@ export function senderOf(it: ThreadItemView): string {
       .map((l) => (l.threadId ? `t/${l.threadId}/${partState(l.tone, l.detail)}/${l.createdBy}` : "x"))
       .join(";")}`;
   }
-  return it.from ? `m:${it.from.threadId}` : "";
+  return it.from ? `m:${it.from.threadId}${it.from.reply === "wanted" ? "/w" : ""}` : "";
 }
 
 function partState(tone: "ok" | "attention" | "fail", detail: string): PartState {
@@ -86,7 +88,10 @@ const PART_STATES: ReadonlySet<string> = new Set<PartState>(["done", "fail", "wa
 
 function decodeSender(from: string | undefined): Sender {
   if (!from) return { kind: "user" };
-  if (from.startsWith("m:")) return { kind: "thread", id: from.slice(2) };
+  if (from.startsWith("m:")) {
+    const [id = "", mark = ""] = from.slice(2).split("/");
+    return { kind: "thread", id, wanted: mark === "w" };
+  }
   if (!from.startsWith("w:")) return { kind: "user" };
   const parts: WakePart[] = [];
   let other = false;
@@ -186,14 +191,24 @@ interface Replay {
   until: number | null;
 }
 
-/** The rows of a thread with the turns its workers started read as one card per run (see the file's comment). */
+/**
+ * The rows of a thread with the turns its workers started read as one card per run, and
+ * the other threads it exchanged messages with as one line each (see the file's comment).
+ */
 export function workerRuns(rows: TimelineRow[], ctx: RunContext): TimelineRow[] {
   const known = new Set(ctx.workers.keys());
-  // A removed worker is no longer listed: its wakes still say who created it.
+  // The answers to this thread's questions to other threads, by their item here.
+  const answers = new Set<string>();
+  let sent = false;
   for (const r of rows) {
     const s = r.type === "user" || r.type === "steer" ? decodeSender(r.from) : null;
-    // Asks only ever go to the asker's creator.
+    // A removed worker is no longer listed: its wakes still say who created it. Asks only ever go to the asker's creator.
     if (s?.kind === "wake") for (const p of s.parts) if (p.createdBy === ctx.self || p.state === "ask") known.add(p.thread);
+    const d = r.type === "system" ? decodeSent(r.sent) : null;
+    if (d) {
+      sent = true;
+      if (d.replyItem) answers.add(d.replyItem);
+    }
   }
   const isWorker = (p: WakePart) => known.has(p.thread);
   const roleOf = (from: string | undefined): Role => {
@@ -208,10 +223,17 @@ export function workerRuns(rows: TimelineRow[], ctx: RunContext): TimelineRow[] 
         return !s.other && s.parts.length > 0 && s.parts.every(isWorker) ? "worker" : "other";
     }
   };
-  if (known.size === 0) return rows;
+  /** The other thread a message came from (not this thread, its creator or a worker); "" for none. */
+  const peerOf = (r: TimelineRow): { id: string; wanted: boolean; at: number | null } | null => {
+    if (r.type !== "user" && r.type !== "steer") return null;
+    const s = decodeSender(r.from);
+    return s.kind === "thread" && roleOf(r.from) === "other" ? { id: s.id, wanted: s.wanted, at: r.at ?? null } : null;
+  };
+  if (known.size === 0 && !sent) return rows;
 
   const blocks = splitBlocks(rows, roleOf);
   const events = workerEvents(rows, ctx, known);
+  const lastBlock = blocks[blocks.length - 1];
 
   // Runs: from each user block (or the thread's start) to the next.
   const segments: { anchor: Block | null; blocks: Block[] }[] = [{ anchor: null, blocks: [] }];
@@ -227,6 +249,8 @@ export function workerRuns(rows: TimelineRow[], ctx: RunContext): TimelineRow[] 
     const next = segments[i + 1];
     const end = next ? (next.anchor?.userAt ?? null) : null;
     const live = next === undefined;
+    const ex = exchanges(seg, peerOf, roleOf, answers);
+    const isRun = (b: Block) => b.role === "worker" || ex.run.has(b);
     const runs = seg.blocks.filter((b) => b.role === "worker");
     // Where the card goes: after the user's turn once it ended (or something came after it); with no user turn, at the run.
     const after = seg.anchor && (seg.anchor.ended || seg.blocks.length > 0) ? seg.anchor : null;
@@ -248,17 +272,34 @@ export function workerRuns(rows: TimelineRow[], ctx: RunContext): TimelineRow[] 
         };
       }
     }
-    if (seg.anchor) out.push(...seg.anchor.rows);
+    // The other threads' lines: under the turn that first sent (once it ended, or something came after it), or above the turn an answer opened.
+    const segKey = seg.anchor ? seg.anchor.turn || (seg.anchor.rows[0]?.key ?? "") : "";
+    const peerRows = (b: Block, before: boolean): TimelineRow[] => {
+      if (!before && !b.ended && b === lastBlock) return [];
+      return ex.order.flatMap((id) => {
+        const place = ex.place.get(id);
+        if (place?.block !== b || place.before !== before) return [];
+        const w = peerWords(ex.events.get(id) ?? [], live);
+        if (!w) return [];
+        const row: PeerRow = { type: "peer", key: `p:${segKey}:${id}`, id, ...w, live, start: peerStart(ex.events.get(id) ?? []), end: live ? null : end };
+        return [row];
+      });
+    };
+    const shown = (r: TimelineRow) => !ex.hidden.has(r);
+    if (seg.anchor) out.push(...seg.anchor.rows.filter(shown));
     if (card && after) out.push(card);
+    if (seg.anchor) out.push(...peerRows(seg.anchor, false));
     for (const b of seg.blocks) {
       if (card && !after && b === at) out.push(card);
-      if (b.role !== "worker") {
-        out.push(...b.rows);
-        continue;
+      out.push(...peerRows(b, true));
+      if (!isRun(b)) {
+        out.push(...b.rows.filter(shown));
+      } else {
+        const kept = runRows(b, (r) => (r.type === "steer" && roleOf(r.from) === "worker") || ex.hidden.has(r));
+        if (b.rows.some((r) => r.type === "gutter" && r.latest) && !kept.some((r) => r.type === "gutter")) droppedLatest = true;
+        out.push(...kept);
       }
-      const kept = runRows(b, roleOf);
-      if (b.rows.some((r) => r.type === "gutter" && r.latest) && !kept.some((r) => r.type === "gutter")) droppedLatest = true;
-      out.push(...kept);
+      out.push(...peerRows(b, false));
     }
   }
   if (droppedLatest) {
@@ -271,6 +312,75 @@ export function workerRuns(rows: TimelineRow[], ctx: RunContext): TimelineRow[] 
   return out;
 }
 
+/** A run's exchanges with other threads (lib/peerLines). */
+interface Exchanges {
+  /** The other threads with a line, in the order their lines began. */
+  order: string[];
+  /** Each one's events in the run. */
+  events: Map<string, PeerEvent[]>;
+  /** Where each line goes: above a block (an answer opened it) or under one (it sent there). */
+  place: Map<string, { block: Block; before: boolean }>;
+  /** Rows a line stands for: the sent notes and the other threads' messages inside the exchange. */
+  hidden: Set<TimelineRow>;
+  /** Blocks opened only by messages inside an exchange (or a worker's): turns of the run. */
+  run: Set<Block>;
+}
+
+/**
+ * The run's exchanges, in order: a thread is in one from this thread's first message to it
+ * in the run, or from the answer to a question this thread asked it earlier (`answers`).
+ * Inside one, its messages are the line's and are not drawn; before one, a message from it
+ * is drawn (rows.tsx FromRow) and opens a turn of its own, which is no turn of the run.
+ */
+function exchanges(
+  seg: { anchor: Block | null; blocks: Block[] },
+  peerOf: (r: TimelineRow) => { id: string; wanted: boolean; at: number | null } | null,
+  roleOf: (from: string | undefined) => Role,
+  answers: ReadonlySet<string>,
+): Exchanges {
+  const ex: Exchanges = { order: [], events: new Map(), place: new Map(), hidden: new Set(), run: new Set() };
+  const push = (id: string, e: PeerEvent) => {
+    const list = ex.events.get(id) ?? [];
+    list.push(e);
+    ex.events.set(id, list);
+  };
+  const begin = (id: string, block: Block, before: boolean) => {
+    if (ex.place.has(id)) return;
+    ex.place.set(id, { block, before });
+    ex.order.push(id);
+  };
+  for (const b of seg.anchor ? [seg.anchor, ...seg.blocks] : seg.blocks) {
+    let opening = true;
+    let openers = 0;
+    let inside = 0;
+    for (const r of b.rows) {
+      if (r.type !== "user") opening = false;
+      const p = peerOf(r);
+      if (p) {
+        const answer = answers.has(r.key);
+        if (answer && !ex.place.has(p.id)) begin(p.id, b, opening);
+        push(p.id, { kind: "got", wanted: p.wanted, item: r.key, answer, at: p.at });
+        if (ex.place.has(p.id)) {
+          ex.hidden.add(r);
+          if (opening) inside++;
+        }
+      }
+      if (r.type === "user" && opening) openers++;
+      const d = r.type === "system" ? decodeSent(r.sent) : null;
+      if (d && r.type === "system") {
+        begin(d.to, b, false);
+        push(d.to, { kind: "sent", wanted: d.wanted, state: d.state, replyItem: d.replyItem, at: r.at ?? null });
+        ex.hidden.add(r);
+      }
+    }
+    // A turn opened by messages inside exchanges, and the rest its workers' (the card's), is a turn of the run.
+    if (b.role === "other" && inside > 0) {
+      const rest = b.rows.slice(0, openers).filter((r) => !ex.hidden.has(r));
+      if (rest.every((r) => r.type === "user" && roleOf(r.from) === "worker")) ex.run.add(b);
+    }
+  }
+  return ex;
+}
 /**
  * The rows in turns: a block per turn (its opening messages, the setup row, its header,
  * its work and its gutter) and one for the rows between turns (a note, a page shown, a
@@ -318,14 +428,15 @@ function splitBlocks(rows: readonly TimelineRow[], roleOf: (from: string | undef
 }
 
 /**
- * What a turn of the run leaves: no opening message (its wake) and no header; its work as
- * its fold has it, with the workers' messages that came mid-turn left out; and its gutter,
- * which carries the fold (its steps count is the toggle). A finished turn that shows
- * nothing else leaves nothing, not even its gutter.
+ * What a turn of the run leaves: no opening message (its wake or the message) and no
+ * header; its work as its fold has it, with what `hide` says the card or a line stands for
+ * left out (a worker's message mid-turn, a sent note, an exchange's message); and its
+ * gutter, which carries the fold (its steps count is the toggle). A finished turn that
+ * shows nothing else leaves nothing, not even its gutter.
  */
-function runRows(b: Block, roleOf: (from: string | undefined) => Role): TimelineRow[] {
+function runRows(b: Block, hide: (r: TimelineRow) => boolean): TimelineRow[] {
   const header = b.rows.find((r): r is Extract<TimelineRow, { type: "header" }> => r.type === "header");
-  const body = b.rows.filter((r) => r.type !== "user" && r.type !== "header" && !(r.type === "steer" && roleOf(r.from) === "worker") && !(r.type === "text" && r.quiet));
+  const body = b.rows.filter((r) => r.type !== "user" && r.type !== "header" && !hide(r) && !(r.type === "text" && r.quiet));
   const shown = body.filter((r) => r.type !== "gutter");
   if (b.ended && shown.length === 0) return [];
   const fold = !header?.foldable ? ("none" as const) : header.folded ? ("folded" as const) : ("open" as const);

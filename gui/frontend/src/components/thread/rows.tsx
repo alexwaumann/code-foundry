@@ -65,6 +65,8 @@ import { AgentReport, ToolDetail } from "./ToolDetail";
 import { useTurnActive } from "./turnActivity";
 import { UserBubble } from "./UserBubble";
 import { WorkerCardRow } from "./WorkerCard";
+import { FromRow } from "./FromRow";
+import { PeerLineRow } from "./PeerLine";
 import { openThread } from "@/stores/openThread";
 
 /** A ticking or whole-second time: "12s", "1m 4s", "1h 5m". */
@@ -864,13 +866,29 @@ function ResumeNoteRow({ note }: { note: string }) {
   );
 }
 
-/** A user message: a turn's opening bubble, or a steer's smaller one inside the turn; a wake message is a note either way. */
+/**
+ * A user message: a turn's opening bubble, or a steer's smaller one inside the turn; a wake
+ * message is a note either way, and a message from another thread that is neither this
+ * thread's lead nor its worker a From row (FromRow, docs/notes/other-thread-lines.md).
+ */
 const UserRow = memo(function UserRow({ id, steer }: { id: string; steer?: boolean }) {
   const { threadId } = useThreadCtx();
   const it = useThreadItem(threadId, id);
   if (it?.kind !== "user") return null;
   const msg = it.wake ? (
     <WakeNotes wake={it.wake} atMs={it.createdAtMs} queued={it.queued === true} />
+  ) : it.from?.relation === "other" ? (
+    <FromRow
+      id={it.id}
+      fromId={it.from.threadId}
+      wanted={it.from.reply === "wanted"}
+      text={it.text}
+      composerText={it.composerText}
+      attachments={it.attachments}
+      createdAtMs={it.createdAtMs}
+      steer={steer}
+      queued={it.queued === true}
+    />
   ) : (
     <UserBubble
       text={it.text}
@@ -1102,6 +1120,8 @@ export function TimelineRowView({ row }: { row: TimelineRow }) {
       return <SetupRow row={row} />;
     case "workers":
       return <WorkerCardRow row={row} />;
+    case "peer":
+      return <PeerLineRow row={row} />;
     default:
       return <WorkNodeView node={row} />;
   }

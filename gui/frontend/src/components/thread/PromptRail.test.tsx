@@ -2,7 +2,9 @@ import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ThreadItemView } from "@/api/thread";
 import { buildRows, buildTurns, decodeTimelineKey, timelineKey } from "@/lib/threadTimeline";
+import type { ThreadView } from "@/api/threads";
 import { structOf, useThreadStore } from "@/stores/thread";
+import { useThreadsStore } from "@/stores/threads";
 import { tooltipText } from "@/test/tooltip";
 import { PromptRail } from "./PromptRail";
 import type { TimelineListApi } from "./Timeline";
@@ -137,6 +139,19 @@ describe("the prompt rail", () => {
       expect(current()).toBe("00001");
     });
     expect(tooltipText(ticks()[2] as HTMLElement)).toContain(" · 3 of 5");
+  });
+
+  it("a message from another thread (a From row) opens a turn: a shorter tick whose tooltip says who sent it", () => {
+    useThreadsStore.setState({ byId: { P: { id: "P", name: "PR page redesign" } as ThreadView } });
+    const from: ThreadItemView = { ...user("m", 9, "Does your branch still touch resize.ts?"), from: { threadId: "P", relation: "other", reply: "wanted" } } as ThreadItemView;
+    render(show([...IDLE, from, answer("a3", 10), end("e3", 11)]).ui);
+    expect(ticks()).toHaveLength(3);
+    const tick = ticks()[2] as HTMLElement;
+    expect(tick.dataset.from).toBe("P");
+    expect(tick.getAttribute("aria-label")).toMatch(/^Prompt 3 of 3: From PR page redesign: Does your branch/);
+    expect(tick.querySelector("span")?.className).toContain("w-1");
+    expect(ticks()[0]?.querySelector("span")?.className).toContain("w-2");
+    expect(tooltipText(tick)).toContain("From PR page redesign");
   });
 
   it("a wake is no prompt: no tick for it", () => {

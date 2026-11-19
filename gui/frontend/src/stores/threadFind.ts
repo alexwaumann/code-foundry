@@ -242,7 +242,8 @@ export function openThreadFindItem(threadId: string, itemId: string): void {
   const kind = it ? findDoc(it)?.kind : undefined;
   const before = getTurnView(threadId);
   ownWrite(() => {
-    if (kind === "question") setRowExpanded(threadId, itemId, true);
+    // A question's row, and a message from another thread (rows.tsx FromRow), hold the text in their expanded part.
+    if (kind === "question" || (it?.kind === "user" && it.from?.relation === "other")) setRowExpanded(threadId, itemId, true);
     getTimeline(threadId)?.unfold?.(itemId);
   });
   const after = getTurnView(threadId);

@@ -29,6 +29,7 @@ import { inlinePage } from "@/lib/inlinePage";
 import { NOTHING_SHOWN, type SetupShown } from "@/lib/threadSetup";
 import { timelineKey } from "@/lib/threadTimeline";
 import { isNothingNew, senderOf } from "@/lib/workerRuns";
+import { sentDescOf } from "@/lib/peerLines";
 
 /** One thread's conversation as the Watch delivered it. */
 export interface ThreadLog {
@@ -822,6 +823,7 @@ export function structOf(it: ThreadItemView): Parameters<typeof timelineKey>[0] 
     page: it.kind === "html" ? inlinePage(it).abs : "",
     ...(it.kind === "user" ? { from: senderOf(it), ...(it.createdAtMs !== null ? { at: it.createdAtMs } : {}) } : {}),
     ...(it.kind === "text" && !it.streaming && isNothingNew(it.text) ? { quiet: true } : {}),
+    ...(it.kind === "note" && sentDescOf(it.sent) ? { sent: sentDescOf(it.sent), ...(it.createdAtMs !== null ? { at: it.createdAtMs } : {}) } : {}),
   };
 }
 

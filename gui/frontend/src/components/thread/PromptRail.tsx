@@ -7,6 +7,7 @@ import type { TimelineRow } from "@/lib/threadTimeline";
 import { parseUserMessage } from "@/lib/userMessage";
 import { cn } from "@/lib/utils";
 import { useThreadItem, useThreadStore } from "@/stores/thread";
+import { useThreadsStore } from "@/stores/threads";
 import type { TimelineListApi } from "./Timeline";
 
 /** Space (px) kept clear above the rail and between it and the composer. */
@@ -22,7 +23,8 @@ interface RailPrompt {
 
 /**
  * The thread's prompt rail (docs/notes/thread-prompt-rail.md): one tick per prompt the
- * timeline shows as a bubble (its `user` rows, wakes left out), in the rows' 40px left
+ * timeline shows as a bubble (its `user` rows, wakes left out; a message from another
+ * thread drawn as a From row is one too, with a shorter tick), in the rows' 40px left
  * gutter, centred in the body above the composer. The tick of the turn in view (the last
  * prompt whose row top is at or above the viewport's middle, the last one at the list's
  * end) is full strength; hovering one
@@ -142,10 +144,18 @@ const PromptTick = memo(function PromptTick({
 }) {
   const it = useThreadItem(threadId, id);
   const user = it?.kind === "user" ? it : undefined;
+  // A message from another thread (FromRow) opens a turn too: its tick is shorter and its tooltip says who sent it.
+  const fromId = user?.from?.relation === "other" ? user.from.threadId : "";
+  const fromName = useThreadsStore((s) => (fromId ? (s.byId[fromId]?.name ?? "Removed thread") : ""));
   const preview = useMemo(() => (user ? promptPreview(parseUserMessage(user.text, user.composerText, user.attachments)) : ""), [user]);
   const meta = [sentTime(it?.createdAtMs ?? null), `${String(n)} of ${String(total)}`].filter(Boolean).join(" · ");
   const tip = (
     <span className="flex flex-col gap-0.5 whitespace-normal">
+      {fromId && (
+        <span className="text-caption text-cf-text-muted" data-testid="prompt-rail-from">
+          From {fromName}
+        </span>
+      )}
       <span className={cn("line-clamp-2", !preview && "text-cf-text-muted")}>{preview || "Attachments only"}</span>
       <span className="text-caption text-cf-text-muted tabular-nums">{meta}</span>
     </span>
@@ -155,7 +165,8 @@ const PromptTick = memo(function PromptTick({
       <Tip label={tip} side="right" delay={0} className="max-w-65" data-testid="prompt-rail-tip">
         <button
           type="button"
-          aria-label={tickLabel(n, total, preview)}
+          aria-label={tickLabel(n, total, fromId ? `From ${fromName}: ${preview}` : preview)}
+          data-from={fromId || undefined}
           aria-current={current ? "location" : undefined}
           data-testid="prompt-rail-tick"
           data-current={current || undefined}
@@ -172,7 +183,8 @@ const PromptTick = memo(function PromptTick({
           <span
             aria-hidden
             className={cn(
-              "h-0.5 w-2 rounded-full transition-colors duration-100",
+              "h-0.5 rounded-full transition-colors duration-100",
+              fromId ? "w-1" : "w-2",
               current ? "bg-cf-text" : "bg-cf-text-muted/45 group-hover:bg-cf-text group-focus-visible:bg-cf-text",
             )}
           />

@@ -60,6 +60,12 @@ export interface TimelineItem {
   at?: number;
   /** A text that is only the "nothing for the user" marker (lib/workerRuns isNothingNew). */
   quiet?: boolean;
+  /**
+   * A note recording a message this thread sent another thread that is neither its lead
+   * nor its worker (lib/peerLines sentDescOf): "<to>/<mark>/<state>/<reply item>". Absent
+   * for every other item. Its `at` is the note's time.
+   */
+  sent?: string;
 }
 
 /** Tools whose consecutive calls fold into one "Read 3 files, searched code 2 times" row. */
@@ -88,8 +94,12 @@ export type WorkNode =
    * `from` and `at`: its sender and time, as TimelineItem's (lib/workerRuns).
    */
   | { type: "steer"; key: string; id: string; from?: string; at?: number }
-  /** A system note (an item of kind "note"): on its own line between turns, or in the open turn it arrived in. */
-  | { type: "system"; key: string; id: string }
+  /**
+   * A system note (an item of kind "note"): on its own line between turns, or in the open
+   * turn it arrived in. `sent` and `at`: a sent-message note's, as TimelineItem's
+   * (lib/peerLines), which the grouping reads as an exchange's line.
+   */
+  | { type: "system"; key: string; id: string; sent?: string; at?: number }
   /**
    * An HTML page the model showed inline (code-foundry view.inline): its "Showed <file>" row
    * and, while open, its card with the page. The turn's fold never touches it: its row and
@@ -180,7 +190,31 @@ export type TimelineRow =
    * docs/notes/worker-card.md), where the run begins. Its key is `w:<the anchoring turn's
    * key>`, so it updates in place.
    */
-  | WorkersRow;
+  | WorkersRow
+  /**
+   * One line per other thread (not this thread's lead, not its worker) this thread
+   * exchanged messages with in a run (lib/peerLines, docs/notes/other-thread-lines.md).
+   * Its key is `p:<the run's anchoring turn key>:<the other thread>`, so it changes in place.
+   */
+  | PeerRow;
+
+/** One other thread's line (lib/peerLines). */
+export interface PeerRow {
+  type: "peer";
+  key: string;
+  /** The other thread's id. */
+  id: string;
+  /** What happened, in a few words ("asked · waiting for a reply", "replied · then asked 1 question, answered"). */
+  words: string;
+  /** The dot's tone. */
+  tone: "info" | "warning" | "success" | "muted";
+  /** The current run's line: its time ticks. A frozen one stopped at the user's next message. */
+  live: boolean;
+  /** When the exchange began (epoch ms); null when unknown. */
+  start: number | null;
+  /** Frozen: the user's next message's time; null while live. */
+  end: number | null;
+}
 
 /** A worker's state in a card line (lib/workerRuns). */
 export type WorkerState = "working" | "needs" | "asks" | "finished" | "failed" | "stopped" | "archived";
@@ -292,7 +326,7 @@ export function workNodes(list: readonly TimelineItem[], children: ReadonlyMap<s
         out.push({ type: "note", key: it.id, id: it.id, kind: it.kind });
         break;
       case "note":
-        out.push({ type: "system", key: it.id, id: it.id });
+        out.push({ type: "system", key: it.id, id: it.id, ...(it.sent ? { sent: it.sent, ...(it.at !== undefined ? { at: it.at } : {}) } : {}) });
         break;
       case "html":
         out.push({ type: "html", key: it.id, id: it.id, page: it.page ?? "", later: "" });
@@ -583,7 +617,7 @@ export function rowTurns(rows: readonly TimelineRow[]): string[] {
   let cur = "";
   const out = rows.map((r) => {
     if (r.type === "header") cur = r.turn;
-    else if (r.type === "user" || r.type === "setup" || r.type === "workers") cur = "";
+    else if (r.type === "user" || r.type === "setup" || r.type === "workers" || r.type === "peer") cur = "";
     const t = cur;
     if (r.type === "gutter") cur = "";
     return t;
@@ -593,7 +627,7 @@ export function rowTurns(rows: readonly TimelineRow[]): string[] {
     out[i] = g.turn;
     for (let j = i - 1; j >= 0 && out[j] === ""; j--) {
       const t = rows[j]?.type;
-      if (t === "user" || t === "setup" || t === "gutter" || t === "workers" || t === "header") break;
+      if (t === "user" || t === "setup" || t === "gutter" || t === "workers" || t === "peer" || t === "header") break;
       out[j] = g.turn;
     }
   });
@@ -706,12 +740,13 @@ const SEP = "\u0001";
 
 /** One string per item with what the timeline depends on, so a shallow-equal list means "same rows". */
 export function timelineKey(it: TimelineItem): string {
-  return [it.id, it.kind, it.name, it.parentToolUseId, it.toolUseId, it.toolStatus, it.requestState, it.streaming ? "1" : "", it.page ?? "", it.from ?? "", it.at === undefined ? "" : String(it.at), it.quiet ? "1" : ""].join(SEP);
+  return [it.id, it.kind, it.name, it.parentToolUseId, it.toolUseId, it.toolStatus, it.requestState, it.streaming ? "1" : "", it.page ?? "", it.from ?? "", it.at === undefined ? "" : String(it.at), it.quiet ? "1" : "", it.sent ?? ""].join(SEP);
 }
 
 export function decodeTimelineKey(k: string): TimelineItem {
-  const [id = "", kind = "text", name = "", parentToolUseId = "", toolUseId = "", toolStatus = "", requestState = "", streaming = "", page = "", from = "", at = "", quiet = ""] = k.split(SEP);
+  const [id = "", kind = "text", name = "", parentToolUseId = "", toolUseId = "", toolStatus = "", requestState = "", streaming = "", page = "", from = "", at = "", quiet = "", sent = ""] = k.split(SEP);
   return {
+    ...(sent ? { sent } : {}),
     ...(quiet ? { quiet: true } : {}),
     ...(from ? { from } : {}),
     ...(at ? { at: Number(at) } : {}),
