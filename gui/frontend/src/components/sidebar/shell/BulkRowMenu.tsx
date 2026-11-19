@@ -4,7 +4,7 @@ import { ContextMenuContent, ContextMenuItem, ContextMenuLabel, ContextMenuSepar
 import { SpaceIcon } from "@/components/shell/SpaceIcon";
 import { SnoozePresetItems } from "@/components/snooze/SnoozeMenu";
 import { bulkMenuItems, bulkSpaceChoices } from "@/lib/bulkMenu";
-import { archiveThreads, moveThreadsToNewSpace, moveThreadsToSpace, removeThreads, snoozeThreads } from "@/stores/bulkThreadActions";
+import { archiveThreads, markThreadsUnread, moveThreadsToNewSpace, moveThreadsToSpace, removeThreads, snoozeThreads } from "@/stores/bulkThreadActions";
 import { spaceOfThread, useLayoutStore } from "@/stores/layout";
 import { useThreadsStore } from "@/stores/threads";
 
@@ -62,7 +62,7 @@ function BulkSpaceItems({ ids }: { ids: readonly string[] }) {
 /**
  * The context menu of a selected row while two or more are selected (docs/notes/sidebar-bulk-select.md):
  * "N threads", then only what applies to every one of them (lib/bulkMenu.ts): Snooze ▸ (the single
- * menu's presets, Pick a date and time…, Save for later), Unsnooze, Move to space ▸, Archive or
+ * menu's presets, Pick a date and time…, Save for later), Unsnooze, Mark as unread, Move to space ▸, Archive or
  * Unarchive, Remove. Each is one command given the ids (stores/bulkThreadActions.ts), which asks
  * once for all of them where the single one asks, and drops the selection once it ran.
  */
@@ -91,6 +91,16 @@ export function BulkRowMenu({ ids }: { ids: readonly string[] }) {
           }}
         >
           Unsnooze
+        </ContextMenuItem>
+      )}
+      {items.unread && (
+        <ContextMenuItem
+          data-testid="bulk-menu-unread"
+          onSelect={() => {
+            void markThreadsUnread(ids);
+          }}
+        >
+          Mark as unread
         </ContextMenuItem>
       )}
       {items.move && (

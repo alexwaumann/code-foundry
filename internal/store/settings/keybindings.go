@@ -16,15 +16,21 @@ func isKeybindingKey(k string) bool { return strings.HasPrefix(k, keybindingKeyP
 // is reported and the command keeps its default. Overrides may swap chords: A and B can
 // trade defaults in one change.
 //
-// It returns the accepted overrides (command -> canonical chord or "none"), every
-// command's effective value by settings key, and the issues.
-func resolveKeybindings(raw map[string]string, cmds []CommandInfo) (map[string]string, map[string]string, []Issue) {
-	var issues []Issue
+// A default of a command marked KeybindingsYield is the exception: an override that binds
+// its chord to another command wins, and the yielding command goes without that chord (its
+// value reads "none"); an override of its own takes it back. Those commands are listed in
+// yielded. No issue: an issue says a value in the file is ignored, and none is (the CLI's
+// settings warning, the file's "# Ignored:" lines).
+//
+// It returns the accepted overrides (command -> canonical chord or "none"), the commands
+// that yielded their only default, every command's effective value by settings key, and
+// the issues.
+func resolveKeybindings(raw map[string]string, cmds []CommandInfo) (over map[string]string, yielded []string, values map[string]string, issues []Issue) {
 	known := make(map[string]CommandInfo, len(cmds))
 	for _, c := range cmds {
 		known[c.Name] = c
 	}
-	over := map[string]string{}
+	over = map[string]string{}
 	field := Field{Type: Keybinding}
 	for k, v := range raw {
 		if !isKeybindingKey(k) || v == "" {
@@ -57,8 +63,9 @@ func resolveKeybindings(raw map[string]string, cmds []CommandInfo) (map[string]s
 		// (TestKeybindingsAreUniqueAndNotReserved).
 		for {
 			owners := map[string][]string{} // chord -> commands
+			taken := overriddenChords(over)
 			for _, c := range cmds {
-				for _, chord := range effectiveChords(c, over) {
+				for _, chord := range yieldTo(c, over, taken) {
 					owners[chord] = append(owners[chord], c.Name)
 				}
 			}
@@ -84,7 +91,8 @@ func resolveKeybindings(raw map[string]string, cmds []CommandInfo) (map[string]s
 		}
 	}
 
-	values := make(map[string]string, len(cmds)+len(over))
+	values = make(map[string]string, len(cmds)+len(over))
+	taken := overriddenChords(over)
 	for _, c := range cmds {
 		if c.NoKeybinding {
 			continue // no field, so no value
@@ -93,12 +101,41 @@ func resolveKeybindings(raw map[string]string, cmds []CommandInfo) (map[string]s
 		if len(c.Keybindings) > 0 {
 			v, _ = command.NormalizeChord(c.Keybindings[0])
 		}
+		if _, own := over[c.Name]; !own && c.KeybindingsYield {
+			if left := yieldTo(c, over, taken); len(left) == 0 && v != "" {
+				v = KeybindingNone
+				yielded = append(yielded, c.Name)
+			} else if len(left) > 0 {
+				v = left[0]
+			}
+		}
 		values[KeybindingKey(c.Name)] = v
 	}
 	for name, c := range over {
 		values[KeybindingKey(name)] = c
 	}
-	return over, values, dedupeIssues(issues)
+	return over, yielded, values, dedupeIssues(issues)
+}
+
+// overriddenChords maps each chord an accepted override binds to its command.
+func overriddenChords(over map[string]string) map[string]string {
+	taken := make(map[string]string, len(over))
+	for name, c := range over {
+		if c != KeybindingNone {
+			taken[c] = name
+		}
+	}
+	return taken
+}
+
+// yieldTo is c's effective chords, less those an override binds to another command when c's
+// defaults yield (CommandInfo.KeybindingsYield) and c has no override of its own.
+func yieldTo(c CommandInfo, over map[string]string, taken map[string]string) []string {
+	chords := effectiveChords(c, over)
+	if _, own := over[c.Name]; own || !c.KeybindingsYield {
+		return chords
+	}
+	return slices.DeleteFunc(chords, func(ch string) bool { return taken[ch] != "" })
 }
 
 // effectiveChords is c's canonical chords after its override, if any.

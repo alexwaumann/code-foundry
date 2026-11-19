@@ -982,12 +982,19 @@ says what each verb does in the window (`docs/notes/shell-20-cutover.md`):
 | ctrl+cmd+1…9 / cmd+1…9 | `space.switch --index n` / the nth thread of the sidebar (view actions) |
 | cmd+shift+enter, escape | `pane.fullscreen`; escape leaves (a window listener) |
 | cmd+shift+m | `pane.collapse`: the focused pane to a rail, or open again (nothing in full screen) |
-| cmd+shift+a | the Needs-you popup of the next thread that waits (Ember first while it waits) |
+| cmd+shift+n | `thread.needs.next`: the Needs-you popup of the next thread that waits (Ember first while it waits) |
 | cmd+r / cmd+shift+r | `tab.rename` / `tab.auto-name` (a thread's tab renames or renames again the thread) |
 | cmd+b | the sidebar (view action) |
 
 Retired with the panels: cmd+shift+e, cmd+\ and cmd+alt+\; a stale override of a removed
 verb in `settings.toml` is reported and dropped, never fatal.
+
+Outside the shell's table, putting a thread away is one key (`docs/notes/put-away-chords.md`):
+cmd+shift+a is `thread.archive` (it was the Needs-you view action until that became
+`thread.needs.next` on cmd+shift+n), cmd+shift+s `thread.snooze.default` (the setting
+`threads.default_snooze`), cmd+shift+u `thread.unread`. A default given to a chord users could
+already bind is marked `Command.KeybindingsYield`: a user's override on it keeps the chord and
+the new command goes without it, reported on its row.
 
 ## 8. Frontend
 
@@ -1254,7 +1261,7 @@ verb in `settings.toml` is reported and dropped, never fatal.
   surface (`surfaces/ember.ts`, a tab linked to Ember's thread) at the task. One shared
   `EmberService.WatchBoard` (`stores/ember.ts`) feeds the row, the chat header and the
   Board while any of them shows (inline for the row alone, core with the chat or the
-  Board). cmd+shift+a visits Ember first while it waits, then the Needs-you popups; the
+  Board). cmd+shift+n (`thread.needs.next`) visits Ember first while it waits, then the Needs-you popups; the
   window title, the Dock badge, Needs you and the space tabs' counts leave it out.
 * Skills page (`docs/notes/skills-page-redesign.md`, over `docs/notes/skills-4-gui.md`):
   Settings → Skills is a GUI page (`components/settings/guiPages.ts`,

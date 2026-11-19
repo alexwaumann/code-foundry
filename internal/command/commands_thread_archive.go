@@ -32,6 +32,10 @@ func threadArchive(b ThreadBackend, idArg ArgSpec) Command {
 			"From a thread: only a thread it created (or below); another archived thread cannot be messaged or unarchived: read it, or ask the user. " +
 			"On itself mid-turn: at turn's end.",
 		Category: "Thread",
+		// cmd+shift+a was a reserved view action (the Needs you jump, now thread.needs.next) until
+		// docs/notes/put-away-chords.md; a user's override already on it keeps it.
+		Keybindings:      []string{"cmd+shift+a"},
+		KeybindingsYield: true,
 		Args: []ArgSpec{
 			positional(optionalID(idArg)),
 			threadIDsArg,

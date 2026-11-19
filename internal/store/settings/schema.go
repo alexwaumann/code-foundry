@@ -223,6 +223,7 @@ const (
 	KeyDefaultModel              = "threads.default_model"
 	KeyDefaultEffort             = "threads.default_effort"
 	KeyDefaultWorktree           = "threads.default_worktree"
+	KeyDefaultSnooze             = "threads.default_snooze"
 	KeyAutoName                  = "threads.auto_name"
 	KeyUtilityModel              = "models.utility"
 	KeyCacheTTL                  = "threads.cache_ttl_seconds"
@@ -406,6 +407,16 @@ var staticFields = []Field{
 		EnumLabels:  []string{"A fresh copy of the project", "The project folder itself"},
 		Default:     WorktreeCurrent,
 		bind:        func(s *Settings) any { return &s.Threads.DefaultWorktree },
+	},
+	{
+		// thread.snooze.default's preset (cmd+shift+s), passed as its to arg's default
+		// (daemon registryOverrides); the GUI's snooze menus mark it (docs/notes/put-away-chords.md).
+		Key: KeyDefaultSnooze, Group: GroupThreads, Page: PageGeneral, Section: "threads", Type: Enum, Title: "Default snooze",
+		Description: "Where Snooze to Default (⇧⌘S) puts the thread you're looking at. The snooze menus mark it.",
+		Enum:        command.SnoozeDefaults,
+		EnumLabels:  []string{"1 hour", "3 hours", "Tomorrow, 9:00 AM", "Next week, Monday 9:00 AM", "Save for later"},
+		Default:     command.SnoozeDefaultFallback,
+		bind:        func(s *Settings) any { return &s.Threads.DefaultSnooze },
 	},
 	{
 		Key: KeyAutoName, Group: GroupThreads, Page: PageGeneral, Section: "threads", Type: Bool, Title: "Name threads automatically",
@@ -850,6 +861,9 @@ type CommandInfo struct {
 	// NoKeybinding: a chord is no use for the command (command.Command.NoKeybinding).
 	// It gets no keybinding field, and an override for it is rejected.
 	NoKeybinding bool
+	// KeybindingsYield: its default chords give way to an override that binds one of them
+	// to another command (command.Command.KeybindingsYield).
+	KeybindingsYield bool
 }
 
 // sortCommands sorts commands by category, then title, like the palette.

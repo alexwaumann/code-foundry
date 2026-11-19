@@ -64,6 +64,13 @@ export function wallTime(d: Day, hour: number, minute = 0): number {
 
 export type SnoozePresetId = "1h" | "3h" | "tomorrow" | "next-week";
 
+const PRESET_IDS: readonly string[] = ["1h", "3h", "tomorrow", "next-week"] satisfies SnoozePresetId[];
+
+/** Whether v names a preset (the daemon's command.SnoozeDefaults less save). */
+export function isSnoozePresetId(v: string): v is SnoozePresetId {
+  return PRESET_IDS.includes(v);
+}
+
 export interface SnoozePreset {
   id: SnoozePresetId;
   label: string;

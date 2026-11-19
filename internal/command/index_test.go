@@ -42,8 +42,8 @@ var noIndex = []string{
 	"pane.focus", "pane.focus.down", "pane.focus.left", "pane.focus.right", "pane.focus.up", "pane.fullscreen", "pane.move.down",
 	"pane.move.left", "pane.move.right", "pane.move.up", "pane.split", "space.move", "tab.auto-name", "tab.next", "tab.previous", "tab.rename", "tab.reopen",
 	"terminal.cycle", "terminal.quick",
-	"thread.move.open", "thread.new-like", "thread.placement.check", "thread.prompts",
-	"thread.regenerate-name", "thread.restart", "thread.shell.stop", "thread.snooze.clear", "thread.stop-waiting", "thread.unread", "thread.workspace",
+	"thread.move.open", "thread.needs.next", "thread.new-like", "thread.placement.check", "thread.prompts",
+	"thread.regenerate-name", "thread.restart", "thread.shell.stop", "thread.snooze.clear", "thread.snooze.default", "thread.stop-waiting", "thread.unread", "thread.workspace",
 	"view.panel.diff", "view.panel.file", "view.panel.gallery", "view.panel.mcp", "view.panel.page", "view.panel.pr",
 	"view.thread-diff", "view.thread-info", "worktree.editors",
 }

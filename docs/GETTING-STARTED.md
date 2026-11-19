@@ -97,8 +97,12 @@ thread's folder, <kbd>⇧⌘T</kbd> one in your home folder. Closing a terminal'
 The sidebar lists this space's threads. **Needs you** at the top lists the threads
 waiting on you: a question, a permission, a plan to approve. Hover one to see the whole
 ask (a command can be allowed or denied right there), click its title to answer in a
-popup, or press <kbd>⇧⌘A</kbd> for the next one. A thread's tab shows a dot while it
+popup, or press <kbd>⇧⌘N</kbd> for the next one. A thread's tab shows a dot while it
 waits. The window title and the badge on the Dock icon count what is waiting.
+
+Done with a thread for now? <kbd>⇧⌘S</kbd> snoozes the one you're looking at until
+tomorrow morning (Settings › **Default snooze** picks another time), and <kbd>⇧⌘A</kbd>
+archives it. The sidebar's **Snoozed** and **Archived** sections keep them.
 
 When a thread's agent starts threads of its own, they belong to that thread: they stay
 out of the sidebar and the Dock badge, and its thread info card lists them. Click one

@@ -253,15 +253,51 @@ var testCmds = []CommandInfo{
 	{Name: "daemon.status", Title: "Daemon Status", Category: "Daemon", NoKeybinding: true},
 }
 
+// yieldCmds adds a command whose default yields (CommandInfo.KeybindingsYield): a default given
+// to a chord users could bind before (docs/notes/put-away-chords.md).
+var yieldCmds = append(slices.Clone(testCmds), CommandInfo{Name: "thread.needs.next", Title: "Next Thread Needing You", Category: "View", Keybindings: []string{"cmd+shift+n"}, KeybindingsYield: true})
+
 func TestResolveKeybindings(t *testing.T) {
 	tests := []struct {
 		name      string
 		raw       map[string]string
 		cmds      []CommandInfo
 		wantOver  map[string]string
+		wantYield []string
 		wantIssue map[string]string // key -> message
 		wantValue map[string]string
 	}{
+		{name: "a yielding default with no override on its chord", cmds: yieldCmds, wantOver: map[string]string{},
+			wantValue: map[string]string{"keybindings.thread.needs.next": "cmd+shift+n"}},
+		{name: "a user's override keeps a yielding default's chord", cmds: yieldCmds,
+			raw:       map[string]string{"keybindings.thread.new": "Shift+Cmd+N"},
+			wantOver:  map[string]string{"thread.new": "cmd+shift+n"},
+			wantYield: []string{"thread.needs.next"},
+			wantValue: map[string]string{"keybindings.thread.new": "cmd+shift+n", "keybindings.thread.needs.next": "none"}},
+		{name: "the yielding command's own override takes a chord back", cmds: yieldCmds,
+			raw:       map[string]string{"keybindings.thread.new": "cmd+shift+n", "keybindings.thread.needs.next": "cmd+shift+y"},
+			wantOver:  map[string]string{"thread.new": "cmd+shift+n", "thread.needs.next": "cmd+shift+y"},
+			wantValue: map[string]string{"keybindings.thread.needs.next": "cmd+shift+y"}},
+		{name: "a yielding command bound to its own default keeps it over a user's override", cmds: yieldCmds,
+			raw:      map[string]string{"keybindings.thread.new": "cmd+shift+n", "keybindings.thread.needs.next": "cmd+shift+n"},
+			wantOver: map[string]string{},
+			wantIssue: map[string]string{
+				"keybindings.thread.new":        "cmd+shift+n is already bound to thread.needs.next",
+				"keybindings.thread.needs.next": "cmd+shift+n is already bound to thread.new",
+			},
+			wantValue: map[string]string{"keybindings.thread.new": "cmd+n", "keybindings.thread.needs.next": "cmd+shift+n"}},
+		{name: "two overrides on a yielding default's chord drop each other, and it keeps it", cmds: yieldCmds,
+			raw:      map[string]string{"keybindings.thread.new": "cmd+shift+n", "keybindings.project.refresh": "cmd+shift+n"},
+			wantOver: map[string]string{},
+			wantIssue: map[string]string{
+				"keybindings.thread.new":      "cmd+shift+n is already bound to project.refresh",
+				"keybindings.project.refresh": "cmd+shift+n is already bound to thread.new",
+			},
+			wantValue: map[string]string{"keybindings.thread.needs.next": "cmd+shift+n"}},
+		{name: "an unbound yielding command yields nothing", cmds: yieldCmds,
+			raw:       map[string]string{"keybindings.thread.needs.next": "none", "keybindings.project.refresh": "cmd+shift+n"},
+			wantOver:  map[string]string{"thread.needs.next": "none", "project.refresh": "cmd+shift+n"},
+			wantValue: map[string]string{"keybindings.thread.needs.next": "none"}},
 		{name: "defaults", cmds: testCmds, wantOver: map[string]string{},
 			wantValue: map[string]string{"keybindings.thread.new": "cmd+n", "keybindings.project.refresh": ""}},
 		{name: "override normalizes", cmds: testCmds, raw: map[string]string{"keybindings.project.refresh": "Alt+Cmd+R"},
@@ -295,9 +331,12 @@ func TestResolveKeybindings(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			over, values, issues := resolveKeybindings(tt.raw, tt.cmds)
+			over, yielded, values, issues := resolveKeybindings(tt.raw, tt.cmds)
 			if !maps.Equal(over, tt.wantOver) {
 				t.Errorf("overrides = %v, want %v", over, tt.wantOver)
+			}
+			if !slices.Equal(yielded, tt.wantYield) {
+				t.Errorf("yielded = %v, want %v", yielded, tt.wantYield)
 			}
 			got := map[string]string{}
 			for _, is := range issues {
@@ -338,7 +377,7 @@ func TestKeybindingFields(t *testing.T) {
 		t.Errorf("git.fetch title = %q, want Fetch", got)
 	}
 	// No value for a command without a field.
-	if _, values, _ := resolveKeybindings(nil, testCmds); len(values) != len(fs) {
+	if _, _, values, _ := resolveKeybindings(nil, testCmds); len(values) != len(fs) {
 		t.Errorf("values = %v, want one per field", values)
 	}
 
@@ -599,12 +638,12 @@ func TestKeybindingOverrideWithoutDefault(t *testing.T) {
 	cmds := []CommandInfo{{Name: "dictation.toggle", Title: "Dictate", Category: "Dictation"}}
 	key := KeybindingKey("dictation.toggle")
 	for _, v := range []string{"cmd+shift+m", KeybindingNone} {
-		_, values, issues := resolveKeybindings(map[string]string{key: v}, cmds)
+		_, _, values, issues := resolveKeybindings(map[string]string{key: v}, cmds)
 		if values[key] != v || len(issues) != 0 {
 			t.Errorf("%s: values %v, issues %v", v, values, issues)
 		}
 	}
-	if _, values, _ := resolveKeybindings(nil, cmds); values[key] != "" {
+	if _, _, values, _ := resolveKeybindings(nil, cmds); values[key] != "" {
 		t.Errorf("unbound value %q", values[key])
 	}
 }

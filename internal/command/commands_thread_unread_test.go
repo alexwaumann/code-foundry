@@ -76,3 +76,63 @@ func TestThreadUnreadSpec(t *testing.T) {
 		t.Errorf("thread.unread = %+v", c)
 	}
 }
+
+// thread.unread given ids (the sidebar's bulk menu): each is marked, past one the daemon
+// refuses, in one command.
+func TestThreadUnreadIDs(t *testing.T) {
+	a, b := idle("s-aaaa11112222", "one"), idle("s-bbbb33334444", "two")
+	refused := connect.NewError(connect.CodeFailedPrecondition, errors.New("thread is not idle at its prompt"))
+	atPrompt := &v1.Thread{Name: "one", Status: v1.ThreadStatus_THREAD_STATUS_IDLE, StatusReason: "at prompt"}
+	tests := []struct {
+		name     string
+		ctx      command.Context
+		args     map[string]string
+		fail     map[string]error
+		wantErr  error
+		wantMsg  string
+		wantExit int
+		wantIDs  []string
+	}{
+		{name: "every one is marked", args: map[string]string{"ids": "11112222,33334444"},
+			wantMsg: "marked 2 threads unread: s-aaaa11112222, s-bbbb33334444", wantIDs: []string{"s-aaaa11112222", "s-bbbb33334444"}},
+		// In a window id is the thread in view; ids replaces it.
+		{name: "ids ignore the thread in view", ctx: command.Context{ActiveView: "thread", ActiveThreadID: "s-aaaa11112222"},
+			args: map[string]string{"ids": "33334444"}, wantMsg: "marked 1 thread unread: s-bbbb33334444", wantIDs: []string{"s-bbbb33334444"}},
+		{name: "one refused, the rest are marked and it exits 1", args: map[string]string{"ids": "11112222,33334444"},
+			fail:     map[string]error{"s-aaaa11112222": refused},
+			wantMsg:  "marked 1 thread unread: s-bbbb33334444\nfailed on 1 thread:\n  s-aaaa11112222: failed_precondition: thread is not idle at its prompt",
+			wantExit: 1, wantIDs: []string{"s-aaaa11112222", "s-bbbb33334444"}},
+		{name: "one id as before", args: map[string]string{"id": "s-aaaa11112222"},
+			wantMsg: "marked thread one (s-aaaa11112222) unread", wantIDs: []string{"s-aaaa11112222"}},
+		{name: "neither id nor ids from the CLI", wantErr: command.ErrInvalidArgs},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			reg, fake := newBulkRegistry(t, a, b)
+			fake.Current = proto.CloneOf(atPrompt)
+			fake.FailIDs = tt.fail
+			res, err := reg.Invoke(context.Background(), tt.ctx, "thread.unread", tt.args)
+			if tt.wantErr != nil {
+				if !errors.Is(err, tt.wantErr) {
+					t.Fatalf("err = %v, want %v", err, tt.wantErr)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if res.Message != tt.wantMsg || res.ExitCode != tt.wantExit {
+				t.Errorf("result = %q (exit %d), want %q (exit %d)", res.Message, res.ExitCode, tt.wantMsg, tt.wantExit)
+			}
+			var ids []string
+			for _, r := range fake.Requests() {
+				if r, ok := r.(*v1.MarkUnreadRequest); ok {
+					ids = append(ids, r.GetId())
+				}
+			}
+			if !slices.Equal(ids, tt.wantIDs) {
+				t.Errorf("marked %v, want %v", ids, tt.wantIDs)
+			}
+		})
+	}
+}

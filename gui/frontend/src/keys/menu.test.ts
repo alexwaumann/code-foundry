@@ -53,8 +53,10 @@ describe("runMenuCommand", () => {
     expect(notify).toHaveBeenCalledWith({ level: "info", title: "no.such.command is not available here" });
   });
 
-  it("runs the attention jump, a GUI view action, by its menu name", () => {
-    runMenuCommand("attention.next");
+  it("runs the Needs you jump, a registry command since docs/notes/put-away-chords.md, by its name", () => {
+    useCommandsStore.setState((s) => ({ commands: [...s.commands, cmd({ name: "thread.needs.next", title: "Next Thread Needing You", keybindings: ["cmd+shift+n"] })] }));
+    // Before the window's first draw, with none waiting, it says so.
+    runMenuCommand("thread.needs.next");
     expect(notify).toHaveBeenCalledWith({ level: "info", title: "No threads need attention" });
   });
 

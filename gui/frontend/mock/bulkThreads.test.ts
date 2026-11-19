@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 import type { UiContext } from "../src/gen/codefoundry/v1/command_pb";
+import { ThreadStatus } from "../src/gen/codefoundry/v1/thread_lifecycle_pb";
 import { World } from "./world";
 
 /**
@@ -45,5 +46,20 @@ describe("the mock's commands given ids", () => {
     expect(await run(w, "thread.remove", { ids: "s-3,s-4" }, true)).toBe("removed 2 threads: s-3, s-4");
     expect(w.threads.has("s-3")).toBe(false);
     expect(w.threads.has("s-4")).toBe(false);
+  });
+
+  it("thread.unread marks each idle one, and names the ones it refuses", async () => {
+    const w = new World();
+    const idle = (id: string) => {
+      const t = w.thread(id);
+      t.status = ThreadStatus.IDLE;
+      t.statusReason = "at prompt";
+    };
+    idle("s-3");
+    idle("s-4");
+    expect(await run(w, "thread.unread", { ids: "s-3,s-4" })).toBe("marked 2 threads unread: s-3, s-4");
+    expect([w.thread("s-3").statusReason, w.thread("s-4").statusReason]).toEqual(["finished", "finished"]);
+    idle("s-3");
+    expect(await run(w, "thread.unread", { ids: "s-3,s-1" })).toMatch(/^marked 1 thread unread: s-3\nfailed on 1 thread:\n {2}s-1: thread s-1 is not idle at its prompt/);
   });
 });

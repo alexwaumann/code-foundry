@@ -45,17 +45,17 @@ test("the focused list takes real keys: Home, ↓ and Enter select; cmd+2 is the
 
 // Status kinds: the order and sections (src/lib/tree.test.ts), each row's icon, word, tone and detail,
 // the idle time muted, no time on waiting rows, the name never coloured (src/components/sidebar/SidebarRow.test.tsx),
-// cmd+1..9 and cmd+shift+a's order (src/keys/bindings.test.ts), the title's count (src/stores/threads.test.ts).
-test("status kinds: cmd+1 and cmd+shift+a through the keymap, and the window title's count", async ({ page }) => {
+// cmd+1..9 and cmd+shift+n's order (src/keys/bindings.test.ts), the title's count (src/stores/threads.test.ts).
+test("status kinds: cmd+1 and cmd+shift+n through the keymap, and the window title's count", async ({ page }) => {
   await mockPost("status-kinds");
   await openApp(page);
   await list(page).focus();
-  // cmd+1 opens the list's first row, a Needs you row (the plan waiting for approval); cmd+shift+a
+  // cmd+1 opens the list's first row, a Needs you row (the plan waiting for approval); cmd+shift+n
   // opens the popup of Needs you's next thread after it (shell-model.md, Keys).
   await page.keyboard.press("Meta+1");
   await expect(row(page, "s:s-k-plan")).toHaveAttribute("aria-selected", "true");
   await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-thread-id", "s-k-plan");
-  await page.keyboard.press("Meta+Shift+a");
+  await page.keyboard.press("Meta+Shift+n");
   await expect(page.getByTestId("needs-popup")).toHaveAttribute("data-thread-id", "s-k-approval");
   await expectAttention(page, 7);
 });

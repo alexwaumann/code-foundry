@@ -7,18 +7,13 @@ import { notify } from "@/lib/notify";
 import { onRunCommandMenu } from "@/api/app";
 import { useCommandsStore } from "@/stores/commands";
 import { openHelp } from "@/stores/views";
-import { shellDrawn } from "@/stores/shellView";
-import { nextAttention, startCommandNamed } from "./bindings";
+import { startCommandNamed } from "./bindings";
 
 /**
  * GUI view actions the menu names (they are not registry commands; see viewActions in
  * bindings.ts). Keep the names in sync with gui/menu.go.
  */
 const menuViewActions: Readonly<Record<string, () => void>> = {
-  // Thread > Next Needing Attention, as cmd+shift+a (in the window shell, nothing visible when none waits).
-  "attention.next": () => {
-    if (!nextAttention() && !shellDrawn()) notify({ level: "info", title: "No threads need attention" });
-  },
   // Help > Getting Started and Keyboard Shortcuts and Help: the help overlay on a tab.
   // Not view.help, a toggle: picking one while the overlay shows switches its tab.
   "help.guide": () => {

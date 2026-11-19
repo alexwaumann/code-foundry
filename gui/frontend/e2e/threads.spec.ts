@@ -73,7 +73,7 @@ test("a running thread that stops looks the same: the composer stays focused and
 // A crashed or stopped thread's header (the project, no path, model or state):
 // src/components/thread/ThreadHeaderStopped.test.tsx; ThreadPane renders the composer for every thread.
 
-test("needs-attention: window title and cmd+shift+a", async ({ page }) => {
+test("needs-attention: window title and cmd+shift+n", async ({ page }) => {
   await openApp(page);
   await expectAttention(page, 1);
 
@@ -82,12 +82,12 @@ test("needs-attention: window title and cmd+shift+a", async ({ page }) => {
   await expect(row(page, "s:s-1")).toHaveAttribute("data-section", "needs");
 
   // Both sit under Needs you, newest status change first: s-1 (asked just now) before s-2.
-  // cmd+shift+a opens the next one's Needs-you popup (shell-model.md, Keys), wrapping around.
+  // cmd+shift+n opens the next one's Needs-you popup (shell-model.md, Keys), wrapping around.
   const needs = () => page.locator('[data-section="needs"][data-row-kind="thread"]').evaluateAll((els) => els.map((e) => e.getAttribute("data-row-key")));
   await expect.poll(needs).toEqual(["s:s-1", "s:s-2"]);
   const popup = page.getByTestId("needs-popup");
   for (const id of ["s-1", "s-2", "s-1", "s-2"]) {
-    await page.keyboard.press("Meta+Shift+a"); // after the first, from inside the popup
+    await page.keyboard.press("Meta+Shift+n"); // after the first, from inside the popup
     await expect(popup).toHaveAttribute("data-thread-id", id);
   }
 

@@ -102,3 +102,68 @@ func TestStaleKeybindingOverrides(t *testing.T) {
 		}
 	}
 }
+
+// The chords that became defaults with docs/notes/put-away-chords.md were the user's to bind
+// before (cmd+shift+n and cmd+shift+s free, cmd+shift+a reserved and refused): an override
+// that already names one keeps it, and the new default's command goes without that chord (its
+// value reads "none"), with no issue: nothing in the file is ignored. Nothing ends up on two
+// commands.
+func TestPutAwayChordsKeepUserOverrides(t *testing.T) {
+	reg := command.NewRegistry()
+	if err := all.Register(reg, all.Deps{Emitter: &commandtest.Emitter{}}); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(t.TempDir(), settings.FileName)
+	file := `[keybindings]
+"thread.new" = "cmd+shift+n"
+"view.usage" = "cmd+shift+a"
+"thread.pin" = "cmd+shift+s"
+`
+	if err := os.WriteFile(path, []byte(file), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	st, err := settings.Open(context.Background(), settings.Options{Path: path, Log: slog.New(slog.DiscardHandler)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = st.Close() })
+	applySettings(st, reg, new(slog.LevelVar), false)
+
+	if is := st.Snapshot().Issues; len(is) != 0 {
+		t.Errorf("issues = %v, want none", is)
+	}
+	for _, name := range []string{"thread.needs.next", "thread.archive", "thread.snooze.default"} {
+		if v := st.Snapshot().Values[settings.KeybindingKey(name)]; v != settings.KeybindingNone {
+			t.Errorf("%s value = %q, want none", name, v)
+		}
+	}
+	owners := map[string][]string{}
+	for _, l := range reg.List(command.Context{}, true) {
+		for _, k := range l.Command.Keybindings {
+			owners[k] = append(owners[k], l.Command.Name)
+		}
+	}
+	for chord, want := range map[string]string{"cmd+shift+n": "thread.new", "cmd+shift+a": "view.usage", "cmd+shift+s": "thread.pin"} {
+		if got := owners[chord]; !slices.Equal(got, []string{want}) {
+			t.Errorf("%s runs %v, want only %s", chord, got, want)
+		}
+	}
+	// The file keeps the user's lines as they were, and gains nothing for the yielded ones.
+	b, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(b) != file {
+		t.Errorf("settings file =\n%s\nwant it untouched", b)
+	}
+	// Binding the yielded command to a chord of its own takes it back.
+	if _, err := st.Update(context.Background(), map[string]string{"keybindings.thread.needs.next": "cmd+alt+n"}); err != nil {
+		t.Fatal(err)
+	}
+	if c, _ := reg.Get("thread.needs.next"); !slices.Equal(c.Keybindings, []string{"cmd+alt+n"}) {
+		t.Errorf("thread.needs.next keybindings = %v after its own override", c.Keybindings)
+	}
+	if v := st.Snapshot().Values[settings.KeybindingKey("thread.needs.next")]; v != "cmd+alt+n" {
+		t.Errorf("thread.needs.next value = %q after its own override", v)
+	}
+}

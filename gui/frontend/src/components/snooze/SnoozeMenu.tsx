@@ -4,6 +4,9 @@ import { saveThreadForLater, snoozeThread } from "@/stores/threadActions";
 import { useThreadsStore } from "@/stores/threads";
 import { openSnoozeDialog, openSnoozeDialogFor } from "@/stores/snoozeDialog";
 import { saveThreadsForLater, snoozeThreads } from "@/stores/bulkThreadActions";
+import { useDefaultSnooze } from "@/stores/snoozeDefault";
+import { useCommandChord } from "@/stores/commands";
+import { formatChord } from "@/keys/chord";
 
 /** A menu item as the snooze items need it: a context menu's or a dropdown's. */
 type MenuItem = ComponentType<{ onSelect: () => void; children?: ReactNode; "data-testid"?: string; "data-preset"?: string }>;
@@ -19,6 +22,9 @@ type MenuItem = ComponentType<{ onSelect: () => void; children?: ReactNode; "dat
  * thread's tab and the sidebar may be hidden, so it toasts (docs/notes/toast-success-rule.md).
  * `ids`: the sidebar's selection (its bulk menu): every item is one thread.snooze --ids for all
  * of them, and Save for later is left out once one of them is saved.
+ * The default snooze's item (Settings, threads.default_snooze) says "default" after its label,
+ * with Snooze to Default's chord in a single thread's menu (the chord acts on the thread in view,
+ * not on a selection; docs/notes/put-away-chords.md).
  */
 export function SnoozePresetItems({ id, ids, Item, Separator, onPreset, inView = true }: { id: string; ids?: readonly string[]; Item: MenuItem; Separator: ComponentType; onPreset?: () => void; inView?: boolean }) {
   // Mounted when the menu opens: the times are as of then.
@@ -26,6 +32,9 @@ export function SnoozePresetItems({ id, ids, Item, Separator, onPreset, inView =
   const list = ids ?? [id];
   const many = list.length > 1;
   const saved = useThreadsStore((s) => list.some((t) => (s.byId[t]?.savedAtMs ?? null) !== null));
+  const byDefault = useDefaultSnooze();
+  const chord = useCommandChord("thread.snooze.default");
+  const mark = <DefaultMark chord={many ? "" : chord} />;
   return (
     <>
       {snoozePresets(now).map((p) => (
@@ -39,6 +48,7 @@ export function SnoozePresetItems({ id, ids, Item, Separator, onPreset, inView =
           }}
         >
           {p.label}
+          {p.id === byDefault && mark}
           <span className="ml-auto pl-6 text-caption tabular-nums" data-testid="snooze-preset-time">
             {p.hint}
           </span>
@@ -63,11 +73,21 @@ export function SnoozePresetItems({ id, ids, Item, Separator, onPreset, inView =
           }}
         >
           Save for later
+          {byDefault === "save" && mark}
           <span className="ml-auto pl-6 text-caption" data-testid="snooze-save-hint">
             No alarm
           </span>
         </Item>
       )}
     </>
+  );
+}
+
+/** The default snooze's quiet mark after an item's label: "default" and the chord that snoozes there, if bound. */
+function DefaultMark({ chord }: { chord: string }) {
+  return (
+    <span className="text-caption text-cf-text-muted" data-testid="snooze-default">
+      default{chord && <span className="ml-1.5 tracking-widest">{formatChord(chord)}</span>}
+    </span>
   );
 }

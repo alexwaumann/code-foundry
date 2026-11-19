@@ -118,7 +118,7 @@ func (d ViewDeps) refusePage(uctx Context, a Args) error {
 //     (UiIntent.ShowView, showPage), and view.pullrequests and view.projects, a tab of the
 //     layout (showPageTab);
 //   - actions on each window's state (ShowView): view.back, view.forward, thread.previous
-//     and thread.next;
+//     and thread.next, and thread.needs.next (commands_view_needs.go);
 //   - the item verbs (commands_view_items.go): view.open.file, view.open.diff and
 //     view.open.pr, each a tab of the layout (commands_view_open.go), with its old
 //     view.panel.<item> name as an unlisted alias (view.open.mcp lives with its domain);
@@ -240,6 +240,6 @@ func RegisterView(r *Registry, d ViewDeps) error {
 		},
 	}
 	cmds = append(append(cmds, d.itemCommands()...), withAliases(d.panelPageCommand(), d.panelGalleryCommand())...)
-	cmds = append(cmds, d.threadDiffCommand(), d.inlineCommand(), d.composerHistoryCommand(), d.composerStageCommand(), d.threadInfoCommand(), d.paneFullscreenCommand(), d.fileFindCommand(), d.fileFindTextCommand(), d.fileSaveCommand(), d.searchOpenCommand())
+	cmds = append(cmds, d.threadDiffCommand(), d.inlineCommand(), d.composerHistoryCommand(), d.composerStageCommand(), d.threadInfoCommand(), d.needsNextCommand(), d.paneFullscreenCommand(), d.fileFindCommand(), d.fileFindTextCommand(), d.fileSaveCommand(), d.searchOpenCommand())
 	return r.RegisterAll(append(append(append(cmds, d.threadFindCommands()...), d.terminalFindCommands()...), d.fileSearchCommands()...)...)
 }

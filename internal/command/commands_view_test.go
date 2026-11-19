@@ -19,6 +19,7 @@ func TestViewCommandsEmitShowView(t *testing.T) {
 		{command: "view.forward", view: command.ViewForward},
 		{command: "thread.previous", view: command.ViewThreadPrevious},
 		{command: "thread.next", view: command.ViewThreadNext},
+		{command: "thread.needs.next", view: command.ViewNeedsNext},
 		{command: "composer.history", view: command.ViewComposerHistory},
 		{command: "view.thread-info", view: command.ViewThreadInfo},
 		{command: "file.find", view: command.ViewFileFind},

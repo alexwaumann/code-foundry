@@ -18,6 +18,10 @@ import (
 // daemon refuses anything but an idle thread at its prompt (FAILED_PRECONDITION, saying
 // why), and the GUI's menus and palette offer it by their own fresh copy of the rule
 // (gui/frontend/src/lib/markUnread.ts).
+//
+// With ids it marks several (commands_thread_bulk.go), past one the daemon refuses: the
+// sidebar's bulk menu, which offers it only when every selected thread can be marked
+// (docs/notes/put-away-chords.md).
 
 // UnreadBackend is the slice of ThreadService thread.unread needs.
 type UnreadBackend interface {
@@ -35,10 +39,17 @@ func threadUnread(b ThreadBackend, idArg ArgSpec) Command {
 			"or a message or a new turn clears it. Only for a thread idle at its prompt (not working, asking, in error, archived, snoozed or saved).",
 		Category:    "Thread",
 		Keybindings: []string{"cmd+shift+u"},
-		Args:        []ArgSpec{positional(idArg)},
-		When:        hasThread,
+		Args:        []ArgSpec{positional(optionalID(idArg)), threadIDsArg},
+		When:        hasThreadOrCLI,
 		Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
-			res, err := b.MarkUnread(ctx, connect.NewRequest(&v1.MarkUnreadRequest{Id: a.String("id")}))
+			ids, err := targetThreads(a)
+			if err != nil {
+				return Result{}, err
+			}
+			if a.Has("ids") {
+				return unreadThreads(ctx, b, ids), nil
+			}
+			res, err := b.MarkUnread(ctx, connect.NewRequest(&v1.MarkUnreadRequest{Id: ids[0]}))
 			if err != nil {
 				return Result{}, err
 			}
@@ -46,4 +57,14 @@ func threadUnread(b ThreadBackend, idArg ArgSpec) Command {
 			return Result{Message: "marked thread " + threadLabel(s) + " unread", JSON: s}, nil
 		},
 	}
+}
+
+// unreadThreads is thread.unread given ids: "marked 2 threads unread: a, b", and the ones the
+// daemon refused with why (eachThread).
+func unreadThreads(ctx context.Context, b ThreadBackend, ids []string) Result {
+	res := eachThread(ctx, ids, "marked", func(ctx context.Context, id string) error {
+		_, err := b.MarkUnread(ctx, connect.NewRequest(&v1.MarkUnreadRequest{Id: id}))
+		return err
+	})
+	return afterCount(res, "marked", " unread")
 }

@@ -15,7 +15,9 @@ import (
 //   - viewActions in gui/frontend/src/keys/bindings.ts: GUI-local actions that win over
 //     any command, even in a focused terminal (a command bound there never fires). The
 //     nine ctrl+cmd+<digit> chords switch to that space (space.switch --index: a chord
-//     cannot carry an argument, docs/notes/shell-model.md "Keys");
+//     cannot carry an argument, docs/notes/shell-model.md "Keys"). cmd+shift+a was the
+//     Needs you jump's until that became a command, thread.needs.next on cmd+shift+n, and
+//     the chord thread.archive's (docs/notes/put-away-chords.md);
 //   - editingChords in gui/frontend/src/keys/chord.ts: clipboard/undo, always left to
 //     the focused terminal or text field;
 //   - the Wails app menu (gui/app.go appMenu): quit, hide, hide others, minimize, full
@@ -28,7 +30,7 @@ import (
 // docs/notes/shell-20-cutover.md.
 var ReservedChords = []string{
 	// viewActions
-	"cmd+k", "cmd+b", "cmd+shift+a",
+	"cmd+k", "cmd+b",
 	"cmd+1", "cmd+2", "cmd+3", "cmd+4", "cmd+5", "cmd+6", "cmd+7", "cmd+8", "cmd+9",
 	"cmd+ctrl+1", "cmd+ctrl+2", "cmd+ctrl+3", "cmd+ctrl+4", "cmd+ctrl+5", "cmd+ctrl+6", "cmd+ctrl+7", "cmd+ctrl+8", "cmd+ctrl+9",
 	"cmd+=", "cmd+-", "cmd+0",

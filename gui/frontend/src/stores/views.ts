@@ -13,6 +13,7 @@ import { useUiStore } from "./ui";
 import { parsePluginView, showPluginView } from "./pluginPanel";
 import { leaveSubagent } from "./subagentView";
 import { jumpToNeighbour } from "./threadNeighbours";
+import { openNextNeedsPopup } from "./needs";
 import { toggleThreadInfo } from "./threadInfoOverlay";
 import { presentPromptHistory } from "./historyComposers";
 import { presentFileFinder, presentTextFinder } from "./fileFinder";
@@ -152,6 +153,10 @@ export function showView(name: string, params?: Readonly<Record<string, string>>
     case "thread.next":
       // thread.next: the thread below the current one in the sidebar, wrapping.
       jumpToNeighbour(1);
+      return true;
+    case "needs.next":
+      // thread.needs.next: the Needs you popup of the next thread that waits (nothing when none does).
+      openNextNeedsPopup();
       return true;
     case "thread-info":
       // view.thread-info: the focused thread's info card, kept per thread (thread.info; its overlay on a narrow pane).

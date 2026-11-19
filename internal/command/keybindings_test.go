@@ -177,7 +177,7 @@ func TestShellKeyTable(t *testing.T) {
 		"cmd+1…9":                           {view},
 		"cmd+shift+enter":                   {"pane.fullscreen"},
 		"cmd+shift+m":                       {"pane.collapse"},
-		"cmd+shift+a":                       {view},
+		"cmd+shift+n":                       {"thread.needs.next"},
 		"cmd+r":                             {"tab.rename"},
 		"cmd+shift+r":                       {"tab.auto-name"},
 		"cmd+b":                             {view},
@@ -341,7 +341,8 @@ func TestValidateBinding(t *testing.T) {
 		{in: "f5", want: "f5"},
 		{in: "shift+f5", want: "shift+f5"},
 		{in: "Cmd+K", err: "cmd+k is reserved by the app"},
-		{in: "cmd+shift+a", err: "cmd+shift+a is reserved by the app"},
+		// thread.archive's default since the Needs you jump became thread.needs.next: bindable.
+		{in: "Shift+Cmd+A", want: "cmd+shift+a"},
 		// tab.close's default since the shell: bindable, no longer the side panel's.
 		{in: "cmd+w", want: "cmd+w"},
 		// Retired with the side panel's split (shell-model.md, "Keys").
