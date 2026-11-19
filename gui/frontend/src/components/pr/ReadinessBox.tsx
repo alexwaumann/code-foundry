@@ -28,7 +28,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { openUrl, pullRequestKey, useViewerLogin } from "@/stores/gh";
-import { revertPullRequest, setAutoMerge, setPullRequestDraft, toggleSection, usePrPanelStore, usePullRequestChange } from "@/stores/prPanel";
+import { revertPullRequest, setAutoMerge, setPullRequestDraft, toggleSection, useMergingMethod, usePrPanelStore, usePullRequestChange } from "@/stores/prPanel";
 import type { PrRef } from "@/surfaces/pullrequestTarget";
 import { AutoMergeButton } from "./AutoMergeButton";
 import { Avatar } from "./Avatar";
@@ -162,12 +162,18 @@ function MainActionButton({ f, d, prRef, panelKey }: { f: Readiness["footer"]; d
   }
 }
 
-/** The header's status section: the state in words, then Review ▾ and the state's main action. */
+/**
+ * The header's status section: the state in words, then Review ▾ and the state's main action.
+ * While a merge runs the words say "Merging into main…" in the state's tone; the detail
+ * showing it merged turns them to Merged.
+ */
 export function HeaderStatus({ r, d, prRef, panelKey, onReview }: { r: Readiness; d: PullRequestDetailView; prRef: PrRef; panelKey: string; onReview: (v: Verdict) => void }) {
   const f = r.footer;
+  const merging = useMergingMethod(prRef) !== null && d.pullRequest.state === "open";
+  const headline = merging ? { ...r.headline, title: `Merging into ${d.pullRequest.baseRef || "the base branch"}…`, meta: "" } : r.headline;
   return (
     <StatusLine
-      words={<StatusWords d={d} headline={r.headline} />}
+      words={<StatusWords d={d} headline={headline} />}
       buttons={
         (f.review || f.main) && (
           <div className="flex max-w-full min-w-0 flex-[1_1_auto] flex-wrap items-center justify-end gap-1.5" data-testid="pr-ready-footer">

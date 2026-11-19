@@ -870,6 +870,8 @@ describe("the header's status and the Overview's cards", () => {
       expect(byTestId("pr-ready-headline").textContent).toBe(words);
       expect(byTestId("pr-ready-headline").dataset.tone).toBe(tone);
       expect(byTestId("pr-header").dataset.tone).toBe(tone);
+      // Quiet text after the words only for an end state; an open one's detail is on the cards.
+      expect(queryTestId("pr-ready-meta") !== null).toBe(number === 138 || number === 131);
     });
   }
 
@@ -994,6 +996,27 @@ describe("the merge button", () => {
     expect(within(byTestId("pr-ready-footer")).getAllByRole("button").map((b) => b.dataset.testid)).toEqual(["pr-revert"]);
     await expectToast("Merged #142 (e2e0142)");
     await expectToast("deleted origin/feat/sidebar");
+  });
+
+  it("#142: while the merge runs the status says Merging into main… in the state's tone; Merged once the detail shows it", async () => {
+    renderPrPanel();
+    await openPr(142);
+    expect(byTestId("pr-ready-headline").textContent).toBe("Ready to merge");
+    const release = world.hold("pr.merge");
+    fireEvent.click(button());
+    await settle();
+    fireEvent.click(byTestId("pr-merge-dialog-confirm"));
+    await settle();
+    expect(byTestId("pr-ready-headline").textContent).toBe("Merging into main…");
+    expect(byTestId("pr-ready-headline").dataset.tone).toBe("success");
+    expect(byTestId("pr-header").dataset.tone).toBe("success");
+    expect(queryTestId("pr-ready-meta")).toBeNull();
+    release();
+    await vi.waitFor(() => {
+      expect(byTestId("pr-ready-headline").textContent).toBe("Merged");
+    });
+    expect(byTestId("pr-header").dataset.tone).toBe("merged");
+    expect(byTestId("pr-ready-meta").textContent).toMatch(/ into main just now$/);
   });
 
   it("#142: the dialog's Method changes its words and the repository's default; its branch box and Cancel", async () => {
@@ -1132,7 +1155,7 @@ describe("auto-merge", () => {
     renderPrPanel();
     await openPr(163);
     expect(byTestId("pr-ready-headline").textContent).toBe("Waiting on checks");
-    expect(byTestId("pr-ready-meta").textContent).toBe("3 running");
+    expect(queryTestId("pr-ready-meta")).toBeNull();
     expect(queryTestId("pr-merge-button")).toBeNull();
     // The menu picks the repository's default, as Merge's does: the pick turns nothing on.
     press(byTestId("pr-auto-merge-button-menu-button"));
@@ -1740,7 +1763,7 @@ describe("Review ▾", () => {
     await openPr(140);
     expect(byTestId("pr-author").textContent).toBe("outside-contrib");
     expect(byTestId("pr-ready-headline").textContent).toBe("You can't merge this");
-    expect(byTestId("pr-ready-meta").textContent).toBe("read access");
+    expect(queryTestId("pr-ready-meta")).toBeNull();
     expect(queryTestId("pr-ready-footer")).toBeNull();
     expect(queryTestId("pr-review-button")).toBeNull();
     expect(queryTestId("pr-your-review")).toBeNull();

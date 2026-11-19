@@ -13,9 +13,13 @@ the merge, review and diff components are unchanged and only render somewhere el
   the right (Review ▾, then the state's main action). The whole header has a wash of the state's
   tone (success, warning, the merged tone, error; none for a draft). The bottom border stays the
   divider colour. No state pill, no Open on GitHub button, no author, ages or diffstat.
-- **Words** (`readiness.ts` headline): Ready to merge, Waiting on checks, Not ready to merge
-  (no "N left"), Auto-merge on (no method after it), Draft, Merged with "a3f9c21 into main 1d
-  ago", Closed with its age. `statusTone` maps the headline's tone to the wash.
+- **Words** (`readiness.ts` headline): Ready to merge, Waiting on checks, Not ready to merge,
+  Auto-merge on, Draft, Merged with "a3f9c21 into main 1d ago", Closed with its age. The status
+  line is the state only: an open pull request has no quiet text after its words (no "3
+  running", "1 optional check failing", "read access"); that detail is on Overview's cards, and
+  the rows' `summary` field that fed it is gone. While a merge runs (`useMergingMethod`) the
+  words read "Merging into main…" in the state's tone, until the detail shows it merged.
+  `statusTone` maps the headline's tone to the wash.
 - **Main action** (`ReadinessFooter.main`, was `merge`): merge, auto-merge or cancel-auto-merge
   as before; `ready` for a draft (the author or write access), `revert` for a merged pull
   request with write access. Rows no longer carry Ready for review or Revert; Revert left the ⋯
@@ -42,11 +46,9 @@ the merge, review and diff components are unchanged and only render somewhere el
   "No checks" say nothing the details do not. A checks row of only skipped checks goes on the
   passed card.
 - The passed card shows titles only. The approvers are in the details' reviewers.
-- Statuses the brief did not name keep their words and their quiet text: "Waiting on your
-  review" (warning), "You can't merge this · read access" and "Checking mergeability" (no wash:
-  neither says the pull request is or is not ready). "Waiting on checks · 3 running" and
-  "Ready to merge · 1 optional check failing" keep the existing meta; the brief dropped only
-  "N left" and the auto-merge method.
+- Statuses the brief did not name keep their words: "Waiting on your review" (warning), "You
+  can't merge this" and "Checking mergeability" (no wash: neither says the pull request is or
+  is not ready).
 - Closed says only its age: the detail has no "closed by".
 - The draft's card is "Still a draft" (the header already says Draft).
 - Reviewers show on merged and closed pull requests when there are any (who reviewed it is

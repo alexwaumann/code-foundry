@@ -68,11 +68,6 @@ export interface ReadinessRow {
    * merge it now (mergeableNow): the row then only informs.
    */
   blocking: boolean;
-  /**
-   * What the headline's meta says of an issue row: "2 running" (Waiting on checks), or
-   * "1 optional check failing" beside Ready to merge when it does not block. Absent: nothing.
-   */
-  summary?: string;
   /** The checks row: it expands to every check. */
   expandable: boolean;
 }
@@ -95,7 +90,10 @@ export interface ReadinessFooter {
 }
 
 export interface Readiness {
-  /** The header's status: the state in words ("Ready to merge", "Merged") and quiet text after it. */
+  /**
+   * The header's status: the state in words ("Ready to merge", "Merged"); quiet text after them
+   * only for an end state ("a3f9c21 into main 2h ago", "3d ago").
+   */
   headline: { icon: ReadyIcon; tone: ReadyTone; title: string; meta: string };
   rows: ReadinessRow[];
   footer: ReadinessFooter;
@@ -224,7 +222,6 @@ function checksRow(d: PullRequestDetailView, checks: CheckView[], open: boolean)
     // Failing checks are a task even when they do not block (optional ones): PR D2 offers "Fix in …".
     task: tone === "failure" && open ? "checks" : null,
     blocking: blocking && open,
-    summary: tone === "failure" ? (n.failed > 0 ? `${plural(n.failed, "optional check")} failing` : "optional checks failing") : tone === "pending" ? (n.running > 0 ? `${String(n.running)} running` : "checks running") : "",
     expandable: d.checks.length > 0,
   });
   const running = n.running > 0 ? `${String(n.running)} running` : "";
@@ -305,7 +302,7 @@ function reviewRows(d: PullRequestDetailView, viewer: string, now: number): Read
   }));
   if (changes.length > 0 || pr.review === "changes_requested") {
     const who = [names(changes), waiting.length > 0 ? `still waiting on ${names(waiting)}` : ""].filter(Boolean).join(" · ");
-    rows.push({ ...base, id: "review", tone: "failure", icon: "failure", title: "Changes requested", meta: "", lines: who ? [{ kind: "text", text: who }] : [], task: "review", blocking: true, summary: "changes requested" });
+    rows.push({ ...base, id: "review", tone: "failure", icon: "failure", title: "Changes requested", meta: "", lines: who ? [{ kind: "text", text: who }] : [], task: "review", blocking: true });
     return rows;
   }
   if (pr.review === "review_required") {
@@ -318,7 +315,7 @@ function reviewRows(d: PullRequestDetailView, viewer: string, now: number): Read
     // Reviewers still requested (a code-owner team, say): when GitHub reports BLOCKED, they are why.
     const still: SubLine[] = waiting.length > 0 ? [{ kind: "text", text: `Still waiting on ${names(waiting)}` }] : [];
     const held = waiting.length > 0 && pr.mergeState === "blocked";
-    rows.push({ ...base, id: "review", tone: held ? "pending" : "success", icon: held ? "clock" : "success", title: "Approved", meta: "", lines: [...approvals, ...still], task: null, blocking: held, summary: held ? `waiting on ${names(waiting)}` : "" });
+    rows.push({ ...base, id: "review", tone: held ? "pending" : "success", icon: held ? "clock" : "success", title: "Approved", meta: "", lines: [...approvals, ...still], task: null, blocking: held });
     return rows;
   }
   // Reviews are not required here.
@@ -347,7 +344,6 @@ function conversationsRow(d: PullRequestDetailView): ReadinessRow | null {
     tone: "pending",
     icon: "conversation",
     title,
-    summary: title,
     meta: "",
     lines: [{ kind: "locations", items: open.map((t) => ({ text: threadLocation({ path: baseOf(t.path), line: t.line }), path: threadLocation(t), outdated: t.isOutdated })) }],
     action: null,
@@ -401,7 +397,6 @@ function openRows(d: PullRequestDetailView, viewer: string, now: number): Readin
       action: { kind: "approve-workflow", url: approval.find((a) => a.url)?.url || pr.url },
       task: null,
       blocking: true,
-      summary: `${plural(approval.length, "workflow")} waiting for approval`,
       expandable: false,
     });
   }
@@ -453,25 +448,25 @@ function computingMergeability(d: PullRequestDetailView): boolean {
   return (pr.mergeable === "unknown" || pr.mergeable === null) && (pr.mergeState === "unknown" || pr.mergeState === "");
 }
 
+/**
+ * An open pull request's state in words, with no quiet text after them: what is behind the
+ * words (what runs, what fails, who can merge) is on Overview's cards.
+ */
 function openHeadline(d: PullRequestDetailView, rows: ReadinessRow[]): Readiness["headline"] {
   if (d.pullRequest.draft) return { icon: "draft", tone: "draft", title: "Draft", meta: "" };
   if (d.autoMergeEnabled) return { icon: "auto-merge", tone: "pending", title: "Auto-merge on", meta: "" };
   if (rows.some((r) => r.id === "review-request")) return { icon: "eye", tone: "pending", title: "Waiting on your review", meta: "" };
-  if (!d.viewerCanUpdate) return { icon: "lock", tone: "neutral", title: "You can't merge this", meta: d.viewerPermission ? `${d.viewerPermission} access` : "" };
+  if (!d.viewerCanUpdate) return { icon: "lock", tone: "neutral", title: "You can't merge this", meta: "" };
   const blocking = rows.filter((r) => r.blocking);
   if (blocking.length === 0) {
     // GitHub is still computing (just after a push): say so, not "Ready". Merge stays as GitHub allows.
     if (computingMergeability(d)) return { icon: "clock", tone: "neutral", title: "Checking mergeability", meta: "" };
-    if (mergeAvailability(d).reason === null) {
-      // What still shows but does not block: "1 optional check failing · 1 unresolved conversation".
-      const meta = rows.map((r) => r.summary ?? "").filter(Boolean).join(" · ");
-      return { icon: "success", tone: "success", title: "Ready to merge", meta };
-    }
-    return { icon: "warning", tone: "pending", title: "Not ready to merge", meta: mergeAvailability(d).reason ?? "" };
+    if (mergeAvailability(d).reason === null) return { icon: "success", tone: "success", title: "Ready to merge", meta: "" };
+    return { icon: "warning", tone: "pending", title: "Not ready to merge", meta: "" };
   }
   const [only] = blocking;
   if (blocking.length === 1 && only?.id === "checks" && only.tone === "pending") {
-    return { icon: "running", tone: "pending", title: "Waiting on checks", meta: only.summary ?? "" };
+    return { icon: "running", tone: "pending", title: "Waiting on checks", meta: "" };
   }
   return { icon: "warning", tone: "pending", title: "Not ready to merge", meta: "" };
 }
