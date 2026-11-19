@@ -322,6 +322,7 @@ func pendingToProto(id string, seq uint64, pending []thread.PendingRequest) *v1.
 	for _, p := range pending {
 		out.Pending = append(out.Pending, &v1.ThreadPendingRequest{
 			RequestId: p.RequestID, ItemId: p.ItemID, Question: p.Kind == thread.KindQuestion, ToolName: p.ToolName, Summary: p.Summary,
+			FromThreadId: p.From,
 		})
 	}
 	return out
@@ -366,6 +367,9 @@ func itemToProto(it thread.Item) *v1.ThreadItem {
 				Description: r.Description, ToolUseId: r.ToolUseID, AgentId: r.AgentID, BlockedPath: r.BlockedPath,
 				DecisionReason: r.DecisionReason, InputJson: r.InputJSON, SuggestionsJson: r.SuggestionsJSON,
 				State: requestStates[r.State], Decision: r.Decision, Message: r.Message, Answers: r.Answers,
+			}
+			if u := r.PassedUp; u != nil {
+				rp.PassedUp = &v1.PassedUpQuestion{FromThreadId: u.From, FromName: u.FromName, ThreadAsk: u.Kind == thread.PassUpAsk, Assuming: u.Assuming}
 			}
 			if it.Kind == thread.KindQuestion {
 				p.Payload = &v1.ThreadItem_Question{Question: rp}

@@ -46,6 +46,18 @@ func (h *Thread) Ask(ctx context.Context, req *connect.Request[v1.AskThreadReque
 	return connect.NewResponse(&v1.AskThreadResponse{Creator: threadToProto(creator), Repeated: repeated}), nil
 }
 
+// PassUp passes a worker's question up to the user for its lead.
+func (h *Thread) PassUp(ctx context.Context, req *connect.Request[v1.PassUpQuestionRequest]) (*connect.Response[v1.PassUpQuestionResponse], error) {
+	m := req.Msg
+	res, err := h.store.PassUp(ctx, m.GetLeadThreadId(), m.GetWorkerId(), m.GetRequestId())
+	if err != nil {
+		return nil, threadError(err)
+	}
+	return connect.NewResponse(&v1.PassUpQuestionResponse{
+		Worker: threadToProto(res.Worker), ThreadAsk: res.Kind == thread.PassUpAsk, Question: res.Question, Item: itemToProto(res.Item),
+	}), nil
+}
+
 // Report records a thread's report, replacing the previous one.
 func (h *Thread) Report(ctx context.Context, req *connect.Request[v1.ReportThreadRequest]) (*connect.Response[v1.ReportThreadResponse], error) {
 	m := req.Msg

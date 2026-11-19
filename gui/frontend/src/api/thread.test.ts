@@ -65,6 +65,10 @@ describe("toThreadItemView", () => {
       isError: true,
     });
     expect(v({ case: "question", value: { requestId: "r", state: ThreadRequestState.PENDING, answers: { Q: "A" } } })).toMatchObject({ kind: "question", request: { requestId: "r", state: "pending", answers: { Q: "A" } } });
+    expect(v({ case: "question", value: { requestId: "r", state: ThreadRequestState.PENDING } })).not.toHaveProperty("request.passedUp");
+    expect(v({ case: "question", value: { requestId: "pu-1", state: ThreadRequestState.PENDING, passedUp: { fromThreadId: "s-w", fromName: "Resize", threadAsk: true, assuming: "only the gutters" } } })).toMatchObject({
+      request: { requestId: "pu-1", passedUp: { threadId: "s-w", name: "Resize", threadAsk: true, assuming: "only the gutters" } },
+    });
     expect(v({ case: "turnEnd", value: { subtype: "success", durationMs: 1234n, costUsd: 0.5, inputTokens: 3n, errors: ["e"] } })).toMatchObject({ kind: "turnEnd", durationMs: 1234, costUsd: 0.5, inputTokens: 3, errors: ["e"] });
     expect(v({ case: "compaction", value: { trigger: "manual", preTokens: 10n, postTokens: 2n } })).toMatchObject({ kind: "compaction", preTokens: 10, postTokens: 2 });
     expect(v({ case: "note", value: { text: "Forked from base" } })).toMatchObject({ kind: "note", text: "Forked from base", createdBy: "" });
@@ -83,6 +87,9 @@ describe("toThreadEventView", () => {
   it("maps snapshots, deltas and the pending snapshot; drops unknown fields", () => {
     const snap = toThreadEventView(create(ThreadEventSchema, { event: { case: "snapshot", value: { threadId: "s", seq: 9n, items: [{ id: "a", payload: { case: "assistantText", value: { text: "x" } } }], pending: [{ requestId: "r", itemId: "perm-r", toolName: "Bash", summary: "Bash ls" }] } } }));
     expect(snap).toMatchObject({ kind: "snapshot", seq: 9, items: [{ id: "a", kind: "text", text: "x" }], pending: [{ requestId: "r" }] });
+    expect(snap?.kind === "snapshot" && snap.pending[0]).not.toHaveProperty("fromThreadId");
+    const passed = toThreadEventView(create(ThreadEventSchema, { event: { case: "pending", value: { threadId: "s", seq: 4n, pending: [{ requestId: "pu-1", itemId: "q", question: true, summary: "From W: ?", fromThreadId: "s-w" }] } } }));
+    expect(passed).toMatchObject({ kind: "pending", pending: [{ requestId: "pu-1", fromThreadId: "s-w" }] });
     const delta = (field: ThreadItemDelta_Field) => toThreadEventView(create(ThreadEventSchema, { event: { case: "delta", value: { threadId: "s", seq: 10n, itemId: "a", field, text: "y" } } }));
     expect(delta(ThreadItemDelta_Field.TEXT)).toMatchObject({ kind: "delta", field: "text", seq: 10 });
     expect(delta(ThreadItemDelta_Field.INPUT)).toMatchObject({ field: "input" });

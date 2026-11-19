@@ -242,6 +242,7 @@ func (m *Manager) saveItem(id string, it Item) {
 	if err := saveItem(context.Background(), m.opts.DB, id, it, searchIndex{}); err != nil {
 		m.log.Error("persist thread item", "thread", id, "item", it.ID, "err", err)
 	}
+	m.requestSettled(id, it) // a passed-up question of it is withdrawn (passup.go)
 }
 
 // closeUnfinished completes items a run left open: streaming text stays as it is,

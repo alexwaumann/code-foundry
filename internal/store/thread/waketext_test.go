@@ -95,7 +95,7 @@ func TestWakeBodyHoldsForgedLines(t *testing.T) {
 // An apostrophe in a question must not end the quote on a line the parent is told to run.
 func TestAnswerLineQuotesApostrophes(t *testing.T) {
 	p := &wakePending{Kind: "question", RequestID: "q", Questions: []wakeQuestion{{Question: "it's $(rm -rf x)'"}, {Question: "b"}}}
-	got := pendingText("s-1", p)
+	got := pendingText("s-1", p, false)
 	if !strings.Contains(got, `it'\''s $(rm -rf x)'\''`) {
 		t.Errorf("text:\n%s", got)
 	}

@@ -159,11 +159,13 @@ type waitState struct {
 	// reminder: a timer wake started (or joined) the thread's current or last turn
 	// (waiting_reminder.go); its end needs attention, waiting or not.
 	reminder bool
+	// passUp: the shown status is the passed-up question's overlay (passup.go).
+	passUp bool
 }
 
 // rawStatus is the record's own status: the shown one, unless that is the overlay.
 func (rec *record) rawStatus() statusVal {
-	if shownWaiting(rec.s.Status, rec.s.StatusReason) {
+	if shownWaiting(rec.s.Status, rec.s.StatusReason) || rec.shownPassUp() {
 		return rec.wait.raw
 	}
 	return statusVal{st: rec.s.Status, reason: rec.s.StatusReason, at: rec.s.StatusChangedAt}
@@ -227,10 +229,22 @@ func (m *Manager) pendingLocked(id string, seen map[string]bool) bool {
 	return false
 }
 
-// shownLocked is the status rec shows: the overlay, or its raw status. Callers hold
-// m.mu.
+// shownPassUp reports whether rec still shows the passed-up question's overlay: a change
+// that wrote a raw status over it left something else.
+func (rec *record) shownPassUp() bool {
+	return rec.wait.passUp && rec.s.Status == rec.wait.shown.st && rec.s.StatusReason == rec.wait.shown.reason
+}
+
+// shownLocked is the status rec shows: the overlay, or its raw status. A worker's question
+// its lead passed up to the user (passup.go) shows as the lead's question, over everything
+// but a request of its own. Callers hold m.mu.
 func (m *Manager) shownLocked(rec *record) statusVal {
 	raw := rec.rawStatus()
+	if !isRequestReason(raw.reason) || raw.st != StatusNeedsAttention {
+		if reason, ok := m.passUpOverlayLocked(rec); ok {
+			return statusVal{st: StatusNeedsAttention, reason: reason}
+		}
+	}
 	if w, ok := m.waitingLocked(rec); ok {
 		return statusVal{st: StatusIdle, reason: w.Reason()}
 	}
@@ -248,8 +262,9 @@ func (m *Manager) applyWaitingLocked(rec *record) bool {
 	rec.wait.raw = raw
 	show := m.shownLocked(rec)
 	prev := rec.wait.shown
+	overlay := show != raw && !shownWaiting(show.st, show.reason)
 	switch {
-	case shownWaiting(show.st, show.reason) && !prev.at.IsZero() && show.st == prev.st && show.reason == prev.reason:
+	case (shownWaiting(show.st, show.reason) || overlay && rec.wait.passUp) && !prev.at.IsZero() && show.st == prev.st && show.reason == prev.reason:
 		show.at = prev.at // the change set a raw status the overlay hides
 	case show.st == before.st && show.reason == before.reason:
 		show.at = before.at
@@ -258,6 +273,8 @@ func (m *Manager) applyWaitingLocked(rec *record) bool {
 	}
 	rec.s.Status, rec.s.StatusReason, rec.s.StatusChangedAt = show.st, show.reason, show.at
 	rec.wait.shown = show
+	rec.wait.passUp = overlay
+	rec.s.PassedUp = m.passUpsOf(rec.s.ID)
 	return show != before
 }
 

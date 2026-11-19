@@ -421,6 +421,14 @@ describe("a Needs you row's lines, one per open request (docs/notes/needs-you-li
     expect(within(rowOf("s:s-2")).getByTestId("row-ask").textContent).toBe("Permission");
   });
 
+  it("a worker's question its lead passed up: the lead's row and a line saying which thread it came from (docs/notes/pass-up-question.md)", () => {
+    render(<ShellSidebarList bodyHeight={800} />);
+    pending("s-2", { ...req(1, { question: true, summary: "From Resize: Should the body drag too?" }), fromThreadId: "s-w" } as ReturnType<typeof req>);
+    expect(lines("s:s-2")).toEqual(["question From Resize: Should the body drag too?"]);
+    // One request: the status word stays the thread's own (the daemon's "question: From Resize: …"), not "1 items".
+    expect(within(rowOf("s:s-2")).getByTestId("row-ask").getAttribute("data-kind")).not.toBe("items");
+  });
+
   it("only under Needs you: an Active row with open requests shows none", () => {
     render(<ShellSidebarList bodyHeight={800} />);
     pending("s-1", req(1), req(2));

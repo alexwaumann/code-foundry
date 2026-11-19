@@ -11,6 +11,8 @@ import { NeedsHoverCard } from "./NeedsCard";
 function useAskText(threadId: string, p: ThreadPendingView): string {
   const item = useThreadItem(threadId, p.itemId);
   const cwd = useThreadsStore((s) => s.byId[threadId]?.worktreePath ?? "");
+  // A worker's question passed up: the summary says which thread it came from ("From <worker>: …").
+  if (p.fromThreadId) return p.summary;
   if (item?.kind === "question") return questionsOf(item.request.inputJson)[0]?.question || p.summary;
   if (item?.kind === "permission") return askTarget(item.request, cwd)?.text.split("\n")[0] || p.summary;
   return p.summary;

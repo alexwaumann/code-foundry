@@ -288,6 +288,9 @@ describe("senderOf", () => {
       "w:t/a/fail/L;t/b/wait/L",
     ],
     ["an ask", { wake: { title: "", json: JSON.stringify({ kind: "ask", thread: "s-2", question: "?" }) } }, "w:t/s-2/ask/"],
+    // The user's answer to a question the lead passed up: the worker works on (docs/notes/pass-up-question.md).
+    ["the user's answer to a passed-up question", { wake: { title: "", json: JSON.stringify({ kind: "answer", thread: "s-2", question: "?", answers: { "?": "a" } }) } }, "w:t/s-2/ask/"],
+    ["a passed-up question skipped", { wake: { title: "", json: JSON.stringify({ kind: "answer", thread: "s-2", question: "?", skipped: true }) } }, "w:t/s-2/ask/"],
     ["an action run", { wake: { title: "", json: JSON.stringify({ kind: "action_run", run: { id: "r", exit_code: 0 } }) } }, "w:x"],
     ["a pull request", { wake: { title: "PR merged", json: JSON.stringify({ kind: "pull_request" }) } }, "w:x"],
   ] as const)("%s", (_n, o, want) => {

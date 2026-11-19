@@ -404,6 +404,11 @@ type Manager struct {
 	// wakeNotes are each resident's wake notes (residenthooks.go): resident name ->
 	// WakeNoteFunc.
 	wakeNotes sync.Map
+	// passUps are the open passed-up questions by their request id on the lead (passup.go);
+	// guarded by mu. anyPassUps is set once one was made, so a settled request costs nothing
+	// before.
+	passUps    map[string]*passUp
+	anyPassUps atomic.Bool
 }
 
 type record struct {
@@ -443,6 +448,8 @@ type record struct {
 	// unreadHold: the user marked the stopped thread unread (unread.go), and the viewer
 	// already there does not see it until a new viewer or the focus. In memory only.
 	unreadHold bool
+	// passUp is what pass-up knows of its thread asks (passup.go). In memory only.
+	passUp passUpState
 }
 
 var _ Store = (*Manager)(nil)
@@ -669,11 +676,16 @@ func (m *Manager) update(id string, persist bool, fn func(*record)) (Thread, boo
 // re-evaluated after the wake subscriptions saw the change (a one-shot that fired is
 // gone by then, its wake queued).
 func (m *Manager) commitLocked(rec *record, persist bool) {
+	m.putAwayPassUpsLocked(rec) // an archived or removed lead's or worker's pass-ups go (passup.go)
 	if m.applyWaitingLocked(rec) {
 		persist = true
 	}
 	if persist {
-		if err := saveThread(context.Background(), m.opts.DB, rec.s); err != nil {
+		saved := rec.s
+		if rec.wait.passUp {
+			saved = rec.rawThread() // the pass-up overlay is the open pass-ups', which a restart loses
+		}
+		if err := saveThread(context.Background(), m.opts.DB, saved); err != nil {
 			m.log.Error("persist thread", "thread", rec.s.ID, "err", err)
 		}
 	}

@@ -264,12 +264,10 @@ to the user; tell them about a denial or something you found, once. Add to the p
 "when an edit is denied, apply the reason before you retry; never resend the same
 edit". When a child asks a question while others wait for permission, first answer
 every pending request you can (`thread list --created-by $CODE_FOUNDRY_THREAD` shows who
-is waiting), then relay the question to the user as plain text at the end of your turn
-(once: do not repeat it in later turns), and answer the child with `thread respond --id
-<child> --answer "<option label>"` once the user has. The child still asks with its own question tool (its `options` reach you in the
-wake); only you relay in plain text: a blocking question tool in your turn would hold
-back every other child until the user answers. Never tell a child not to use its
-question tool.
+is waiting). A worker's question is yours to answer (`thread respond --id <child> --answer
+"<option label>"`); pass it up only as `reference/wakes.md` says, never with a question
+tool of your own: it would hold back every other child until the user answers. Never tell
+a child not to use its question tool.
 
 ## 6. Budget stops
 

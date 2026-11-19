@@ -80,7 +80,7 @@ export function senderOf(it: ThreadItemView): string {
 }
 
 function partState(tone: "ok" | "attention" | "fail", detail: string): PartState {
-  if (detail === "asks") return "ask";
+  if (detail === "asks" || detail === "answered" || detail === "skipped") return "ask"; // the user's answer to its passed-up question: it works on
   return tone === "ok" ? "done" : tone === "fail" ? "fail" : "wait";
 }
 

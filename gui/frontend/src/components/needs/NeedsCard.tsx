@@ -8,6 +8,7 @@ import { PromptDiff } from "@/components/thread/PromptDiff";
 import { useThreadPlace } from "@/components/thread/useThreadPlace";
 import { shellTokens } from "@/lib/highlight";
 import { askTarget } from "@/lib/needsAsk";
+import { askerName, askTitle, passedUpLine } from "@/lib/passUp";
 import { statusLine } from "@/lib/statusLine";
 import { statusBadge } from "@/lib/statusRegistry";
 import { permissionTitle, questionsOf } from "@/lib/threadRequest";
@@ -84,6 +85,9 @@ export function NeedsCardBody({ threadId, anchor, read = true, requestId = null 
   const line = useThreadsStore(useShallow((s) => statusLine(s.byId[threadId])));
   const { pending, request } = ask;
   const question = pending?.question ?? false;
+  // A worker's question its lead (this thread) passed up: titled with the worker's name (docs/notes/pass-up-question.md).
+  const from = pending?.fromThreadId ?? "";
+  const fromName = useThreadsStore((s) => (from ? s.byId[from]?.name : undefined));
   // A line's card is one of the lines on screen: no "+N more" there.
   const more = ask.count > 1 && requestId === null ? (
     <span className="chip muted" data-testid="needs-card-more">
@@ -106,12 +110,19 @@ export function NeedsCardBody({ threadId, anchor, read = true, requestId = null 
     head = (
       <>
         <MessageCircleQuestionMark aria-hidden />
-        <span>{questions.length > 1 ? `Claude has ${String(questions.length)} questions` : "Claude has a question"}</span>
+        <span>{askTitle(from ? askerName(from, fromName, request?.passedUp?.name) : null, questions.length)}</span>
         {more}
       </>
     );
-    body =
-      questions.length > 0 ? (
+    const passed = from ? (
+      <p className="pend-sub text-body-sm text-cf-text-muted" data-testid="needs-card-passed-up">
+        {passedUpLine(request?.passedUp)}
+      </p>
+    ) : null;
+    body = (
+      <>
+        {passed}
+        {questions.length > 0 ? (
         questions.map((q, i) => (
           <div key={i} className="q-text selectable" data-testid="needs-card-question">
             {q.header && <span className="q-hdr">{q.header}</span>} {q.question}
@@ -122,7 +133,9 @@ export function NeedsCardBody({ threadId, anchor, read = true, requestId = null 
         <div className="q-text selectable" data-testid="needs-card-question">
           {pending.summary}
         </div>
-      );
+        )}
+      </>
+    );
   } else if (pending && request) {
     // The whole request is known: the only state with Allow and Deny.
     const input = parseObject(request.inputJson);

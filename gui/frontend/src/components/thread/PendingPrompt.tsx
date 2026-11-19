@@ -24,6 +24,7 @@ import {
   type PromptShape,
   type QuestionPick,
 } from "@/lib/threadRequest";
+import { askerName, askTitle, passedUpLine } from "@/lib/passUp";
 import { parseObject, relPath, str } from "@/lib/toolSummary";
 import { useThreadsStore } from "@/stores/threads";
 import { useAgentInputOf, useThreadItem } from "@/stores/thread";
@@ -297,6 +298,10 @@ function QuestionPrompt({ r, keysRef, refocus }: PromptProps) {
   const pick = picks[page] ?? NO_PICK;
   const last = page >= questions.length - 1;
   const answered = q ? answerOf(q, pick) !== "" : false;
+  // A worker's question this thread passed up to the user (docs/notes/pass-up-question.md).
+  const passed = r.passedUp;
+  const fromName = useThreadsStore((s) => (passed ? s.byId[passed.threadId]?.name : undefined));
+  const asker = passed ? askerName(passed.threadId, fromName, passed.name) : null;
 
   const setPick = (p: QuestionPick) => {
     setPicks((all) => all.map((x, i) => (i === page ? p : x)));
@@ -344,7 +349,7 @@ function QuestionPrompt({ r, keysRef, refocus }: PromptProps) {
       ref={rootRef}
       tabIndex={-1}
       role="group"
-      aria-label={questions.length === 1 ? "Claude's question" : "Claude's questions"}
+      aria-label={asker ? `Question from ${asker}` : questions.length === 1 ? "Claude's question" : "Claude's questions"}
       data-keys-local=""
       data-testid="thread-question"
       data-request-id={r.requestId}
@@ -352,7 +357,7 @@ function QuestionPrompt({ r, keysRef, refocus }: PromptProps) {
     >
       <div className="pend-h">
         <MessageCircleQuestionMark aria-hidden />
-        <span>{questions.length === 1 ? "Claude has a question" : `Claude has ${String(questions.length)} questions`}</span>
+        <span>{askTitle(asker, questions.length)}</span>
         {r.agentId && <AskingAgent toolUseId={r.toolUseId} />}
         {questions.length > 1 && (
           <span className="pager" aria-label={`Question ${String(page + 1)} of ${String(questions.length)}`}>
@@ -365,6 +370,11 @@ function QuestionPrompt({ r, keysRef, refocus }: PromptProps) {
           </span>
         )}
       </div>
+      {passed && (
+        <p className="pend-sub text-body-sm text-cf-text-muted" data-testid="thread-question-passed-up">
+          {passedUpLine(passed)}
+        </p>
+      )}
       <div className="q-text selectable">
         {q.header && <span className="q-hdr">{q.header}</span>} {q.question}
         {q.multiSelect && <span className="q-multi"> Pick any.</span>}

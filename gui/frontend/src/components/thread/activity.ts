@@ -38,7 +38,8 @@ export function useThreadActivity(threadId: string): ThreadActivity {
   const watch = useThreadWatch(threadId);
   const catchingUp = watch.status === "retrying";
   const open = useOpenRequests(threadId);
-  const waiting = pendingList.length > 0;
+  // A worker's question this thread passed up to the user is no turn of its own: it may be idle (docs/notes/pass-up-question.md).
+  const waiting = pendingList.some((p) => !p.fromThreadId);
   const running = state !== "disconnected" && state !== "closing";
   const busy = running && (status === "busy" || waiting);
   const working = running && (status === "busy" || state === "starting") && open.length === 0;

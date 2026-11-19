@@ -316,6 +316,9 @@ type Thread struct {
 	Report Report
 	// Asked is its latest question to its creator (ask.go); nil for none. Not persisted.
 	Asked *ThreadAsked
+	// PassedUp counts the open questions of its workers it passed up to the user (passup.go),
+	// which its status shows while its own status is no request. Not persisted.
+	PassedUp int
 	// BudgetUSD is the spending limit (0 = none); BudgetHitUSD the budget value the
 	// budget stop last fired for (0 = armed; budget.go). Persisted.
 	BudgetUSD    float64
@@ -723,6 +726,12 @@ type Store interface {
 	// Ask sends id's question to the thread that created it, which it does not wait on
 	// (ask.go). It answers the creator and whether the same question was just sent.
 	Ask(ctx context.Context, id, question, assuming string) (Thread, bool, error)
+	// PassUp passes worker's question up to the user for lead, a thread above it
+	// (passup.go): requestID, a pending question of the worker's, else its oldest pending
+	// question, else its latest thread ask the lead has not answered. The question becomes
+	// an ask on the lead; Respond on it answers the worker and tells the lead. Never a
+	// permission prompt; once per question. ErrFailedPrecondition for the refusals.
+	PassUp(ctx context.Context, lead, worker, requestID string) (PassUpResult, error)
 	// SetBudget sets the thread's spending limit (0 clears it). A budget above the
 	// thread's cost re-arms the budget stop (budget.go). Any state.
 	SetBudget(ctx context.Context, id string, usd float64) (Thread, error)

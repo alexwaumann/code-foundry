@@ -157,6 +157,33 @@ describe("the hover card's contents", () => {
     expect(within(body).getAllByRole("button").map((b) => b.textContent)).toEqual(["Answer…", "Go to thread"]);
   });
 
+  it("a worker's question passed up: titled with the worker's name, a line saying it was passed up and what the worker assumes", async () => {
+    const PASSED: ThreadPendingView = { requestId: "pu-1", itemId: "q-1", question: true, toolName: "AskUserQuestion", summary: "From Resize: Should the body drag too?", fromThreadId: "s-w" };
+    const input = JSON.stringify({ questions: [{ question: "Should the body drag too?", header: "", multiSelect: false, options: [] }] });
+    waiting("s-lead", PASSED, [questionItem({ requestId: "pu-1", inputJson: input, passedUp: { threadId: "s-w", name: "Resize", threadAsk: true, assuming: "only the gutters" } })]);
+    useThreadsStore.setState((s) => ({ byId: { ...s.byId, "s-w": thread("s-w", { name: "Resize across collapsed panes", createdBy: "s-lead" }) } }));
+    render(<NeedsCardBody threadId="s-lead" anchor="sidebar:s-lead" />);
+    await waitFor(() => {
+      expect(screen.getByTestId("needs-card-passed-up").textContent).toBe("Passed up by this thread. Until you answer, it assumes: only the gutters.");
+    });
+    const body = screen.getByTestId("needs-card-body");
+    expect(body.querySelector(".pend-h")?.textContent).toBe("Resize across collapsed panes has a question");
+    expect(screen.getByTestId("needs-card-question").textContent).toContain("Should the body drag too?");
+    expect(within(body).getAllByRole("button").map((b) => b.textContent)).toEqual(["Answer…", "Go to thread"]);
+  });
+
+  it("a passed-up question-tool prompt: the line says only who passed it up", async () => {
+    const PASSED: ThreadPendingView = { ...ASK, requestId: "pu-2", summary: "From Port: Which part?", fromThreadId: "s-w" };
+    waiting("s-lead", PASSED, [questionItem({ requestId: "pu-2", inputJson: JSON.stringify(QUESTION), passedUp: { threadId: "s-w", name: "Port", threadAsk: false, assuming: "" } })]);
+    render(<NeedsCardBody threadId="s-lead" anchor="sidebar:s-lead" />);
+    await waitFor(() => {
+      expect(screen.getByTestId("needs-card-question").textContent).toContain("The cell grid · The cursor");
+    });
+    // The worker is not in the store (removed meanwhile): the name it had when passed up.
+    expect(screen.getByTestId("needs-card-body").querySelector(".pend-h")?.textContent).toBe("Port has a question");
+    expect(screen.getByTestId("needs-card-passed-up").textContent).toBe("Passed up by this thread.");
+  });
+
   it("more than one open request: the oldest, and how many more", async () => {
     waiting("s-1", PERM, [permItem({ requestId: "req-1", toolName: "Bash", inputJson: JSON.stringify({ command: "ls" }) })]);
     useThreadStore.setState((s) => ({ pending: { ...s.pending, "s-1": { threadId: "s-1", seq: 2, pending: [PERM, { ...PERM, requestId: "req-2", itemId: "perm-2" }] } } }));

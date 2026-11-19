@@ -13,15 +13,19 @@
  * - needs: as live, but W3 waits on the user's permission in its own thread.
  * - frozen: as live, then the user stepped in ("Hold the code block one…"): the first card
  *   froze and folded; W3 carried over into a new card under that turn, where it finished.
+ * - passup: as live, but W2 still works: it asked whether the body of a collapsed pane drags
+ *   too, and the lead passed the question up to the user (mock/passUp.ts), so the lead is in
+ *   Needs you with it and W2's line reads "asks you" (docs/notes/pass-up-question.md).
  */
 import type { MessageInitShape } from "@bufbuild/protobuf";
 import { MessageOrigin, ToolCallStatus, type ThreadItemSchema } from "../src/gen/codefoundry/v1/thread_pb";
+import { passUpItem, PASSUP_REQUEST } from "./passUp";
 
 type ItemInit = MessageInitShape<typeof ThreadItemSchema>;
 type Over = Partial<ItemInit> & { at?: Date; until?: Date };
 
-export type WorkerCardState = "live" | "needs" | "frozen";
-export const WORKER_CARD_STATES: readonly WorkerCardState[] = ["live", "needs", "frozen"];
+export type WorkerCardState = "live" | "needs" | "frozen" | "passup";
+export const WORKER_CARD_STATES: readonly WorkerCardState[] = ["live", "needs", "frozen", "passup"];
 
 export const LEAD = "s-wl-lead";
 /** The workers in spawn order: id, name. */
@@ -54,7 +58,7 @@ export function workerPlans(state: WorkerCardState): WorkerPlan[] {
   const [w1, w2, w3] = WORKERS;
   return [
     { ...w1, createdMin: START - 0.5, state: "done", atMin: 17 },
-    { ...w2, createdMin: START - 0.5, state: "done", atMin: 11 },
+    { ...w2, createdMin: START - 0.5, state: state === "passup" ? "working" : "done", atMin: state === "passup" ? START - 0.5 : 11 },
     { ...w3, createdMin: START - 0.5, state: state === "frozen" ? "done" : state === "needs" ? "needs" : "working", atMin: state === "frozen" ? 2 : state === "needs" ? 1 : START - 0.5 },
   ];
 }
@@ -75,8 +79,8 @@ export function workerWake(w: { id: string; name: string }, at: Date, status: { 
 }
 
 /** A worker's `thread ask`. */
-function askWake(w: { id: string; name: string }, at: Date, question: string): { title: string; json: string } {
-  const payload = { kind: "ask", thread: w.id, name: w.name, question, assuming: "only the header", asked_at: at.toISOString() };
+function askWake(w: { id: string; name: string }, at: Date, question: string, assuming = "only the header"): { title: string; json: string } {
+  const payload = { kind: "ask", thread: w.id, name: w.name, question, assuming, asked_at: at.toISOString() };
   return { title: `Thread "${w.name}" (${w.id}) asks you something and keeps working: ${question}`, json: JSON.stringify(payload, null, 2) };
 }
 
@@ -118,6 +122,17 @@ export function scriptLead(s: WorkerCardScript, state: WorkerCardState): void {
   // Claude Code asks again after a turn with no visible text: the daemon's marker (lib/workerRuns NOTHING_NEW).
   s.it({ case: "assistantText", value: { text: "[nothing new]" } }, { at: sec(14, 8) });
   end(s, sec(14, 9), 9, 0.04);
+
+  if (state === "passup") {
+    // W2 asked; the lead could not say what the user wants, so it passed the question up and works on.
+    s.it(wakeItem(askWake(w2, ago(3), "Should the body of a collapsed pane also drag, or only the gutters?", "only the gutters")), { at: ago(3) });
+    bash(`code-foundry thread pass-up ${w2.id}`, `passed thread ${w2.name} (${w2.id})'s question up to the user; keep working.`, sec(3, 6));
+    // The daemon writes the question into the running turn, after the tool call that passed it up.
+    s.it(passUpItem(), { id: `q-${PASSUP_REQUEST}`, at: sec(3, 7) });
+    s.it({ case: "assistantText", value: { text: "[nothing new]" } }, { at: sec(3, 9) });
+    end(s, sec(3, 10), 10, 0.04);
+    return;
+  }
 
   // W2 finished: merged.
   s.it(wakeItem(workerWake(w2, ago(11), FINISHED, "Opened #798: every gutter in the run drags.")), { at: ago(11) });

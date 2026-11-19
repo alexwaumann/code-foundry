@@ -78,7 +78,7 @@ func wakeBody(sub Subscription, t Thread, d wakeDetail) string {
 		parts = append(parts, "Your note: "+sub.Note)
 	}
 	if d.pending != nil {
-		parts = append(parts, pendingText(t.ID, d.pending))
+		parts = append(parts, pendingText(t.ID, d.pending, sub.SubscriberID != "" && t.CreatedBy == sub.SubscriberID))
 	}
 	if rep := reportText(t.Report, d); rep != "" {
 		parts = append(parts, rep)
@@ -127,8 +127,27 @@ func reportText(rep Report, d wakeDetail) string {
 	return out
 }
 
-// pendingText is the request a thread waits on, and the command that answers it.
-func pendingText(id string, p *wakePending) string {
+// PassUpLine is what a lead reads under its worker's question (a pending question, a
+// thread ask): it answers it, and passes it up to the user (passup.go) only for a product
+// decision it is genuinely unsure of. Restrained on purpose: leads should not pass up
+// more than they need to.
+func PassUpLine(worker string) string {
+	return "A worker's question is yours to answer. Answer it when you know the answer or can infer what the user wants. " +
+		"Pass it up (code-foundry thread pass-up " + worker + ") only for a product decision you are genuinely unsure of; then keep working."
+}
+
+// pendingText is the request a thread waits on, and the command that answers it; lead:
+// the reader created the thread, so a question may also be passed up (PassUpLine).
+func pendingText(id string, p *wakePending, lead bool) string {
+	text := requestText(id, p)
+	if lead && p.Kind == "question" {
+		text += "\n" + PassUpLine(id)
+	}
+	return text
+}
+
+// requestText is pendingText without the pass-up line.
+func requestText(id string, p *wakePending) string {
 	respond := "code-foundry thread respond --id " + id + " --request " + p.RequestID
 	if p.Kind != "question" {
 		return fmt.Sprintf("It waits on your permission for %s: %s\nAnswer with: %s allow (or deny --message \"why\")",

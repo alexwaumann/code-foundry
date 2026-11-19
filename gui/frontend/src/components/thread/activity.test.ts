@@ -47,4 +47,15 @@ describe("useThreadActivity: timelineStrips", () => {
     setThread("busy", "disconnected");
     expect(result.current.timelineStrips).toBe(false);
   });
+
+  it("a worker's question passed up is no turn of the lead's own: not busy, no strips (docs/notes/pass-up-question.md)", () => {
+    act(() => {
+      useThreadStore.setState({ pending: { s: { threadId: "s", seq: 1, pending: [{ requestId: "pu-1", itemId: "q", question: true, toolName: "AskUserQuestion", summary: "From W: ?", fromThreadId: "w" }] } } });
+    });
+    setThread("attention");
+    const { result } = renderHook(() => useThreadActivity("s"));
+    expect(result.current.busy).toBe(false);
+    expect(result.current.timelineStrips).toBe(false);
+    expect(result.current.open).toHaveLength(1);
+  });
 });

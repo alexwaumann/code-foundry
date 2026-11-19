@@ -1438,6 +1438,10 @@ html[data-thread-width="full"] {
   color: var(--t-amber);
   flex: none;
 }
+/* The line under a passed-up question's title (docs/notes/pass-up-question.md), aligned with the title's text. */
+.cf-thread .pend-sub {
+  margin: 2px 0 0 23px;
+}
 .cf-thread .pend-h .why {
   margin-left: auto;
   font-weight: 400;

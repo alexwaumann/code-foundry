@@ -54,6 +54,7 @@ import { SETUP_PROMPT, type SetupMessage } from "./setup";
 import { refuseSlashCommand, slashCommandsFixture, type SlashCommandInit } from "./slashCommands";
 import { scriptServers, shellSummary, type ShellCall } from "./shells";
 import { answerReply, scriptReplies } from "./replies";
+import { answerWake, PASSUP_QUESTION, PASSUP_REQUEST, PASSUP_WORKER, workerAnswer } from "./passUp";
 
 export { MOCK_ATTACHMENT };
 
@@ -641,6 +642,52 @@ export class MockThreadLogs {
   }
 
   /**
+   * A worker's question passed up to the user on lead `id` (mock/passUp.ts): its question item
+   * (passed_up set) and its pending request with from_thread_id, the lead's status the question.
+   * The lead's status before it comes back once it is answered.
+   */
+  seedPassUp(id: string): void {
+    const l = this.log(id);
+    const w = PASSUP_WORKER;
+    const item = l.items.find((x) => x.payload?.case === "question" && x.payload.value.requestId === PASSUP_REQUEST);
+    if (!item) throw new Error(`thread ${id} has no passed-up question`);
+    l.pending = [{ requestId: PASSUP_REQUEST, itemId: item.id ?? "", question: true, toolName: "AskUserQuestion", summary: `From ${w.name}: ${PASSUP_QUESTION}`, fromThreadId: w.id }];
+    this.passUpBefore.set(id, { status: this.world.statusOf(id), reason: this.world.reasonOf(id) });
+    this.world.setStatus(id, ThreadStatus.NEEDS_ATTENTION, `question: From ${w.name}: ${PASSUP_QUESTION}`);
+    this.source({ event: { case: "pending", value: { threadId: id, seq: BigInt(l.seq), pending: l.pending } } });
+  }
+
+  /** Each lead's status before its passed-up question (seedPassUp). */
+  private readonly passUpBefore = new Map<string, { status: ThreadStatus; reason: string }>();
+
+  /** respond for a passed-up question: as the daemon (internal/store/thread/passup.go answerPassUp). */
+  private answerPassUp(id: string, p: PendingInit, req: ItemInit, deny: boolean, answers: Record<string, string>): ItemInit {
+    if (req.payload?.case !== "question") throw new Error("not a question");
+    const r = req.payload.value;
+    const resolved = {
+      ...req,
+      updatedAt: timestampFromDate(new Date()),
+      payload: { case: "question", value: { ...r, state: deny ? ThreadRequestState.DENIED : ThreadRequestState.ALLOWED, decision: deny ? "deny" : "allow", message: deny ? "skipped" : "", answers: deny ? {} : answers } },
+    } as ItemInit;
+    this.update(id, resolved);
+    this.setPending(id, this.log(id).pending.filter((x) => x.requestId !== p.requestId));
+    const before = this.passUpBefore.get(id) ?? { status: ThreadStatus.IDLE, reason: "at prompt" };
+    this.world.setStatus(id, before.status, before.reason);
+    this.calls.push(`pass-up answered ${p.fromThreadId ?? ""}${deny ? " skipped" : ` ${JSON.stringify(answers)}`}`);
+    if (!deny && p.fromThreadId && this.logs.has(p.fromThreadId)) this.append(p.fromThreadId, this.item(p.fromThreadId, workerAnswer(id, answers)));
+    const wake = answerWake(answers, deny);
+    const gen = this.generation;
+    void (async () => {
+      await sleep(150);
+      if (gen !== this.generation) return;
+      this.append(id, this.item(id, { case: "userMessage", value: { text: wake.text, attachments: [], origin: MessageOrigin.WAKE, wakeTitle: wake.title, wakeJson: wake.json } }));
+      this.append(id, this.item(id, { case: "assistantText", value: { text: "[nothing new]" } }));
+      this.append(id, this.item(id, { case: "turnEnd", value: { subtype: "success", durationMs: 3000n, numTurns: 1, costUsd: 0.02, turnCostUsd: 0.02, model: "claude-sonnet-5-5", stopReason: "end_turn" } }));
+    })();
+    return resolved;
+  }
+
+  /**
    * ThreadService.Respond / thread.respond: resolves the request (the oldest pending one when
    * requestId is empty). Once nothing is pending, the turn carries on: an allowed tool
    * finishes, Claude streams a short reply to what was decided, and the turn ends.
@@ -659,6 +706,7 @@ export class MockThreadLogs {
       const missing = qs.find((q) => !(answers[q.question] ?? "").trim());
       if (missing) throw new Error(`no answer for question "${missing.question}"`);
     }
+    if (isQuestion && r.passedUp) return this.answerPassUp(id, p, req, deny, answers);
     const resolved = {
       ...req,
       updatedAt: timestampFromDate(new Date()),

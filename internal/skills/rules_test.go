@@ -48,6 +48,8 @@ var rules = []rule{
 	{note: "thread-reply-mark", file: messagesRef, says: []string{"--reply wanted", "--reply none", "do not poll",
 		`does not\s+confirm or report back`, "answer once", `thread ask`, "archived or removed"}},
 	{note: "thread-reply-mark", file: wakesFile, says: []string{`thread send --id <child> --reply wanted`, `--reply none`}},
+	{note: "pass-up-question", file: orchFile, says: []string{"thread pass-up", `reference/wakes\.md`}},
+	{note: "pass-up-question", file: wakesFile, says: []string{`A worker's question is yours to answer\. Answer it when you know the answer or can infer\s+what the user wants\. Pass it up \(code-foundry thread pass-up <worker>\) only for a product\s+decision you are genuinely unsure of; then keep working\. Never pass up a permission prompt:\s+approve or deny it yourself\.`}},
 	{note: "thread-reply-mark", file: emberFile, says: []string{`thread send --id <worker> --reply wanted`}},
 	// Prompts that loaded no skill, and threads that acted like a terminal assistant.
 	{note: "control-7-skill-routing", file: entryFile, description: true,

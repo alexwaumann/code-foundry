@@ -84,6 +84,12 @@ describe("wakeLines", () => {
     expect(first({ title: "t", json: JSON.stringify({ ...ask, name: "" }) })).toMatchObject({ name: "s-g" });
   });
 
+  it("the user's answer to a question passed up: the worker's line, answered with the answer, or skipped with the question", () => {
+    const answer = { kind: "answer", thread: "s-w", name: "Resize", question: "Should the body drag too?", answers: { "Should the body drag too?": "The body too" }, asked: "ask" };
+    expect(first({ title: "t", json: JSON.stringify(answer) })).toMatchObject({ tone: "ok", threadId: "s-w", name: "Resize", detail: "answered", summary: "The body too", createdBy: "" });
+    expect(first({ title: "t", json: JSON.stringify({ ...answer, answers: undefined, skipped: true }) })).toMatchObject({ detail: "skipped", summary: "Should the body drag too?" });
+  });
+
   it("a single wake is one line", () => {
     expect(wakeLines({ title: "t", json: thread({ status: "idle" }) })).toHaveLength(1);
   });

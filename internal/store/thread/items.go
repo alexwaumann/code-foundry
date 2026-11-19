@@ -1,6 +1,7 @@
 package thread
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"slices"
@@ -216,6 +217,9 @@ type Request struct {
 	// Answers are a question's answers: question text -> chosen label(s) (several
 	// joined with ", ").
 	Answers map[string]string
+	// PassedUp: a worker's question its lead passed up to the user (passup.go): this item is
+	// on the lead, and its answer goes to the worker. nil otherwise.
+	PassedUp *PassedUp `json:",omitempty"`
 }
 
 // TurnEnd is a turn_end item's payload (the CLI's result).
@@ -265,6 +269,8 @@ type PendingRequest struct {
 	ToolName string
 	// Summary is a one-line description ("Write hello.txt", the question).
 	Summary string
+	// From is the worker whose question this lead passed up to the user (passup.go).
+	From string
 }
 
 // ItemsSnapshot is a thread's items at one point.
@@ -659,7 +665,9 @@ func (t *threadLog) unfinished() []Item {
 	defer t.mu.Unlock()
 	var out []Item
 	for _, it := range t.items {
-		if it.Streaming || it.Queued || (it.Tool != nil && it.Tool.Status == ToolRunning) || (it.Request != nil && it.Request.State == RequestPending) {
+		// A passed-up question is the lead's ask of the user, not its process's: it outlives
+		// the process (passup.go).
+		if it.Streaming || it.Queued || (it.Tool != nil && it.Tool.Status == ToolRunning) || (it.Request != nil && it.Request.State == RequestPending && it.Request.PassedUp == nil) {
 			out = append(out, it)
 		}
 	}
@@ -672,10 +680,14 @@ func pendingOf(items []Item) []PendingRequest {
 		if it.Request == nil || it.Request.State != RequestPending {
 			continue
 		}
-		out = append(out, PendingRequest{
+		p := PendingRequest{
 			RequestID: it.Request.RequestID, ItemID: it.ID, Kind: it.Kind, ToolName: it.Request.ToolName,
 			Summary: requestSummary(it),
-		})
+		}
+		if it.Request.PassedUp != nil {
+			p.From = it.Request.PassedUp.From
+		}
+		out = append(out, p)
 	}
 	return out
 }
@@ -685,10 +697,14 @@ func pendingOf(items []Item) []PendingRequest {
 func requestSummary(it Item) string {
 	r := it.Request
 	if it.Kind == KindQuestion {
+		q := "question"
 		if qs := questionsOf(r.InputJSON); len(qs) > 0 {
-			return qs[0].Question
+			q = qs[0].Question
 		}
-		return "question"
+		if p := r.PassedUp; p != nil {
+			return "From " + cmp.Or(p.FromName, p.From) + ": " + q
+		}
+		return q
 	}
 	what := r.Description
 	if what == "" {
@@ -759,6 +775,7 @@ func (m *Manager) thread(ctx context.Context, id string) (*threadLog, error) {
 	if rec.s.Setup != nil {
 		queued = rec.s.Setup.Queued
 	}
+	passed := m.openPassUpItems(id)
 	m.mu.Unlock()
 	m.tmu.Lock()
 	defer m.tmu.Unlock()
@@ -796,6 +813,7 @@ func (m *Manager) thread(ctx context.Context, id string) (*threadLog, error) {
 		// finish them.
 		closeLostRun(itemWriter{log: t, save: func(it Item) { m.saveItem(id, it) }}, "the thread's process ended")
 	}
+	withdrawStale(itemWriter{log: t, save: func(it Item) { m.saveItem(id, it) }}, passed)
 	return t, nil
 }
 

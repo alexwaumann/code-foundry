@@ -1525,6 +1525,11 @@ export class World {
     this.logs.script(WORKER_LEAD, (sc) => {
       scriptLead(sc, state);
     });
+    if (state === "passup") {
+      // The worker's question, passed up: the lead's ask in Needs you (mock/passUp.ts).
+      this.logs.seedPassUp(WORKER_LEAD);
+      lead.statusChangedAt = ago(3);
+    }
     this.publishThread(lead);
     return WORKER_LEAD;
   }

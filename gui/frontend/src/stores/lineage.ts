@@ -7,7 +7,9 @@ import { useMemo } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { creatorOf, noteCreator, type Creator } from "@/lib/lineage";
 import { liveCount } from "@/lib/liveCount";
+import { withPassedUp } from "@/lib/passUp";
 import { decodeWorkers, workersKey, type WorkerNow } from "@/lib/workerRuns";
+import { usePassedUpFrom } from "./thread";
 import { useThreadsStore } from "./threads";
 
 /**
@@ -49,5 +51,7 @@ export function useNoteCreator(createdBy: string, recorded: string): Creator {
  */
 export function useWorkers(threadId: string): ReadonlyMap<string, WorkerNow> {
   const key = useThreadsStore((s) => workersKey(s.byId, threadId));
-  return useMemo(() => decodeWorkers(key), [key]);
+  // A worker whose question this thread passed up to the user reads "asks you" while it is open.
+  const passed = usePassedUpFrom(threadId);
+  return useMemo(() => withPassedUp(decodeWorkers(key), passed), [key, passed]);
 }
