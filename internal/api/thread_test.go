@@ -195,6 +195,32 @@ func TestItemToProto(t *testing.T) {
 		{"created-by note", thread.Item{Kind: thread.KindNote, Text: "Created by Parent", NoteCreatedBy: "s-parent"}, func(p *v1.ThreadItem) bool {
 			return p.GetNote().GetText() == "Created by Parent" && p.GetNote().GetCreatedBy() == "s-parent"
 		}},
+		{"a sent message's note, waiting", thread.Item{Kind: thread.KindNote, Text: "Asked", Sent: &thread.SentMessage{ToThreadID: "s-b", ToName: "Docs",
+			Relation: thread.RelationOther, Reply: thread.ReplyWanted, ItemID: "u-1", Ordinal: 4}}, func(p *v1.ThreadItem) bool {
+			s := p.GetNote().GetSent()
+			return s.GetToThreadId() == "s-b" && s.GetToName() == "Docs" && s.GetRelation() == v1.ThreadRelation_THREAD_RELATION_OTHER &&
+				s.GetReply() == v1.ReplyMark_REPLY_MARK_WANTED && s.GetItemId() == "u-1" && s.GetOrdinal() == 4 && s.RepliedAt == nil && s.GetUnanswered() == ""
+		}},
+		{"a sent message's note, replied", thread.Item{Kind: thread.KindNote, Text: "Asked", Sent: &thread.SentMessage{ToThreadID: "s-b",
+			Relation: thread.RelationLead, Reply: thread.ReplyWanted, RepliedAt: time.Date(2026, 11, 19, 9, 0, 0, 0, time.UTC), ReplyItemID: "u-9"}}, func(p *v1.ThreadItem) bool {
+			s := p.GetNote().GetSent()
+			return s.GetRelation() == v1.ThreadRelation_THREAD_RELATION_LEAD && s.GetRepliedAt().AsTime().Equal(time.Date(2026, 11, 19, 9, 0, 0, 0, time.UTC)) &&
+				s.GetReplyItemId() == "u-9"
+		}},
+		{"a sent message's note, unanswered", thread.Item{Kind: thread.KindNote, Text: "Told", Sent: &thread.SentMessage{ToThreadID: "s-b",
+			Relation: thread.RelationOther, Reply: thread.ReplyWanted, Unanswered: thread.UnansweredArchived}}, func(p *v1.ThreadItem) bool {
+			return p.GetNote().GetSent().GetUnanswered() == "archived"
+		}},
+		{"a plain note has no sent", thread.Item{Kind: thread.KindNote, Text: "x"}, func(p *v1.ThreadItem) bool { return p.GetNote().GetSent() == nil }},
+		{"a message from another thread", thread.Item{Kind: thread.KindUserMessage, Text: "hi", SentBy: "s-a", SenderRelation: thread.RelationWorker,
+			Reply: thread.ReplyNone}, func(p *v1.ThreadItem) bool {
+			u := p.GetUserMessage()
+			return u.GetSentByThreadId() == "s-a" && u.GetSenderRelation() == v1.ThreadRelation_THREAD_RELATION_WORKER && u.GetReply() == v1.ReplyMark_REPLY_MARK_NONE
+		}},
+		{"the user's message", thread.Item{Kind: thread.KindUserMessage, Text: "hi"}, func(p *v1.ThreadItem) bool {
+			u := p.GetUserMessage()
+			return u.GetSentByThreadId() == "" && u.GetSenderRelation() == v1.ThreadRelation_THREAD_RELATION_UNSPECIFIED && u.GetReply() == v1.ReplyMark_REPLY_MARK_UNSPECIFIED
+		}},
 		{"assistant text", thread.Item{Kind: thread.KindAssistantText, Text: "hi"}, func(p *v1.ThreadItem) bool {
 			return p.GetAssistantText().GetText() == "hi" && !p.GetAssistantText().GetApiError()
 		}},

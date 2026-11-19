@@ -706,7 +706,13 @@ func pendingInput(in string) any {
 
 // threadWake is the wake message of sub about thread t, fired at, with detail d.
 func threadWake(sub Subscription, t Thread, at time.Time, d wakeDetail) Message {
-	return wakeTextMessage(joinSentences(threadWakeTitle(sub.Condition, t, d), siblingsSentence(d.siblings)), threadWakePayload(sub, t, at, d), wakeBody(sub, t, d))
+	return wakeTextMessage(joinSentences(partTitle(sub, t, d), siblingsSentence(d.siblings)), threadWakePayload(sub, t, at, d), wakeBody(sub, t, d))
+}
+
+// partTitle is the header of sub's wake about t: threadWakeTitle, and a reply-wait's
+// sentence (replies.go).
+func partTitle(sub Subscription, t Thread, d wakeDetail) string {
+	return joinSentences(threadWakeTitle(sub.Condition, t, d), replySentence(sub))
 }
 
 // threadWakePayload is the JSON of sub's wake about thread t, fired at, with detail d.

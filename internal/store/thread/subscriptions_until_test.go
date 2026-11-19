@@ -184,14 +184,18 @@ func TestNotifyRenewedBySend(t *testing.T) {
 		msg   func(n *notifyEnv) Message
 		renew bool
 	}{
-		{"the creator's send", func(n *notifyEnv) Message { return Message{Text: "more", ByThreadID: n.parent.ID} }, true},
-		{"with NoNotify", func(n *notifyEnv) Message { return Message{Text: "more", ByThreadID: n.parent.ID, NoNotify: true} }, false},
+		{"the creator's send", func(n *notifyEnv) Message { return Message{Text: "more", ByThreadID: n.parent.ID, Reply: ReplyWanted} }, true},
+		{"with NoNotify", func(n *notifyEnv) Message {
+			return Message{Text: "more", ByThreadID: n.parent.ID, Reply: ReplyWanted, NoNotify: true}
+		}, false},
+		// No reply wanted: the turn that reads it wakes nobody (replies.go).
+		{"with no reply wanted", func(n *notifyEnv) Message { return Message{Text: "fyi", ByThreadID: n.parent.ID, Reply: ReplyNone} }, false},
 		{"the user's message", func(n *notifyEnv) Message { return Message{Text: "more"} }, false},
 		{"a wake", func(n *notifyEnv) Message {
 			return Message{Text: "wake", ByThreadID: n.parent.ID, Origin: OriginWake, WakeTitle: "x"}
 		}, false},
 		{"another thread's send", func(n *notifyEnv) Message {
-			return Message{Text: "more", ByThreadID: n.stopped("other").ID}
+			return Message{Text: "more", ByThreadID: n.stopped("other").ID, Reply: ReplyNone}
 		}, false},
 	}
 	for _, tt := range tests {

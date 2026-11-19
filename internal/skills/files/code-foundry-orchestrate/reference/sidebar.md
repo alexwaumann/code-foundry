@@ -32,8 +32,8 @@ has forked it.
 
 `thread archive` on a thread also archives every thread below it (its children, theirs,
 and so on), first and the same way: their Claude stops, their shells go. Unarchiving
-brings back only the thread named; a `thread send` to a child you archived unarchives it
-too. When a thread below is still working or waiting on an
+brings back only the thread named; a `thread send` (with its `--reply`) to a child you
+archived unarchives it too. When a thread below is still working or waiting on an
 answer, the archive asks first (exit 2 without `--yes`); to keep its work, the user forks
 it before you archive. `thread remove` takes them along the same way. `--descendants-of`
 and `--ids` archive exactly the threads they name.

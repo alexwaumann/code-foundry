@@ -51,7 +51,9 @@ res, err := h.Invoke(ctx, "thread.send", map[string]string{"text": "The deploy f
 - Other failures keep their code: -32004 not found, -32602 invalid args, -32002 not
   available here. `pluginsdk.ErrorCode(err)` reads it.
 
-Useful commands: `thread.send` (a message into a thread: `"Send failure to Claude"`),
+Useful commands: `thread.send` (a message into a thread: `"Send failure to Claude"`; with a
+context thread and an `id` of another thread it is that thread's message and needs `reply`:
+`wanted` or `none`),
 `pr.checks` (a pull request's checks, `--json` shape `{repo, number, url, headSha,
 checks: [{name, workflow, status, conclusion, app, provider, url, startedAt,
 completedAt}]}`), `thread.get`, `thread.list`, `project.list`. A plugin that only needs

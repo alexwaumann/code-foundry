@@ -181,7 +181,7 @@ func (h *Thread) watchGone(ctx context.Context, id string) error {
 func (h *Thread) Send(ctx context.Context, req *connect.Request[v1.SendThreadMessageRequest]) (*connect.Response[v1.SendThreadMessageResponse], error) {
 	m := req.Msg
 	it, err := h.store.Send(ctx, m.GetThreadId(), thread.Message{Text: m.GetText(), Attachments: m.GetAttachments(), ComposerText: m.GetComposerText(),
-		ByThreadID: m.GetByThreadId(), NoNotify: m.GetNoNotify()})
+		ByThreadID: m.GetByThreadId(), NoNotify: m.GetNoNotify(), Reply: replyFromProto[m.GetReply()]})
 	if err != nil {
 		return nil, threadError(err)
 	}
@@ -393,7 +393,7 @@ func itemToProto(it thread.Item) *v1.ThreadItem {
 	case thread.KindCommandOutput:
 		p.Payload = &v1.ThreadItem_CommandOutput{CommandOutput: &v1.CommandOutputItem{Text: it.Text}}
 	case thread.KindNote:
-		p.Payload = &v1.ThreadItem_Note{Note: &v1.NoteItem{Text: it.Text, CreatedBy: it.NoteCreatedBy}}
+		p.Payload = &v1.ThreadItem_Note{Note: &v1.NoteItem{Text: it.Text, CreatedBy: it.NoteCreatedBy, Sent: sentToProto(it.Sent)}}
 	case thread.KindHTML:
 		if h := it.HTML; h != nil {
 			p.Payload = &v1.ThreadItem_Html{Html: &v1.HtmlItem{Path: h.Path, Title: h.Title, BaseDir: h.BaseDir}}

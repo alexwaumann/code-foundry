@@ -21,6 +21,7 @@ func (m *Manager) unwatchForArchive(id, by string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.markArchivingLocked(id, by)
+	m.replyArchivedLocked(id, by) // before the archive forgets the reply-waits on it
 	m.unwatchForArchiveLocked(id)
 }
 

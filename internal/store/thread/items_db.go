@@ -12,26 +12,29 @@ import (
 
 // itemData is the JSON in thread_items.data.
 type itemData struct {
-	Text          string      `json:"text,omitempty"`
-	Attachments   []string    `json:"attachments,omitempty"`
-	Composer      string      `json:"composer,omitempty"`
-	Origin        string      `json:"origin,omitempty"`
-	WakeTitle     string      `json:"wake_title,omitempty"`
-	WakeJSON      string      `json:"wake_json,omitempty"`
-	SentBy        string      `json:"sent_by,omitempty"`
-	ResumeNote    string      `json:"resume_note,omitempty"`
-	SeedPrefix    string      `json:"seed_prefix,omitempty"`
-	MemoryNote    string      `json:"memory_note,omitempty"`
-	NoteCreatedBy string      `json:"note_created_by,omitempty"`
-	APIError      bool        `json:"api_error,omitempty"`
-	Queued        bool        `json:"queued,omitempty"`
-	PlacedAfter   int64       `json:"placed_after,omitempty"`
-	Tool          *ToolCall   `json:"tool,omitempty"`
-	Request       *Request    `json:"request,omitempty"`
-	Turn          *TurnEnd    `json:"turn,omitempty"`
-	Compaction    *Compaction `json:"compaction,omitempty"`
-	HTML          *HTMLPage   `json:"html,omitempty"`
-	Theme         *ThemeCard  `json:"theme,omitempty"`
+	Text          string       `json:"text,omitempty"`
+	Attachments   []string     `json:"attachments,omitempty"`
+	Composer      string       `json:"composer,omitempty"`
+	Origin        string       `json:"origin,omitempty"`
+	WakeTitle     string       `json:"wake_title,omitempty"`
+	WakeJSON      string       `json:"wake_json,omitempty"`
+	SentBy        string       `json:"sent_by,omitempty"`
+	Relation      Relation     `json:"relation,omitempty"`
+	Reply         Reply        `json:"reply,omitempty"`
+	Sent          *SentMessage `json:"sent,omitempty"`
+	ResumeNote    string       `json:"resume_note,omitempty"`
+	SeedPrefix    string       `json:"seed_prefix,omitempty"`
+	MemoryNote    string       `json:"memory_note,omitempty"`
+	NoteCreatedBy string       `json:"note_created_by,omitempty"`
+	APIError      bool         `json:"api_error,omitempty"`
+	Queued        bool         `json:"queued,omitempty"`
+	PlacedAfter   int64        `json:"placed_after,omitempty"`
+	Tool          *ToolCall    `json:"tool,omitempty"`
+	Request       *Request     `json:"request,omitempty"`
+	Turn          *TurnEnd     `json:"turn,omitempty"`
+	Compaction    *Compaction  `json:"compaction,omitempty"`
+	HTML          *HTMLPage    `json:"html,omitempty"`
+	Theme         *ThemeCard   `json:"theme,omitempty"`
 }
 
 // execer is a *sql.DB or a *sql.Tx.
@@ -73,7 +76,7 @@ func saveItem(ctx context.Context, db *sql.DB, threadID string, it Item, ix sear
 // writeItem inserts or rewrites one item's row.
 func writeItem(ctx context.Context, db execer, threadID string, it Item) error {
 	data, err := json.Marshal(itemData{Text: it.Text, Attachments: it.Attachments, Composer: it.ComposerText,
-		Origin: string(it.Origin), WakeTitle: it.WakeTitle, WakeJSON: it.WakeJSON, SentBy: it.SentBy, ResumeNote: it.ResumeNote, SeedPrefix: it.SeedPrefix, MemoryNote: it.MemoryNote,
+		Origin: string(it.Origin), WakeTitle: it.WakeTitle, WakeJSON: it.WakeJSON, SentBy: it.SentBy, Relation: it.SenderRelation, Reply: it.Reply, Sent: it.Sent, ResumeNote: it.ResumeNote, SeedPrefix: it.SeedPrefix, MemoryNote: it.MemoryNote,
 		NoteCreatedBy: it.NoteCreatedBy, APIError: it.APIError, Queued: it.Queued, PlacedAfter: it.PlacedAfter, Tool: it.Tool, Request: it.Request, Turn: it.Turn, Compaction: it.Compaction, HTML: it.HTML, Theme: it.Theme})
 	if err != nil {
 		return fmt.Errorf("thread: encode item %s: %w", it.ID, err)
@@ -155,5 +158,6 @@ func decodeItem(itemID string, ordinal int64, kind, parent string, created, upda
 	it.Queued, it.PlacedAfter, it.APIError = d.Queued, d.PlacedAfter, d.APIError
 	it.Text, it.Attachments, it.Tool, it.Request, it.Turn, it.Compaction = d.Text, d.Attachments, d.Tool, d.Request, d.Turn, d.Compaction
 	it.HTML, it.Theme = d.HTML, d.Theme
+	it.SenderRelation, it.Reply, it.Sent = d.Relation, d.Reply, d.Sent
 	return it, nil
 }

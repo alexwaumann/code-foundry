@@ -49,8 +49,11 @@ type outgoing struct {
 	// origin, wakeTitle and wakeJSON: the item's Origin, WakeTitle and WakeJSON.
 	origin              MessageOrigin
 	wakeTitle, wakeJSON string
-	// by is the thread that sent it (the item's SentBy); "" for the user.
-	by string
+	// by is the thread that sent it (the item's SentBy); "" for the user. relation and
+	// reply: the item's SenderRelation and Reply (replies.go).
+	by       string
+	relation Relation
+	reply    Reply
 	// note is the resume note line the prompt starts with (the item's ResumeNote), and
 	// resume the pending note it came from, cleared once the message went out
 	// (resumenote.go); empty without one.

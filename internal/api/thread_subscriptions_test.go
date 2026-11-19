@@ -105,16 +105,36 @@ func TestThreadSubscriptions(t *testing.T) {
 	}
 }
 
+// A send's reply mark reaches the store; UNSPECIFIED is none given, which the store
+// refuses from another thread.
+func TestSendReplyMark(t *testing.T) {
+	fake, c := newThreadServer(t)
+	fake.Put(thread.Thread{ID: "s-c", State: thread.StateConnected})
+	for _, m := range []v1.ReplyMark{v1.ReplyMark_REPLY_MARK_WANTED, v1.ReplyMark_REPLY_MARK_NONE} {
+		if _, err := c.Send(context.Background(), connect.NewRequest(&v1.SendThreadMessageRequest{ThreadId: "s-c", Text: "x", ByThreadId: "s-p", Reply: m})); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if calls := fake.Calls(); !slices.Equal(calls[len(calls)-2:], []string{"Send s-c x reply=wanted", "Send s-c x reply=none"}) {
+		t.Errorf("calls = %q", calls)
+	}
+	_, err := c.Send(context.Background(), connect.NewRequest(&v1.SendThreadMessageRequest{ThreadId: "s-c", Text: "x", ByThreadId: "s-p"}))
+	if connect.CodeOf(err) != connect.CodeInvalidArgument {
+		t.Errorf("unmarked: err = %v", err)
+	}
+}
+
 // A send's no_notify reaches the store (thread send --notify=false, --wait).
 func TestSendNoNotify(t *testing.T) {
 	fake, c := newThreadServer(t)
 	fake.Put(thread.Thread{ID: "s-c", State: thread.StateConnected})
 	for _, no := range []bool{false, true} {
-		if _, err := c.Send(context.Background(), connect.NewRequest(&v1.SendThreadMessageRequest{ThreadId: "s-c", Text: "more", ByThreadId: "s-p", NoNotify: no})); err != nil {
+		if _, err := c.Send(context.Background(), connect.NewRequest(&v1.SendThreadMessageRequest{ThreadId: "s-c", Text: "more", ByThreadId: "s-p", NoNotify: no,
+			Reply: v1.ReplyMark_REPLY_MARK_WANTED})); err != nil {
 			t.Fatal(err)
 		}
 	}
-	if calls := fake.Calls(); !slices.Equal(calls[len(calls)-2:], []string{"Send s-c more", "Send s-c more no-notify"}) {
+	if calls := fake.Calls(); !slices.Equal(calls[len(calls)-2:], []string{"Send s-c more reply=wanted", "Send s-c more no-notify reply=wanted"}) {
 		t.Errorf("calls = %q", calls)
 	}
 }

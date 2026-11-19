@@ -827,6 +827,13 @@ func (f *Fake) Send(_ context.Context, id string, msg thread.Message) (thread.It
 	if msg.NoNotify {
 		call += " no-notify" // the store's renotify is skipped (subscriptions_until.go)
 	}
+	if msg.Reply != "" {
+		call += " reply=" + string(msg.Reply)
+	}
+	if err := thread.CheckReply(id, msg); err != nil {
+		f.mu.Unlock()
+		return thread.Item{}, err // refused before anything is sent, as the store does
+	}
 	if err := f.record(call); err != nil {
 		f.mu.Unlock()
 		return thread.Item{}, err
@@ -840,7 +847,8 @@ func (f *Fake) Send(_ context.Context, id string, msg thread.Message) (thread.It
 		return thread.Item{}, err
 	}
 	f.next++
-	it, ev := f.appendItem(id, thread.Item{ID: fmt.Sprintf("u-%d", f.next), Kind: thread.KindUserMessage, Text: msg.Text, Attachments: msg.Attachments, ComposerText: msg.ComposerText})
+	it, ev := f.appendItem(id, thread.Item{ID: fmt.Sprintf("u-%d", f.next), Kind: thread.KindUserMessage, Text: msg.Text, Attachments: msg.Attachments, ComposerText: msg.ComposerText,
+		SentBy: msg.ByThreadID, Reply: msg.Reply})
 	// A message starts a stopped thread (no handshake to fake: connected at once).
 	started := s.State == thread.StateDisconnected
 	if started {

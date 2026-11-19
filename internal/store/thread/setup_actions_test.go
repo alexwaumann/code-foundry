@@ -1062,7 +1062,7 @@ func TestSendDuringSetupQueues(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	third, err := e.m.Send(e.ctx(), s.ID, Message{Text: "third", ByThreadID: "s-other"})
+	third, err := e.m.Send(e.ctx(), s.ID, Message{Text: "third", ByThreadID: "s-other", Reply: ReplyNone})
 	if err != nil {
 		t.Fatal(err)
 	}

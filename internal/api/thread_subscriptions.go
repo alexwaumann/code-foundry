@@ -64,7 +64,7 @@ func subscriptionToProto(s thread.Subscription) *v1.ThreadSubscription {
 func userMessageToProto(it thread.Item) *v1.UserMessageItem {
 	p := &v1.UserMessageItem{Text: it.Text, Attachments: it.Attachments, ComposerText: it.ComposerText,
 		Origin: v1.MessageOrigin_MESSAGE_ORIGIN_USER, ResumeNote: it.ResumeNote, Queued: it.Queued,
-		SeedPrefix: it.SeedPrefix}
+		SeedPrefix: it.SeedPrefix, SentByThreadId: it.SentBy, SenderRelation: relationToProto[it.SenderRelation], Reply: replyToProto[it.Reply]}
 	if it.Origin == thread.OriginWake {
 		p.Origin, p.WakeTitle, p.WakeJson = v1.MessageOrigin_MESSAGE_ORIGIN_WAKE, it.WakeTitle, it.WakeJSON
 	}

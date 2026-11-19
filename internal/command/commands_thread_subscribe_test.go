@@ -212,7 +212,7 @@ func TestThreadSubscriptionCommands(t *testing.T) {
 		{name: "list needs a thread", cmd: "thread.subscriptions", wantErr: command.ErrInvalidArgs},
 
 		{name: "new with notify", cmd: "thread.new", args: map[string]string{"project": "r1", "created-by": "s-me", "notify": "true"},
-			wantMsg:  "created thread s1 in ; s-me is woken when it settles, until the wake that says it finished; s-me's next thread send to it subscribes again",
+			wantMsg:  "created thread s1 in ; s-me is woken when it settles, until the wake that says it finished; s-me's next thread send --reply wanted to it subscribes again",
 			wantReqs: []proto.Message{&v1.CreateThreadRequest{ProjectId: "r1", PermissionMode: auto, CreatedBy: "s-me", Notify: true}}},
 		{name: "new with notify-repeat", cmd: "thread.new", args: map[string]string{"project": "r1", "created-by": "s-me", "notify": "true", "notify-repeat": "true"},
 			wantMsg:  "created thread s1 in ; s-me is woken each time it settles",

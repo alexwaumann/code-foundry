@@ -253,7 +253,7 @@ func TestPullRequestTask(t *testing.T) {
 			wantThread: []proto.Message{
 				&v1.GetThreadRequest{Id: "s-other000001"},
 				&v1.PullRequestOwnerRequest{Id: "s-other000001", RepoSlugs: []string{"o/r"}, Number: 7},
-				&v1.SendThreadMessageRequest{ThreadId: "s-other000001", ByThreadId: "s-lead0000001"},
+				&v1.SendThreadMessageRequest{ThreadId: "s-other000001", ByThreadId: "s-lead0000001", Reply: v1.ReplyMark_REPLY_MARK_NONE},
 				&v1.ListThreadSubscriptionsRequest{SubscriberThreadId: "s-lead0000001"},
 			},
 			wantPrompt:   "Follow-up task: review PR `o/r#7`",
@@ -307,7 +307,7 @@ func TestPullRequestTask(t *testing.T) {
 				&v1.SubscribeThreadRequest{SubscriberThreadId: "s-lead0000001", TargetThreadId: "s-kid00000001", BeforeSend: true,
 					Condition: v1.ThreadSubscriptionCondition_THREAD_SUBSCRIPTION_CONDITION_SETTLED,
 					Note:      "pr.task forwarded from you: Review it (read-only) on o/r#7"},
-				&v1.SendThreadMessageRequest{ThreadId: "s-kid00000001", ByThreadId: "s-ember000001"},
+				&v1.SendThreadMessageRequest{ThreadId: "s-kid00000001", ByThreadId: "s-ember000001", Reply: v1.ReplyMark_REPLY_MARK_NONE},
 				&v1.SubscribeThreadRequest{SubscriberThreadId: "s-lead0000001", TargetThreadId: "s-kid00000001", AfterOrdinal: 6,
 					Condition: v1.ThreadSubscriptionCondition_THREAD_SUBSCRIPTION_CONDITION_SETTLED,
 					Note:      "pr.task forwarded from you: Review it (read-only) on o/r#7"},

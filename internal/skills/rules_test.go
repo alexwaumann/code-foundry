@@ -38,9 +38,17 @@ const (
 	sourcesRef   = skills.Pages + "/reference/sources.md"
 	reactRef     = skills.Pages + "/reference/react.md"
 	emberFile    = skills.Ember + "/SKILL.md"
+	messagesRef  = skills.Orchestrate + "/reference/messages.md"
 )
 
 var rules = []rule{
+	// A lead told another lead something and got a confirmation nobody needed, which woke it
+	// for nothing; a sender that needed an answer could not say so (thread-reply-mark).
+	{note: "thread-reply-mark", file: orchFile, says: []string{"--reply wanted", "--reply none", `reference/messages\.md`}},
+	{note: "thread-reply-mark", file: messagesRef, says: []string{"--reply wanted", "--reply none", "do not poll",
+		`does not\s+confirm or report back`, "answer once", `thread ask`, "archived or removed"}},
+	{note: "thread-reply-mark", file: wakesFile, says: []string{`thread send --id <child> --reply wanted`, `--reply none`}},
+	{note: "thread-reply-mark", file: emberFile, says: []string{`thread send --id <worker> --reply wanted`}},
 	// Prompts that loaded no skill, and threads that acted like a terminal assistant.
 	{note: "control-7-skill-routing", file: entryFile, description: true,
 		says: []string{"version", "model", "effort", "usage", "cost", "worktree", "file", "diff", "html", "chart", "theme", "preference", "remember", `\bprs?\b`}},
@@ -118,7 +126,8 @@ var rules = []rule{
 	{note: "notify-ends-on-finish", file: orchFile, says: []string{"until the wake that says it finished", "subscribes you again"}},
 	{note: "notify-ends-on-finish", file: wakesFile, says: []string{"the last wake from that child", "the send subscribes you", "never subscribe or unsubscribe by hand"},
 		never: []string{"fires again on its next settle"}},
-	{note: "notify-ends-on-finish", file: leadsFile, says: []string{"its answer wakes no one"}},
+	// Superseded by thread-reply-mark: a wanted reply from a lead's worker wakes its asker.
+	{note: "thread-reply-mark", file: leadsFile, says: []string{"you are not its lead", `--reply wanted`}},
 	{note: "wake-final-message", file: wakesFile, says: []string{"it said", "from the app, not the thread"}, never: []string{"report_stale", "said more"}},
 	{note: "wake-final-message", file: orchFile, says: []string{"no closing report", "thread report blocked"}, never: []string{"after any later message", "report_stale"}},
 	{note: "wake-final-message", file: emberFile, says: []string{"no closing report", "what git says"}, never: []string{"after any later message", "report_stale"}},

@@ -432,7 +432,7 @@ func restartWake(n restartNotice, parts []threadWakePart) Message {
 	var head string
 	if len(parts) == 1 {
 		p := parts[0]
-		head = threadWakeTitle(p.sub.Condition, p.t, p.d)
+		head = partTitle(p.sub, p.t, p.d)
 	} else {
 		head, _ = batchHeader(parts)
 	}
