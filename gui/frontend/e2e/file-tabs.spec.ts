@@ -86,7 +86,7 @@ test("a TypeScript file at a line scrolls to it; the HTML sandbox runs its page;
   await openFile(page, "docs/preview.html");
   await expect(file(page)).toHaveAttribute("data-mode", "rendered");
   // Served by the daemon at a granted URL (with the frame's nonce: docs/notes/bridge-fix-frames.md).
-  await expect(file(page).getByTestId("file-html-frame")).toHaveAttribute("src", /\/preview\/mock-preview-\d+\/docs\/preview\.html#cf=[0-9a-f]{32}$/);
+  await expect(file(page).getByTestId("file-html-frame")).toHaveAttribute("src", /\/preview\/mock-preview-\d+\/docs\/preview\.html\?cf-nonce=[0-9a-f]{32}$/);
   // The page is interactive: its script ran, a relative image loaded, a button's handler fires,
   // and an in-page anchor stays in the page (a srcdoc frame navigated into the app's blank shell).
   const inner = page.frameLocator('[data-testid="file-html-frame"]');
@@ -106,6 +106,24 @@ test("a TypeScript file at a line scrolls to it; the HTML sandbox runs its page;
 
   await openFile(page, "docs/logo.png");
   await expect(file(page).getByTestId("file-image").locator("img")).toHaveJSProperty("naturalWidth", 2);
+});
+
+// What only WebKit's opaque frame shows (docs/notes/page-frame-states.md): the page's own empty
+// hash, though the frame carries its nonce, and storage that works in memory, said on the strip.
+test("an HTML page in a File tab sees its own hash and keeps storage in memory, told on its strip", async ({ page }) => {
+  await openApp(page);
+  await worktreeTab(page, "s-1");
+  await openFile(page, "docs/preview.html");
+  const body = page.frameLocator('[data-testid="file-html-frame"]').locator("body");
+  await expect(page.frameLocator('[data-testid="file-html-frame"]').locator("#title")).toHaveText("script ran");
+  expect(await body.evaluate(() => [location.hash, self.origin])).toEqual(["", "null"]);
+  const kept = await body.evaluate(() => {
+    localStorage.setItem("todos", "[1]");
+    localStorage.n = "2";
+    return [localStorage.getItem("todos"), localStorage.getItem("n"), "serviceWorker" in navigator];
+  });
+  expect(kept).toEqual(["[1]", "2", false]);
+  await expect(file(page).getByTestId("file-html-footer").getByTestId("page-errors")).toHaveText("1");
 });
 
 // The PDF and image meta, no mode or wrap for a PDF, and the too-large states: src/components/files/FileTab.test.tsx.

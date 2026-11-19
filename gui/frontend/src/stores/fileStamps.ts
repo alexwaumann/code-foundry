@@ -4,8 +4,9 @@
  * watch per file, shared by every view of it: its stamp (size and modification time,
  * api/files.ts statFile) is read when the first view mounts, then every STAMP_POLL_MS
  * while the window is visible and at once when it becomes visible again. A stamp unlike
- * the last one calls the file's listeners; a file that went away calls nothing until it is
- * back. Any writer counts: the thread's Edit or Write, its Bash (`cp` over the file,
+ * the last one calls the file's listeners; a file that went away calls only the listeners
+ * that asked to hear it (`gone`: the File tab, which then says the file is not there), the
+ * rest nothing until it is back (a card keeps the page it shows). Any writer counts: the thread's Edit or Write, its Bash (`cp` over the file,
  * `touch`, `sed -i`), another thread, the user's editor. The last view to go stops it.
  *
  * A poll, not a stream: a stat a second of the few files on screen costs nothing.
@@ -26,14 +27,24 @@ export interface FileWatcherDeps {
 }
 
 export interface FileWatcher {
-  /** Calls `onChange` each time the file at `abs` is written; returns the unsubscribe. */
-  watch: (abs: string, onChange: () => void) => () => void;
+  /** Calls `onChange` each time the file at `abs` is written (and, with `gone`, when it goes away); returns the unsubscribe. */
+  watch: (abs: string, onChange: () => void, opts?: WatchOptions) => () => void;
   /** Reads the file's stamp now (a tool just wrote it), not at the next poll; nothing when unwatched. */
   check: (abs: string) => void;
 }
 
+export interface WatchOptions {
+  /** Called also when the file goes away (deleted or moved), not only when it is written. */
+  gone?: boolean;
+}
+
+interface Listener {
+  fn: () => void;
+  gone: boolean;
+}
+
 interface Watch {
-  listeners: Set<() => void>;
+  listeners: Set<Listener>;
   /** The last stamp read; null until the first answer. */
   stamp: FileStamp | null;
   timer: ReturnType<typeof setInterval>;
@@ -60,7 +71,8 @@ export function createFileWatcher(deps: FileWatcherDeps): FileWatcher {
         if (watches.get(abs) !== w) return;
         const before = w.stamp;
         w.stamp = now;
-        if (before !== null && now !== "" && now !== before) for (const l of [...w.listeners]) l();
+        if (before === null || now === before) return;
+        for (const l of [...w.listeners]) if (now !== "" || l.gone) l.fn();
       })
       .catch(() => {
         // The daemon is away or the read failed: keep the last stamp, try at the next poll.
@@ -74,7 +86,7 @@ export function createFileWatcher(deps: FileWatcherDeps): FileWatcher {
       });
   };
 
-  const watch = (abs: string, onChange: () => void) => {
+  const watch = (abs: string, onChange: () => void, opts: WatchOptions = {}) => {
     let w = watches.get(abs);
     if (!w) {
       const timer = setInterval(() => {
@@ -88,8 +100,11 @@ export function createFileWatcher(deps: FileWatcherDeps): FileWatcher {
       check(abs);
     }
     const entry = w;
-    const l = () => {
-      onChange();
+    const l: Listener = {
+      fn: () => {
+        onChange();
+      },
+      gone: opts.gone === true,
     };
     entry.listeners.add(l);
     return () => {

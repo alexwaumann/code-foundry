@@ -10,18 +10,23 @@ vi.mock("@/stores/filePanel", () => ({ openFileInPanel }));
 const CF = "/Users/dev/src/code-foundry";
 const HELLO = "<!doctype html>\n<h1 id=hello>Hello</h1>\n<button id=wave>Wave</button>\n";
 
-// The daemon's file reads: hello.html is there (a grant, its source), gone.html is not.
+// The daemon's file reads: hello.html is there (a grant, its source), gone.html is not (a test
+// may write it, or delete hello.html).
+const disk = vi.hoisted(() => {
+  const d = { files: new Set(["hello.html"]), there: (path: string) => [...d.files].some((f) => path.endsWith(`/${f}`)) };
+  return d;
+});
 vi.mock("@/api/files", async (orig) => {
   const read = (path: string): FileReadView => {
-    const there = path.endsWith("hello.html");
+    const there = disk.there(path);
     return { path: `${CF}/${path}`, size: there ? HELLO.length : 0, truncated: false, binary: false, mime: there ? "text/html" : "", modifiedAtMs: null, notFound: !there, isDir: false, outsideHome: false, text: there ? HELLO : null } as FileReadView;
   };
   return {
     ...(await orig<typeof import("@/api/files")>()),
     readFile: (_base: string, path: string) => Promise.resolve(read(path)),
-    statFile: () => Promise.resolve(""),
+    statFile: (_base: string, abs: string) => Promise.resolve(disk.there(abs) ? "1:1" : ""),
     previewFile: (_base: string, path: string) =>
-      path.endsWith("hello.html") ? Promise.resolve({ url: `http://127.0.0.1:1/preview/g/${path}`, scope: CF, singleFile: false }) : Promise.reject(new ConnectError(`${CF}/${path} does not exist`, Code.NotFound)),
+      disk.there(path) ? Promise.resolve({ url: `http://127.0.0.1:1/preview/g/${path}`, scope: CF, singleFile: false }) : Promise.reject(new ConnectError(`${CF}/${path} does not exist`, Code.NotFound)),
   };
 });
 
@@ -113,6 +118,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  disk.files = new Set(["hello.html"]);
   openFileInPanel.mockClear();
   useThreadStore.setState({ logs: {}, expanded: {}, folds: {}, pageModals: {} });
 });
@@ -151,16 +157,49 @@ describe("an inline page's card", () => {
     expect(within(c).getByTestId("thread-html-source-toggle").getAttribute("aria-disabled")).toBe("true");
   });
 
-  it("Reload loads the page again as written; there is nothing to reload behind the source or a failed page", async () => {
+  it("Reload asks for the page again and loads it as written; there is nothing to reload behind the source", async () => {
     mount();
     const c = () => card("hello.html") as HTMLElement;
     const first = await within(c()).findByTestId("thread-html-frame");
     fireEvent.click(within(c()).getByTestId("thread-html-reload"));
-    expect(within(c()).getByTestId("thread-html-frame")).not.toBe(first);
+    // The frame up stays until the daemon answered.
+    expect(within(c()).getByTestId("thread-html-frame")).toBe(first);
+    await vi.waitFor(() => {
+      expect(within(c()).getByTestId("thread-html-frame")).not.toBe(first);
+    });
     fireEvent.click(within(c()).getByTestId("thread-html-source-toggle"));
     expect(within(c()).getByTestId("thread-html-reload").getAttribute("aria-disabled")).toBe("true");
-    await within(card("gone.html") as HTMLElement).findByTestId("thread-html-failed");
-    expect(within(card("gone.html") as HTMLElement).getByTestId("thread-html-reload").getAttribute("aria-disabled")).toBe("true");
+  });
+
+  it("Reload on a page whose file was deleted says it cannot render it, not the preview's bare 404", async () => {
+    mount();
+    const c = () => card("hello.html") as HTMLElement;
+    await within(c()).findByTestId("thread-html-frame");
+    disk.files.delete("hello.html");
+    fireEvent.click(within(c()).getByTestId("thread-html-reload"));
+    const failed = await within(c()).findByTestId("thread-html-failed");
+    expect(failed.textContent).toContain("does not exist");
+    expect(within(c()).queryByTestId("thread-html-frame")).toBeNull();
+  });
+
+  it("a page that could not render renders once its file is back: on Reload", async () => {
+    mount();
+    const c = () => card("gone.html") as HTMLElement;
+    await within(c()).findByTestId("thread-html-failed");
+    expect(within(c()).getByTestId("thread-html-reload").getAttribute("aria-disabled")).toBeNull();
+    disk.files.add("gone.html");
+    fireEvent.click(within(c()).getByTestId("thread-html-reload"));
+    expect(await within(c()).findByTestId("thread-html-frame")).toBeTruthy();
+    expect(within(c()).queryByTestId("thread-html-failed")).toBeNull();
+  });
+
+  it("a page that could not render renders once its file is back: by itself, when the file is written", async () => {
+    mount();
+    const c = () => card("gone.html") as HTMLElement;
+    await within(c()).findByTestId("thread-html-failed");
+    disk.files.add("gone.html");
+    // The card's watch reads the file's stamp every second (stores/fileStamps.ts).
+    expect(await within(c()).findByTestId("thread-html-frame", {}, { timeout: 3000 })).toBeTruthy();
   });
 
   it("open in side panel opens the file in the thread's own panel", () => {

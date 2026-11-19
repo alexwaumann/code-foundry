@@ -191,7 +191,7 @@ function CardBody({
     );
   if (source) return <SourceView page={page} height={height} version={version} />;
   if (covered) return <div className="bg-cf-surface" style={{ height }} data-testid="thread-html-covered" />;
-  return <HtmlFrame key={version} url={grant.preview.url} name={page.title || page.name} thread={threadId} style={{ height }} onResize={onResize} onPageErrors={onPageErrors} testId="thread-html-frame" />;
+  return <HtmlFrame key={version} url={grant.preview.url} scope={grantScope(grant)} name={page.title || page.name} thread={threadId} style={{ height }} onResize={onResize} onPageErrors={onPageErrors} testId="thread-html-frame" />;
 }
 
 /** The file read-only as code (the File tab's code view), or why it cannot be read. */
@@ -282,7 +282,7 @@ function Actions({
         }}
         testId="thread-html-panel"
       />
-      <Action label="Reload page" icon={RotateCw} disabled={failed || source} onClick={onReload} testId="thread-html-reload" />
+      <Action label="Reload page" icon={RotateCw} disabled={source} onClick={onReload} testId="thread-html-reload" />
       {onExpand && <Action label="Expand" icon={Maximize2} onClick={onExpand} testId="thread-html-expand" />}
       <Action label={source ? "Show the page" : "Source"} icon={Code} pressed={source} disabled={failed} onClick={onSource} testId="thread-html-source-toggle" />
     </>
@@ -290,6 +290,30 @@ function Actions({
 }
 
 const NO_ERRORS: readonly PageError[] = [];
+
+/** The directory a page's grant serves, whose files its frame watches; null for a one-file grant (or none yet). */
+function grantScope(grant: PreviewGrant): string | null {
+  return grant.preview && !grant.preview.singleFile ? grant.preview.scope : null;
+}
+
+/**
+ * Reload: asks the daemon for the page's grant again and, once it answered, loads the page
+ * again as written (the frame up meanwhile stays). So a card whose file was deleted or moved,
+ * or whose checkout went, says so ("Could not render this page") instead of showing the
+ * preview's bare 404, and one that could not render recovers once the file is back
+ * (docs/notes/page-frame-states.md).
+ */
+function useReload(grant: PreviewGrant, setVersion: (f: (v: number) => number) => void): () => void {
+  const [asked, setAsked] = useState<{ preview: PreviewGrant["preview"]; error: string | null } | null>(null);
+  if (asked && (grant.preview !== asked.preview || grant.error !== asked.error)) {
+    setAsked(null);
+    setVersion((v) => v + 1);
+  }
+  return () => {
+    setAsked({ preview: grant.preview, error: grant.error });
+    grant.retry();
+  };
+}
 
 /** The card: strip and page; Expand shows the same in the pane's modal (PaneOverlay). */
 function HtmlCard({ threadId, id, page, flash }: { threadId: string; id: string; page: InlinePage; flash: number }) {
@@ -302,8 +326,11 @@ function HtmlCard({ threadId, id, page, flash }: { threadId: string; id: string;
   const [version, setVersion] = useState(0);
   const [errors, setErrors] = useState<readonly PageError[]>([]);
   const ref = useRef<HTMLDivElement>(null);
-  // The file was written (an edit, `cp` over it, `touch`): load it again (the grant holds).
+  const reload = useReload(grant, setVersion);
+  // The file was written (an edit, `cp` over it, `touch`): load it again (the grant holds),
+  // or, for a card that could not render it, ask for the grant again: the file is back.
   useFileChanges(page.abs, () => {
+    if (!grant.loading && !grant.preview) grant.retry();
     setVersion((v) => v + 1);
   });
   useEffect(() => {
@@ -358,9 +385,7 @@ function HtmlCard({ threadId, id, page, flash }: { threadId: string; id: string;
           threadId={threadId}
           page={page}
           errors={covered ? NO_ERRORS : errors}
-          onReload={() => {
-            setVersion((v) => v + 1);
-          }}
+          onReload={reload}
           source={source}
           onSource={() => {
             setSource((s) => !s);
@@ -414,7 +439,9 @@ function PageModalBox({ scope, threadId, item, source }: { scope: string; thread
   const grant = usePreviewGrant(page.baseDir, page.path);
   const [version, setVersion] = useState(0);
   const [errors, setErrors] = useState<readonly PageError[]>([]);
+  const reload = useReload(grant, setVersion);
   useFileChanges(page.abs, () => {
+    if (!grant.loading && !grant.preview) grant.retry();
     setVersion((v) => v + 1);
   });
   const close = () => {
@@ -428,9 +455,7 @@ function PageModalBox({ scope, threadId, item, source }: { scope: string; thread
           page={page}
           errors={errors}
           onAsk={close}
-          onReload={() => {
-            setVersion((v) => v + 1);
-          }}
+          onReload={reload}
           source={source}
           onSource={() => {
             setPageModalSource(scope, !source);
@@ -443,7 +468,7 @@ function PageModalBox({ scope, threadId, item, source }: { scope: string; thread
         </Button>
       </Strip>
       {grant.preview && !source ? (
-        <HtmlFrame key={version} url={grant.preview.url} name={page.title || page.name} thread={threadId} className="min-h-0 flex-1" onPageErrors={setErrors} onKey={close} testId="thread-html-lightbox-frame" />
+        <HtmlFrame key={version} url={grant.preview.url} scope={grantScope(grant)} name={page.title || page.name} thread={threadId} className="min-h-0 flex-1" onPageErrors={setErrors} onKey={close} testId="thread-html-lightbox-frame" />
       ) : (
         <div className="flex min-h-0 flex-1 flex-col overflow-auto">
           <CardBody threadId={threadId} page={page} grant={grant} source={source} height={2000} version={version} />

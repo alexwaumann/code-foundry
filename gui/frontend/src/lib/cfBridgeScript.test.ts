@@ -35,10 +35,10 @@ interface Cf {
   storage(prefix?: string): { get(k: string): unknown; set(k: string, v: unknown): Promise<void>; remove(k: string): Promise<void>; keys(): string[]; clear(): Promise<unknown> };
 }
 
-/** The nonce the fake frame's URL carries (HtmlFrame's `#cf=<nonce>`). */
+/** The nonce the fake frame's URL carries (HtmlFrame's `?cf-nonce=<nonce>`). */
 const N = "n0nce";
 
-function load(opts: { userActivation?: { isActive: boolean } | null; embedded?: boolean; stylesheet?: boolean; hash?: string; url?: string; navigation?: object } = {}) {
+function load(opts: { userActivation?: { isActive: boolean } | null; embedded?: boolean; stylesheet?: boolean; search?: string; hash?: string; url?: string; navigation?: object } = {}) {
   const listeners: Record<string, ((e: unknown) => void)[]> = {};
   const posted: { m: Msg; origin: string }[] = [];
   const parent = {
@@ -98,11 +98,12 @@ function load(opts: { userActivation?: { isActive: boolean } | null; embedded?: 
         href: where.href,
         origin: where.origin,
         pathname: where.pathname,
+        search: where.search,
         hash: where.hash,
         assign: (u: string) => went.push(`assign ${u}`),
         replace: (u: string) => went.push(`replace ${u}`),
       }
-    : { hash: opts.hash ?? `#cf=${N}` };
+    : { search: opts.search ?? `?cf-nonce=${N}`, hash: opts.hash ?? "" };
   run(win, nav, doc, localStorage, ResizeObserver, loc);
   const cf = win.cf as Cf;
   const send = (data: unknown, source: unknown = parent) => {
@@ -335,11 +336,12 @@ describe("bridge.js", () => {
   });
 
   it.each([
-    ["no fragment", ""],
-    ["a fragment of the page's own", "#section"],
-    ["an empty nonce", "#cf="],
-  ])("has no bridge in a frame whose URL carries no nonce (%s): only its height and theme ack go out", async (_name, hash) => {
-    const h = load({ hash });
+    ["no query", "", ""],
+    ["a query of the page's own", "?tab=2", ""],
+    ["an empty nonce", "?cf-nonce=", ""],
+    ["a nonce in the fragment, as the app once put it", "", `#cf=${N}`],
+  ])("has no bridge in a frame whose URL carries no nonce (%s): only its height and theme ack go out", async (_name, search, hash) => {
+    const h = load({ search, hash });
     await expect(h.cf.ready).rejects.toMatchObject({ code: "unavailable", message: /not opened by Code Foundry in this frame/ });
     await expect(h.cf.run("thread.get")).rejects.toMatchObject({ code: "unavailable" });
     h.cf.on("gh", () => {});
@@ -351,8 +353,8 @@ describe("bridge.js", () => {
     ]);
   });
 
-  it("finds its nonce after the page's own fragment", () => {
-    const h = load({ hash: `#top&cf=${N}` });
+  it("finds its nonce after the page's own parameters, and leaves the fragment to the page", () => {
+    const h = load({ search: `?tab=2&cf-nonce=${N}`, hash: "#/about" });
     expect(h.posted[0]?.m).toEqual({ type: "cf:hello", cf: 1, nonce: N });
   });
 
@@ -640,7 +642,7 @@ describe("bridge.js: a page no thread owns (docs/notes/page-ownership-gui.md)", 
 });
 
 describe("bridge.js: a page's own next document", () => {
-  const PAGE = `http://127.0.0.1:9246/preview/g1/docs/page.html#cf=${N}`;
+  const PAGE = `http://127.0.0.1:9246/preview/g1/docs/page.html?cf-nonce=${N}`;
 
   /** A fake Navigation API: the script's navigate listener, and a navigate event it can cancel. */
   function navigation() {
@@ -653,12 +655,12 @@ describe("bridge.js: a page's own next document", () => {
     return { api: { addEventListener: (t: string, fn: (e: unknown) => void) => t === "navigate" && fns.push(fn) }, navigate, fns };
   }
 
-  it("sends a navigation to another file under its grant on with the frame's nonce, after the file's own fragment", () => {
+  it("sends a navigation to another file under its grant on with the frame's nonce in its query, its fragment left alone", () => {
     const n = navigation();
     const h = load({ url: PAGE, navigation: n.api });
     expect(n.navigate("http://127.0.0.1:9246/preview/g1/docs/detail.html")).toBe(true);
-    expect(n.navigate("http://127.0.0.1:9246/preview/g1/other/rows.html#top", { navigationType: "replace" })).toBe(true);
-    expect(h.went).toEqual([`assign http://127.0.0.1:9246/preview/g1/docs/detail.html#cf=${N}`, `replace http://127.0.0.1:9246/preview/g1/other/rows.html#top&cf=${N}`]);
+    expect(n.navigate("http://127.0.0.1:9246/preview/g1/other/rows.html?x=1#top", { navigationType: "replace" })).toBe(true);
+    expect(h.went).toEqual([`assign http://127.0.0.1:9246/preview/g1/docs/detail.html?cf-nonce=${N}`, `replace http://127.0.0.1:9246/preview/g1/other/rows.html?x=1&cf-nonce=${N}#top`]);
   });
 
   it.each([
@@ -666,7 +668,7 @@ describe("bridge.js: a page's own next document", () => {
     ["another site", "https://example.com/preview/g1/docs/page.html", {}],
     ["another port", "http://127.0.0.1:9999/preview/g1/docs/page.html", {}],
     ["outside the previews", "http://127.0.0.1:9246/cf/theme.json", {}],
-    ["a URL with a nonce already", `http://127.0.0.1:9246/preview/g1/docs/detail.html#cf=${N}`, {}],
+    ["a URL with a nonce already", `http://127.0.0.1:9246/preview/g1/docs/detail.html?cf-nonce=${N}`, {}],
     ["the same document", "http://127.0.0.1:9246/preview/g1/docs/page.html#part", { destination: { url: "http://127.0.0.1:9246/preview/g1/docs/page.html#part", sameDocument: true } }],
     ["a form's POST", "http://127.0.0.1:9246/preview/g1/docs/detail.html", { formData: {} }],
     ["a download", "http://127.0.0.1:9246/preview/g1/docs/rows.csv", { downloadRequest: "rows.csv" }],
@@ -682,7 +684,7 @@ describe("bridge.js: a page's own next document", () => {
 
   it.each([
     ["no nonce", "http://127.0.0.1:9246/preview/g1/docs/page.html"],
-    ["no grant", `http://127.0.0.1:9246/page.html#cf=${N}`],
+    ["no grant", `http://127.0.0.1:9246/page.html?cf-nonce=${N}`],
   ])("carries nothing from a page with %s", (_name, url) => {
     const n = navigation();
     load({ url, navigation: n.api });
@@ -702,7 +704,7 @@ describe("bridge.js: a page's own next document", () => {
     const e = click("detail.html#rows");
     h.fire("click", e);
     expect(e.prevented).toBe(true);
-    expect(h.went).toEqual([`assign http://127.0.0.1:9246/preview/g1/docs/detail.html#rows&cf=${N}`]);
+    expect(h.went).toEqual([`assign http://127.0.0.1:9246/preview/g1/docs/detail.html?cf-nonce=${N}#rows`]);
   });
 
   it.each([

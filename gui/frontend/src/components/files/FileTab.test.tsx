@@ -105,10 +105,11 @@ vi.mock("./previews/registry", async (orig) => {
   return { ...real, PREVIEW_KINDS: kinds, previewKindOf: (path: string, file: FileReadView | null) => real.previewKindOf(path, file, kinds) };
 });
 // The file-stamp watcher (stores/fileStamps.ts): what each path's listeners are; `written` calls them.
-const stamps = vi.hoisted(() => ({ watched: new Map<string, Set<() => void>>() }));
+const stamps = vi.hoisted(() => ({ watched: new Map<string, Set<() => void>>(), gone: new Set<string>() }));
 vi.mock("@/stores/fileStamps", () => ({
   fileWatcher: {
-    watch: (path: string, onChange: () => void) => {
+    watch: (path: string, onChange: () => void, opts?: { gone?: boolean }) => {
+      if (opts?.gone) stamps.gone.add(path);
       const listeners = stamps.watched.get(path) ?? new Set();
       stamps.watched.set(path, listeners.add(onChange));
       return () => {
@@ -1301,5 +1302,18 @@ describe("a project's file written on disk", () => {
     });
     cleanup();
     expect(stamps.watched.has(path)).toBe(false);
+  });
+
+  it("says the file is not there once it is deleted, without a Refresh", async () => {
+    const path = "/Users/dev/pages/life.html";
+    files.set(path, { text: "<p>life</p>", lossless: true, binary: false, mime: "text/html", size: 11 });
+    useCodeViewStore.setState((s) => ({ preview: { ...s.preview, html: "source" } }));
+    render(<FileTab target={{ project: "", base: "", path }} />);
+    await screen.findByTestId("code-file");
+    // The tab asks its watch to hear the file going away (the real watcher calls it then).
+    expect(stamps.gone.has(path)).toBe(true);
+    files.delete(path);
+    written(path);
+    expect(await screen.findByText("File not found")).toBeTruthy();
   });
 });

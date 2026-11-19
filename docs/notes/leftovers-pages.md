@@ -25,6 +25,8 @@ file, as the File tab's own menu runs it).
 
 A page's frame is opened at `#cf=<nonce>`; a page that went on to another file of its own
 lost the fragment and with it the bridge. Now `bridge.js`'s last block carries the nonce on.
+(Since `page-frame-states.md` the nonce is in the query, `?cf-nonce=<nonce>`, and carried on
+there; the fragment is the page's own.)
 
 **Decision: carry it in the URL, at navigation time, only to a known destination.** A
 navigation the page makes is re-made with `#cf=<nonce>` added (after the destination's own

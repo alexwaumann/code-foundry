@@ -24,8 +24,8 @@ describe("HtmlPreview", () => {
     render(<HtmlPreview path="/Users/me/proj/docs/a.html" text="<p>1</p>" name="a.html" />);
     const frame = await screen.findByTestId("file-html-frame");
     expect(previewFile).toHaveBeenCalledWith("", "/Users/me/proj/docs/a.html", undefined, expect.any(AbortSignal));
-    // The frame's nonce in the fragment (docs/notes/bridge-fix-frames.md).
-    expect(frame.getAttribute("src")).toMatch(/^http:\/\/127\.0\.0\.1:1\/preview\/g\/docs\/a\.html#cf=[0-9a-f]{32}$/);
+    // The frame's nonce in the query, the fragment left to the page (docs/notes/page-frame-states.md).
+    expect(frame.getAttribute("src")).toMatch(/^http:\/\/127\.0\.0\.1:1\/preview\/g\/docs\/a\.html\?cf-nonce=[0-9a-f]{32}$/);
     // No owning thread (no thread's panel): an opaque origin, so it cannot reach another page's frame.
     expect(frame.getAttribute("sandbox")).toBe(HTML_PREVIEW_SANDBOX);
     expect(frame.hasAttribute("srcdoc")).toBe(false);
@@ -112,14 +112,22 @@ describe("HtmlPreview", () => {
     expect(screen.getByTestId<HTMLIFrameElement>("file-html-frame").style.colorScheme).toBe("dark");
   });
 
-  it("reloads on a new published theme unless the page acked cf:theme", async () => {
+  /** A load of the frame, its document answering the ping as frame.js does: whether it uses the app's theme. */
+  const loadsUsingTheme = (frame: HTMLIFrameElement, theme: boolean) => {
+    fireEvent.load(frame);
+    act(() => {
+      window.dispatchEvent(new MessageEvent("message", { data: { type: "cf:here", seq: 1, files: ["/preview/g/a.html"], theme }, source: frame.contentWindow, origin: "null" }));
+    });
+  };
+
+  it("reloads a page that uses the app's theme on a new published theme, unless the page acked cf:theme", async () => {
     setThemePreference("dark");
     const stop = startThemePublish(() => Promise.resolve(), () => () => undefined, 0);
     try {
       previewFile.mockResolvedValue({ url: "http://127.0.0.1:1/preview/g/a.html", scope: "/Users/me/x", singleFile: false });
       render(<HtmlPreview path="/Users/me/x/a.html" text="x" name="a.html" />);
       const frame = await screen.findByTestId<HTMLIFrameElement>("file-html-frame");
-      fireEvent.load(frame);
+      loadsUsingTheme(frame, true);
       expect(frame.dataset.load).toBe("0");
       // A page that does not answer: the frame reloads THEME_ACK_MS after the publish.
       act(() => {
@@ -130,7 +138,7 @@ describe("HtmlPreview", () => {
       });
       // A page that acks the message it was posted keeps its load.
       const next = screen.getByTestId<HTMLIFrameElement>("file-html-frame");
-      fireEvent.load(next);
+      loadsUsingTheme(next, true);
       act(() => {
         setThemeSlots({ dark: "dracula" });
         window.dispatchEvent(new MessageEvent("message", { data: { type: "cf:theme:ack" }, source: next.contentWindow, origin: "null" }));
@@ -145,6 +153,32 @@ describe("HtmlPreview", () => {
       await waitFor(() => {
         expect(screen.getByTestId("file-html-frame").dataset.load).toBe("2");
       });
+    } finally {
+      stop();
+    }
+  });
+
+  it.each([
+    ["said it does not use the app's theme", true],
+    ["never said what it uses (no frame script)", false],
+  ])("leaves a plain page in a File tab alone on a theme change: its document %s", async (_name, answers) => {
+    setThemePreference("dark");
+    const stop = startThemePublish(() => Promise.resolve(), () => () => undefined, 0);
+    try {
+      previewFile.mockResolvedValue({ url: "http://127.0.0.1:1/preview/g/a.html", scope: "/Users/me/x", singleFile: false });
+      render(<HtmlPreview path="/Users/me/x/a.html" text="x" name="a.html" />);
+      const frame = await screen.findByTestId<HTMLIFrameElement>("file-html-frame");
+      if (answers) loadsUsingTheme(frame, false);
+      else fireEvent.load(frame);
+      act(() => {
+        setThemeSlots({ dark: "nord" });
+      });
+      act(() => {
+        setThemePreference("light");
+      });
+      await new Promise((r) => setTimeout(r, THEME_ACK_MS + 100));
+      expect(screen.getByTestId("file-html-frame")).toBe(frame);
+      expect(frame.dataset.load).toBe("0");
     } finally {
       stop();
     }

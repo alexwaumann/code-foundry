@@ -243,7 +243,7 @@ test("the panel copy names the page by its title and counts its errors too", asy
 });
 
 /** The frame's nonce, as the page reads it from its own URL (lib/bridge.ts withNonce). */
-const NONCE = () => /(?:^#|&)cf=([^&]+)/.exec(location.hash)?.[1] ?? "";
+const NONCE = () => /[?&]cf-nonce=([^&]+)/.exec(location.search)?.[1] ?? "";
 
 /** The mock's thread.wait calls, each held until its caller aborts it (mock/bridge.ts). */
 const mockWaitList = async (): Promise<unknown> => (await fetch(`${mockUrl}/__mock/waits`)).json();
@@ -273,13 +273,13 @@ test("a page that leads its frame to another grant's page, or is led to its own 
   await page.waitForTimeout(400);
   expect((await bridgeCounters(page)).posts).toBe(after.posts);
   expect(after.subscriptions).toBe(before.subscriptions - 1);
-  // The bridge page itself, without its fragment, loaded by the app's document rather than by
+  // The bridge page itself, without its nonce, loaded by the app's document rather than by
   // the page: the same.
   await page.getByTestId("thread-html").filter({ hasText: "bridge.html" }).getByTestId("thread-html-row").click();
   await page.getByTestId("thread-html").filter({ hasText: "bridge.html" }).getByTestId("thread-html-row").click();
   await expect(doc(page).locator("body")).toHaveAttribute("data-ready", "1");
   await card(page).locator('[data-testid="thread-html-frame"]').evaluate((f: HTMLIFrameElement) => {
-    f.src = f.src.replace(/#.*$/, "");
+    f.src = f.src.replace(/[?&]cf-nonce=[^&#]*/, "");
   });
   await expect(doc(page).locator("body")).toHaveAttribute("data-ready", "no");
 });
@@ -317,7 +317,9 @@ test("a page's own other file keeps the bridge, followed by a link or set as its
   await doc(page).locator("#next").click();
   await navigatedTo(page, frame, /\/bridge-next\.html$/);
   expect(await doc(page).locator("body").evaluate(() => location.pathname)).toMatch(/\/bridge-next\.html$/);
-  expect(await doc(page).locator("body").evaluate(() => location.hash)).toBe(`#rows&cf=${nonce}`);
+  // The nonce in the query; the fragment is the page's own.
+  expect(await doc(page).locator("body").evaluate(() => location.search)).toBe(`?cf-nonce=${nonce}`);
+  expect(await doc(page).locator("body").evaluate(() => location.hash)).toBe("#rows");
   await doc(page).locator("#list").click();
   await expect(doc(page).locator("#list-out")).toHaveText(/"threads":\d+/);
   // Back to the first file by script.
@@ -359,7 +361,7 @@ test("a run id already in flight is refused, and a page's cancel or reload abort
   const results = await doc(page)
     .locator("body")
     .evaluate(async () => {
-      const nonce = /(?:^#|&)cf=([^&]+)/.exec(location.hash)?.[1] ?? "";
+      const nonce = /[?&]cf-nonce=([^&]+)/.exec(location.search)?.[1] ?? "";
       const got: unknown[] = [];
       addEventListener("message", (e: MessageEvent<{ type?: string; id?: string }>) => {
         if (e.data.type === "cf:result" && e.data.id === "dup") got.push(e.data);
@@ -375,7 +377,7 @@ test("a run id already in flight is refused, and a page's cancel or reload abort
   await doc(page)
     .locator("body")
     .evaluate(() => {
-      const nonce = /(?:^#|&)cf=([^&]+)/.exec(location.hash)?.[1] ?? "";
+      const nonce = /[?&]cf-nonce=([^&]+)/.exec(location.search)?.[1] ?? "";
       parent.postMessage({ cf: 1, type: "cf:cancel", id: "dup", nonce }, "*");
       parent.postMessage({ cf: 1, type: "cf:run", id: "next", verb: "thread.wait", args: { id: "s-2" }, nonce }, "*");
     });

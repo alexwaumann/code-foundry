@@ -23,11 +23,11 @@
  * cf.ready waits (the app said cf:asking), and nothing times out. Allowed, it has storage, fetch,
  * the verbs that need no thread and every source but "thread"; refused, every call says so.
  *
- * The app opens the page with a nonce in its URL's fragment (#cf=<nonce>), sent back on
- * every message (docs/notes/bridge-fix-frames.md), and carried on to the page's own other
- * files when it goes to one in its frame (the last block below). A page reached any other
- * way (another site's or another grant's link, another tab) has no bridge, and cf.ready
- * rejects at once.
+ * The app opens the page with a nonce in its URL's query (?cf-nonce=<nonce>; the fragment
+ * stays the page's own), sent back on every message (docs/notes/bridge-fix-frames.md,
+ * page-frame-states.md), and carried on to the page's own other files when it goes to one
+ * in its frame (the last block below). A page reached any other way (another site's or
+ * another grant's link, another tab) has no bridge, and cf.ready rejects at once.
  */
 (function () {
   "use strict";
@@ -49,8 +49,8 @@
 
   var host = window.parent;
   var embedded = !!host && host !== window;
-  // The frame's nonce, from the fragment the app opened the page with; "" for none.
-  var nonceMatch = /(?:^#|&)cf=([A-Za-z0-9_-]+)/.exec(location.hash || "");
+  // The frame's nonce, from the query the app opened the page with; "" for none.
+  var nonceMatch = /[?&]cf-nonce=([A-Za-z0-9_-]+)/.exec(location.search || "");
   var NONCE = nonceMatch ? nonceMatch[1] : "";
   // Whether the app hears this page's calls: a frame the app opened for it, nonce and all.
   var bridged = embedded && NONCE !== "";
@@ -706,7 +706,7 @@
 (function () {
   "use strict";
   var host = window.parent;
-  var nonceMatch = /(?:^#|&)cf=([A-Za-z0-9_-]+)/.exec(location.hash || "");
+  var nonceMatch = /[?&]cf-nonce=([A-Za-z0-9_-]+)/.exec(location.search || "");
   if (!host || host === window || !nonceMatch || window.__cfKeys) return;
   window.__cfKeys = true;
   // Bubble phase on the window: every handler in the page has had the event by then.
@@ -722,14 +722,14 @@
 
 // A page's own next document keeps the bridge (docs/notes/leftovers-pages.md). A navigation
 // the page makes to another file of its own (at this origin, under its own grant's
-// /preview/<grant>/) is sent on with the frame's nonce in its fragment, so that document's
+// /preview/<grant>/) is sent on with the frame's nonce in its query, so that document's
 // bridge works too. A navigation to another site or another grant goes as it is, without
 // the nonce, so it has no bridge there. With the Navigation API every such navigation (a
 // link, location = …, location.assign or replace) is seen with where it goes; without it,
 // a followed link is. Its own block, apart from the bridge above.
 (function () {
   "use strict";
-  var nonceMatch = /(?:^#|&)cf=([A-Za-z0-9_-]+)/.exec(location.hash || "");
+  var nonceMatch = /[?&]cf-nonce=([A-Za-z0-9_-]+)/.exec(location.search || "");
   var grant = /^\/preview\/[^/]+\//.exec(location.pathname || "");
   if (window.parent === window || !nonceMatch || !grant || window.__cfFollow) return;
   window.__cfFollow = true;
@@ -744,8 +744,8 @@
       return "";
     }
     if (u.origin !== location.origin || u.pathname.indexOf(grant[0]) !== 0) return "";
-    if (/(?:^#|&)cf=/.test(u.hash)) return "";
-    u.hash = u.hash ? u.hash.slice(1) + "&cf=" + nonce : "cf=" + nonce;
+    if (/[?&]cf-nonce=/.test(u.search)) return "";
+    u.search = (u.search ? u.search + "&" : "?") + "cf-nonce=" + nonce;
     return u.href;
   }
 

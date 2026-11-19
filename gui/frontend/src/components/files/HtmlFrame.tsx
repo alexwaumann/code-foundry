@@ -8,7 +8,9 @@ import { addPageError, type PageError } from "@/lib/pageErrors";
 import { activeThemeSlots, onThemePublished, subscribeThemeSlots, themeFrameMessage, useActiveTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 import { zoomFactor } from "@/lib/zoom";
+import { fileWatcher } from "@/stores/fileStamps";
 import { openUrl } from "@/stores/gh";
+import { frameReport, grantFiles } from "./frameFiles";
 import { isThemeAck, pageFrameNote, pageKey, pageOpenUrl, pageUnsupported, resizeHeight, themedUrl } from "./previewGrant";
 
 /**
@@ -47,6 +49,9 @@ export const THEME_ACK_MS = 300;
  */
 export const FRAME_REVEAL_MS = 1000;
 
+/** How long a frame waits after one of its document's files was written before it reloads the document, so a build writing several reloads it once. */
+export const FILES_RELOAD_MS = 150;
+
 /** The least time between two links a frame sends to the browser. */
 export const OPEN_GAP_MS = 500;
 
@@ -74,6 +79,11 @@ export const LEFT_WAIT_MS = 400;
  *   (onThemePublished) and the page did not ack it, the frame is posted the theme again
  *   and reloads THEME_ACK_MS later unless an ack came meanwhile: a page that only links the
  *   stylesheet (fetched once, no-store) repaints, its state going with the reload.
+ * - A page with no thread (an opaque frame, served as written) is reloaded only when its
+ *   document said it uses the theme (`/cf/theme.css` or the bridge; the `theme` of its
+ *   `cf:here`, frame.js): any other HTML file has nothing of the theme to repaint, and a reload
+ *   would lose what the user did in it (docs/notes/page-frame-states.md). A thread's page is
+ *   painted in the theme by the daemon, so it reloads as above.
  *
  * `onResize` hears this frame's own `{ type: "cf:resize", height }` messages (a page asking
  * for its height), in layout px. A page stays at 100% under the app's zoom.
@@ -86,6 +96,11 @@ export const LEFT_WAIT_MS = 400;
  * paints it in the theme from its first byte; an opaque frame's page (any other HTML file) is
  * served as written and, once shown, has a white canvas, as in a browser.
  *
+ * The page's other files (`scope`, the directory its grant serves): the frame watches the
+ * files under it its document said it loaded (stylesheets, scripts, data; frameFiles.ts),
+ * and asks the document to reload itself (`{ type: "cf:reload" }`) FILES_RELOAD_MS after one
+ * is written, so it stays on the file it is at. The page's own file is its host's to watch.
+ *
  * The bridge (stores/bridgeHost.ts): a page loading `/cf/bridge.js` runs verbs and
  * subscribes to the app's state as `thread`, the thread it acts for (its owner); without one
  * it is in an opaque origin (HTML_PREVIEW_SANDBOX) and its bridge does what `page` says
@@ -93,12 +108,12 @@ export const LEFT_WAIT_MS = 400;
  * page, its ready held while they are asked (`onAsk` hears a document that wants it), every
  * call refused otherwise. A change of `page` that a document already had its ready under
  * loads the frame again, so the page starts over under the new answer; a held ready just
- * goes out. The frame's src carries a nonce of its own in its fragment
- * (lib/bridge.ts withNonce), which the script sends back on every message. Only this
+ * goes out. The frame's src carries a nonce of its own in its query (lib/bridge.ts
+ * withNonce; the fragment is the page's), which the script sends back on every message. Only this
  * frame's own window, at the origin its URL names ("null" without a thread), with that
  * nonce is heard; `cf:resize` and `cf:theme:ack` may come without one (a page without the
  * script), never with another. A frame navigated to another URL, another page's grant
- * included, loses the fragment and with it the bridge; the page's own way to another file
+ * included, loses the nonce and with it the bridge; the page's own way to another file
  * under its grant keeps it (bridge.js carries the nonce on). Replies go to that window and
  * origin. A change of owning thread reloads the frame (its sandbox changes with it).
  * `onKey` hears this frame's own `{ type: "cf:key", key: "Escape" }`, with its nonce only:
@@ -110,9 +125,9 @@ export const LEFT_WAIT_MS = 400;
  * every document the frame loads (internal/preview/frame.js), bridge or not. A link to
  * another site, and `window.open`, arrive as `{ type: "cf:open", url }` and open in the
  * browser (view.open.url) while the user is in the frame, at most one per OPEN_GAP_MS; an
- * `alert`, `confirm`, `prompt` or download arrives as `cf:unsupported` and joins the
- * page's errors. Neither needs the nonce: a page that left for another document of its
- * own keeps them.
+ * `alert`, `confirm`, `prompt`, download or storage use (in an opaque frame, whose
+ * storage frame.js keeps in memory) arrives as `cf:unsupported` and joins the page's errors.
+ * Neither needs the nonce: a page that left for another document of its own keeps them.
  *
  * A frame that went to another site anyway (docs/notes/leftovers-pages.md): after each
  * `load` the frame posts `{ type: "cf:ping", seq }`, which the script in every document the
@@ -137,8 +152,11 @@ export function HtmlFrame({
   onStale,
   onPageErrors,
   onKey,
+  scope = null,
 }: {
   url: string;
+  /** The directory the page's grant serves (none for a one-file grant): the files its document loaded under it are watched. */
+  scope?: string | null;
   name: string;
   /** The thread that shows the page, whose verbs and state its bridge may use; null for none. */
   thread?: string | null;
@@ -169,6 +187,12 @@ export function HtmlFrame({
   const posted = useRef<Readonly<Record<string, string>> | null>(null);
   const acked = useRef<Readonly<Record<string, string>> | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  // Whether the document in the frame said it uses the app's theme (its cf:here).
+  const themed = useRef(false);
+  const opaqueRef = useRef(thread === null);
+  useEffect(() => {
+    opaqueRef.current = thread === null;
+  });
   const post = () => {
     const win = frameRef.current?.contentWindow;
     if (!win) return;
@@ -186,7 +210,8 @@ export function HtmlFrame({
     const stopPublished = onThemePublished(() => {
       const slots = activeThemeSlots();
       if (shown.current === slots) return;
-      if (acked.current === slots) {
+      // A page served as written that does not use the theme: nothing to repaint, nothing to lose.
+      if (acked.current === slots || (opaqueRef.current && !themed.current)) {
         shown.current = slots;
         return;
       }
@@ -244,6 +269,12 @@ export function HtmlFrame({
     },
     [],
   );
+  // The files to watch, one per line ("" for none), and the scope the next report maps under.
+  const [files, setFiles] = useState("");
+  const scopeRef = useRef(scope);
+  useEffect(() => {
+    scopeRef.current = scope;
+  });
   const host = useRef<BridgeHost | null>(null);
   const present = useRef<() => boolean>(() => false);
   const openedAt = useRef(Number.NEGATIVE_INFINITY);
@@ -328,10 +359,15 @@ export function HtmlFrame({
         void openUrl(link);
         return;
       }
-      const cannot = pageUnsupported(e.data);
+      const cannot = pageUnsupported(e.data, opaque);
       if (cannot !== null) {
         report(addPageError(errors.current, { ...cannot, code: "unavailable", atMs: Date.now() }));
         return;
+      }
+      const doc = frameReport(e.data);
+      if (doc) {
+        themed.current = doc.theme;
+        setFiles(scopeRef.current ? grantFiles(url, scopeRef.current, doc.files).join("\n") : "");
       }
       const note = pageFrameNote(e.data);
       if (note) {
@@ -351,7 +387,24 @@ export function HtmlFrame({
     return () => {
       window.removeEventListener("message", onMessage);
     };
-  }, [origin, nonce, report]);
+  }, [origin, nonce, report, opaque, url]);
+  // The files the document said it loaded, watched: one written reloads the document in place.
+  useEffect(() => {
+    if (!files) return;
+    let t: ReturnType<typeof setTimeout> | undefined;
+    const reload = () => {
+      clearTimeout(t);
+      t = setTimeout(() => {
+        const win = frameRef.current?.contentWindow;
+        if (win && target) win.postMessage({ type: "cf:reload" }, target);
+      }, FILES_RELOAD_MS);
+    };
+    const stops = files.split("\n").map((f) => fileWatcher.watch(f, reload));
+    return () => {
+      clearTimeout(t);
+      for (const stop of stops) stop();
+    };
+  }, [files, target]);
   // The frame's load: visible once its `load` came (or FRAME_REVEAL_MS passed). A new grant's
   // URL for the same frame (a daemon restart) keeps it visible: that page is up.
   const frameKey = `${String(load)}:${thread ?? ""}`;
@@ -395,6 +448,7 @@ export function HtmlFrame({
         key={frameKey}
         ref={frameRef}
         onLoad={() => {
+          themed.current = false;
           setVisibleKey(frameKey);
           post();
           if (errors.current.length > 0) report([]);

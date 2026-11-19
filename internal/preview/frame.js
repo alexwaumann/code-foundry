@@ -11,7 +11,11 @@
 // app's { type: "cf:ping", seq } after a load with { type: "cf:here", seq }, and says when it
 // goes on to a document at its own origin ({ type: "cf:going" }): a frame whose document
 // answers nothing went to another site, and the app offers to load the page again
-// (docs/notes/leftovers-pages.md). No bridge is needed: a page that never loads
+// (docs/notes/leftovers-pages.md). The answer also says what the document loaded from its
+// own origin and whether it uses the app's theme, so the app reloads it ({ type: "cf:reload" })
+// when one of its files is written, and on a theme change only when it uses the theme; a page
+// in an opaque origin keeps localStorage, sessionStorage and cookies in memory until it
+// reloads (docs/notes/page-frame-states.md). No bridge is needed: a page that never loads
 // /cf/bridge.js gets this too.
 (function () {
   if (window.parent === window || window.__cfFrame) return;
@@ -194,9 +198,232 @@
     return null;
   };
 
+  // A page no thread owns runs in an opaque origin (the File tab's frame has no
+  // allow-same-origin), where every storage API throws, which stops most pages that keep
+  // state. localStorage, sessionStorage and document.cookie live in memory instead, until the
+  // page reloads, and the first use of each tells the app ({ what: "storage" }), which says
+  // the data is not kept. indexedDB.open still throws, told first. A service worker and the
+  // Cache API are taken away, so a page that looks for them goes on without. A use before the
+  // app's ping (the page's first script) is told after the answer: the frame's load, which
+  // comes between, clears what the page's strip had.
+  var answered = false;
+  var early = [];
+  var opaque = false;
+  try {
+    void window.localStorage;
+  } catch (_) {
+    opaque = true;
+  }
+  if (opaque) {
+    var told = {};
+    var tell = function (name) {
+      if (told[name]) return;
+      told[name] = true;
+      if (answered) unsupported("storage", name);
+      else early.push(name);
+    };
+    var memoryStorage = function (name) {
+      var data = Object.create(null);
+      var api = {};
+      var method = function (k, fn) {
+        Object.defineProperty(api, k, {
+          configurable: true,
+          value: function () {
+            tell(name);
+            return fn.apply(null, arguments);
+          },
+        });
+      };
+      method("getItem", function (k) {
+        k = String(k);
+        return k in data ? data[k] : null;
+      });
+      method("setItem", function (k, v) {
+        data[String(k)] = String(v);
+      });
+      method("removeItem", function (k) {
+        delete data[String(k)];
+      });
+      method("clear", function () {
+        data = Object.create(null);
+      });
+      method("key", function (i) {
+        var keys = Object.keys(data);
+        return i >= 0 && i < keys.length ? keys[i] : null;
+      });
+      Object.defineProperty(api, "length", {
+        configurable: true,
+        get: function () {
+          tell(name);
+          return Object.keys(data).length;
+        },
+      });
+      if (typeof Proxy !== "function") return api;
+      // Pages also read and write it as properties (localStorage.todos = …).
+      var own = function (t, k) {
+        return typeof k !== "string" || k in t;
+      };
+      return new Proxy(api, {
+        get: function (t, k) {
+          if (own(t, k)) return t[k];
+          tell(name);
+          return k in data ? data[k] : undefined;
+        },
+        set: function (t, k, v) {
+          if (own(t, k)) return false;
+          tell(name);
+          data[k] = String(v);
+          return true;
+        },
+        has: function (t, k) {
+          return own(t, k) || k in data;
+        },
+        deleteProperty: function (t, k) {
+          if (own(t, k)) return false;
+          tell(name);
+          delete data[k];
+          return true;
+        },
+        ownKeys: function () {
+          return Object.keys(data);
+        },
+        getOwnPropertyDescriptor: function (t, k) {
+          if (own(t, k) || !(k in data)) return undefined;
+          return { value: data[k], writable: true, enumerable: true, configurable: true };
+        },
+      });
+    };
+    var replace = function (obj, key, desc) {
+      try {
+        desc.configurable = true;
+        Object.defineProperty(obj, key, desc);
+      } catch (_) {
+        // Not ours to replace here: the page meets the browser's own.
+      }
+    };
+    ["localStorage", "sessionStorage"].forEach(function (k) {
+      var store = memoryStorage(k);
+      replace(window, k, {
+        get: function () {
+          return store;
+        },
+      });
+    });
+    var cookies = Object.create(null);
+    replace(document, "cookie", {
+      get: function () {
+        tell("document.cookie");
+        return Object.keys(cookies)
+          .map(function (k) {
+            return k + "=" + cookies[k];
+          })
+          .join("; ");
+      },
+      set: function (v) {
+        tell("document.cookie");
+        var parts = String(v).split(";");
+        var eq = parts[0].indexOf("=");
+        var k = (eq < 0 ? "" : parts[0].slice(0, eq)).trim();
+        var val = (eq < 0 ? parts[0] : parts[0].slice(eq + 1)).trim();
+        var gone = parts.slice(1).some(function (p) {
+          var a = p.trim().toLowerCase();
+          if (a.indexOf("max-age=") === 0) return Number(a.slice(8)) <= 0;
+          if (a.indexOf("expires=") === 0) return Date.parse(p.trim().slice(8)) <= Date.now();
+          return false;
+        });
+        if (gone) delete cookies[k];
+        else cookies[k] = val;
+      },
+    });
+    var idb = null;
+    try {
+      idb = window.indexedDB;
+    } catch (_) {
+      idb = null;
+    }
+    if (idb) {
+      ["open", "deleteDatabase"].forEach(function (k) {
+        var real = idb[k];
+        if (typeof real !== "function") return;
+        replace(idb, k, {
+          writable: true,
+          value: function () {
+            tell("indexedDB");
+            return real.apply(idb, arguments);
+          },
+        });
+      });
+    }
+    var drop = function (obj, key) {
+      for (var o = obj; o; o = Object.getPrototypeOf(o)) {
+        var d = Object.getOwnPropertyDescriptor(o, key);
+        if (!d) continue;
+        try {
+          if (d.configurable) delete o[key];
+        } catch (_) {
+          // Left as the browser has it.
+        }
+        return;
+      }
+    };
+    drop(navigator, "serviceWorker");
+    drop(window, "caches");
+  }
+
+  // What the document loaded from its own origin, as paths (itself first), at most MAX_FILES:
+  // the app watches those under the page's grant and reloads the document when one is written.
+  var MAX_FILES = 64;
+  var files = [];
+  function noteFile(href) {
+    if (files.length >= MAX_FILES) return false;
+    var u;
+    try {
+      u = new URL(String(href), document.baseURI);
+    } catch (_) {
+      return false;
+    }
+    if (u.host !== location.host || files.indexOf(u.pathname) >= 0) return false;
+    files.push(u.pathname);
+    return true;
+  }
+  function noteLoaded() {
+    var grew = noteFile(location.href);
+    var perf = window.performance;
+    var entries = perf && typeof perf.getEntriesByType === "function" ? perf.getEntriesByType("resource") : [];
+    for (var i = 0; i < entries.length; i++) grew = noteFile(entries[i].name) || grew;
+    var els = document.querySelectorAll ? document.querySelectorAll("link[href], script[src]") : [];
+    for (var j = 0; j < els.length; j++) grew = noteFile(els[j].href || els[j].src) || grew;
+    return grew;
+  }
+  // Whether the document uses the app's theme: its stylesheet, or the bridge, which hands it.
+  function themed() {
+    return files.indexOf("/cf/theme.css") >= 0 || files.indexOf("/cf/bridge.js") >= 0 || !!(window.cf && window.cf.version);
+  }
+  var Observer = window.PerformanceObserver;
+  if (typeof Observer === "function") {
+    try {
+      new Observer(function () {
+        // Files fetched after the load (a lazy script, the page's data): the app watches them too.
+        if (noteLoaded() && answered) post({ type: "cf:files", files: files.slice(), theme: themed() });
+      }).observe({ type: "resource", buffered: false });
+    } catch (_) {
+      // No resource timing: the load's own list is all the app gets.
+    }
+  }
+
   window.addEventListener("message", function (e) {
     var m = e.data;
-    if (e.source !== parent || !m || m.type !== "cf:ping" || typeof m.seq !== "number") return;
-    post({ type: "cf:here", seq: m.seq });
+    if (e.source !== parent || !m) return;
+    if (m.type === "cf:reload") {
+      location.reload();
+      return;
+    }
+    if (m.type !== "cf:ping" || typeof m.seq !== "number") return;
+    noteLoaded();
+    answered = true;
+    post({ type: "cf:here", seq: m.seq, files: files.slice(), theme: themed() });
+    early.splice(0).forEach(function (name) {
+      unsupported("storage", name);
+    });
   });
 })();

@@ -13,7 +13,7 @@ import { useCallback, useEffect, useEffectEvent, useRef, useState } from "react"
 import { errorMessage, isAbort, onVisibilityChange } from "@/api/stream";
 import type { ThreadItemView } from "@/api/thread";
 import { parseObject } from "@/lib/toolSummary";
-import { fileWatcher } from "@/stores/fileStamps";
+import { fileWatcher, type WatchOptions } from "@/stores/fileStamps";
 import { useResource } from "@/stores/resource";
 import { useThreadStore, type ThreadLog } from "@/stores/thread";
 import { useUiStore } from "@/stores/ui";
@@ -196,16 +196,21 @@ export function useToolEdits(path: string, onEdit: () => void): void {
  * own tools, its Bash (`cp` over it, `touch`), another process (stores/fileStamps.ts). The
  * visible thread's finished Edit, MultiEdit, Write or NotebookEdit of it reads its stamp at
  * once rather than at the next poll, so that edit shows without the wait and still loads
- * once. An empty path watches nothing.
+ * once. With `gone`, also when the file goes away. An empty path watches nothing.
  */
-export function useFileChanges(path: string, onChange: () => void): void {
+export function useFileChanges(path: string, onChange: () => void, opts: WatchOptions = {}): void {
   const fire = useEffectEvent(onChange);
+  const gone = opts.gone === true;
   useEffect(() => {
     if (!path) return;
-    return fileWatcher.watch(path, () => {
-      fire();
-    });
-  }, [path]);
+    return fileWatcher.watch(
+      path,
+      () => {
+        fire();
+      },
+      { gone },
+    );
+  }, [path, gone]);
   useToolEdits(path, () => {
     fileWatcher.check(path);
   });

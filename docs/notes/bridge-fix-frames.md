@@ -17,6 +17,9 @@ Host header, read-only marker, waits ending on request cancellation) is
 Supersedes the contract section of `bridge-2-gui.md` (and `lib/bridge.ts`'s header says the
 same).
 
+- **Since `page-frame-states.md`** the nonce rides in the query (`?cf-nonce=<nonce>`), not the
+  fragment, which is the page's own (hash routing, `:target`). What follows about the fragment
+  holds for the query parameter.
 - **The frame's nonce.** `HtmlFrame` opens every page at `<grant URL>#cf=<nonce>`: 128 random
   bits in hex, one per mounted frame (`frameNonce`, `withNonce`; after the URL's own fragment
   as `&cf=` when it has one). A fragment never reaches the server, survives a reload, and is

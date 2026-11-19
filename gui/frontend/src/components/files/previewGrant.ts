@@ -42,7 +42,7 @@ export function pageOpenUrl(data: unknown): string | null {
 }
 
 /** What a frame cannot do for a page (internal/preview/frame.js). */
-export type PageUnsupported = "alert" | "confirm" | "prompt" | "download" | "form" | "navigation";
+export type PageUnsupported = "alert" | "confirm" | "prompt" | "download" | "form" | "navigation" | "storage";
 
 const UNSUPPORTED: Readonly<Record<PageUnsupported, { call: string; message: string }>> = {
   alert: { call: "alert()", message: "alert() shows nothing in a page here: show the message in the page itself" },
@@ -60,17 +60,40 @@ const UNSUPPORTED: Readonly<Record<PageUnsupported, { call: string; message: str
     call: "location",
     message: "a page here cannot send its frame to another site, which could not sign in: link to it, and the user's click opens it in the browser",
   },
+  storage: {
+    call: "storage",
+    message: "a page no thread showed has no storage here: what it keeps lasts until it reloads. Open the file in a browser to keep its data; a page made for Code Foundry keeps it with cf.storage (/cf/bridge.js)",
+  },
 };
 
 /**
- * A call the frame could not make for the page, `{ type: "cf:unsupported", what, text }`, as
- * the page's strip reports it (lib/pageErrors.ts); null for any other message.
+ * What differs for a page with no thread (a File tab's opaque frame; docs/notes/page-frame-states.md):
+ * it has no checkout to export into, and was likely not written for Code Foundry at all.
  */
-export function pageUnsupported(data: unknown): { call: string; message: string } | null {
+const THREADLESS: Readonly<Partial<Record<PageUnsupported, { call: string; message: string }>>> = {
+  download: { call: "download", message: "a download saves nothing from a page in a File tab: open the file in a browser to download from it" },
+};
+
+/** The storage APIs frame.js names in a `storage` report, each its own entry on the strip. */
+const STORAGE_CALLS: ReadonlySet<string> = new Set(["localStorage", "sessionStorage", "document.cookie", "indexedDB"]);
+
+/** What the strip says of indexedDB, which frame.js cannot keep in memory: it still fails. */
+const INDEXED_DB = "indexedDB fails in a page no thread showed (it has no storage here). Open the file in a browser to keep its data; a page made for Code Foundry keeps it with cf.storage (/cf/bridge.js)";
+
+/**
+ * A call the frame could not make for the page, `{ type: "cf:unsupported", what, text }`, as
+ * the page's strip reports it (lib/pageErrors.ts); null for any other message. `threadless`:
+ * the frame shows a page with no thread, which has no checkout to save a download into.
+ */
+export function pageUnsupported(data: unknown, threadless = false): { call: string; message: string } | null {
   if (typeof data !== "object" || data === null) return null;
-  const m = data as { type?: unknown; what?: unknown };
+  const m = data as { type?: unknown; what?: unknown; text?: unknown };
   if (m.type !== "cf:unsupported" || typeof m.what !== "string" || !Object.hasOwn(UNSUPPORTED, m.what)) return null;
-  return UNSUPPORTED[m.what as PageUnsupported];
+  const what = m.what as PageUnsupported;
+  if (what === "storage" && typeof m.text === "string" && STORAGE_CALLS.has(m.text)) {
+    return { call: m.text, message: m.text === "indexedDB" ? INDEXED_DB : UNSUPPORTED.storage.message };
+  }
+  return (threadless ? THREADLESS[what] : undefined) ?? UNSUPPORTED[what];
 }
 
 /** What a document's frame script says of it (internal/preview/frame.js). */
