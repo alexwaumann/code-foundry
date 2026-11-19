@@ -7,6 +7,8 @@ import { deferTurnFolds, foldDeferredTurns, getThreadItems, setTurnFolded, struc
 import { setupRowPhase } from "@/lib/threadSetup";
 import { registerTimeline } from "@/stores/cite";
 import { useThreadsStore } from "@/stores/threads";
+import { useWorkers } from "@/stores/lineage";
+import { workerRuns } from "@/lib/workerRuns";
 import { heldScroll, spacerAfterGrowth } from "@/lib/timelineHold";
 import { keepTimelinePlace, placeRow, placeTop, timelinePlace, type TimelinePlace } from "@/lib/timelinePlace";
 import { scrollIntent, type ScrollSample } from "@/lib/scrollIntent";
@@ -53,7 +55,7 @@ function measurements(v: { getTotalSize(): number; measurementsCache: VirtualIte
 }
 
 /** A first guess of a row's height before it is measured. */
-function estimate(r: { type: string; later?: string } | undefined): number {
+function estimate(r: { type: string; later?: string; lines?: readonly unknown[]; folded?: boolean } | undefined): number {
   switch (r?.type) {
     case "user":
       return 72;
@@ -65,6 +67,9 @@ function estimate(r: { type: string; later?: string } | undefined): number {
       return 28;
     case "gutter":
       return 28;
+    case "workers":
+      // A folded card is its title line; an open one a line per worker more.
+      return r.lines && !r.folded ? 34 + 25 * r.lines.length : 34;
     case "strip":
       return 26;
     case "system":
@@ -86,8 +91,12 @@ function useRows(threadId: string, working: boolean, strips: boolean): TimelineR
   const deferred = useDeferredTurns(threadId);
   const shown = useSetupShown(threadId).size > 0;
   const setup = useThreadsStore((s) => setupRowPhase(s.byId[threadId]?.setup, shown));
+  const workers = useWorkers(threadId);
+  const creator = useThreadsStore((s) => s.byId[threadId]?.createdBy ?? "");
   const turns = useMemo(() => buildTurns(keys.map(decodeTimelineKey)), [keys]);
-  return useMemo(() => buildRows(turns, { fold: (k) => folds[k], deferred: (e) => deferred[e] === true, working, strips, setup }), [turns, folds, deferred, working, strips, setup]);
+  const rows = useMemo(() => buildRows(turns, { fold: (k) => folds[k], deferred: (e) => deferred[e] === true, working, strips, setup }), [turns, folds, deferred, working, strips, setup]);
+  // The turns this thread's workers started read as one card per run (docs/notes/worker-card.md).
+  return useMemo(() => workerRuns(rows, { self: threadId, creator, workers, fold: (k) => folds[k] }), [rows, threadId, creator, workers, folds]);
 }
 
 /**
@@ -740,7 +749,7 @@ export function TimelineList<R extends ListRow>({
               // The last row of a turn before the next one gets the space between turns.
               const next = rows[vi.index + 1];
               // Not the setup's row: it takes no height until its lines show, and a space there would move the message below.
-              const turnEnd = row.type !== "user" && row.type !== "system" && row.type !== "setup" && (next?.type === "user" || next?.type === "system");
+              const turnEnd = row.type !== "user" && row.type !== "system" && row.type !== "setup" && (next?.type === "user" || next?.type === "system" || next?.type === "workers");
               return (
                 <div
                   key={vi.key}

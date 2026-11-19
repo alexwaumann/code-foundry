@@ -51,6 +51,15 @@ export interface TimelineItem {
   streaming: boolean;
   /** An html item's page, resolved to its absolute path (lib/inlinePage); "" or absent otherwise. */
   page?: string;
+  /**
+   * A user message's sender (lib/workerRuns senderOf): "" the user; a wake's or another
+   * thread's descriptor. "" or absent for other kinds.
+   */
+  from?: string;
+  /** A user message's time (epoch ms); absent for other kinds or when unknown. */
+  at?: number;
+  /** A text that is only the "nothing for the user" marker (lib/workerRuns isNothingNew). */
+  quiet?: boolean;
 }
 
 /** Tools whose consecutive calls fold into one "Read 3 files, searched code 2 times" row. */
@@ -70,12 +79,15 @@ export type WorkNode =
    * set, gives the row its own copy action copying those ids (joined by "\n"): Ember's
    * reply only (lib/ember); a thread's turn copies from its gutter, so "" here.
    */
-  | { type: "text"; key: string; id: string; final: boolean; answer: string }
+  | { type: "text"; key: string; id: string; final: boolean; answer: string; quiet?: boolean }
   | { type: "question"; key: string; id: string }
   | { type: "permission"; key: string; id: string }
   | { type: "note"; key: string; id: string; kind: "error" | "compaction" | "commandOutput" }
-  /** A user message sent while the turn ran (a steer); it stays visible when the turn folds. */
-  | { type: "steer"; key: string; id: string }
+  /**
+   * A user message sent while the turn ran (a steer); it stays visible when the turn folds.
+   * `from` and `at`: its sender and time, as TimelineItem's (lib/workerRuns).
+   */
+  | { type: "steer"; key: string; id: string; from?: string; at?: number }
   /** A system note (an item of kind "note"): on its own line between turns, or in the open turn it arrived in. */
   | { type: "system"; key: string; id: string }
   /**
@@ -107,7 +119,8 @@ export type StripStep = Extract<WorkNode, { type: "tool" } | { type: "group" }>;
 
 /** One row of the timeline (what the virtualizer lays out). */
 export type TimelineRow =
-  | { type: "user"; key: string; id: string }
+  /** A turn's opening message; `from` and `at` as TimelineItem's (lib/workerRuns). */
+  | { type: "user"; key: string; id: string; from?: string; at?: number }
   | WorkNode
   /**
    * The thread's setup, under its first user message (lib/threadSetup): one row, so a step
@@ -155,13 +168,55 @@ export type TimelineRow =
       reply: string;
       /** The thread's latest turn: its contents show at rest; an older turn's only while it is hovered or has the keyboard. */
       latest: boolean;
-    };
+      /**
+       * A turn of a run this thread's workers started (lib/workerRuns), whose header is not
+       * shown: its fold state, the steps count being its toggle ("none": nothing to fold).
+       * Absent for every other turn.
+       */
+      fold?: "folded" | "open" | "none";
+    }
+  /**
+   * The card for a run of turns this thread's own workers started (lib/workerRuns,
+   * docs/notes/worker-card.md), where the run begins. Its key is `w:<the anchoring turn's
+   * key>`, so it updates in place.
+   */
+  | WorkersRow;
+
+/** A worker's state in a card line (lib/workerRuns). */
+export type WorkerState = "working" | "needs" | "asks" | "finished" | "failed" | "stopped" | "archived";
+
+/** One worker's line in a card. */
+export interface WorkerLine {
+  /** The worker thread's id. */
+  id: string;
+  state: WorkerState;
+  /** When its current (or last) stretch of work started (epoch ms); null when unknown. */
+  since: number | null;
+  /** When that stretch ended (epoch ms): set for a stopped worker and in a frozen card; null while it runs. */
+  until: number | null;
+}
+
+export interface WorkersRow {
+  type: "workers";
+  key: string;
+  lines: WorkerLine[];
+  /** The current card: it updates and never folds. A frozen one stopped at the user's next message. */
+  live: boolean;
+  /** A frozen card shows only its title line (the user opens it; not kept across visits). */
+  folded: boolean;
+  /** When the run's stretch began (the user's message; epoch ms); null when unknown. */
+  start: number | null;
+  /** Frozen: the user's next message's time. Live: when its last worker stopped, null while any runs. */
+  end: number | null;
+}
 
 /** A turn: from a user message (or the thread's start) to its turn_end, inclusive. */
 export interface TimelineTurn {
   /** The first item's id. */
   key: string;
   user: string[];
+  /** The opening messages' senders and times, by item id, for those that have them (lib/workerRuns). */
+  senders?: Readonly<Record<string, { from?: string; at?: number }>>;
   body: WorkNode[];
   /** The turn_end item; "" while the turn runs. */
   end: string;
@@ -222,7 +277,7 @@ export function workNodes(list: readonly TimelineItem[], children: ReadonlyMap<s
         break;
       }
       case "text":
-        out.push({ type: "text", key: it.id, id: it.id, final: false, answer: "" });
+        out.push({ type: "text", key: it.id, id: it.id, final: false, answer: "", ...(it.quiet ? { quiet: true } : {}) });
         break;
       case "question":
         out.push({ type: "question", key: it.id, id: it.id });
@@ -247,13 +302,18 @@ export function workNodes(list: readonly TimelineItem[], children: ReadonlyMap<s
         break;
       case "user":
         // Only a steer reaches here (buildTurns keeps a turn's opening messages apart).
-        out.push({ type: "steer", key: it.id, id: it.id });
+        out.push({ type: "steer", key: it.id, id: it.id, ...sender(it) });
         break;
       case "turnEnd":
         break;
     }
   }
   return out;
+}
+
+/** A user message's sender and time for its row, when it has them (lib/workerRuns reads them). */
+function sender(it: TimelineItem): { from?: string; at?: number } {
+  return { ...(it.from ? { from: it.from } : {}), ...(it.at !== undefined ? { at: it.at } : {}) };
 }
 
 /** Marks the trailing text rows of a turn's body as final, its answer (thinking may sit between them). */
@@ -353,11 +413,13 @@ export function buildTurns(items: readonly TimelineItem[]): TimelineTurn[] {
 
   const turns: TimelineTurn[] = [];
   let cur: { key: string; user: string[]; items: TimelineItem[]; end: string } | null = null;
+  const senders: Record<string, { from?: string; at?: number }> = {};
   const close = () => {
     if (!cur) return;
     const body = workNodes(cur.items, children, permissions);
     markFinal(body);
-    turns.push({ key: cur.key, user: cur.user, body, end: cur.end });
+    const own = cur.user.filter((u) => u in senders);
+    turns.push({ key: cur.key, user: cur.user, ...(own.length > 0 ? { senders: Object.fromEntries(own.map((u) => [u, senders[u] ?? {}])) } : {}), body, end: cur.end });
     cur = null;
   };
   for (const it of top) {
@@ -382,6 +444,7 @@ export function buildTurns(items: readonly TimelineItem[]): TimelineTurn[] {
         cur = { key: it.id, user: [], items: [], end: "" };
       }
       cur.user.push(it.id);
+      if (it.from || it.at !== undefined) senders[it.id] = sender(it);
       continue;
     }
     if (it.kind === "note") {
@@ -488,7 +551,7 @@ export function buildRows(turns: readonly TimelineTurn[], opts: TimelineOptions)
   turns.forEach((t) => {
     const folded = t.end !== "" && (opts.fold(t.key) ?? (opts.deferred?.(t.end) ? false : defaultFolded(t)));
     const reply = turnReply(t);
-    for (const u of t.user) rows.push({ type: "user", key: u, id: u });
+    for (const u of t.user) rows.push({ type: "user", key: u, id: u, ...t.senders?.[u] });
     const steps = stepCount(t.body);
     if (finished(t) || t === live) {
       const finals = t.body.flatMap((n) => (n.type === "text" && n.final ? [n.id] : []));
@@ -512,17 +575,29 @@ export function buildRows(turns: readonly TimelineTurn[], opts: TimelineOptions)
 /**
  * The turn each row belongs to for the gutter's hover (by index; "" for none): a turn's
  * rows from its header to its gutter. Its user message(s), a system note between turns
- * and the setup row belong to none.
+ * and the setup row belong to none. A turn of a worker run (lib/workerRuns) has no header:
+ * its rows count from the row after the one before them (a gutter, a card, a message) to
+ * its gutter.
  */
 export function rowTurns(rows: readonly TimelineRow[]): string[] {
   let cur = "";
-  return rows.map((r) => {
+  const out = rows.map((r) => {
     if (r.type === "header") cur = r.turn;
-    else if (r.type === "user" || r.type === "setup") cur = "";
+    else if (r.type === "user" || r.type === "setup" || r.type === "workers") cur = "";
     const t = cur;
     if (r.type === "gutter") cur = "";
     return t;
   });
+  rows.forEach((g, i) => {
+    if (g.type !== "gutter" || g.fold === undefined) return;
+    out[i] = g.turn;
+    for (let j = i - 1; j >= 0 && out[j] === ""; j--) {
+      const t = rows[j]?.type;
+      if (t === "user" || t === "setup" || t === "gutter" || t === "workers" || t === "header") break;
+      out[j] = g.turn;
+    }
+  });
+  return out;
 }
 
 /**
@@ -631,12 +706,15 @@ const SEP = "\u0001";
 
 /** One string per item with what the timeline depends on, so a shallow-equal list means "same rows". */
 export function timelineKey(it: TimelineItem): string {
-  return [it.id, it.kind, it.name, it.parentToolUseId, it.toolUseId, it.toolStatus, it.requestState, it.streaming ? "1" : "", it.page ?? ""].join(SEP);
+  return [it.id, it.kind, it.name, it.parentToolUseId, it.toolUseId, it.toolStatus, it.requestState, it.streaming ? "1" : "", it.page ?? "", it.from ?? "", it.at === undefined ? "" : String(it.at), it.quiet ? "1" : ""].join(SEP);
 }
 
 export function decodeTimelineKey(k: string): TimelineItem {
-  const [id = "", kind = "text", name = "", parentToolUseId = "", toolUseId = "", toolStatus = "", requestState = "", streaming = "", page = ""] = k.split(SEP);
+  const [id = "", kind = "text", name = "", parentToolUseId = "", toolUseId = "", toolStatus = "", requestState = "", streaming = "", page = "", from = "", at = "", quiet = ""] = k.split(SEP);
   return {
+    ...(quiet ? { quiet: true } : {}),
+    ...(from ? { from } : {}),
+    ...(at ? { at: Number(at) } : {}),
     id,
     kind: kind as ThreadItemKind,
     name,

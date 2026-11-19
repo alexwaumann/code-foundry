@@ -1,5 +1,9 @@
 # Wake content: batches, sibling counts, words after a report, held lead wakes (2026-10-19)
 
+Update 2026-11-19 (`worker-card.md`): a batch of the thread's own workers' wakes that starts a
+turn is drawn in the worker card, not as "Woken by" lines; and every thread wake, batch and ask
+now ends with `WakeReplyNote`, which tells the lead how its replies show.
+
 From the orchestration battle test of 2026-10-19 (`/tmp/cf-exp2/results/REPORT.md`):
 A2 (burst wakes give a false status: E1 §4 item 3, E5 friction 2, E7 F2, W1 finding 3,
 E3 item 1), A3 (what a child says after its report never reaches the parent: E1 item 1,

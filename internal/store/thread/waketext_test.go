@@ -138,3 +138,47 @@ func TestWakeKeepsItsJSON(t *testing.T) {
 		t.Errorf("wake json %q: %v", msg.WakeJSON, err)
 	}
 }
+
+// What a woken thread is told about its replies (docs/notes/worker-card.md): the agreed
+// words, and the marker the GUI hides, since Claude Code asks again after a turn that ends
+// with no visible text.
+func TestWakeReplyNote(t *testing.T) {
+	for _, want := range []string{
+		"When another thread wakes you, the user sees only what is new: your reply is shown under the earlier ones.",
+		"Reply only when there is something new the user should know, in a line or two, without repeating earlier replies.",
+		"If the turn was only between you and the other thread, end it without a message to the user",
+		"make your last message only " + NothingNew,
+	} {
+		if !strings.Contains(WakeReplyNote, want) {
+			t.Errorf("WakeReplyNote lacks %q:\n%s", want, WakeReplyNote)
+		}
+	}
+	if got := withReplyNote(Message{Text: "wake", WakeTitle: "t"}); got.Text != "wake\n\n"+WakeReplyNote || got.WakeTitle != "t" {
+		t.Errorf("withReplyNote = %+v", got)
+	}
+}
+
+// A worker's message to its lead gets the reply note after its sender line; nothing else does.
+func TestWithWorkerReplyNote(t *testing.T) {
+	const line = "[code-foundry] From your worker \"W\" (s-w), not the user."
+	tests := []struct {
+		name string
+		to   Thread
+		rel  Relation
+		from string
+		want string
+	}{
+		{"a worker to its lead", Thread{ID: "s-l"}, RelationWorker, line, line + " " + WakeReplyNote},
+		{"a worker to a resident lead", Thread{ID: "s-r", Kind: KindResident}, RelationWorker, line, line},
+		{"a lead to its worker", Thread{ID: "s-w"}, RelationLead, line, line},
+		{"another thread", Thread{ID: "s-l"}, RelationOther, line, line},
+		{"no line", Thread{ID: "s-l"}, RelationWorker, "", ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := withWorkerReplyNote(tt.to, tt.rel, tt.from); got != tt.want {
+				t.Errorf("got %q, want %q", got, tt.want)
+			}
+		})
+	}
+}

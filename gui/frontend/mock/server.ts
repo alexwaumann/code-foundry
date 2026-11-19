@@ -29,6 +29,9 @@
  *        a question)
  *   POST /__mock/snooze-holds                     (snoozed s-8 working, and a snoozed thread asking for
  *        a permission: docs/notes/snooze-holds-archive-refuses.md)
+ *   POST /__mock/workers?state=live|needs|frozen  (a lead with three workers for the worker card: s-wl-lead and
+ *                                                 s-wl-1..3; mock/workerCard.ts, World.addWorkerCard)
+ *   POST /__mock/workers/step                     (its working worker finishes now and the lead's turn for it lands)
  *   POST /__mock/lineage                          (thread lineage: a creator, the child s-l-child with
  *        six siblings, one archived, and a child of its own; every child out of the
  *        sidebar while its creator exists; World.addLineage)
@@ -315,6 +318,7 @@ import { mockFetches, mockProxyFetch, resetFetches } from "./proxyFetch";
 import { refuseSlashCommand } from "./slashCommands";
 import { MOCK_ATTACHMENT, MOCK_ATTACHMENT_PNG, MockThreadLogs, THREAD_STATES, type ThreadState as ScriptedThreadState } from "./thread";
 import { CommandError, ConfirmNeeded, snoozeUntil, World, type EventInit } from "./world";
+import { WORKER_CARD_STATES, type WorkerCardState } from "./workerCard";
 
 type AttachEventInit = MessageInitShape<typeof AttachEventSchema>;
 
@@ -1430,6 +1434,19 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       break;
     case "POST /__mock/status-kinds":
       json(res, 200, world.addStatusKinds());
+      break;
+    case "POST /__mock/workers": {
+      const state = (q.get("state") ?? "live") as WorkerCardState;
+      if (!WORKER_CARD_STATES.includes(state)) {
+        json(res, 400, { error: `state: one of ${WORKER_CARD_STATES.join(", ")}` });
+        break;
+      }
+      json(res, 200, world.addWorkerCard(state));
+      break;
+    }
+    case "POST /__mock/workers/step":
+      world.stepWorkerCard();
+      json(res, 200, {});
       break;
     case "POST /__mock/snooze-holds":
       json(res, 200, world.addSnoozeHolds());

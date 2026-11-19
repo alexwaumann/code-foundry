@@ -53,7 +53,7 @@ func TestAskWakesTheCreator(t *testing.T) {
 	items := e.waitItems(parent.ID, "the wake", func(items []Item) bool { return len(wakes(items)) == 1 })
 	w := wakes(items)[0]
 	for _, want := range []string{"asks you something and keeps working", "> Which port?\n> The spec says two.", "> I use 8080",
-		"If the assumption is right, do not answer", "thread send --id " + kid.ID + " --reply none"} {
+		"If the assumption is right, do not answer", "thread send --id " + kid.ID + " --reply none", "\n\n" + WakeReplyNote} {
 		if !strings.Contains(w.Text, want) {
 			t.Errorf("text lacks %q:\n%s", want, w.Text)
 		}

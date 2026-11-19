@@ -112,6 +112,12 @@ func TestWakeBatchWindow(t *testing.T) {
 			if got := wakeSizes(t, items); !slices.Equal(got, tt.want) {
 				t.Errorf("messages = %v, want %v:\n%s", got, tt.want, describeItems(items))
 			}
+			// One wake or a batch, the lead is told how its replies show (worker-card.md).
+			for _, w := range wakes(items) {
+				if !strings.HasSuffix(w.Text, "\n\n"+WakeReplyNote) {
+					t.Errorf("wake text does not end with the reply note:\n%s", w.Text)
+				}
+			}
 			for i, id := range b.subs[:sum(tt.want)] {
 				if got, _ := b.subscription(id); got.FiredCount != 1 {
 					t.Errorf("child %d fired %d times, want 1", i, got.FiredCount)

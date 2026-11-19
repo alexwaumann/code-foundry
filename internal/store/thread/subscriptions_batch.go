@@ -277,6 +277,9 @@ func (m *Manager) deliverThreadWakes(subscriber string, batch []delivery) {
 		about[i] = p.t.ID
 	}
 	msg = m.withWakeNote(subscriber, msg, about)
+	if t, ok := m.Snapshot().Thread(subscriber); ok && t.Kind != KindResident {
+		msg = withReplyNote(msg)
+	}
 	if _, err := m.Send(ctx, subscriber, msg); err != nil {
 		m.log.Warn("wake not delivered", "thread", subscriber, "subscriptions", subs, "err", err)
 		return

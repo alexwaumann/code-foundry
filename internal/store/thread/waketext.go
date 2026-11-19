@@ -26,6 +26,37 @@ func wakeTextMessage(title string, p any, body string) Message {
 	return msg
 }
 
+// NothingNew is the whole last message of a turn another thread started that had nothing
+// for the user. Claude Code does not let a turn end without visible text (it asks the model
+// again: "Your previous response had no visible output"), so this marks it, and the GUI
+// leaves such a turn out of the worker card's stacked replies (gui lib/workerRuns).
+const NothingNew = "[nothing new]"
+
+// WakeReplyNote ends what another thread's wake (a settle, a batch, a restart's thread
+// wakes, an ask) and a worker's message say to a thread that is not a resident: the GUI
+// draws the turns its workers start as one card with the replies stacked under it, so a
+// reply should be new and short, and a turn with nothing for the user ends with NothingNew
+// alone (docs/notes/worker-card.md). A resident has its own rules for its replies.
+const WakeReplyNote = "When another thread wakes you, the user sees only what is new: your reply is shown under the earlier ones. " +
+	"Reply only when there is something new the user should know, in a line or two, without repeating earlier replies. " +
+	"If the turn was only between you and the other thread, end it without a message to the user: make your last message only " + NothingNew + ", which the app does not show."
+
+// withReplyNote is msg with WakeReplyNote after its text.
+func withReplyNote(msg Message) Message {
+	msg.Text += "\n\n" + WakeReplyNote
+	return msg
+}
+
+// withWorkerReplyNote is the line a worker's message to its lead starts with (fromNote),
+// WakeReplyNote after it: that message starts a turn the GUI stacks like a wake's. A
+// resident lead, any other sender and an empty line are left as they are.
+func withWorkerReplyNote(to Thread, rel Relation, from string) string {
+	if from == "" || rel != RelationWorker || to.Kind == KindResident {
+		return from
+	}
+	return from + " " + WakeReplyNote
+}
+
 // lineBreaks are the ways a line can end that a reader may honour, turned into "\n" so none
 // slips past the quote mark.
 var lineBreaks = strings.NewReplacer("\r\n", "\n", "\r", "\n", "\u2028", "\n", "\u2029", "\n", "\v", "\n", "\f", "\n", "\u0085", "\n")

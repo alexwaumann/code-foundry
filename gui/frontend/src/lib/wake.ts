@@ -27,6 +27,8 @@ export interface WakeLine {
   summary: string;
   /** The payload pretty-printed for the expandable body (the raw text when it does not parse). */
   json: string;
+  /** A thread wake's `created_by` (who created the thread that woke this one); "" otherwise. */
+  createdBy: string;
 }
 
 type Obj = Record<string, unknown>;
@@ -66,13 +68,14 @@ function threadLine(t: Obj, json: string): WakeLine {
     // The daemon's own finished report carries no summary in the wake: the last message says it.
     summary: str(report?.summary) || firstLine(str(t.last_message)),
     json,
+    createdBy: str(t.created_by),
   };
 }
 
 /** A child's question (`thread ask`): it keeps working meanwhile, and waits on an answer. */
 function askLine(p: Obj, json: string): WakeLine {
   const id = str(p.thread);
-  return { tone: "attention", threadId: id, name: str(p.name) || id, detail: "asks", summary: firstLine(str(p.question)), json };
+  return { tone: "attention", threadId: id, name: str(p.name) || id, detail: "asks", summary: firstLine(str(p.question)), json, createdBy: "" };
 }
 
 function runLine(r: Obj, json: string): WakeLine {
@@ -88,6 +91,7 @@ function runLine(r: Obj, json: string): WakeLine {
     detail: code === null ? "" : `exit ${String(code)}`,
     summary: tail.at(-1) ?? "",
     json,
+    createdBy: "",
   };
 }
 
@@ -102,6 +106,7 @@ function restartLine(p: Obj, json: string): WakeLine {
     detail,
     summary: cut.map((t) => str(t.name) || str(t.id)).join(", "),
     json,
+    createdBy: "",
   };
 }
 
@@ -129,5 +134,5 @@ function lineOf(p: Obj | null, w: WakeView): WakeLine {
   if (run) return runLine(run, json);
   if (p?.kind === "restart") return restartLine(p, json);
   if (p?.kind === "ask") return askLine(p, json);
-  return { tone: "ok", threadId: "", name: "", detail: "", summary: w.title, json };
+  return { tone: "ok", threadId: "", name: "", detail: "", summary: w.title, json, createdBy: "" };
 }

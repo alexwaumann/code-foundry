@@ -1,5 +1,9 @@
 # Agents, PR 3: thread lineage in the GUI (2026-10-17)
 
+Update 2026-11-19 (`worker-card.md`): a wake from one of the thread's own workers is no longer
+drawn as a "Woken by" note when it starts a turn: the turns its workers start read as one card
+with the replies stacked under it. Other wakes keep the note.
+
 The third of five PRs that make threads drivable by agents (PR 1: `agents-1-wait-events.md`,
 PR 2: `agents-2-metadata.md`). PR 2 records who created a thread (`created_by`,
 `created_by_name`), why (`brief`) and writes a "Created by" note at the top of it; this PR

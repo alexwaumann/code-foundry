@@ -5,6 +5,15 @@
 For the code-foundry-orchestrate skill: what a `[code-foundry wake]` message tells you
 and what to do in the turn it starts. Every command runs in your Bash tool.
 
+## What the user sees of a wake turn
+
+The app draws the turns your children start as one card under your last turn for the user,
+with each wake turn's reply stacked under it. The user sees only what is new, so reply only
+when there is something new they should know, in a line or two, without repeating earlier
+replies. If the turn was only between you and a child (you answered its ask, sent it a fix),
+make your last message only `[nothing new]`: the app does not show it. A turn cannot end with
+no text at all.
+
 ## Following up from a wake turn
 
 From a wake turn, follow up with `thread send --id <child> --reply wanted` WITHOUT `--wait`
@@ -60,7 +69,7 @@ plain `--notify` when one piece starts the next.
 On a wake for a batch, look at the whole batch (`thread reports --created-by
 $CODE_FOUNDRY_THREAD --all`; wakes can arrive seconds apart), and talk to the user only
 when something needs them (a question, a failure, a conflict) or the batch is complete;
-otherwise end the turn silently or with one short line ("done pushed; 2 still working").
+otherwise end the turn with `[nothing new]` or one short line ("done pushed; 2 still working").
 No analysis of a partial batch. Do a check now or not at all: never promise one for
 later. For a chain (B builds on A): one line when A is done and B started; the roll-up
 once B is done. Routine approvals of a supervised child: no text at all.

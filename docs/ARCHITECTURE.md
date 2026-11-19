@@ -1041,7 +1041,8 @@ the new command goes without it, reported on its row.
   one three-dot menu with Open ▸ and Move to space ▸; `ThreadHeader.tsx`) over a virtualized
   work-log timeline built from the items' structure (`lib/threadTimeline.ts`; text deltas
   re-render only their row), turns that fold under their header the moment they finish (the
-  latest too), inline diffs on `components/code` (@pierre/diffs, themed from the app's syntax
+  latest too; the turns a thread's own workers start read as one card with the replies stacked
+  under it, `lib/workerRuns.ts`, `docs/notes/worker-card.md`), inline diffs on `components/code` (@pierre/diffs, themed from the app's syntax
   colours by `lib/codeTheme.ts`; `docs/notes/file-viewer-2-code-foundation.md`),
   lowlight-highlighted markdown in the terminal palette, and the
   follow-up composer with a pending permission or question docked into it. Its items live
