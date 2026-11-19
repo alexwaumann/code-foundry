@@ -13,7 +13,7 @@
  *   GET  /__mock/invocations | writes | threads | streams
  *   GET  /__mock/waits                            (every thread.wait invoked, held until its caller aborts it: mock/bridge.ts)
  *   GET  /__mock/fetches                          (every proxied page fetch: mock/proxyFetch.ts)
- *   POST /__mock/page?path=…[&owner=s-1|&owner=][&how=shown|written][&consent=allowed|refused|not-asked][&unavailable=<reason>]
+ *   POST /__mock/page?path=…[&owner=s-1|&owner=][&how=shown|written][&at=<ms it first did>][&consent=allowed|refused|not-asked][&unavailable=<reason>]
  *        (a page file's owner, the user's answer, or why it is no page: mock/pages.ts; answers its PageAccess)
  *   GET  /__mock/page/calls                       (page.allow / page.disallow as "allow <path>")
  *   POST /__mock/reset                            (a new home: layout.threads_open_as unset, so Panes)
@@ -360,7 +360,7 @@ world.pages.world = {
       return undefined;
     }
   },
-  lastShown: (abs) => world.logs.lastShown(abs),
+  shownBy: (abs) => world.logs.shownBy(abs),
   threadExists: (id) => world.threads.has(id),
 };
 
@@ -704,7 +704,13 @@ function routes(router: ConnectRouter): void {
     send: (req) => guard(() => (refuseSlashCommand(req.text, (name) => world.logs.offersSlashCommand(req.threadId, name)), { item: world.logs.send(req.threadId, req.text, req.attachments, req.composerText) })),
     slashCommands: (req) => guard(() => ({ commands: world.logs.slashCommandsOf(req.threadId) })),
     // code-foundry view.inline's RPC (docs/notes/inline-html.md).
-    showHtml: (req) => guard(() => ({ item: world.logs.showHtml(req.threadId, req.path, req.title) })),
+    showHtml: (req) =>
+      guard(() => {
+        const item = world.logs.showHtml(req.threadId, req.path, req.title);
+        // The thread owns the page now: a new owner is announced, as the daemon's Record does.
+        world.pages.shown(req.path, req.threadId);
+        return { item };
+      }),
     // What a thread's pages keep with cf.storage (mock/pageStorage.ts).
     pageStorage: (req) => guard(() => (world.thread(req.threadId), { values: pageStorageOf(req.threadId) })),
     setPageStorage: (req) => guard(() => (world.thread(req.threadId), { values: setPageStorage(req.threadId, req.key, req.value) })),
@@ -1671,7 +1677,7 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       json(res, 200, mockFetches());
       break;
     case "POST /__mock/page":
-      json(res, 200, world.pages.script(q.get("path") ?? "", { owner: q.get("owner"), how: q.get("how"), consent: q.get("consent"), unavailable: q.get("unavailable") }));
+      json(res, 200, world.pages.script(q.get("path") ?? "", { owner: q.get("owner"), how: q.get("how"), at: q.get("at"), consent: q.get("consent"), unavailable: q.get("unavailable") }));
       break;
     case "GET /__mock/page/calls":
       json(res, 200, world.pages.calls);

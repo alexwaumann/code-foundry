@@ -43,10 +43,14 @@
  * A run that saved a file (file.export) is shown to the user too, with a way to the file
  * (stores/pageSaved.ts); every other answer goes to the page only.
  *
- * Page storage (docs/notes/bridge-fix-storage.md): `cf:ready` carries the stored map and
- * every `cf:store` goes to the daemon (ThreadService.SetPageStorage for a thread's page,
- * PageService.SetPageStorage for a page alone), one at a time per thread (or page file) in
- * the order sent; every other frame of that thread (or file) hears the map after.
+ * Page storage (docs/notes/bridge-fix-storage.md, page-storage-per-file.md): `cf:ready`
+ * carries the stored map and every `cf:store` goes to the daemon: the page file's storage
+ * (PageService.PageStorage/SetPageStorage {path}) whichever thread the page acts for, when the
+ * daemon keeps storage per file (`storagePath`, and always for a page alone); its thread's
+ * (ThreadService) from an older daemon. One call at a time per storage, in the order sent;
+ * every other frame of that storage (a card and a tab of the same file) hears the map after.
+ * The storage is the frame's page's, so a document of the page that goes on to another file
+ * of its own in the frame keeps it.
  *
  * The daemon has the last word on a page's access (docs/notes/page-access-live.md): a page
  * alone's run names its page (pageContext's pagePath), and Invoke refuses it unless the user
@@ -176,12 +180,15 @@ function onStorageChain<T>(key: string, call: () => Promise<T>): Promise<T> {
  */
 export type PageBridge = { kind: "allowed"; path: string } | { kind: "ask" } | { kind: "refused"; error: BridgeError };
 
-/** Whom a host acts for now. */
-/** `quiet`: its refusals are the user's own answer (or no page at all), which the footer shows: not reported to the error strip. */
-type Mode = { kind: "thread"; id: string } | { kind: "page"; path: string } | { kind: "ask" } | { kind: "none"; error: BridgeError; quiet: boolean };
+/**
+ * Whom a host acts for now. A thread's `storage` is the page file its cf.storage is kept for
+ * (PageService), or null for its thread's own (an older daemon). `quiet`: its refusals are the
+ * user's own answer (or no page at all), which the footer shows: not reported to the error strip.
+ */
+type Mode = { kind: "thread"; id: string; storage: string | null } | { kind: "page"; path: string } | { kind: "ask" } | { kind: "none"; error: BridgeError; quiet: boolean };
 
-function modeOf(threadId: string | null, page: PageBridge | undefined): Mode {
-  if (threadId !== null) return { kind: "thread", id: threadId };
+function modeOf(threadId: string | null, page: PageBridge | undefined, storagePath = ""): Mode {
+  if (threadId !== null) return { kind: "thread", id: threadId, storage: storagePath || null };
   if (!page) return { kind: "none", error: NO_THREAD, quiet: false };
   if (page.kind === "allowed") return { kind: "page", path: page.path };
   if (page.kind === "ask") return { kind: "ask" };
@@ -190,16 +197,24 @@ function modeOf(threadId: string | null, page: PageBridge | undefined): Mode {
 
 function sameMode(a: Mode, b: Mode): boolean {
   if (a.kind !== b.kind) return false;
-  if (a.kind === "thread" && b.kind === "thread") return a.id === b.id;
+  if (a.kind === "thread" && b.kind === "thread") return a.id === b.id && a.storage === b.storage;
   if (a.kind === "page" && b.kind === "page") return a.path === b.path;
   if (a.kind === "none" && b.kind === "none") return a.error.message === b.error.message;
   return true;
 }
 
-/** The storage a mode reads and writes, or null for none. */
+/** The page file whose storage a mode reads and writes; null for its thread's own or none. */
+function storageFile(m: Mode): string | null {
+  if (m.kind === "thread") return m.storage;
+  if (m.kind === "page") return m.path;
+  return null;
+}
+
+/** The storage a mode reads and writes (a page file's, `page:<path>`, or a thread's own, `thread:<id>`), or null for none. */
 function storageKey(m: Mode): string | null {
+  const file = storageFile(m);
+  if (file !== null) return `page:${file}`;
   if (m.kind === "thread") return `thread:${m.id}`;
-  if (m.kind === "page") return `page:${m.path}`;
   return null;
 }
 
@@ -245,8 +260,14 @@ export interface BridgeHost {
 }
 
 export interface BridgeFrame {
-  /** The owning thread; null when the page has none (`page` then says what it may do). */
+  /** The thread the page acts for; null when it has none (`page` then says what it may do). */
   threadId: string | null;
+  /**
+   * The page file (PageAccess.path) a page acting for a thread keeps its cf.storage for, when
+   * the daemon keeps storage per file (PageAccess.storage_per_file); absent: its thread's own
+   * (an older daemon). A page with no thread keeps it for `page.path`.
+   */
+  storagePath?: string;
   /** What a page with no thread may do at first (setPage changes it); absent: nothing, refused with NO_THREAD (a daemon older than page ownership). */
   page?: PageBridge;
   /** The page's file name, quoted under "Asked by" in a confirmation. */
@@ -274,7 +295,7 @@ export interface BridgeFrame {
 
 export function createBridgeHost(frame: BridgeFrame): BridgeHost {
   const { threadId } = frame;
-  let mode: Mode = modeOf(threadId, frame.page);
+  let mode: Mode = modeOf(threadId, frame.page, frame.storagePath);
   /** The document now in the frame; a reply for an older one is dropped. */
   let doc = 0;
   let disposed = false;
@@ -374,7 +395,8 @@ export function createBridgeHost(frame: BridgeFrame): BridgeHost {
   const readStorage = (m: Mode): Promise<PageStorageValues> => {
     const key = storageKey(m);
     if (key === null) return Promise.resolve({});
-    return onStorageChain(key, () => (m.kind === "thread" ? getPageStorage(m.id) : m.kind === "page" ? getPageFileStorage(m.path) : Promise.resolve({})));
+    const file = storageFile(m);
+    return onStorageChain(key, () => (file !== null ? getPageFileStorage(file) : m.kind === "thread" ? getPageStorage(m.id) : Promise.resolve({})));
   };
 
   const ready = (forDoc: number) => {
@@ -413,15 +435,16 @@ export function createBridgeHost(frame: BridgeFrame): BridgeHost {
       post(forDoc, errorResult(id, noBridge() ?? NO_THREAD));
       return;
     }
-    const write = () => (m.kind === "thread" ? setPageStorage(m.id, key, value) : m.kind === "page" ? setPageFileStorage(m.path, key, value) : Promise.resolve({}));
+    const file = storageFile(m);
+    const write = () => (file !== null ? setPageFileStorage(file, key, value) : m.kind === "thread" ? setPageStorage(m.id, key, value) : Promise.resolve({}));
     void onStorageChain(sk, write).then(
       (values) => {
         post(forDoc, okResult(id, { message: "", resultJson: "" }));
         for (const hear of storageFrames.get(sk) ?? []) if (hear !== hearStorage) hear(values);
       },
       async (err: unknown) => {
-        if (m.kind === "page" && isConsentError(err)) stale();
-        post(forDoc, errorResult(id, m.kind === "page" ? pageErrorOf(err) : bridgeErrorOf(err)));
+        if (file !== null && isConsentError(err)) stale();
+        post(forDoc, errorResult(id, file !== null ? pageErrorOf(err) : bridgeErrorOf(err)));
         // The page applied the write already: put back what is stored.
         const values = await readStorage(m).catch(() => null);
         if (values) post(forDoc, { type: "cf:storage", values });

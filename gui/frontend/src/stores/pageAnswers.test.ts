@@ -8,7 +8,7 @@ afterEach(() => {
   usePageAnswers.setState({ byPath: {}, byThread: {}, all: 0 });
 });
 
-const count = (path: string, owner = "") => pageChanges(usePageAnswers.getState(), path, owner);
+const count = (path: string, owner = "") => pageChanges(usePageAnswers.getState(), path, owner ? [owner] : []);
 
 describe("pageAnswers: what makes a page's grant be read again", () => {
   it.each([
@@ -22,6 +22,14 @@ describe("pageAnswers: what makes a page's grant be read again", () => {
     applyPageEvent(ev);
     expect(count("/a.html", "s-1") - ownedBefore).toBe(owned);
     expect(count("/a.html") - unownedBefore).toBe(unowned + (ev.paths.includes("/a.html") ? 1 : 0));
+  });
+
+  it("any owner's removal counts for a page many threads own", () => {
+    const owners = () => pageChanges(usePageAnswers.getState(), "/a.html", ["s-1", "s-2"]);
+    applyPageEvent({ paths: [], removedThread: "s-2", all: false });
+    expect(owners()).toBe(1);
+    applyPageEvent({ paths: [], removedThread: "s-3", all: false });
+    expect(owners()).toBe(1);
   });
 
   it("an answer in this window counts at once", () => {

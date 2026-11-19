@@ -1,13 +1,15 @@
 /**
  * PageService and the page.* commands (docs/notes/page-ownership-daemon.md), as the GUI half
- * reads them (docs/notes/page-ownership-gui.md): who owns each page file and the user's answer
- * for a page no thread owns, with its storage and fetch.
+ * reads them (docs/notes/page-ownership-gui.md, page-storage-per-file.md): who owns each page
+ * file and the user's answer for a page no thread owns, with every page's storage and fetch.
  *
- * The owner is the thread that last showed the file (an html item in its log: view.inline, a
- * scripted thread's card) or opened it with view.open.page, latest wins; a file in a thread's
- * pages directory (~/.code-foundry/pages/<id>/) is that thread's otherwise. Tests script the
- * rest with POST /__mock/page (mock/server.ts): an owner (`owner=s-1&how=written`), an answer
- * (`consent=allowed|refused|not-asked`), a file that is no page (`unavailable=<reason>`).
+ * Every thread that showed the file (an html item in its log: view.inline, a scripted thread's
+ * card) or opened it with view.open.page owns it, and the thread whose pages directory
+ * (~/.code-foundry/pages/<id>/) holds it; that thread first, then by when each first showed
+ * it. A page's storage is its file's, whichever thread it acts for. Tests script the rest with
+ * POST /__mock/page (mock/server.ts): an owner (`owner=s-1&how=written`, `at=<ms>` when it first
+ * did; `owner=` forgets the recorded ones), an answer (`consent=allowed|refused|not-asked`), a file that is no page
+ * (`unavailable=<reason>`).
  * Paths are resolved through the mock's links (POST /__mock/fs/link), as the daemon follows
  * symlinks. Consent is enforced here as there: storage, fetch and a command naming a page
  * (UiContext.page_path) for a page not allowed are refused whatever the GUI sends. A new
@@ -31,8 +33,8 @@ export const PAGES_ROOT = `${HOME}/.code-foundry/pages`;
 export interface PageWorld {
   /** The path as the daemon resolves it (links followed); undefined when nothing is there. */
   resolve: (path: string) => string | undefined;
-  /** The thread whose log last showed the file, and when (ms); null for none. */
-  lastShown: (abs: string) => { threadId: string; at: number } | null;
+  /** Every thread whose log showed the file, and when it first did (ms). */
+  shownBy: (abs: string) => { threadId: string; at: number }[];
   threadExists: (id: string) => boolean;
 }
 
@@ -43,8 +45,8 @@ const MAX = 256 << 10;
 
 export class MockPages {
   world: PageWorld | null = null;
-  /** Owners recorded by view.open.page and scripted by tests, with when (ms). */
-  private owners = new Map<string, { thread: string; how: How; at: number }>();
+  /** Owners recorded by view.open.page and scripted by tests, per page and thread, with when each first did (ms). */
+  private owners = new Map<string, Map<string, { how: How; at: number }>>();
   private answers = new Map<string, Answer>();
   private unavailable = new Map<string, string>();
   private storage = new Map<string, Record<string, string>>();
@@ -75,25 +77,45 @@ export class MockPages {
     return abs;
   }
 
-  /** The thread that owns the resolved page and how, or null. */
-  private owner(abs: string): { thread: string; how: How | "pages-directory" } | null {
+  /** Every thread that owns the resolved page and how: its pages directory's thread first, then by when each first showed or wrote it. */
+  private ownersOf(abs: string): { thread: string; how: How | "pages-directory" }[] {
     const exists = (id: string) => this.world?.threadExists(id) ?? true;
-    const rec = this.owners.get(abs);
-    const shown = this.world?.lastShown(abs) ?? null;
-    const latest = rec && (!shown || rec.at >= shown.at) ? { thread: rec.thread, how: rec.how } : shown ? { thread: shown.threadId, how: "shown" as How } : null;
-    if (latest && exists(latest.thread)) return latest;
+    const claims = new Map<string, { how: How; at: number }>();
+    for (const s of this.world?.shownBy(abs) ?? []) claims.set(s.threadId, { how: "shown", at: s.at });
+    for (const [thread, c] of this.owners.get(abs) ?? []) {
+      const was = claims.get(thread);
+      claims.set(thread, { how: c.how, at: Math.min(was?.at ?? c.at, c.at) });
+    }
+    const out = [...claims]
+      .filter(([thread]) => exists(thread))
+      .sort(([a, x], [b, y]) => x.at - y.at || a.localeCompare(b))
+      .map(([thread, c]): { thread: string; how: How | "pages-directory" } => ({ thread, how: c.how }));
     const m = new RegExp(`^${PAGES_ROOT.replace(/[.]/g, "\\.")}/([^/]+)/`).exec(abs);
-    if (m?.[1] && exists(m[1])) return { thread: m[1], how: "pages-directory" };
-    return null;
+    const dir = m?.[1];
+    if (dir && exists(dir)) {
+      const i = out.findIndex((o) => o.thread === dir);
+      const first = i >= 0 ? out.splice(i, 1)[0] : { thread: dir, how: "pages-directory" as const };
+      if (first) out.unshift(first);
+    }
+    return out;
   }
 
   /** PageAccess for a resolved page. */
   private accessOf(abs: string): PageAccessInit {
-    const own = this.owner(abs);
+    const owners = this.ownersOf(abs);
     const answer = this.answers.get(abs);
     const answered = answer === "allowed" ? PageConsent.ALLOWED : answer === "refused" ? PageConsent.REFUSED : PageConsent.NOT_ASKED;
-    const source = own?.how === "shown" ? PageOwnerSource.SHOWN : own?.how === "written" ? PageOwnerSource.WRITTEN : own ? PageOwnerSource.PAGES_DIRECTORY : PageOwnerSource.UNSPECIFIED;
-    return { path: abs, ownerThread: own?.thread ?? "", ownerSource: source, consent: own ? PageConsent.OWNED : answered, answer: answered };
+    const sourceOf = (how: string) => (how === "shown" ? PageOwnerSource.SHOWN : how === "written" ? PageOwnerSource.WRITTEN : PageOwnerSource.PAGES_DIRECTORY);
+    const first = owners[0];
+    return {
+      path: abs,
+      ownerThread: first?.thread ?? "",
+      ownerSource: first ? sourceOf(first.how) : PageOwnerSource.UNSPECIFIED,
+      owners: owners.map((o) => ({ threadId: o.thread, source: sourceOf(o.how) })),
+      storagePerFile: true,
+      consent: first ? PageConsent.OWNED : answered,
+      answer: answered,
+    };
   }
 
   /** PreviewFileResponse.page: never an error; a file that is no page is UNAVAILABLE with why. */
@@ -109,10 +131,10 @@ export class MockPages {
     return { page: this.accessOf(this.resolved(path)) };
   }
 
-  /** The page's storage key once the user allowed it (or a thread owns it); the daemon's consent errors otherwise. */
+  /** The page's storage key once a thread owns it or the user allowed it; the daemon's consent errors otherwise. */
   private allowed(path: string): string {
     const abs = this.resolved(path);
-    if (this.owner(abs)) return abs;
+    if (this.ownersOf(abs).length > 0) return abs;
     const a = this.answers.get(abs);
     if (a === "refused") throw new ConnectError("the user did not allow this page", Code.PermissionDenied);
     if (a !== "allowed") throw new ConnectError("the user has not answered for this page yet", Code.FailedPrecondition);
@@ -166,16 +188,18 @@ export class MockPages {
   shown(path: string, thread: string): void {
     try {
       const abs = this.resolved(path);
-      const before = this.owner(abs)?.thread;
-      this.owners.set(abs, { thread, how: "shown", at: Date.now() });
-      if (before !== thread) this.publish({ paths: [abs] });
+      const had = this.ownersOf(abs).some((o) => o.thread === thread);
+      const recorded = this.owners.get(abs) ?? new Map<string, { how: How; at: number }>();
+      recorded.set(thread, { how: "shown", at: recorded.get(thread)?.at ?? Date.now() });
+      this.owners.set(abs, recorded);
+      if (!had) this.publish({ paths: [abs] });
     } catch {
       // Not a page: nothing to record, as the daemon.
     }
   }
 
   /** POST /__mock/page: scripts one page's owner, answer or unavailability. */
-  script(path: string, q: { owner?: string | null; how?: string | null; consent?: string | null; unavailable?: string | null }): PageAccessInit {
+  script(path: string, q: { owner?: string | null; how?: string | null; at?: string | null; consent?: string | null; unavailable?: string | null }): PageAccessInit {
     const abs = path.startsWith("~/") ? HOME + path.slice(1) : path;
     if (q.unavailable != null) {
       this.unavailable.set(abs, q.unavailable);
@@ -184,7 +208,11 @@ export class MockPages {
     this.unavailable.delete(abs);
     const real = this.world?.resolve(abs) ?? abs;
     if (q.owner === "") this.owners.delete(real);
-    else if (q.owner) this.owners.set(real, { thread: q.owner, how: q.how === "written" ? "written" : "shown", at: Date.now() });
+    else if (q.owner) {
+      const recorded = this.owners.get(real) ?? new Map<string, { how: How; at: number }>();
+      recorded.set(q.owner, { how: q.how === "written" ? "written" : "shown", at: q.at ? Number(q.at) : (recorded.get(q.owner)?.at ?? Date.now()) });
+      this.owners.set(real, recorded);
+    }
     if (q.consent === "allowed" || q.consent === "refused") this.answers.set(real, q.consent);
     else if (q.consent === "not-asked") this.answers.delete(real);
     this.publish({ paths: [real] });
@@ -198,7 +226,8 @@ export class MockPages {
       const p = this.getPage(path).page;
       const consent = { [PageConsent.OWNED]: "owned", [PageConsent.ALLOWED]: "allowed", [PageConsent.REFUSED]: "refused", [PageConsent.NOT_ASKED]: "not-asked" } as Record<number, string>;
       const how = { [PageOwnerSource.SHOWN]: "shown", [PageOwnerSource.WRITTEN]: "written", [PageOwnerSource.PAGES_DIRECTORY]: "pages-directory" } as Record<number, string>;
-      return JSON.stringify({ path: p.path, owner_thread: p.ownerThread, owner_source: how[p.ownerSource ?? 0] ?? "", consent: consent[p.consent ?? 0] ?? "", answer: consent[p.answer ?? 0] ?? "" });
+      const owners = (p.owners ?? []).map((o) => ({ thread: o.threadId ?? "", source: how[o.source ?? 0] ?? "" }));
+      return JSON.stringify({ path: p.path, owner_thread: p.ownerThread, owner_source: how[p.ownerSource ?? 0] ?? "", owners, consent: consent[p.consent ?? 0] ?? "", answer: consent[p.answer ?? 0] ?? "" });
     };
     const answer = (ctx: UiContext | undefined, args: Record<string, string>, a: Answer) => {
       // The answer is the user's about the page's script: never the page's own call.

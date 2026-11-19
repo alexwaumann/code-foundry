@@ -242,6 +242,30 @@ test("the panel copy names the page by its title and counts its errors too", asy
   await expect(page.getByTestId("file-html-footer").getByTestId("page-errors")).toHaveText("1");
 });
 
+// docs/notes/page-storage-per-file.md (thread-pages fuzz #1, author-docs #1): another thread
+// showed the page first, and the card's "Open in a tab" still opens the same page: the card's
+// thread, the same storage, nobody else named.
+test("the card and the tab opened from it are one page: the card's thread and one storage, whoever showed the page first", async ({ page }) => {
+  await openBridgeThread(page);
+  await expect(doc(page).locator("#visits")).toHaveText("1");
+  const threadName = (await doc(page).locator("#thread").textContent()) ?? "";
+  await mockPost(`page?path=${encodeURIComponent(`${CF}/docs/bridge.html`)}&owner=s-1&how=written&at=1`);
+  await card(page).getByTestId("thread-html-panel").click();
+  const inner = page.frameLocator('[data-testid="file-html-frame"]');
+  await expect(inner.locator("body")).toHaveAttribute("data-ready", "1");
+  await expect(inner.locator("#thread")).toHaveText(threadName);
+  await expect(inner.locator("#visits")).toHaveText("2");
+  await expect(page.getByTestId("file-html-footer-owner")).toHaveCount(0);
+  if (shots) {
+    for (const scheme of ["dark", "light"] as const) {
+      await page.emulateMedia({ colorScheme: scheme });
+      await page.waitForTimeout(600);
+      await page.screenshot({ path: `${shots}/page-card-and-tab-${scheme}.png` });
+    }
+    await page.emulateMedia({ colorScheme: null });
+  }
+});
+
 /** The frame's nonce, as the page reads it from its own URL (lib/bridge.ts withNonce). */
 const NONCE = () => /[?&]cf-nonce=([^&]+)/.exec(location.search)?.[1] ?? "";
 
@@ -302,8 +326,9 @@ async function navigatedTo(page: Page, frame: Frame, file: RegExp): Promise<void
   await expect(doc(page).locator("body")).toHaveAttribute("data-ready", "1");
 }
 
-test("a page's own other file keeps the bridge, followed by a link or set as its location", async ({ page }) => {
+test("a page's own other file keeps the bridge and the page's storage, followed by a link or set as its location", async ({ page }) => {
   await openBridgeThread(page);
+  await expect(doc(page).locator("#visits")).toHaveText("1");
   const frame = await cardFrame(page);
   const nonce = await doc(page).locator("body").evaluate(NONCE);
   // A link the page adds, followed by the user's click.
@@ -320,6 +345,9 @@ test("a page's own other file keeps the bridge, followed by a link or set as its
   // The nonce in the query; the fragment is the page's own.
   expect(await doc(page).locator("body").evaluate(() => location.search)).toBe(`?cf-nonce=${nonce}`);
   expect(await doc(page).locator("body").evaluate(() => location.hash)).toBe("#rows");
+  // Still the page the frame opened on: its storage, not one of the other file's own
+  // (docs/notes/page-storage-per-file.md).
+  await expect(doc(page).locator("#visits")).toHaveText("2");
   await doc(page).locator("#list").click();
   await expect(doc(page).locator("#list-out")).toHaveText(/"threads":\d+/);
   // Back to the first file by script.
@@ -329,6 +357,7 @@ test("a page's own other file keeps the bridge, followed by a link or set as its
   await navigatedTo(page, frame, /\/bridge\.html$/);
   expect(await doc(page).locator("body").evaluate(() => location.pathname)).toMatch(/\/bridge\.html$/);
   expect(await doc(page).locator("body").evaluate(NONCE)).toBe(nonce);
+  await expect(doc(page).locator("#visits")).toHaveText("3");
   await doc(page).locator("#list").click();
   await expect(doc(page).locator("#list-out")).toHaveText(/"threads":\d+/);
 });

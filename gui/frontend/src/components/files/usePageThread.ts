@@ -12,13 +12,17 @@ const THREAD_KEY = "thread:";
 /**
  * Whom a File tab's HTML page acts for, and what it may do (docs/notes/page-ownership-gui.md).
  *
- * The daemon decides (the grant's `page`, FilePreview.page; docs/notes/page-ownership-daemon.md):
- * a page a thread owns (it last showed or wrote it, or it lies in its pages directory) gets
- * that thread's bridge in any tab, linked to that thread, to another or to none, whether or
- * not the thread's view was ever open; `actsFor` names the owner when it is not the tab's
- * own thread. A page no thread owns gets the bridge without a thread once the user allowed
- * it, and asks (`ask`) when they have not answered; one they refused, or a file that is no
- * page (`unavailable`), gets every call refused with the reason.
+ * The daemon decides (the grant's `page`, FilePreview.page; docs/notes/page-ownership-daemon.md,
+ * page-storage-per-file.md): a page threads own (each that showed or wrote it, and the thread
+ * whose pages directory holds it) acts for the tab's own thread when that is one of them, and
+ * otherwise for the page's first owner (`ownerThread`), which stays the same whoever shows the
+ * page later, whether or not the thread's view was ever open; `actsFor` names that thread when
+ * it is not the tab's own. So a tab opened from a thread's card (linked to that thread, which
+ * owns the page it showed) acts for the card's thread, as the card does. A page no thread owns
+ * gets the bridge without a thread once the user allowed it, and asks (`ask`) when they have
+ * not answered; one they refused, or a file that is no page (`unavailable`), gets every call
+ * refused with the reason. Whatever it acts for, its cf.storage is its file's (`storagePath`)
+ * when the daemon keeps storage per file.
  *
  * From a daemon older than ownership (no `page`) it is as before (docs/notes/bridge-2-gui.md):
  * the thread whose panel holds the tab, when that thread showed this very file as a page (an
@@ -34,7 +38,7 @@ export function usePageThread(abs: string, own?: { title: string }, preview?: Fi
   const key = usePanelKey();
   const tabThread = key.startsWith(THREAD_KEY) ? key.slice(THREAD_KEY.length) : "";
   const access = preview?.page ?? null;
-  const owner = access?.consent === "owned" ? access.ownerThread : "";
+  const owner = access?.consent === "owned" ? actingOwner(access, tabThread) : "";
   const logThread = owner || tabThread;
   // The log's items change as the thread streams; the scan runs only when they do.
   const byId = useThreadStore((s) => (logThread ? s.logs[logThread]?.byId : undefined));
@@ -58,29 +62,52 @@ export function usePageThread(abs: string, own?: { title: string }, preview?: Fi
     // An older daemon: the tab's thread, when its log, the page flag or its pages directory says so.
     const inPages = pageThread !== "" && pageThread === tabThread;
     const legacy = tabThread !== "" && abs !== "" && (ownTitle !== undefined || inPages || shown !== null);
-    return { thread: legacy ? tabThread : null, title: legacy ? title : "", actsFor: "", access: null };
+    return { thread: legacy ? tabThread : null, title: legacy ? title : "", actsFor: "", access: null, storagePath: null };
   }, [access, tabThread, ownTitle, shown, pageThread, abs]);
+}
+
+/**
+ * The owner a page acts for in a view of `viewThread` ("" for none): that thread when it owns
+ * the page, else the page's first owner. "" for a page no thread owns.
+ */
+export function actingOwner(access: PageAccessView, viewThread: string): string {
+  if (viewThread !== "" && access.owners.some((o) => o.thread === viewThread)) return viewThread;
+  return access.ownerThread;
+}
+
+/**
+ * The page file a page acting for a thread keeps its cf.storage for: its own path when the
+ * daemon keeps storage per file and the page may use it (owned, or allowed); null for the
+ * thread's own (an older daemon, a file that is no page).
+ */
+export function pageStoragePath(access: PageAccessView | null | undefined): string | null {
+  if (!access?.storagePerFile || !access.path) return null;
+  return access.consent === "owned" || access.consent === "allowed" ? access.path : null;
 }
 
 function fromAccess(access: PageAccessView, tabThread: string, title: string): PageOf {
   switch (access.consent) {
-    case "owned":
-      return { thread: access.ownerThread, title, actsFor: access.ownerThread === tabThread ? "" : access.ownerThread, access };
+    case "owned": {
+      const thread = actingOwner(access, tabThread);
+      return { thread, title, actsFor: thread === tabThread ? "" : thread, access, storagePath: pageStoragePath(access) };
+    }
     case "allowed":
-      return { thread: null, title, actsFor: "", access, bridge: { kind: "allowed", path: access.path } };
+      return { thread: null, title, actsFor: "", access, bridge: { kind: "allowed", path: access.path }, storagePath: null };
     case "not-asked":
-      return { thread: null, title, actsFor: "", access, bridge: { kind: "ask" } };
+      return { thread: null, title, actsFor: "", access, bridge: { kind: "ask" }, storagePath: null };
     case "refused":
-      return { thread: null, title, actsFor: "", access, bridge: { kind: "refused", error: NOT_ALLOWED } };
+      return { thread: null, title, actsFor: "", access, bridge: { kind: "refused", error: NOT_ALLOWED }, storagePath: null };
     case "unavailable":
-      return { thread: null, title, actsFor: "", access, bridge: { kind: "refused", error: pageUnavailable(access.unavailableReason) } };
+      return { thread: null, title, actsFor: "", access, bridge: { kind: "refused", error: pageUnavailable(access.unavailableReason) }, storagePath: null };
   }
 }
 
 /** Whom a File tab's page acts for and what it may do. */
 export interface PageOf {
-  /** The thread whose bridge the page gets; null for none. */
+  /** The thread the page acts for (its bridge); null for none. */
   thread: string | null;
+  /** The page file whose storage a page acting for `thread` keeps (HtmlFrame's `storagePath`); null: the thread's own (an older daemon) or no thread. */
+  storagePath: string | null;
   /** The title it was shown with; "" for none. */
   title: string;
   /** The thread the page acts for when that is not the tab's own thread (or the tab has none), to name it; "" otherwise. */

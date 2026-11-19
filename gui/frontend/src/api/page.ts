@@ -18,13 +18,26 @@ export type PageConsentView = "owned" | "allowed" | "refused" | "not-asked" | "u
 /** How its owner came to own a page; "" for no owner. */
 export type PageOwnerSourceView = "shown" | "written" | "pages-directory" | "";
 
+/** One thread that owns a page (PageOwner). */
+export interface PageOwnerView {
+  thread: string;
+  source: Exclude<PageOwnerSourceView, "">;
+}
+
 /** PageAccess: what the daemon says about one page file. */
 export interface PageAccessView {
   /** The file's resolved absolute path: what storage, fetch and the page.* commands are sent. "" with `unavailable`. */
   path: string;
-  /** The thread whose bridge the page gets, whatever tab shows it; "" for none. */
+  /** The page's first owner: the thread it acts for where no owner of its own is given (a File tab of another thread); "" for none. */
   ownerThread: string;
   ownerSource: PageOwnerSourceView;
+  /**
+   * Every thread that owns the page, the first first (docs/notes/page-storage-per-file.md). From
+   * a daemon older than many owners: the owner alone.
+   */
+  owners: readonly PageOwnerView[];
+  /** The page keeps cf.storage for its file (PageService) whichever thread it acts for; false from an older daemon (a thread's page keeps its thread's). */
+  storagePerFile: boolean;
   consent: PageConsentView;
   /** The user's own answer, kept while a thread owns the page too. */
   answer: Exclude<PageConsentView, "owned">;
@@ -53,10 +66,17 @@ export function toPageAccessView(p: PageAccess | undefined): PageAccessView | nu
   const consent = p ? CONSENT[p.consent] : null;
   if (!p || !consent) return null;
   const answer = CONSENT[p.answer];
+  const owners = p.owners.flatMap((o) => {
+    const source = SOURCE[o.source];
+    return o.threadId && source ? [{ thread: o.threadId, source }] : [];
+  });
+  const ownerSource = SOURCE[p.ownerSource];
   return {
     path: p.path,
     ownerThread: p.ownerThread,
-    ownerSource: SOURCE[p.ownerSource],
+    ownerSource,
+    owners: owners.length > 0 || !p.ownerThread ? owners : [{ thread: p.ownerThread, source: ownerSource || "shown" }],
+    storagePerFile: p.storagePerFile,
     consent,
     answer: answer === null || answer === "owned" ? "not-asked" : answer,
     unavailableReason: p.unavailableReason,
@@ -110,17 +130,27 @@ export function pageAccessFromJson(json: string): PageAccessView | null {
   const answer = str("answer");
   const source = str("owner_source");
   if (str("path") === "" || !CONSENTS.includes(consent)) return null;
+  const ownerSource = (SOURCES.includes(source) ? source : "") as PageOwnerSourceView;
+  const owners = (Array.isArray(o.owners) ? (o.owners as unknown[]) : []).flatMap((x): PageOwnerView[] => {
+    if (typeof x !== "object" || x === null) return [];
+    const { thread, source: s } = x as Record<string, unknown>;
+    return typeof thread === "string" && thread !== "" && typeof s === "string" && s !== "" && SOURCES.includes(s) ? [{ thread, source: s as PageOwnerView["source"] }] : [];
+  });
+  const owner = str("owner_thread");
   return {
     path: str("path"),
-    ownerThread: str("owner_thread"),
-    ownerSource: (SOURCES.includes(source) ? source : "") as PageOwnerSourceView,
+    ownerThread: owner,
+    ownerSource,
+    owners: owners.length > 0 || !owner ? owners : [{ thread: owner, source: ownerSource || "shown" }],
+    // The commands' JSON does not say; the grant (PreviewFile) does, and is what a frame reads.
+    storagePerFile: false,
     consent: consent as PageConsentView,
     answer: (answer === "allowed" || answer === "refused" ? answer : "not-asked") as PageAccessView["answer"],
     unavailableReason: "",
   };
 }
 
-/** PageService.PageStorage: the whole storage of a page no thread owns. */
+/** PageService.PageStorage: the whole storage of a page file, whichever thread it acts for. */
 export async function getPageFileStorage(path: string, conn: DaemonConnection = daemon): Promise<PageStorageValues> {
   const c = await conn.client(PageService);
   const res = await c.pageStorage({ path });

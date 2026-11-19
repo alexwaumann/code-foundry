@@ -4,7 +4,7 @@
  * (docs/notes/page-ownership-gui.md, page-access-live.md). Three things count:
  *
  * - the daemon's page source (EventService, applyPageEvent): a page's new owner or answer,
- *   from any window, the CLI or a thread; a removed thread, whose pages have no owner now;
+ *   from any window, the CLI or a thread; a removed thread, which its pages lost as an owner;
  *   and on (re)connect, every page;
  * - an answer given in this window (answerPage), at once, before the event comes;
  * - a call the daemon refused because the page may not use Code Foundry any more (the bridge
@@ -19,7 +19,7 @@ import { runCommandForResult } from "./commands";
 interface PageAnswersState {
   /** How many times each page (its resolved path) changed. */
   byPath: Readonly<Record<string, number>>;
-  /** How many times each thread's pages lost it as their owner (it was removed). */
+  /** How many times each thread's pages lost it as an owner (it was removed). */
   byThread: Readonly<Record<string, number>>;
   /** How many times every page may have changed. */
   all: number;
@@ -28,11 +28,13 @@ interface PageAnswersState {
 export const usePageAnswers = create<PageAnswersState>()(() => ({ byPath: {}, byThread: {}, all: 0 }));
 
 /**
- * The count a grant of the page at `path` owned by `owner` ("" for none) follows: it grows
- * whenever the daemon's word about that page may have changed.
+ * The count a grant of the page at `path` owned by `owners` (none: no thread owns it) follows:
+ * it grows whenever the daemon's word about that page may have changed.
  */
-export function pageChanges(s: PageAnswersState, path: string, owner: string): number {
-  return s.all + (s.byPath[path] ?? 0) + (owner ? (s.byThread[owner] ?? 0) : 0);
+export function pageChanges(s: PageAnswersState, path: string, owners: readonly string[]): number {
+  let n = s.all + (s.byPath[path] ?? 0);
+  for (const o of owners) n += s.byThread[o] ?? 0;
+  return n;
 }
 
 function bump(counts: Readonly<Record<string, number>>, keys: readonly string[]): Readonly<Record<string, number>> {

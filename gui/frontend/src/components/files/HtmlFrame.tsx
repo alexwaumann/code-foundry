@@ -147,6 +147,7 @@ export function HtmlFrame({
   onResize,
   testId,
   thread = null,
+  storagePath = null,
   page,
   pagePath,
   onAsk,
@@ -159,8 +160,14 @@ export function HtmlFrame({
   /** The directory the page's grant serves (none for a one-file grant): the files its document loaded under it are watched. */
   scope?: string | null;
   name: string;
-  /** The thread that shows the page, whose verbs and state its bridge may use; null for none. */
+  /** The thread the page acts for, whose verbs and state its bridge may use; null for none. */
   thread?: string | null;
+  /**
+   * The page file whose cf.storage a page acting for `thread` keeps (PageAccess.path, when the
+   * daemon keeps storage per file; docs/notes/page-storage-per-file.md); null: the thread's own
+   * (an older daemon). A change loads the page again under it.
+   */
+  storagePath?: string | null;
   /** What a page with no thread may do (usePageThread); absent: nothing, every call refused. */
   page?: PageBridge | undefined;
   /** The page's file, named in a confirmation of a page with no thread. */
@@ -251,7 +258,7 @@ export function HtmlFrame({
     },
     [report],
   );
-  // The bridge's host for this frame: one per owning thread and page; gone on unmount. A
+  // The bridge's host for this frame: one per thread it acts for, storage and page; gone on unmount. A
   // page without a thread is in an opaque origin, which messages name "null" and a post
   // cannot target.
   const opaque = thread === null;
@@ -300,6 +307,7 @@ export function HtmlFrame({
     const first = pageRef.current;
     const h = createBridgeHost({
       threadId: thread,
+      ...(storagePath ? { storagePath } : {}),
       ...(first ? { page: first } : {}),
       get pageName() {
         return nameRef.current;
@@ -325,7 +333,7 @@ export function HtmlFrame({
       attention.stop();
       if (host.current === h) host.current = null;
     };
-  }, [thread, target, report]);
+  }, [thread, storagePath, target, report]);
   // The user answered (or the grant changed): the host is told; a document that had its ready loads again.
   useEffect(() => {
     const p = pageRef.current;
@@ -408,7 +416,7 @@ export function HtmlFrame({
   }, [files, target]);
   // The frame's load: visible once its `load` came (or FRAME_REVEAL_MS passed). A new grant's
   // URL for the same frame (a daemon restart) keeps it visible: that page is up.
-  const frameKey = `${String(load)}:${thread ?? ""}`;
+  const frameKey = `${String(load)}:${thread ?? ""}:${storagePath ?? ""}`;
   const [visibleKey, setVisibleKey] = useState<string | null>(null);
   // The frame load whose document went to another site.
   const [leftKey, setLeftKey] = useState<string | null>(null);

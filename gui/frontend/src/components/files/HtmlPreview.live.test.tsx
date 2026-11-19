@@ -35,7 +35,7 @@ vi.mock("@/api/pageStorage", () => ({ getPageStorage: () => Promise.resolve({}),
 
 const REAL = "/Users/me/real/board.html";
 const URL_ = "http://127.0.0.1:1/preview/g/board.html";
-const access = (over: Partial<PageAccessView> = {}): PageAccessView => ({ path: REAL, ownerThread: "", ownerSource: "", consent: "not-asked", answer: "not-asked", unavailableReason: "", ...over });
+const access = (over: Partial<PageAccessView> = {}): PageAccessView => ({ path: REAL, ownerThread: "", ownerSource: "", owners: [], storagePerFile: false, consent: "not-asked", answer: "not-asked", unavailableReason: "", ...over });
 const grant = (page: PageAccessView | null): FilePreview => ({ url: URL_, scope: "/Users/me/real", singleFile: false, pageThread: "", page });
 const ALLOWED = access({ consent: "allowed", answer: "allowed" });
 const REFUSED = access({ consent: "refused", answer: "refused" });
