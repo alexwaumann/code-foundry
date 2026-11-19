@@ -55,7 +55,8 @@ Two findings of the pages fuzz pass (bridge-gui #1 and #2, the stale-state halve
   thread showed later, which is the pending ownership decision, not this fix.
 - **The ownership rule and storage keys are unchanged.** Which thread owns a page shown by
   several, and whether storage is per thread or per file (bridge-gui #1's second half and #5),
-  wait for that decision; tabs now only follow whatever the daemon says.
+  waited for that decision; tabs now only follow whatever the daemon says. Decided since:
+  `page-storage-per-file.md` (every thread that showed it owns it; storage per file).
 - **A notification, not the access.** The event carries no answer: a client always reads the
   grant, so there is one source of truth and nothing to keep in step with `PreviewFile`.
 - **`cf.on` sources stay GUI-side.** They read the GUI's own slices, so they stop when the host

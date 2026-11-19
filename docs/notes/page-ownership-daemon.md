@@ -1,5 +1,10 @@
 # Page ownership in the daemon (the daemon half)
 
+> Changed by `page-storage-per-file.md`: every thread that showed or wrote a page owns it (one
+> `page_owners` row each; the first owner is the page's default, not the latest), removing a thread
+> removes only its claim, and a page's storage is its file's whatever owns it. Rules 1 and 2, the
+> tab section, the OWNED row of the contract and "On disk" below are as they were then.
+
 A page got its thread's bridge only when the GUI's in-memory log of the thread showed the
 page (`usePageThread`), so a page outside a thread's pages directory lost its bridge
 whenever the thread's view had not been open in this window (`page-bridge-without-log.md`

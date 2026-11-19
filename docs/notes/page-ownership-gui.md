@@ -1,5 +1,10 @@
 # Page ownership in the GUI (the GUI half)
 
+> Changed by `page-storage-per-file.md`: a File tab acts for its own thread when that thread owns
+> the page (else the first owner), a card for its thread, and both keep `cf.storage` for the page
+> file (`PageService`) when the daemon says `storage_per_file`. The `owned` row and the storage row
+> of the tables below are as they were then.
+
 The daemon keeps who owns every page file and the user's answer for a page no thread owns
 (`page-ownership-daemon.md`, the contract). The File tab's frame now takes both from the
 preview grant (`FilePreview.page`) and never reads a thread's log to decide which thread a
