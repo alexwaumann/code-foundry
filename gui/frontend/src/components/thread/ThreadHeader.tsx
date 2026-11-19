@@ -27,7 +27,7 @@ const CHIP = "flex h-6 min-w-0 items-center gap-1 rounded-md bg-cf-control-hover
  * (while it can move) opens the move picker, which the menu's "Move to project…" also opens.
  * While a move is in flight (sent, or the daemon's pending move), it says where to.
  */
-function PlaceChip({ threadId }: { threadId: string }) {
+export function PlaceChip({ threadId }: { threadId: string }) {
   // The sidebar row's branch (lib/threadRow): the checkout's, else the short head or folder.
   const { branch, noProject } = useThreadPlace(threadId);
   const movable = useCanMove(threadId);
@@ -72,7 +72,7 @@ function PlaceChip({ threadId }: { threadId: string }) {
  * The thread's one menu (docs/notes/shell-model.md, "The thread's header") behind the header's
  * "…": ThreadMenuBody, which a right click on the thread's tab shows too.
  */
-function ThreadHeaderMenu({ threadId, paneId }: { threadId: string; paneId: string }) {
+export function ThreadHeaderMenu({ threadId, paneId }: { threadId: string; paneId: string }) {
   const spaceId = useLayoutStore((s) => s.panes[paneId]?.spaceId ?? "");
   // The pane's tab of this thread when it is a preview: "Keep open" keeps it (tab.keep).
   const preview = useLayoutStore((s) => {

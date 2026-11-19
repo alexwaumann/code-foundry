@@ -1096,6 +1096,8 @@ export class World {
     this.notifications.reset();
     this.themes.reset();
     this.layout.reset();
+    // The setting is back to its default, so the next switch is seen as one.
+    this.threadsOpenAsSeen = null;
     const started = new Date(Date.now() - 42 * 60_000);
     // A shell terminal.new started on the Projects page for feat/sidebar (worktree-owned).
     this.addTerm({ id: "t-top", argv: ["top"], cwd: `${CFW}/feat-sidebar`, title: "", kind: "top", labels: shellLabels("", "repo-cf", `${CFW}/feat-sidebar`), startedAt: started });

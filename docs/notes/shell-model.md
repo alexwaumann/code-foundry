@@ -399,7 +399,13 @@ A user setting (`layout.threads_open_as`, Appearance › Panes) says how a threa
     replace the target thread pane's thread with it (a draft whose tab is replaced stays listed);
     sending turns it into the thread in place. A "+" of a pane of other tabs opens it in a new
     thread pane on that pane's left.
-  - **Smart swap** is on, whatever its setting says.
+  - **Smart swap** is on, whatever its setting says; its row in Settings shows it on and
+    disabled, and keeps the user's own value for Tabs.
+  - **A thread pane's header.** A pane that shows one thread (or a composer) draws one row in
+    place of its tab strip and the thread's header: the thread's icon with its status dot, its
+    name, its branch chip; then the "+", the thread info toggle, the thread's menu, collapse and
+    full screen. No close button (the row's context menu and the "…" menu have Close). The row
+    drags the pane. Panes of other tabs keep their strips (docs/notes/threads-open-as-2-gui.md).
   - **Moving a thread** to another space opens it there in place of that space's thread pane's
     thread.
 - **Single**: as Panes, with at most one thread pane per space. Every open replaces it, the
@@ -412,7 +418,8 @@ A user setting (`layout.threads_open_as`, Appearance › Panes) says how a threa
   into a new pane on its right (the thread keeps its pane). To Single, each space also keeps only
   the thread pane focused most recently. Toward Tabs nothing changes. Nothing is deleted: closed
   threads stay in the sidebar with their remembered sets. `layout.threads-open-as.preview --to X`
-  says what a switch would close and move, without changing anything. A layout stored under one
+  says what a switch would close and move, without changing anything; the settings page shows
+  it in a confirm dialog before a switch that closes or moves something. A layout stored under one
   mode and loaded under another (the settings file edited while the app was closed) is converted
   as it loads.
 

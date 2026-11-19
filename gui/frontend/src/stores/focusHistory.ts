@@ -26,9 +26,10 @@ import { focusedTab } from "@/stores/selectionBridge";
 import { useLayoutStore, type LayoutState } from "@/stores/layout";
 import { useSettingsStore } from "@/stores/settings";
 import { requestPaneFocus } from "@/stores/shellView";
+import { THREADS_OPEN_AS_KEY } from "@/shell/threadsOpenAs";
 
 /** The setting that makes an open replace a thread pane's thread (internal/layout modes.go). */
-export const THREADS_OPEN_AS_KEY = "layout.threads_open_as";
+export { THREADS_OPEN_AS_KEY };
 
 /** Whether a value of layout.threads_open_as replaces: panes and single. */
 export function threadsReplace(value: string | undefined): boolean {

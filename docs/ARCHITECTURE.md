@@ -1616,7 +1616,10 @@ what depends on the drawn frame (rails, full screen, tab fitting, drag targets, 
   and placement keeps other tabs out of thread panes; `single` allows one thread pane per space.
   Under both, every op ends with `conform`, which is also the conversion (the `conform` op,
   applied by the daemon when the setting changes and by the store at load), and smart swap is
-  forced on (`docs/notes/threads-open-as-1-rules.md`).
+  forced on (`docs/notes/threads-open-as-1-rules.md`). In the GUI such a pane draws one header
+  row in place of its strip and the thread's header (`components/shell/ThreadPaneHeader.tsx`,
+  `shell/threadsOpenAs.ts`), and the settings page asks before a switch that closes tabs
+  (`docs/notes/threads-open-as-2-gui.md`).
 * **Focus from a thread**: `Options.KeepFocus` runs any op and puts back the user's current
   space, focused tabs and MRU, so a model's tab waits behind the user's focused tab. The
   commands use it for every call not made by the user in person (§7).

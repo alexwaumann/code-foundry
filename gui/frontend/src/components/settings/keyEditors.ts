@@ -6,6 +6,8 @@ import { DictationMicrophoneDescription, DictationMicrophoneEditor, DictationNee
 import type { SettingEditor } from "./editor";
 import { IncludeIgnoredEditor } from "./IncludeIgnoredSettings";
 import { ThemeDarkEditor, ThemeLightEditor } from "./ThemeSlotEditor";
+import { SmartSwapEditor, SmartSwapForcedNote, ThreadsOpenAsEditor } from "./ThreadsOpenAsSettings";
+import { useSmartSwapForced } from "./threadsOpenAsSwitch";
 import { VolumeEditor } from "./VolumeEditor";
 import { WorkerModelsEditor } from "./WorkerModelsEditor";
 
@@ -21,6 +23,8 @@ export const keyEditors: Readonly<Partial<Record<string, SettingEditor>>> = {
   "ember.worker_models": WorkerModelsEditor,
   "dictation.enabled": DictationToggleEditor,
   "dictation.microphone": DictationMicrophoneEditor,
+  "layout.threads_open_as": ThreadsOpenAsEditor,
+  "layout.smart_swap": SmartSwapEditor,
   // On its page the section draws the list (sectionBodies); this is its search result's editor.
   "files.include_ignored": IncludeIgnoredEditor,
 };
@@ -37,11 +41,28 @@ export const keyTitleChips: Readonly<Partial<Record<string, ComponentType>>> = {
 export const keyDescriptionTails: Readonly<Partial<Record<string, ComponentType<{ field: SettingFieldView }>>>> = {
   "dictation.enabled": DictationNeedsModel,
   "projects.branch_naming": BranchNamingOff,
+  "layout.smart_swap": SmartSwapForcedNote,
 };
 
 /** A description that depends on state, by key, in place of the setting's own (its `fallback`). The search still shows and marks the setting's own. */
 export const keyDescriptions: Readonly<Partial<Record<string, ComponentType<{ fallback: string }>>>> = {
   "dictation.microphone": DictationMicrophoneDescription,
+};
+
+/**
+ * Explained enums whose row keeps the setting's own description rather than the picked option's
+ * (each option's words are in its dropdown): layout.threads_open_as says what all of its
+ * non-default options share.
+ */
+export const ownDescriptionKeys: ReadonlySet<string> = new Set(["layout.threads_open_as"]);
+
+/**
+ * Settings another setting holds at a value for now, by key: a hook that says whether it does.
+ * Their row hides the reset arrow while held (the editor shows the held value, disabled), and the
+ * stored value is kept for when it is not (layout.smart_swap under Threads open as Panes or Single).
+ */
+export const keyHeld: Readonly<Partial<Record<string, () => boolean>>> = {
+  "layout.smart_swap": useSmartSwapForced,
 };
 
 /**

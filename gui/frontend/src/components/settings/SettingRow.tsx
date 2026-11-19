@@ -5,7 +5,7 @@ import type { SettingFieldView } from "@/api/settings";
 import { Tip } from "@/components/ui/tooltip";
 import { MatchedOptions, PickedOption } from "./EnumOptions";
 import { Highlight } from "./Highlight";
-import { keyDescriptions, keyDescriptionTails, keyEditors, keyTitleChips, tallKeyEditors } from "./keyEditors";
+import { keyDescriptions, keyDescriptionTails, keyEditors, keyHeld, keyTitleChips, ownDescriptionKeys, tallKeyEditors } from "./keyEditors";
 import { displayValue, explainedOptions } from "./model";
 import { useSettingField } from "./useSettingField";
 
@@ -28,9 +28,14 @@ export function RestartChip({ field, restartPending }: { field: SettingFieldView
   );
 }
 
-/** The reset arrow; its slot is kept while hidden, so editors stay aligned. */
+const notHeld = (): boolean => false;
+
+/** The reset arrow; its slot is kept while hidden, so editors stay aligned. Hidden while another setting holds the value (keyHeld). */
 export function ResetButton({ field, state }: { field: SettingFieldView; state: FieldState }) {
-  const { modified, pending, commit } = state;
+  const { pending, commit } = state;
+  // A row's key never changes, so the hook (or none) is the same on every render.
+  const held = (keyHeld[field.key] ?? notHeld)();
+  const modified = state.modified && !held;
   return (
     <Tip label={`Reset to default (${displayValue(field, field.defaultValue)})`}>
       <button
@@ -97,7 +102,7 @@ export function SettingRow({ field, className, crumb, words, indent = false, dim
   const DescriptionTail = keyDescriptionTails[field.key];
   const Description = words ? undefined : keyDescriptions[field.key];
   // Outside the search, the row says what the picked option does in place of the field's description.
-  const picked = words ? undefined : explainedOptions(field).find((o) => o.value === state.value);
+  const picked = words || ownDescriptionKeys.has(field.key) ? undefined : explainedOptions(field).find((o) => o.value === state.value);
   return (
     <div
       className={cn(

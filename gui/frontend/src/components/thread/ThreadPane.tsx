@@ -105,7 +105,8 @@ function ThreadBody({ threadId }: { threadId: string }) {
   const infoOpen = useThreadInfoOpen(threadId);
   const findOpen = useThreadFindOpen(threadId);
   const [rowRef, infoFits] = useInfoRoom(threadId);
-  // The pane's header (ThreadHeader): the tab above is the title. None outside a pane (tests).
+  // The pane's header (ThreadHeader): the tab above is the title. None outside a pane (tests), nor
+  // in a pane whose one row is the thread's (Threads open as Panes or Single: ThreadPaneHeader).
   const shellPane = useShellPane();
   // A shell pane too short for the full ask draws it as one line above the composer (shell/askStrip.ts).
   const askKey = open.map((p) => p.requestId).join(" ");
@@ -113,7 +114,7 @@ function ThreadBody({ threadId }: { threadId: string }) {
   return (
     <ThreadContext.Provider value={ctx}>
       <section className="cf-thread flex min-h-0 min-w-0 flex-1 flex-col outline-none" tabIndex={-1} aria-label="Thread" data-thread-id={threadId} data-testid="thread-pane" data-region="content">
-        {shellPane && <ThreadHeader threadId={threadId} paneId={shellPane.paneId} />}
+        {shellPane && !shellPane.headed && <ThreadHeader threadId={threadId} paneId={shellPane.paneId} />}
         {/* The find bar (thread.find) sits where the card starts, which moves down under it (--ti-find), inline or floating.
             Clipped: in a pane narrower than a thread's minimum (200% zoom in a small window) the composer's
             footer stacks and its dock grows taller than this box; it would cover the header above. */}

@@ -18,6 +18,8 @@ import { useUiStore } from "@/stores/ui";
 import { shellBodyDomId, shellTabDomId } from "@/shell/domIds";
 import { LinkedRow } from "./LinkedRow";
 import { PaneTabStrip } from "./PaneTabStrip";
+import { ThreadPaneHeader } from "./ThreadPaneHeader";
+import { useHeadedTab } from "@/shell/threadsOpenAs";
 import { PaneRail } from "./PaneRail";
 import { FloatingComposer } from "./FloatingComposer";
 
@@ -71,7 +73,8 @@ export function PaneView({ paneId, rect, focused }: { paneId: string; rect: Pane
 }
 
 /**
- * An open pane: its tab strip, then its active tab's body. A pointer press or the keyboard (Tab)
+ * An open pane: its tab strip (a thread pane's header row under Threads open as Panes or
+ * Single: ThreadPaneHeader), then its active tab's body. A pointer press or the keyboard (Tab)
  * entering it focuses it (pane.focus, shown at once); a focus request (a direction key, a closed
  * tab, a click on a rail's icon) moves the keyboard into its active tab. A key inside it may be
  * its active surface's own (surfaceKey). Full screen, a linked tab's thread composer floats over
@@ -93,7 +96,9 @@ function OpenPane({ paneId, rect, focused }: { paneId: string; rect: PaneRect; f
     // Only a new request moves the keyboard, once; a tab switching under it or a remount does not.
     // oxlint-disable-next-line react/exhaustive-deps
   }, [request]);
-  const ctx = useMemo<ShellPane>(() => ({ paneId, focused }), [paneId, focused]);
+  // Under Threads open as Panes or Single, a pane of one thread (or composer) draws one header row for it, not a strip and the thread's header.
+  const headed = useHeadedTab(paneId) !== "";
+  const ctx = useMemo<ShellPane>(() => ({ paneId, focused, headed }), [paneId, focused, headed]);
   const takeFocus = () => {
     // Read now: a press right after a key may beat the render.
     const s = useLayoutStore.getState();
@@ -127,7 +132,7 @@ function OpenPane({ paneId, rect, focused }: { paneId: string; rect: PaneRect; f
         if (lastInputWasKeyboard()) takeFocus();
       }}
     >
-      <PaneTabStrip paneId={paneId} focused={focused} fullscreen={full} />
+      {headed && tab ? <ThreadPaneHeader tabId={tab.id} focused={focused} fullscreen={full} /> : <PaneTabStrip paneId={paneId} focused={focused} fullscreen={full} />}
       {tab && <LinkedRow tab={tab} />}
       <div ref={bodyRef} id={shellBodyDomId(paneId)} role="tabpanel" className="relative flex min-h-0 min-w-0 flex-1 flex-col outline-none" data-testid="shell-pane-body">
         {tab && (

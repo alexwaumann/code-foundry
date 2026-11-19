@@ -5,6 +5,7 @@
  */
 import { create } from "zustand";
 import type { Rect } from "@/shell/geometry/types";
+import type { ModeDrop } from "./modeDrop";
 import type { DragSource, DropTarget } from "./targets";
 
 export interface ShellDragState {
@@ -29,6 +30,8 @@ export interface ShellDragState {
   group: readonly string[];
   /** The sidebar header under the pointer whose drop would act (Archived archives, Snoozed saves for later); "" otherwise (`target` is then null). */
   section: "" | "archived" | "snoozed";
+  /** What dropping a thread on `target` does under Threads open as Panes or Single (modeDrop.ts); null otherwise. */
+  effect?: ModeDrop | null;
 }
 
 const IDLE: ShellDragState = {

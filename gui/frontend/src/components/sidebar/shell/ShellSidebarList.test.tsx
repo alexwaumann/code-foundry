@@ -349,6 +349,37 @@ describe("the shell sidebar list", () => {
     expect(runs).toEqual([{ name: "view.open.diff", args: { thread: "s-5" }, thread: "s-5" }]);
   });
 
+  it.each([
+    ["tabs", false],
+    ["panes", true],
+    ["single", false],
+  ])("under threads open as %s, Open ▸ starts with Open beside: %s (thread.open --beside the thread pane a click replaces)", async (mode, shown) => {
+    useSettingsStore.setState({ snapshot: { values: { "layout.threads_open_as": mode } } as never });
+    await seedLayout({ ...layoutOf([space(pane("p-1", [tab("t-1", "thread", "s-1")]), "p-1")]), rev: 2 });
+    render(<ShellSidebarList bodyHeight={800} />);
+    fireEvent.contextMenu(rowOf("s:s-5"));
+    const menu = await screen.findByTestId("row-menu");
+    fireEvent.keyDown(within(menu).getByTestId("row-menu-open"), { key: "ArrowRight" });
+    const sub = await screen.findByTestId("row-menu-open-surfaces");
+    const first = sub.querySelector('[role="menuitem"]')?.textContent;
+    expect(first === "Open beside").toBe(shown);
+    if (!shown) return;
+    fireEvent.click(within(sub).getByText("Open beside"));
+    await settle();
+    expect(runs).toEqual([{ name: "thread.open", args: { id: "s-5", beside: "p-1", focus: "true" }, thread: "s-5" }]);
+  });
+
+  it("Open beside is not offered for a thread already open in the space", async () => {
+    useSettingsStore.setState({ snapshot: { values: { "layout.threads_open_as": "panes" } } as never });
+    await seedLayout({ ...layoutOf([space(pane("p-1", [tab("t-1", "thread", "s-5")]), "p-1")]), rev: 2 });
+    render(<ShellSidebarList bodyHeight={800} />);
+    fireEvent.contextMenu(rowOf("s:s-5"));
+    const menu = await screen.findByTestId("row-menu");
+    fireEvent.keyDown(within(menu).getByTestId("row-menu-open"), { key: "ArrowRight" });
+    await screen.findByTestId("row-menu-open-surfaces");
+    expect(screen.queryByTestId("row-menu-open-beside")).toBeNull();
+  });
+
   it("Move to space ▸ in the row's menu lists the spaces and moves the thread with thread.space.move", async () => {
     await seedLayout({ ...layoutOf([space(pane("p-1", [tab("t-1", "thread", "s-1")]), "p-1"), space(null, "", { id: "sp-b", name: "Review" })]), rev: 2 });
     render(<ShellSidebarList bodyHeight={800} />);

@@ -592,13 +592,20 @@ var staticFields = []Field{
 		bind:        func(s *Settings) any { return &s.Layout.SmartPlacement },
 	},
 	{
+		// The GUI's row shows this description, not the picked option's (gui/frontend keyEditors),
+		// and asks before a switch that closes tabs (layout.threads-open-as.preview).
 		Key: KeyThreadsOpenAs, Group: GroupLayout, Page: PageAppearance, Section: "panes", Type: Enum, Title: "Threads open as",
-		Description: "Tabs: a thread opens as a tab beside the others. Panes: a pane shows one thread, and opening another thread replaces it, " +
-			"its diff, files, pull requests and terminals switching with it; a thread opens beside another only when you put it there. " +
-			"Single: as Panes, with one thread pane per space. Switching to Panes or Single closes the extra thread tabs (they stay in the sidebar).",
-		Enum: []string{ThreadsOpenAsTabs, ThreadsOpenAsPanes, ThreadsOpenAsSingle}, EnumLabels: []string{"Tabs", "Panes", "Single"},
-		Default: ThreadsOpenAsTabs,
-		bind:    func(s *Settings) any { return &s.Layout.ThreadsOpenAs },
+		Description: "With Panes or Single, linked panes always follow the focused thread (smart swap is on).",
+		Enum:        []string{ThreadsOpenAsTabs, ThreadsOpenAsPanes, ThreadsOpenAsSingle}, EnumLabels: []string{"Tabs", "Panes", "Single"},
+		EnumDescriptions: []string{
+			"Each thread you open adds a tab. You close tabs yourself.",
+			"A thread pane shows one thread. Opening another thread swaps it in, and the diff, files and terminals beside it switch with it. " +
+				"Split when you want two threads side by side.",
+			"As Panes, with one thread pane per space. Every thread opens there.",
+		},
+		EnumExamples: []string{"", "", ""},
+		Default:      ThreadsOpenAsTabs,
+		bind:         func(s *Settings) any { return &s.Layout.ThreadsOpenAs },
 	},
 	{
 		Key: KeyThreadInfo, Group: GroupLayout, Page: PageAppearance, Section: "panes", Type: Bool, Title: "Thread info by default",
