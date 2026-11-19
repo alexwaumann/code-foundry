@@ -98,7 +98,7 @@ func TestFilesystemPreviewFilePage(t *testing.T) {
 			t.Errorf("%s: page %v; want owner %q %v, %v", tc.path, p, tc.owner, tc.source, tc.consent)
 		}
 		if tc.consent == v1.PageConsent_PAGE_CONSENT_UNAVAILABLE {
-			if p.GetUnavailableReason() == "" || p.GetPath() != "" {
+			if !strings.HasSuffix(p.GetUnavailableReason(), "notes.txt is not an .html or .htm file") || strings.HasPrefix(p.GetUnavailableReason(), "invalid") || p.GetPath() != "" {
 				t.Errorf("%s: unavailable without a reason or with a path: %v", tc.path, p)
 			}
 		} else if p.GetPath() != filepath.Join(e.root, tc.path) {

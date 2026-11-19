@@ -141,9 +141,13 @@ func consentProto(c page.Consent) v1.PageConsent {
 }
 
 // UnavailablePage is the access of a file that is no page the bridge is given, err saying
-// why.
+// why (without the store's sentinel, "invalid argument: ").
 func UnavailablePage(err error) *v1.PageAccess {
-	return &v1.PageAccess{Consent: v1.PageConsent_PAGE_CONSENT_UNAVAILABLE, Answer: v1.PageConsent_PAGE_CONSENT_UNAVAILABLE, UnavailableReason: err.Error()}
+	reason := err.Error()
+	for _, s := range []error{page.ErrInvalidArgument, page.ErrNotFound, page.ErrGuarded} {
+		reason = strings.TrimPrefix(reason, s.Error()+": ")
+	}
+	return &v1.PageAccess{Consent: v1.PageConsent_PAGE_CONSENT_UNAVAILABLE, Answer: v1.PageConsent_PAGE_CONSENT_UNAVAILABLE, UnavailableReason: reason}
 }
 
 // pageError is a page store error as a Connect error.

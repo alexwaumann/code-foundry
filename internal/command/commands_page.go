@@ -65,7 +65,11 @@ func pageMessage(a pagestore.Access) string {
 	b.WriteString(a.Path + "\n")
 	switch {
 	case a.Recorded != "":
-		fmt.Fprintf(&b, "owner: thread %s (it last %s the page): the page gets its bridge", a.Owner, a.How)
+		did := "showed"
+		if a.How == pagestore.Written {
+			did = "wrote"
+		}
+		fmt.Fprintf(&b, "owner: thread %s (it last %s the page): the page gets its bridge", a.Owner, did)
 	case a.PagesThread != "":
 		fmt.Fprintf(&b, "owner: thread %s (its pages directory): the page gets its bridge", a.Owner)
 	default:

@@ -45,7 +45,7 @@ func TestPageCommands(t *testing.T) {
 	}{
 		{name: "an owned page", uctx: cli, verb: "page.get", path: "/h/owned.html",
 			want:    command.PageView{Path: "/h/owned.html", OwnerThread: "t-1", OwnerSource: "written", Consent: "owned", Answer: "not-asked"},
-			wantMsg: "owner: thread t-1 (it last written the page)"},
+			wantMsg: "owner: thread t-1 (it last wrote the page)"},
 		{name: "a pages directory's", uctx: cli, verb: "page.get", path: "/h/dir.html",
 			want: command.PageView{Path: "/h/dir.html", OwnerThread: "t-2", OwnerSource: "pages-directory", Consent: "owned", Answer: "not-asked"}},
 		{name: "not asked", uctx: app, verb: "page.get", path: "/h/new.html",
