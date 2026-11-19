@@ -162,7 +162,8 @@ message PageProxyFetchResponse {
 // GetPage) and every frame on it follows: a page refused in one window or from the CLI stops
 // in every window, and a page whose last owning thread is removed is asked about again. It is
 // EventService's page source (EVENT_SOURCE_PAGE). It names pages, never their answer, and
-// may name one whose answer did not change.
+// may name one whose answer did not change. It also names pages whose storage changed
+// (storage_paths), never the values.
 message PageEvent {
   // The resolved paths (PageAccess.path) that got an owner (owners) or another answer.
   repeated string paths = 1;
@@ -170,6 +171,11 @@ message PageEvent {
   // now when it was the last).
   string removed_thread = 2;
   // Any page may have changed: the source's snapshot (on connect, and after the client
-  // missed events). Read every page shown again.
+  // missed events). Read every page shown again. Its storage too.
   bool all = 3;
+  // The resolved paths whose cf.storage a write changed (SetPageStorage), from any client:
+  // a client with frames on one reads it again (PageStorage) and hands it to them, so every
+  // open copy of a page hears another's write (docs/notes/page-storage-change-event.md). Not
+  // a change of answer: paths stays empty for it. An event names only one of the two.
+  repeated string storage_paths = 4;
 }

@@ -159,7 +159,10 @@ export class MockPages {
       vals[key] = value;
       if (JSON.stringify(vals).length > MAX) throw new ConnectError("page storage is full (256 KiB per page); remove something first", Code.InvalidArgument);
     }
+    const before = this.storage.get(abs)?.[key];
     this.storage.set(abs, vals);
+    // As the daemon's page.StorageChanged: every client's copies of the page read it again.
+    if (before !== vals[key]) this.publish({ storagePaths: [abs] });
     return { values: { ...vals } };
   }
 

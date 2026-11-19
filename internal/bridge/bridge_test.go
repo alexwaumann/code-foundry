@@ -86,6 +86,22 @@ func TestScriptNamesTheContract(t *testing.T) {
 	}
 }
 
+// cf.storage(prefix).onChange is in the API header the pages skill copies, and hears the
+// cf:storage the app already sends: no new message, so an app that never sends it (or an
+// older one) leaves the listener quiet (docs/notes/page-storage-change-event.md).
+func TestScriptStorageOnChange(t *testing.T) {
+	src := string(Script())
+	head, body, _ := strings.Cut(src, "*/")
+	if !strings.Contains(head, " *   cf.storage(prefix?) ") || !strings.Contains(head, ".onChange(fn)") {
+		t.Errorf("bridge.js's header does not name cf.storage(prefix?).onChange(fn)")
+	}
+	for _, w := range []string{"onChange: function (fn)", "announce(changed);", "announce([w.key]);"} {
+		if !strings.Contains(body, w) {
+			t.Errorf("bridge.js does not contain %s", w)
+		}
+	}
+}
+
 // The script's own list of sources (what cf.on checks before cf:ready) is Sources.
 func TestScriptSources(t *testing.T) {
 	quoted := make([]string, len(Sources))

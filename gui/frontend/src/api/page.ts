@@ -92,10 +92,12 @@ export interface PageEventView {
   paths: readonly string[];
   removedThread: string;
   all: boolean;
+  /** Pages whose cf.storage a write changed, from any client (docs/notes/page-storage-change-event.md). */
+  storagePaths: readonly string[];
 }
 
 export function toPageEventView(e: PageEvent): PageEventView {
-  return { paths: [...e.paths], removedThread: e.removedThread, all: e.all };
+  return { paths: [...e.paths], removedThread: e.removedThread, all: e.all, storagePaths: [...e.storagePaths] };
 }
 
 /**

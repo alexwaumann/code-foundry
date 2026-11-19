@@ -266,6 +266,34 @@ test("the card and the tab opened from it are one page: the card's thread and on
   }
 });
 
+// docs/notes/page-storage-change-event.md: a page that draws from cf.storage in onChange stays in
+// step in its card and its tab, without a reload, both ways.
+test("a click in the card shows in the tab, and one in the tab in the card, without a reload", async ({ page }) => {
+  await openBridgeThread(page);
+  await card(page).getByTestId("thread-html-panel").click();
+  const tab = page.frameLocator('[data-testid="file-html-frame"]');
+  await expect(tab.locator("body")).toHaveAttribute("data-ready", "1");
+  await expect(tab.locator("#visits")).toHaveText("2");
+  await tab.locator("#tally").click();
+  await tab.locator("#tally").click();
+  await expect(tab.locator("#tally-n")).toHaveText("2");
+  await expect(doc(page).locator("#tally-n")).toHaveText("2");
+  await doc(page).locator("#tally").click();
+  await expect(doc(page).locator("#tally-n")).toHaveText("3");
+  await expect(tab.locator("#tally-n")).toHaveText("3");
+  // Neither reloaded: each still shows the visit it counted when it loaded.
+  await expect(doc(page).locator("#visits")).toHaveText("1");
+  await expect(tab.locator("#visits")).toHaveText("2");
+  if (shots) {
+    for (const scheme of ["dark", "light"] as const) {
+      await page.emulateMedia({ colorScheme: scheme });
+      await page.waitForTimeout(600);
+      await page.screenshot({ path: `${shots}/page-card-and-tab-in-step-${scheme}.png` });
+    }
+    await page.emulateMedia({ colorScheme: null });
+  }
+});
+
 /** The frame's nonce, as the page reads it from its own URL (lib/bridge.ts withNonce). */
 const NONCE = () => /[?&]cf-nonce=([^&]+)/.exec(location.search)?.[1] ?? "";
 

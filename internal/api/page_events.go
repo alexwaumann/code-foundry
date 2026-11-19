@@ -13,7 +13,8 @@ import (
 // to read again, never their answer. The page store publishes page.Changed for a new owner
 // or answer; a removed thread's pages lose their owner in the removal's own transaction
 // (ON DELETE CASCADE), which the page store does not see, so thread.Removed is carried as
-// PageEvent.removed_thread. Its snapshot asks for every page again: a client that missed
+// PageEvent.removed_thread. A write to a page's storage is PageEvent.storage_paths
+// (page.StorageChanged). Its snapshot asks for every page again: a client that missed
 // events, or just connected, cannot know which changed.
 type pageSource struct {
 	bus *bus.Bus
@@ -26,6 +27,11 @@ func pageWrap(e *v1.PageEvent) *v1.Event { return &v1.Event{Event: &v1.Event_Pag
 func (s pageSource) topics() []topic {
 	return []topic{
 		busTopic(s.bus, watchBuffer, func(ev page.Changed) *v1.Event { return pageWrap(&v1.PageEvent{Paths: []string{ev.Path}}) }),
+		// Another client's write to a page's storage: every open copy of the page hears it
+		// (docs/notes/page-storage-change-event.md).
+		busTopic(s.bus, watchBuffer, func(ev page.StorageChanged) *v1.Event {
+			return pageWrap(&v1.PageEvent{StoragePaths: []string{ev.Path}})
+		}),
 		busTopic(s.bus, watchBuffer, func(ev thread.Event) *v1.Event {
 			if r, ok := ev.(thread.Removed); ok {
 				return pageWrap(&v1.PageEvent{RemovedThread: r.ID})

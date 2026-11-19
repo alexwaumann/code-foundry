@@ -65,7 +65,7 @@ function hello(): unknown[] {
 const footer = () => screen.getByTestId("file-html-footer");
 const pageEvent = (event: { paths?: string[]; removedThread?: string; all?: boolean }) => {
   act(() => {
-    dispatchEvent({ source: "page", event: { paths: [], removedThread: "", all: false, ...event } });
+    dispatchEvent({ source: "page", event: { paths: [], removedThread: "", all: false, storagePaths: [], ...event } });
   });
 };
 

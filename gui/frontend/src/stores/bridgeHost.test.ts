@@ -36,11 +36,14 @@ vi.mock("@/api/pageStorage", () => ({
 const proxyFetch = vi.hoisted(() => vi.fn());
 vi.mock("@/api/proxyFetch", () => ({ proxyFetch }));
 // PageService for a page no thread owns: storage per path in memory, fetch answered by the test.
-const fileStore = vi.hoisted(() => ({ values: new Map<string, Record<string, string>>(), sets: [] as string[], refuse: null as Error | null }));
+const fileStore = vi.hoisted(() => ({ values: new Map<string, Record<string, string>>(), sets: [] as string[], reads: [] as string[], refuse: null as Error | null }));
 const proxyPageFetch = vi.hoisted(() => vi.fn());
 vi.mock("@/api/page", async (importOriginal) => ({
   refusedPageOf: (await importOriginal<typeof import("@/api/page")>()).refusedPageOf,
-  getPageFileStorage: (path: string) => (fileStore.refuse ? Promise.reject(fileStore.refuse) : Promise.resolve({ ...fileStore.values.get(path) })),
+  getPageFileStorage: (path: string) => {
+    fileStore.reads.push(path);
+    return fileStore.refuse ? Promise.reject(fileStore.refuse) : Promise.resolve({ ...fileStore.values.get(path) });
+  },
   setPageFileStorage: (path: string, key: string, value: string | null) => {
     if (fileStore.refuse) return Promise.reject(fileStore.refuse);
     fileStore.sets.push(`${path} ${key}`);
@@ -53,7 +56,7 @@ vi.mock("@/api/page", async (importOriginal) => ({
 }));
 const noticePageResult = vi.hoisted(() => vi.fn());
 vi.mock("./pageSaved", () => ({ noticePageResult }));
-const { createBridgeHost, BRIDGE_DEBOUNCE_MS, PAGE_ASKS } = await import("./bridgeHost");
+const { createBridgeHost, applyPageStorageEvent, BRIDGE_DEBOUNCE_MS, PAGE_ASKS } = await import("./bridgeHost");
 type PageBridge = import("./bridgeHost").PageBridge;
 const { EMBER_OFF_SCREEN } = await import("./bridgeSources");
 
@@ -131,6 +134,7 @@ beforeEach(() => {
   pageStore.refuse = null;
   fileStore.values.clear();
   fileStore.sets = [];
+  fileStore.reads = [];
   fileStore.refuse = null;
   proxyPageFetch.mockReset();
   useThreadsStore.setState({ byId: { "t-1": thread("t-1", "Fix stale badge") }, order: ["t-1"] });
@@ -1156,6 +1160,30 @@ describe("bridge host: storage per page file", () => {
       expect(posts.filter((p) => p.type === "cf:ready")).toHaveLength(2);
     });
     expect(posts.filter((p) => p.type === "cf:ready").at(-1)).toMatchObject({ storage: { n: "2" } });
+  });
+
+  it("the daemon's news of a write elsewhere: every frame of the page here is handed the map, once per news queued", async () => {
+    const OTHER = "/Users/me/notes/news-other.html";
+    const NEWS = "/Users/me/notes/news.html";
+    const card = host("t-1", undefined, NEWS);
+    const tab = host("t-2", undefined, NEWS);
+    const other = host("t-1", undefined, OTHER);
+    fileStore.values.set(NEWS, { n: "3" });
+    // Three in a row before the first read starts: one read is enough.
+    for (let i = 0; i < 3; i++) applyPageStorageEvent({ storagePaths: [NEWS], all: false });
+    await vi.waitFor(() => {
+      expect(tab.posts).toContainEqual({ type: "cf:storage", values: { n: "3" } });
+    });
+    expect(card.posts).toEqual([{ type: "cf:storage", values: { n: "3" } }]);
+    expect(other.posts).toEqual([]);
+    expect(fileStore.reads).toEqual([NEWS]);
+    // A page with no frame here reads nothing; a disposed frame hears nothing.
+    card.h.dispose();
+    tab.h.dispose();
+    applyPageStorageEvent({ storagePaths: [NEWS, "/Users/me/notes/not-shown.html"], all: false });
+    await Promise.resolve();
+    expect(fileStore.reads).toEqual([NEWS]);
+    other.h.dispose();
   });
 
   it("a write the daemon refuses because the page may not use it any more asks for the grant", async () => {

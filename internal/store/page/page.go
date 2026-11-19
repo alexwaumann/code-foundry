@@ -137,6 +137,15 @@ type Changed struct {
 	Path string
 }
 
+// StorageChanged is published on the bus when a write changed the storage of the page at
+// Path (SetStorage), so every client with a copy of the page open reads it again
+// (docs/notes/page-storage-change-event.md). A write that set a key to the value it had
+// publishes nothing.
+type StorageChanged struct {
+	// Path is the page's resolved path (Access.Path).
+	Path string
+}
+
 // Allowed reports whether the page may use the bridge: a thread owns it, or the user
 // allowed it.
 func (a Access) Allowed() bool { return a.Owner != "" || a.Consent == Allowed }
@@ -162,7 +171,7 @@ type Options struct {
 	// thread that does not is no one's. Nil: every one does.
 	ThreadExists func(id string) bool
 	Log          *slog.Logger
-	// Bus hears Changed. Nil: nothing is published.
+	// Bus hears Changed and StorageChanged. Nil: nothing is published.
 	Bus *bus.Bus
 	// Now is the clock; nil is time.Now.
 	Now func() time.Time
@@ -621,24 +630,44 @@ func (s *Store) SetStorage(ctx context.Context, path, key string, value *string)
 	if s.o.StorageRoot == "" {
 		return nil, fmt.Errorf("%w: this daemon keeps no page storage", ErrInvalidArgument)
 	}
+	vals, changed, err := s.setStorage(a.Path, key, value)
+	if err != nil {
+		return nil, err
+	}
+	if changed && s.o.Bus != nil {
+		bus.Publish(s.o.Bus, StorageChanged{Path: a.Path})
+	}
+	return vals, nil
+}
+
+// setStorage is SetStorage's write under storeMu, and whether it changed the key's value.
+func (s *Store) setStorage(real, key string, value *string) (map[string]string, bool, error) {
 	s.storeMu.Lock()
 	defer s.storeMu.Unlock()
-	dir, keptAs := s.storageOf(a.Path)
+	dir, keptAs := s.storageOf(real)
 	if err := os.MkdirAll(dir, 0o700); err != nil {
-		return nil, fmt.Errorf("page: storage of %s: %w", a.Path, err)
+		return nil, false, fmt.Errorf("page: storage of %s: %w", real, err)
 	}
 	// The key its directory is named for, so Sweep keeps it (an older spelling's too).
 	if err := pagestorage.WriteAtomic(filepath.Join(dir, pathFile), []byte(keptAs)); err != nil {
-		return nil, fmt.Errorf("page: storage of %s: %w", a.Path, err)
+		return nil, false, fmt.Errorf("page: storage of %s: %w", real, err)
 	}
-	vals, err := pagestorage.Set(dir, key, value, "page", s.o.Log, "page", a.Path)
+	// What the key held, to publish only a write that changed it. Set reads the file again
+	// (and refuses the same way): the storage is small, and this keeps Set the thread's too.
+	before, err := pagestorage.Read(dir, s.o.Log, "page", real)
+	if err != nil {
+		return nil, false, fmt.Errorf("page: storage of %s: %w", real, err)
+	}
+	old, had := before[key]
+	vals, err := pagestorage.Set(dir, key, value, "page", s.o.Log, "page", real)
 	if errors.Is(err, pagestorage.ErrInvalid) {
-		return nil, fmt.Errorf("%w: %w", ErrInvalidArgument, err)
+		return nil, false, fmt.Errorf("%w: %w", ErrInvalidArgument, err)
 	}
 	if err != nil {
-		return nil, fmt.Errorf("page: storage of %s: %w", a.Path, err)
+		return nil, false, fmt.Errorf("page: storage of %s: %w", real, err)
 	}
-	return vals, nil
+	now, has := vals[key]
+	return vals, had != has || (has && now != string(old)), nil
 }
 
 // SweepAfter is how long a page's storage is kept after its last write once its file is
