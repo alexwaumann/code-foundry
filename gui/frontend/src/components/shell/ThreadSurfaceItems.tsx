@@ -82,8 +82,8 @@ function SurfaceItem({ item, kit, onPick }: { item: ThreadSurfaceItem; kit: Menu
 }
 
 /**
- * A thread's surfaces, the items of its header's Open ▸ and of the "+" menu's thread submenu
- * (docs/notes/shell-model.md): its diff of each checkout and its pull requests, each marked
+ * A thread's surfaces, the items of its header's Open ▸ and of the "+" menu's thread submenu (a
+ * thread pane's "+": at its top level) (docs/notes/shell-model.md): its diff of each checkout and its pull requests, each marked
  * "open" when its tab is open in the space; its plugin surfaces (scope thread or pr) whose show
  * command is available for it; then its terminal tabs there and New terminal tab.
  * The tabs of threads it created (diffs, pull requests, terminals) are listed with its own.

@@ -659,6 +659,10 @@ func TestModeOpSequences(t *testing.T) {
 				s := &bytesrc{b: data}
 				for step := 0; step < 60 && !s.done(); step++ {
 					op := randomOp(s, st)
+					if s.n(8) == 0 {
+						_, panes, _, _ := stateIDs(st)
+						op = &NewThread{Beside: pick(s, append(panes, "th-1", "th-2")...), Focus: s.n(2) == 0}
+					}
 					if o, ok := op.(*OpenThread); ok {
 						_, panes, _, _ := stateIDs(st)
 						switch s.n(4) {
@@ -700,5 +704,105 @@ func TestPanesOpenKeepsFocus(t *testing.T) {
 	}
 	if sp := next.Spaces[0]; sp.Focus != "p-f" || focusedTab(sp) != "t-f" {
 		t.Errorf("focus %s/%s, want p-f/t-f", sp.Focus, focusedTab(sp))
+	}
+}
+
+// New thread beside (new_thread with Beside, a thread pane's "+" under Panes): a composer in a
+// new pane on the right of the pane, which keeps its thread; the space's empty composer moves
+// there when open elsewhere; folded without room; refused under Single as open_thread's beside.
+func TestNewThreadBeside(t *testing.T) {
+	twoThreads := func(t *testing.T) *State {
+		return mstate(t, msplit("s-r", Row, mpane("p-a", mth("t-a", "a")), mpane("p-b", mth("t-b", "b")), mpane("p-f", mfile("t-f"))), "p-a", "t-a")
+	}
+	composerRight := func(t *testing.T) *State {
+		return mstate(t, msplit("s-r", Row, mpane("p-a", mth("t-a", "a")), mpane("p-c", mcompose("t-c")), mpane("p-f", mfile("t-f"))), "p-a", "t-a")
+	}
+	tests := []struct {
+		name     string
+		mode     Mode
+		state    func(t *testing.T) *State
+		op       *NewThread
+		shape    string
+		focus    string
+		existing bool
+		folded   bool
+		err      error
+	}{
+		{
+			name: "panes: a composer in a new pane on the pane's right, its thread kept",
+			mode: ModePanes, state: twoThreads, op: &NewThread{Beside: "p-a", Focus: true},
+			shape: "row(p-a[th:a] p-n1[compose] p-b[th:b] p-f[t-f])", focus: "p-n1",
+		},
+		{
+			name: "beside a thread names its pane",
+			mode: ModePanes, state: twoThreads, op: &NewThread{Beside: "b", Focus: true},
+			shape: "row(p-a[th:a] p-b[th:b] p-n1[compose] p-f[t-f])", focus: "p-n1",
+		},
+		{
+			name: "the space's empty composer open elsewhere moves there, its pane closing",
+			mode: ModePanes, state: composerRight, op: &NewThread{Beside: "p-f", Focus: true},
+			shape: "row(p-a[th:a] p-f[t-f] p-n1[compose])", focus: "p-n1",
+		},
+		{
+			name: "beside the empty composer's own pane: it is focused where it is",
+			mode: ModePanes, state: composerRight, op: &NewThread{Beside: "p-c", Focus: true},
+			shape: "row(p-a[th:a] p-c[compose] p-f[t-f])", focus: "p-c", existing: true,
+		},
+		{
+			name: "tabs: a new pane on its right too",
+			mode: ModeTabs, state: twoThreads, op: &NewThread{Beside: "p-a", Focus: true},
+			shape: "row(p-a[th:a] p-n1[compose] p-b[th:b] p-f[t-f])", focus: "p-n1",
+		},
+		{
+			name: "no room: it opens folded",
+			mode: ModePanes,
+			state: func(t *testing.T) *State {
+				return mstate(t, msplit("s-r", Row, mpane("p-a", mth("t-a", "a")), mpane("p-f", mfile("t-f"))), "p-a", "t-a")
+			},
+			op:    &NewThread{Beside: "p-a", Focus: true, W: 1000, H: 800},
+			shape: "row(p-a[th:a] p-n1~[compose] p-f[t-f])", focus: "p-n1", folded: true,
+		},
+		{
+			name: "single refuses beside",
+			mode: ModeSingle, state: twoThreads, op: &NewThread{Beside: "p-a", Focus: true}, err: ErrFailedPrecondition,
+		},
+		{
+			name: "beside is a place of its own: no pane",
+			mode: ModePanes, state: twoThreads, op: &NewThread{Beside: "p-a", Pane: "p-b", Focus: true}, err: ErrInvalidArgument,
+		},
+		{
+			name: "beside nothing open in the space",
+			mode: ModePanes, state: twoThreads, op: &NewThread{Beside: "zz", Focus: true}, err: ErrNotFound,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.op.W == 0 {
+				tt.op.W, tt.op.H = wideW, wideH
+			}
+			next, res, err := ApplyWith(tt.state(t), tt.op, &SeqIDs{}, Options{Mode: tt.mode})
+			if tt.err != nil {
+				if !errors.Is(err, tt.err) {
+					t.Fatalf("err %v, want %v", err, tt.err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			sp := next.Spaces[0]
+			if got := bare(sp.Root); got != tt.shape {
+				t.Errorf("shape %s, want %s", got, tt.shape)
+			}
+			if sp.Focus != tt.focus {
+				t.Errorf("focus %s, want %s", sp.Focus, tt.focus)
+			}
+			if res.Existing != tt.existing || res.Collapsed != tt.folded {
+				t.Errorf("existing %v collapsed %v, want %v %v", res.Existing, res.Collapsed, tt.existing, tt.folded)
+			}
+			if tt.mode.Panes() {
+				checkMode(t, next, tt.mode, tt.name)
+			}
+		})
 	}
 }

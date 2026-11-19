@@ -18,6 +18,7 @@ import { formatChord } from "@/keys/chord";
 import { terminalName } from "@/lib/terminalName";
 import { plusAction, showTerminalAction, tabbedTerminalIds, untabbedTerminals, type LinkedAction, type PlusItem } from "@/shell/linked";
 import { runLinked } from "@/shell/linkedRun";
+import { useThreadsOpenAs, type ThreadsOpenAs } from "@/shell/threadsOpenAs";
 import { useThreadName } from "@/shell/useThreadName";
 import { paneTakesAnyTab } from "@/shell/drag/room";
 import { geoTree, useLayoutStore } from "@/stores/layout";
@@ -28,12 +29,29 @@ import { TERMINAL_ICONS } from "./terminalIcons";
 import { ThreadDot } from "./ThreadDot";
 import { ThreadSurfaceItems } from "./ThreadSurfaceItems";
 
-const GENERAL: readonly { item: PlusItem; label: string; icon: typeof Plus; chord?: string }[] = [
+type GeneralItem = { item: PlusItem; label: string; icon: typeof Plus; chord?: string };
+
+const GENERAL: readonly GeneralItem[] = [
   { item: "new-thread", label: "New thread", icon: MessageSquare, chord: "cmd+n" },
   { item: "terminal", label: "Terminal", icon: SquareTerminal },
   { item: "prs", label: "Pull Requests", icon: GitPullRequest },
   { item: "projects", label: "Projects", icon: Folders },
 ];
+
+/**
+ * A thread pane's general items (docs/notes/shell-model.md, "A thread pane's header"): nothing
+ * opens as a tab in that pane, so New thread is New thread beside under Panes (a composer in a
+ * new pane on its right; cmd+n is not that, so no chord) and is left out under Single (one thread
+ * pane per space: New thread would only replace this pane's thread, which cmd+n and the sidebar do).
+ * Also left out in the pane of the space's empty composer: a space has one, so it would only be
+ * focused where it is.
+ */
+function threadPaneGeneral(mode: ThreadsOpenAs, emptyComposer: boolean): readonly GeneralItem[] {
+  return GENERAL.flatMap((g): GeneralItem[] => {
+    if (g.item !== "new-thread") return [g];
+    return mode === "single" || emptyComposer ? [] : [{ item: "new-thread-beside", label: "New thread beside", icon: MessageSquare }];
+  });
+}
 
 /** The thread of the pane's active tab when that tab is a thread's own; "". */
 function useActiveThread(paneId: string): string {
@@ -104,6 +122,28 @@ function ThreadSub({ threadId, paneId, spaceId, pick }: { threadId: string; pane
   );
 }
 
+/** A thread pane's own thread: its surfaces at the top level under the label, no submenu (the pane is that thread). */
+function ThreadGroup({ threadId, paneId, spaceId, pick }: { threadId: string; paneId: string; spaceId: string; pick: (a: LinkedAction) => void }) {
+  return (
+    <>
+      <DropdownMenuLabel className="text-caption text-cf-text-muted">This thread</DropdownMenuLabel>
+      <ThreadSurfaceItems threadId={threadId} spaceId={spaceId} pane={paneId} onPick={pick} />
+      <DropdownMenuSeparator />
+    </>
+  );
+}
+
+/** The general items for a strip's "+", or a thread pane's under the mode. */
+function useGeneral(paneId: string, threadPane: boolean): readonly GeneralItem[] {
+  const mode = useThreadsOpenAs();
+  const emptyComposer = useLayoutStore((s) => {
+    const p = s.panes[paneId];
+    const t = p ? s.tabs[p.active] : undefined;
+    return t?.kind === "compose" && !t.params.draft;
+  });
+  return threadPane ? threadPaneGeneral(mode, emptyComposer) : GENERAL;
+}
+
 /**
  * A pane's "+" (docs/notes/shell-model.md, "Structure"): a menu of surfaces after the strip's
  * last tab. With a thread's tab active, first a submenu of that thread's surfaces (the header's
@@ -115,9 +155,17 @@ function ThreadSub({ threadId, paneId, spaceId, pick }: { threadId: string; pane
  * panel's shells): a pick gives one a tab here. In a pane of terminals that has no room for
  * anything else, only Terminal (and the untabbed ones), no plugin surface. Keyboard: Enter or Space opens it,
  * arrows move, right opens the submenu.
+ *
+ * `threadPane`: the "+" of a thread pane's header row under Panes and Single
+ * (ThreadPaneHeader.tsx), where nothing it lists opens as a tab in that pane. It is named "Open",
+ * the thread's surfaces are top-level items under "This thread" (no submenu: the pane is that
+ * thread), and New thread is New thread beside under Panes and absent under Single
+ * (threadPaneGeneral). The rest is the strip's.
  */
-export function PanePlusMenu({ paneId }: { paneId: string }) {
+export function PanePlusMenu({ paneId, threadPane = false }: { paneId: string; threadPane?: boolean }) {
   const threadId = useActiveThread(paneId);
+  const general = useGeneral(paneId, threadPane);
+  const name = threadPane ? "Open" : "Open a tab";
   const spaceId = useLayoutStore((s) => s.panes[paneId]?.spaceId ?? "");
   const untabbed = useUntabbedTerminals();
   const anyTab = useTakesAnyTab(paneId, spaceId);
@@ -130,11 +178,11 @@ export function PanePlusMenu({ paneId }: { paneId: string }) {
   };
   return (
     <DropdownMenu modal={false} open={open} onOpenChange={setOpen}>
-      <Tip label="Open a tab">
+      <Tip label={name}>
         <DropdownMenuTrigger asChild>
           <button
             type="button"
-            aria-label="Open a tab"
+            aria-label={name}
             className="flex size-7 shrink-0 cursor-default items-center justify-center rounded-md text-cf-text-muted outline-none [--wails-draggable:no-drag] hover:bg-cf-control-hover/40 hover:text-cf-text focus-visible:ring-1 focus-visible:ring-cf-focus aria-expanded:bg-cf-control-hover/40 aria-expanded:text-cf-text"
             data-testid="pane-plus"
             // Not the pane's drag grip (the strip's free space): a press here opens the menu only.
@@ -156,8 +204,8 @@ export function PanePlusMenu({ paneId }: { paneId: string }) {
           e.preventDefault();
         }}
       >
-        {threadId && <ThreadSub threadId={threadId} paneId={paneId} spaceId={spaceId} pick={pick} />}
-        {GENERAL.filter(({ item }) => anyTab || item === "terminal").map(({ item, label, icon: Icon, chord }) => (
+        {threadId && (threadPane ? <ThreadGroup threadId={threadId} paneId={paneId} spaceId={spaceId} pick={pick} /> : <ThreadSub threadId={threadId} paneId={paneId} spaceId={spaceId} pick={pick} />)}
+        {general.filter(({ item }) => anyTab || item === "terminal").map(({ item, label, icon: Icon, chord }) => (
           <Fragment key={item}>
             <DropdownMenuItem
               data-testid="plus-item"

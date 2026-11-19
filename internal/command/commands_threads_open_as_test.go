@@ -1,6 +1,7 @@
 package command_test
 
 import (
+	"slices"
 	"strings"
 	"testing"
 
@@ -107,6 +108,61 @@ func TestThreadOpenThreadsOpenAs(t *testing.T) {
 			}
 			if panes != tt.panes || tabs != tt.tabs {
 				t.Errorf("%d thread tabs in %d panes, want %d in %d", tabs, panes, tt.tabs, tt.panes)
+			}
+		})
+	}
+}
+
+// composer.new --beside (a thread pane's "+", New thread beside): a composer in a new pane on
+// the right of the thread's pane, which keeps its thread; refused under single as
+// thread.open --beside is, and with --pane.
+func TestComposerNewBeside(t *testing.T) {
+	const lead = "s-aaaa00000001"
+	tests := []struct {
+		name   string
+		mode   core.Mode
+		args   map[string]string
+		refuse string
+	}{
+		{"panes: beside the thread's pane", core.ModePanes, map[string]string{"beside": lead}, ""},
+		{"tabs: beside too", core.ModeTabs, map[string]string{"beside": lead}, ""},
+		{"single: refused", core.ModeSingle, map[string]string{"beside": lead}, "threads open as single"},
+		{"with --pane: refused", core.ModePanes, map[string]string{"beside": lead, "pane": "p-left"}, "--beside is a place of its own"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			f := newLayoutFixture(t).wide(t)
+			f.store.Mode = tt.mode
+			before := core.PaneIDs(f.state().Space("sp-main").Root)
+			res, err := f.run(t, fromApp, "composer.new", tt.args)
+			if tt.refuse != "" {
+				if err == nil || !strings.Contains(err.Error(), tt.refuse) {
+					t.Fatalf("err %v, want %q in it", err, tt.refuse)
+				}
+				if tt.mode == core.ModeSingle && connect.CodeOf(err) != connect.CodeFailedPrecondition {
+					t.Errorf("code %v, want failed_precondition", connect.CodeOf(err))
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			r := res.JSON.(command.LayoutResult)
+			sp := f.state().Space("sp-main")
+			if slices.Contains(before, r.Pane) {
+				t.Errorf("the composer opened in pane %s, which was there before; want a new pane", r.Pane)
+			}
+			if sp.Focus != r.Pane {
+				t.Errorf("focus %s, want the composer's pane %s", sp.Focus, r.Pane)
+			}
+			threadOpen := false
+			for _, p := range core.Panes(sp.Root) {
+				for _, tb := range p.Tabs {
+					threadOpen = threadOpen || (tb.Kind == "thread" && tb.Thread == lead)
+				}
+			}
+			if !threadOpen {
+				t.Errorf("thread %s's tab closed; New thread beside keeps it", lead)
 			}
 		})
 	}

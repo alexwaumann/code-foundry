@@ -105,7 +105,9 @@ when the first working version is whole. Nothing partial is released.
   surfaces of no thread that can show (a thread's plugin surfaces are in its submenu;
   plus-menu-plugins.md). Without a thread it has no submenu. The choice always opens in that pane, except that a linked surface which is already open is
   focused where it is. One exception to the menu: in a pane that holds only terminals, while
-  anything else there would not fit ("Room for panes"), the menu lists only terminals.
+  anything else there would not fit ("Room for panes"), the menu lists only terminals. A thread
+  pane's "+" under Panes and Single is named "Open" and differs ("A thread pane's header", under
+  "Threads open as").
 - **Reopening closed tabs.** cmd+shift+t reopens the most recently closed tab or pane of the
   current space.
   - **What is recorded.** What the user closes: a tab (cmd+w, its ×, a middle click, Close in its
@@ -399,7 +401,10 @@ A user setting (`layout.threads_open_as`, Appearance › Panes) says how a threa
   - **The composer** is a thread pane's content while it is written: New thread and a draft's row
     replace the target thread pane's thread with it (a draft whose tab is replaced stays listed);
     sending turns it into the thread in place. A "+" of a pane of other tabs opens it in a new
-    thread pane on that pane's left.
+    thread pane on that pane's left. A thread pane's "+" has New thread beside: a composer in a
+    new thread pane on that pane's right, focused, the pane keeping its thread
+    (`composer.new --beside <pane|thread>`; the space's empty composer open elsewhere moves there;
+    folded when there is no room). cmd+n is unchanged.
   - **Smart swap** is on, whatever its setting says; its row in Settings shows it on and
     disabled, and keeps the user's own value for Tabs.
   - **A thread pane's header.** A pane that shows one thread (or a composer) draws one row in
@@ -407,12 +412,18 @@ A user setting (`layout.threads_open_as`, Appearance › Panes) says how a threa
     name, its branch chip; then the "+", the thread info toggle, the thread's menu, collapse and
     full screen. No close button (the row's context menu and the "…" menu have Close). The row
     drags the pane. Panes of other tabs keep their strips (docs/notes/threads-open-as-2-gui.md).
+    Its "+" is named "Open", not "Open a tab": nothing it lists opens as a tab in that pane. Under
+    a "This thread" label it lists the thread's surfaces at the top level (no submenu: the pane is
+    that thread), then New thread beside (no chord), Terminal, Pull Requests, Projects and the
+    Plugins list as a strip's "+" has them. A composer's row has no thread's surfaces, and the
+    space's empty composer's no New thread beside (it would only focus itself).
   - **Moving a thread** to another space opens it there in place of that space's thread pane's
     thread.
 - **Single**: as Panes, with at most one thread pane per space. Every open replaces it, the
   explicit ones too (an edge drop, a child from its lead, a drop on a pane of other tabs); Back
-  returns to the thread replaced. `thread.open --beside` is refused with an error that names the
-  setting and says to leave it out.
+  returns to the thread replaced. `thread.open --beside` and `composer.new --beside` are refused
+  with an error that names the setting and says to leave it out. A thread pane's "+" has no New
+  thread item (cmd+n and the sidebar replace the one thread shown).
 - **Switching.** To Panes, in one layout change across all spaces: each pane keeps its active
   thread tab (else the one focused most recently) and its other thread tabs close as closing a
   thread closes them; other tabs that shared a pane with a thread move together, in their order,

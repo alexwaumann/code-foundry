@@ -107,7 +107,7 @@ function HeaderBox({ tab, focused, fullscreen, ref: triggerRef, ...rest }: { tab
           e.stopPropagation();
         }}
       >
-        <PanePlusMenu paneId={paneId} />
+        <PanePlusMenu paneId={paneId} threadPane />
         {own && (
           <ThreadContext.Provider value={ctx}>
             <ThreadInfoToggle />
@@ -125,7 +125,8 @@ function HeaderBox({ tab, focused, fullscreen, ref: triggerRef, ...rest }: { tab
  * A thread pane's one header row under "Threads open as" Panes and Single
  * (docs/notes/threads-open-as-2-gui.md): the sidebar is the thread switcher, so a pane that shows
  * one thread draws no strip for it. Left, the thread's icon with its status dot, its name and its
- * branch chip (the thread header's); right, the "+" menu, the thread info toggle, the thread's
+ * branch chip (the thread header's); right, the "+" menu ("Open": the thread's surfaces, New thread
+ * beside under Panes, then the strip's general items; PanePlusMenu threadPane), the thread info toggle, the thread's
  * menu, then collapse and full screen as the strip has them. No close button: the row's context
  * menu (the tab's) and the "…" menu have Close. The row drags the pane, as a strip's free space
  * does. A composer's row shows its "New thread" or draft label and no thread buttons.

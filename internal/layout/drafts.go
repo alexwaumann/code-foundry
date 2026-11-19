@@ -158,9 +158,17 @@ func followDrafts(st *State) {
 // Pane (a pane's "+": an empty composer open elsewhere in the space moves there). Space is
 // the space ("" is the current one, or Pane's). It is open_surface with a compose tab, in the
 // W x H pane area.
+//
+// Beside (a pane, or a thread whose tab is open in the space; not with Pane) opens it instead
+// in a new pane on the right of that pane, which stays as it is: a thread pane's "+" under
+// Panes (New thread beside). The space's empty composer open elsewhere moves there (its pane
+// closes when it held only that), and one already in that pane is focused where it is. A new
+// pane that does not fit opens folded (Result.Collapsed). Under Single, Beside is refused, as
+// open_thread's is.
 type NewThread struct {
 	Space  string            `json:"space,omitempty"`
 	Pane   string            `json:"pane,omitempty"`
+	Beside string            `json:"beside,omitempty"`
 	Params map[string]string `json:"params,omitempty"`
 	Focus  bool              `json:"focus,omitempty"`
 	W      float64           `json:"w,omitempty"`
@@ -174,8 +182,64 @@ func (o *NewThread) apply(t *tx) (Result, error) {
 	if o.Params[DraftParam] != "" {
 		return Result{}, fmt.Errorf("new_thread opens the empty composer; a draft opens with open_draft: %w", ErrInvalidArgument)
 	}
+	if o.Beside != "" {
+		return o.beside(t)
+	}
 	op := &OpenSurface{Space: o.Space, Pane: o.Pane, Tab: &Tab{Kind: "compose", Params: maps.Clone(o.Params)}, Focus: o.Focus, W: o.W, H: o.H}
 	return op.apply(t)
+}
+
+// beside is new_thread with Beside (NewThread's doc).
+func (o *NewThread) beside(t *tx) (Result, error) {
+	if o.Pane != "" {
+		return Result{}, fmt.Errorf("beside is a place of its own: no pane: %w", ErrInvalidArgument)
+	}
+	if t.opts.Mode == ModeSingle {
+		return Result{}, errSingleBeside
+	}
+	var sp *Space
+	var anchor *Node
+	if psp, p := t.st.FindPane(o.Beside); p != nil {
+		if o.Space != "" && psp.ID != o.Space {
+			return Result{}, fmt.Errorf("pane %s is not in space %s: %w", p.ID, o.Space, ErrInvalidArgument)
+		}
+		sp, anchor = psp, p
+	} else {
+		var err error
+		if sp, err = t.space(o.Space); err != nil {
+			return Result{}, err
+		}
+		if anchor, err = t.paneFor(sp, o.Beside); err != nil {
+			return Result{}, err
+		}
+	}
+	tb := &Tab{Kind: "compose", Params: maps.Clone(o.Params)}
+	same, err := t.prepare(sp, tb)
+	if err != nil {
+		return Result{}, err
+	}
+	if same != nil {
+		if tb.Params != nil {
+			same.Params = tb.Params
+		}
+		_, from, _ := t.st.FindTab(same.ID)
+		if from == anchor {
+			t.show(sp, anchor, same.ID, o.Focus)
+			return Result{Space: sp.ID, Pane: anchor.ID, Tab: same.ID, Existing: true, Rule: "1"}, nil
+		}
+		detach(sp, from, same.ID)
+		tb = same
+	}
+	w, h := viewport(o.W, o.H)
+	np, fold, err := t.newPane(sp, anchor, Right, tb, "", w, h)
+	if err != nil {
+		return Result{}, err
+	}
+	t.show(sp, np, tb.ID, o.Focus)
+	if fold {
+		t.refold(np.ID)
+	}
+	return Result{Space: sp.ID, Pane: np.ID, Tab: tb.ID, Rule: "edge", Collapsed: fold}, nil
 }
 
 // StartDraft makes a space's empty composer a draft: the user typed its first text. The

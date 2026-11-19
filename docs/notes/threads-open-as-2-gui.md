@@ -21,6 +21,10 @@ default for new installs.
   merges them (`lib/mergeHandlers.ts`, moved out of `PaneTabStrip` for fast refresh). The buttons
   stop the pointer press so they are not the grip. A composer's row has its label and only the
   "+" and pane buttons. The name element carries the tab's dom id, so the pane stays labelled by it.
+- **The row's "+"** is `PanePlusMenu` with `threadPane` (`thread-pane-plus-menu.md`): named
+  "Open"; the thread's surfaces (`ThreadSurfaceItems`) at the top level under "This thread"; New
+  thread beside (`composer.new --beside <pane>`) under Panes and no New thread under Single; the
+  rest as a strip's "+".
 - **Drops** (`shell/drag/targets.ts` `SceneModes`, built by `ShellDnd` `sceneModes`): a thread
   pane's row and middle are one target, the pane (no places in a row of one tab); they take a
   thread (sidebar row, a thread's tab) or a thread pane, not another tab or a pane of them (the

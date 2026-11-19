@@ -180,6 +180,7 @@ func TestSpaceDocDrafts(t *testing.T) {
 func TestDraftOpsJSON(t *testing.T) {
 	ops := []Op{
 		&NewThread{Space: "sp-a", Pane: "p-a", Params: map[string]string{"project": "pj"}, Focus: true},
+		&NewThread{Beside: "p-a", Focus: true},
 		&StartDraft{Tab: "t-a", Draft: "d-1", Label: "Fix"},
 		&LabelDraft{Draft: "d-1", Label: "Fix it"},
 		&ClearDraft{Draft: "d-1"},
