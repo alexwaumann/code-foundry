@@ -93,7 +93,7 @@ func newTunnelRig(t *testing.T, level slog.Level, devOrigins func(pagesPort int)
 	dev := devOrigins(pagesPort)
 	tunnel := newTunnel(log, tunnelToken, caps, pagesPort, dev, mux)
 	serveOn(t, apiLn, logRequests(log, "loopback", loopbackHost(apiPort, loopbackHandler(tunnelToken, caps, prefixes, pagesPort, dev, mux, tunnel))))
-	serveOn(t, pagesLn, logRequests(log, "pages", loopbackHost(pagesPort, pagesHandler(routes))))
+	serveOn(t, pagesLn, logRequests(log, "pages", pagesHost(pagesPort, pagesHandler(routes, nil))))
 
 	dir, err := os.MkdirTemp("/tmp", "cf-ws-")
 	if err != nil {
@@ -132,6 +132,8 @@ func tunnelOrigins(r *tunnelRig) []tunnelCase {
 		{"null", "null", false},
 		{"pages origin", "http://127.0.0.1:" + pages, false},
 		{"pages origin by name", "http://localhost:" + pages, false},
+		{"a grant's own origin", "http://0123456789abcdef0123456789abcdef.localhost:" + pages, false},
+		{"a grant's name on the dev port", "http://0123456789abcdef0123456789abcdef.localhost:9245", false},
 		{"api origin", "http://127.0.0.1:" + api, false},
 		{"other loopback port", "http://127.0.0.1:9246", false},
 		{"https dev port", "https://127.0.0.1:9245", false},

@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+
+	"github.com/alexwaumann/code-foundry/internal/preview"
 )
 
 // loopbackHost serves a TCP listener's requests only when their Host names it: a loopback
@@ -12,7 +14,8 @@ import (
 // is 421, before CORS, the bearer check or a grant. A browser sends the Host of the URL it
 // loads, so a web page whose own name a DNS rebinding pointed at 127.0.0.1 sends its own
 // name and gets nothing, even holding a token or a grant (docs/notes/bridge-fix-floor.md).
-// The CLI, the Wails webview and pages all use http://127.0.0.1:<port>.
+// The CLI and the Wails webview use http://127.0.0.1:<port>; pages, a grant's own host
+// (pagesHost).
 func loopbackHost(port int, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !allowedHost(r.Host, port) {
@@ -44,4 +47,18 @@ func allowedHost(host string, port int) bool {
 		return false
 	}
 	return p == "" || p == strconv.Itoa(port)
+}
+
+// pagesHost is loopbackHost for the pages listener, which also serves each grant's own host,
+// <grant>.localhost with the listener's port or with none (preview.GrantOrigin). Only the
+// machine resolves *.localhost (to loopback), so a rebinding page cannot send that name.
+func pagesHost(port int, next http.Handler) http.Handler {
+	loopback := loopbackHost(port, next)
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if _, p, ok := preview.HostGrant(r.Host); ok && (p == "" || p == strconv.Itoa(port)) {
+			next.ServeHTTP(w, r)
+			return
+		}
+		loopback.ServeHTTP(w, r)
+	})
 }

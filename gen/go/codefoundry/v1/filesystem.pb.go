@@ -1996,7 +1996,13 @@ type PreviewFileRequest struct {
 	// path.
 	BaseDir string `protobuf:"bytes,1,opt,name=base_dir,json=baseDir,proto3" json:"base_dir,omitempty"`
 	// Absolute, "~/"-prefixed, or relative to base_dir.
-	Path          string `protobuf:"bytes,2,opt,name=path,proto3" json:"path,omitempty"`
+	Path string `protobuf:"bytes,2,opt,name=path,proto3" json:"path,omitempty"`
+	// The client can load a page on its grant's own origin,
+	// http://<grant>.localhost:<pages port> (the app's App Transport Security allows
+	// *.localhost since docs/notes/page-preview-serving.md), so the URL is there. Unset (a
+	// client from before it, which an update can leave running beside a newer daemon): the
+	// URL is on the pages listener's loopback origin, http://127.0.0.1:<pages port>/preview/<grant>/.
+	GrantHost     bool `protobuf:"varint,3,opt,name=grant_host,json=grantHost,proto3" json:"grant_host,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2043,6 +2049,13 @@ func (x *PreviewFileRequest) GetPath() string {
 		return x.Path
 	}
 	return ""
+}
+
+func (x *PreviewFileRequest) GetGrantHost() bool {
+	if x != nil {
+		return x.GrantHost
+	}
+	return false
 }
 
 type StreamFileRequest struct {
@@ -2175,8 +2188,11 @@ func (x *StreamFileResponse) GetModifiedAt() int64 {
 
 type PreviewFileResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// Root-relative URL of the file on the daemon's loopback listener
-	// ("/preview/<grant>/docs/index.html"); the GUI joins it to the daemon's base URL.
+	// URL of the file on the daemon's pages listener: on the grant's own origin
+	// ("http://<grant>.localhost:<pages port>/docs/index.html") when grant_host was asked,
+	// else under the preview route ("http://127.0.0.1:<pages port>/preview/<grant>/docs/index.html").
+	// A server with no pages listener answers root-relative ("/preview/<grant>/docs/index.html");
+	// the GUI joins it to the daemon's base URL.
 	Url string `protobuf:"bytes,1,opt,name=url,proto3" json:"url,omitempty"`
 	// Absolute directory the grant serves: the checkout holding the file, else its
 	// directory; the file itself when single_file.
@@ -2428,10 +2444,12 @@ const file_codefoundry_v1_filesystem_proto_rawDesc = "" +
 	"\x04size\x18\x02 \x01(\x03R\x04size\x12#\n" +
 	"\rresolved_path\x18\x03 \x01(\tR\fresolvedPath\x12\x1a\n" +
 	"\bconflict\x18\x04 \x01(\bR\bconflict\x12\x1b\n" +
-	"\tnot_found\x18\x05 \x01(\bR\bnotFound\"C\n" +
+	"\tnot_found\x18\x05 \x01(\bR\bnotFound\"b\n" +
 	"\x12PreviewFileRequest\x12\x19\n" +
 	"\bbase_dir\x18\x01 \x01(\tR\abaseDir\x12\x12\n" +
-	"\x04path\x18\x02 \x01(\tR\x04path\"B\n" +
+	"\x04path\x18\x02 \x01(\tR\x04path\x12\x1d\n" +
+	"\n" +
+	"grant_host\x18\x03 \x01(\bR\tgrantHost\"B\n" +
 	"\x11StreamFileRequest\x12\x19\n" +
 	"\bbase_dir\x18\x01 \x01(\tR\abaseDir\x12\x12\n" +
 	"\x04path\x18\x02 \x01(\tR\x04path\"x\n" +

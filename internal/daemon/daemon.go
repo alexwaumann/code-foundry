@@ -8,8 +8,8 @@
 //     (0600) once both listeners are up, and removed on shutdown.
 //   - A second loopback TCP listener for the HTML pages the model shows (pages.go): the
 //     preview route and /cf/ only, nothing behind the token. Its port is written to
-//     pages.port and kept, so the next start can take it again and pages keep their
-//     origin.
+//     pages.port and kept, so the next start can take it again, and page grants' ids are
+//     derived from the secret in pages.key, so pages keep their origin.
 //
 // The loopback listener also carries the GUI's streams over WebSockets (internal/wstunnel).
 //
@@ -216,7 +216,11 @@ func Run(ctx context.Context, opts Options) (retErr error) {
 	searchAPI := api.NewSearch(st.search, events)
 	// The file viewer also reads the temp folders, where agents write; nothing else does.
 	tempRoots := fsx.TempRoots(st.home)
-	grants := preview.NewGrants(preview.NewFloor(st.home, p).WithTemp(tempRoots))
+	key, err := pagesKey(log, p.PagesKey())
+	if err != nil {
+		return err
+	}
+	grants := preview.NewGrants(preview.NewFloor(st.home, p).WithTemp(tempRoots)).WithKey(key)
 	// The GUI's active theme, published for pages the model writes (GET /cf/theme.css),
 	// and its contrast reports on the user's themes (theme save, theme check).
 	liveTheme, themeReports := theme.NewLive(), theme.NewReports()
@@ -236,7 +240,7 @@ func Run(ctx context.Context, opts Options) (retErr error) {
 		return err
 	}
 	st.thread.SetPageRecorder(pages)
-	filesystemAPI := api.NewFilesystem(st.home, st.project, grants).WithTemp(tempRoots).WithPagesOrigin(pagesOrigin(pagesPort)).WithPagesRoot(p.Pages()).
+	filesystemAPI := api.NewFilesystem(st.home, st.project, grants).WithTemp(tempRoots).WithPagesPort(pagesPort).WithPagesRoot(p.Pages()).
 		WithIncludeIgnored(includeIgnored(st.settings)).WithRipgrep(st.ripgrep).WithPages(pages)
 	commands := command.NewRegistry()
 	facts := pluginFacts{thread: st.thread, project: st.project, gh: st.gh}
@@ -459,7 +463,7 @@ func Run(ctx context.Context, opts Options) (retErr error) {
 	tcpSrv := newServer(reqCtx, log, "loopback", logRequests(log, "loopback",
 		loopbackHost(port, withMedia(preview.MediaHandler(grants, log.With("component", "media")),
 			loopbackHandler(token, caps, slices.Collect(maps.Keys(pageRoutes)), pagesPort, opts.DevOrigins, mux, tunnel)))))
-	pagesSrv := newServer(reqCtx, log, "pages", logRequests(log, "pages", loopbackHost(pagesPort, pagesHandler(pageRoutes))))
+	pagesSrv := newServer(reqCtx, log, "pages", logRequests(log, "pages", pagesHost(pagesPort, pagesHandler(pageRoutes, grantHost(grants, liveTheme, log)))))
 
 	errc := make(chan error, 3)
 	go func() { errc <- serve(unixSrv, unixLn) }()

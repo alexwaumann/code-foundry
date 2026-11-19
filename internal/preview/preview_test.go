@@ -61,6 +61,60 @@ func TestGrants(t *testing.T) {
 	}
 }
 
+// With a key, a page grant's id is the same in a new table (a restarted daemon) and differs
+// by key and by what it serves; a media grant's id stays random.
+func TestGrantsWithKey(t *testing.T) {
+	floor := NewFloor("/home", paths.New("/home/.code-foundry"))
+	key := []byte("0123456789abcdef0123456789abcdef")
+	type mint func(*Grants) (string, error)
+	tree := func(dir string) mint { return func(g *Grants) (string, error) { return g.Grant(dir) } }
+	file := func(f string) mint { return func(g *Grants) (string, error) { return g.GrantFile(f) } }
+	media := func(f string) mint { return func(g *Grants) (string, error) { return g.GrantMedia(f) } }
+	id := func(g *Grants, m mint) string {
+		t.Helper()
+		s, err := m(g)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !grantID(s) {
+			t.Fatalf("id %q is not a grant id", s)
+		}
+		return s
+	}
+	tests := []struct {
+		name       string
+		a, b       mint
+		keyB       []byte
+		wantSameID bool
+	}{
+		{"a tree after a restart", tree("/home/a"), tree("/home/a"), key, true},
+		{"a file after a restart", file("/home/a/x.html"), file("/home/a/x.html"), key, true},
+		{"another key", tree("/home/a"), tree("/home/a"), []byte("another key, another daemon home"), false},
+		{"another tree", tree("/home/a"), tree("/home/b"), key, false},
+		{"a tree and a file of the same name", tree("/home/a"), file("/home/a"), key, false},
+		{"a tree whose name runs on", tree("/home/a"), tree("/home/a/b"), key, false},
+		{"a media grant after a restart", media("/home/a/clip.mp4"), media("/home/a/clip.mp4"), key, false},
+		{"a media grant and a page grant of one file", media("/home/a/clip.mp4"), file("/home/a/clip.mp4"), key, false},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			a := id(NewGrants(floor).WithKey(key), tc.a)
+			gb := NewGrants(floor).WithKey(tc.keyB)
+			b := id(gb, tc.b)
+			if (a == b) != tc.wantSameID {
+				t.Errorf("ids %q and %q, want same: %v", a, b, tc.wantSameID)
+			}
+			if again := id(gb, tc.b); again != b {
+				t.Errorf("asked again: %q, then %q", b, again)
+			}
+		})
+	}
+	// Without a key, a new table mints a new id.
+	if a, b := id(NewGrants(floor), tree("/home/a")), id(NewGrants(floor), tree("/home/a")); a == b {
+		t.Errorf("unkeyed tables both minted %q", a)
+	}
+}
+
 func TestURL(t *testing.T) {
 	got := URL("g1", "docs/a b#1/index.html")
 	if want := "/preview/g1/docs/a%20b%231/index.html"; got != want {

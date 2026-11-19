@@ -1,6 +1,8 @@
 package daemon
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -18,14 +20,41 @@ import (
 )
 
 // The pages listener (docs/notes/bridge-1-daemon.md) serves what an HTML page the model
-// shows loads without a credential: the preview route (its grant is in the URL) and /cf/
-// (the theme, the bridge script and the page library). It serves nothing else, and the API listener none of
-// it. The split gives pages an origin of their own, http://127.0.0.1:<pages port>, which
-// CORS on the API listener refuses (allowedOrigin), so a page holding a leaked token still
-// cannot call the API. The port is kept in pages.port and tried again on the next start,
-// so a page's origin survives restarts. Its localStorage does not survive the app's: WebKit
-// keeps a cross-site frame's storage in memory for the session, so cf.storage is kept by
-// the daemon instead (docs/notes/bridge-fix-storage.md).
+// shows loads without a credential: each grant's files on the grant's own host,
+// http://<grant>.localhost:<pages port> (preview.GrantOrigin, docs/notes/page-preview-serving.md),
+// the preview route (/preview/<grant>/) on a loopback name, and /cf/ (the theme, the bridge
+// script and the page library) on both. It serves nothing else, and the API listener none of
+// it. The split gives pages origins of their own, on the pages port, which CORS on the API
+// listener refuses (allowedOrigin), so a page holding a leaked token still cannot call the
+// API. The port is kept in pages.port and tried again on the next start, and a page grant's
+// id is derived from a secret kept in pages.key (pagesKey), so a page's origin, and the
+// storage WebKit keeps for it, survive a daemon restart. Its localStorage does not survive the
+// app's: WebKit keeps a cross-site frame's storage in memory for the session, so cf.storage is
+// kept by the daemon instead (docs/notes/bridge-fix-storage.md).
+
+// pagesKey reads the secret page grants' ids are derived from (preview.Grants.WithKey), kept
+// in file like the daemon token (0600, in the config home, which no grant may read), or makes
+// and writes a new one when there is none or it is not 32 hex-encoded bytes. A new key gives
+// every page a new origin once; a key that cannot be written is still used for this run.
+func pagesKey(log *slog.Logger, file string) ([]byte, error) {
+	raw, err := os.ReadFile(file)
+	if err == nil {
+		if key, derr := hex.DecodeString(strings.TrimSpace(string(raw))); derr == nil && len(key) == 32 {
+			return key, nil
+		}
+		log.Warn("replacing a malformed pages key; pages get new origins", "path", file)
+	} else if !errors.Is(err, os.ErrNotExist) {
+		log.Warn("read pages key; pages get new origins", "path", file, "err", err)
+	}
+	key := make([]byte, 32)
+	if _, err := rand.Read(key); err != nil {
+		return nil, fmt.Errorf("generate pages key: %w", err)
+	}
+	if err := writeFileAtomic(file, []byte(hex.EncodeToString(key)+"\n"), 0o600); err != nil {
+		log.Warn("write pages key; pages get new origins at the next start", "path", file, "err", err)
+	}
+	return key, nil
+}
 
 // listenPages binds the pages listener on loopback: the port in file when it is still
 // free, else a new one. A missing, unreadable or taken port is not an error.
@@ -74,7 +103,8 @@ func themePaint(live *theme.Live) preview.Paint {
 	}
 }
 
-// pagesOrigin is the origin pages are served from.
+// pagesOrigin is the pages listener's origin on a loopback name (the preview route's);
+// a grant's own is preview.GrantOrigin.
 func pagesOrigin(port int) string { return "http://127.0.0.1:" + strconv.Itoa(port) }
 
 // newPageRoutes is what a page loads without a credential, by path prefix (the most
@@ -90,13 +120,38 @@ func newPageRoutes(grants *preview.Grants, liveTheme *theme.Live, log *slog.Logg
 	return routes
 }
 
-// pagesHandler is what the pages listener serves: routes, keyed by path prefix, each
-// setting its own headers; every other path is 404.
-func pagesHandler(routes map[string]http.Handler) http.Handler {
-	m := http.NewServeMux()
+// grantHost is what a grant's own host on the pages listener serves (preview.GrantOrigin):
+// the grant's files at the root, and, at a path the grant has no file at, missing (the /cf/
+// routes).
+func grantHost(grants *preview.Grants, liveTheme *theme.Live, log *slog.Logger) func(missing http.Handler) http.Handler {
+	return func(missing http.Handler) http.Handler {
+		return preview.HandlerMissing(grants, themePaint(liveTheme), missing, log.With("component", "preview"))
+	}
+}
+
+// pagesHandler is what the pages listener serves. On a loopback name: routes, keyed by path
+// prefix, each setting its own headers; every other path is 404. On a grant's own host
+// (<grant>.localhost): own, given the routes other than the preview route for the paths the
+// grant has no file at; a nil own serves 404 there.
+func pagesHandler(routes map[string]http.Handler, own func(missing http.Handler) http.Handler) http.Handler {
+	m, cf := http.NewServeMux(), http.NewServeMux()
 	for prefix, h := range routes {
 		m.Handle(prefix, h)
+		if prefix != preview.Prefix {
+			cf.Handle(prefix, h)
+		}
 	}
 	m.Handle("/", http.NotFoundHandler())
-	return m
+	cf.Handle("/", http.NotFoundHandler())
+	var grant http.Handler = http.NotFoundHandler()
+	if own != nil {
+		grant = own(cf)
+	}
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if _, _, ok := preview.HostGrant(r.Host); ok {
+			grant.ServeHTTP(w, r)
+			return
+		}
+		m.ServeHTTP(w, r)
+	})
 }

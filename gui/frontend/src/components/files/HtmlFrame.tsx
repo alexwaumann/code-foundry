@@ -27,12 +27,13 @@ export const HTML_PREVIEW_SANDBOX = "allow-scripts allow-forms allow-popups allo
  * The sandbox of a page a thread showed: HTML_PREVIEW_SANDBOX and `allow-same-origin`, so
  * it has localStorage and IndexedDB (docs/notes/bridge-2-gui.md), for the app's session
  * only: WebKit never writes a cross-site frame's storage to disk, so cf.storage is the
- * daemon's (docs/notes/bridge-fix-storage.md). That origin is the daemon's pages listener
- * (`/preview/` and `/cf/` on a port of their own), never the app's and never the API's,
- * whose CORS refuses it: the page still cannot reach Code Foundry's window or the
- * daemon's authenticated routes, and reaches Code Foundry only through the bridge. Every
- * thread's pages share that origin, so two of them on screen can reach each other's
- * window (accepted: both are the user's own threads).
+ * daemon's (docs/notes/bridge-fix-storage.md). That origin is its grant's own on the
+ * daemon's pages listener (`http://<grant>.localhost:<pages port>`,
+ * docs/notes/page-preview-serving.md), never the app's and never the API's, whose CORS
+ * refuses it: the page still cannot reach Code Foundry's window or the daemon's
+ * authenticated routes, and reaches Code Foundry only through the bridge. Pages of one tree
+ * share that origin, so two of them on screen can reach each other's window (accepted: both
+ * are the user's own threads).
  */
 export const THREAD_PAGE_SANDBOX = `${HTML_PREVIEW_SANDBOX} allow-same-origin`;
 

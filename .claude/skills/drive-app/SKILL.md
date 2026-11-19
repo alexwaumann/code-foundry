@@ -8,7 +8,8 @@ description: Drive the Code Foundry GUI in a headless WebKit browser with `playw
 `playwright cli` ships inside the repo's `@playwright/test`, so it uses the same WebKit build as
 the e2e suite (the engine of the Wails window). `gui/frontend/.playwright/cli.config.json` is
 picked up automatically when the CLI runs from `gui/frontend`: WebKit, headless, in-memory
-profile, dark, 1280×800, and only `127.0.0.1` / `localhost` origins.
+profile, dark, 1280×800, and only `127.0.0.1` / `localhost` / `*.localhost` origins (a page in a
+File tab is framed at its grant's own `<grant>.localhost`).
 
 ## Start
 

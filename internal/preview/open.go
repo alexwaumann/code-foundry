@@ -14,53 +14,56 @@ import (
 // openFlags opens without blocking: what is there may be a FIFO by the time it is opened.
 const openFlags = os.O_RDONLY | syscall.O_NONBLOCK
 
-// open opens the regular file rel names under e and says where it really is, or fails with
-// ErrNotExist or a read error, each a 404. A temp grant goes by what it opened (openTemp). A
+// open opens the regular file rel names under e and says where it really is, and whether rel
+// named a directory (whose index.html it opened), or fails with ErrNotExist or a read error,
+// each a 404. A temp grant goes by what it opened (openTemp). A
 // home grant checks first and opens after, with no link allowed on the way: real has none, so
 // a link swapped in since the check fails the open. Other users can write in parts of home
 // (~/Public/Drop Box), so a swap there is possible.
-func open(floor Floor, e entry, rel string) (*os.File, string, error) {
+func open(floor Floor, e entry, rel string) (*os.File, string, bool, error) {
 	if floor.inTemp(e.dir) {
 		return openTemp(floor, e, rel)
 	}
-	real, err := resolve(floor, e.dir, rel)
+	real, dir, err := resolve(floor, e.dir, rel)
 	if err != nil {
-		return nil, "", err
+		return nil, "", false, err
 	}
 	f, err := os.OpenFile(real, openFlags|fsx.NoFollowAny, 0)
 	if err != nil {
-		return nil, "", err
+		return nil, "", false, err
 	}
-	return f, real, nil
+	return f, real, dir, nil
 }
 
-// resolve maps a request path to the regular file it names under dir, or ErrNotExist. The file
+// resolve maps a request path to the regular file it names under dir (a directory's
+// index.html, saying so), or ErrNotExist. The file
 // must be under home: only a grant in a temp folder serves what lies in one, so a link from
 // home into temp, which anything can repoint, is no way to give temp's bytes a home page's URL.
-func resolve(floor Floor, dir, rel string) (string, error) {
+func resolve(floor Floor, dir, rel string) (string, bool, error) {
 	clean := path.Clean("/" + rel)
 	p := filepath.Join(dir, filepath.FromSlash(clean))
 	if !fsx.Within(dir, p) {
-		return "", fs.ErrNotExist
+		return "", false, fs.ErrNotExist
 	}
 	real, err := filepath.EvalSymlinks(p)
 	if err != nil {
-		return "", err
+		return "", false, err
 	}
 	if !fsx.Within(floor.home, real) || floor.Guarded(real) {
-		return "", fs.ErrNotExist
+		return "", false, fs.ErrNotExist
 	}
 	fi, err := os.Stat(real)
 	if err != nil {
-		return "", err
+		return "", false, err
 	}
 	if fi.IsDir() {
-		return resolve(floor, dir, path.Join(clean, "index.html"))
+		real, _, err := resolve(floor, dir, path.Join(clean, "index.html"))
+		return real, true, err
 	}
 	if !fi.Mode().IsRegular() {
-		return "", fs.ErrNotExist
+		return "", false, fs.ErrNotExist
 	}
-	return real, nil
+	return real, false, nil
 }
 
 // openTemp is open for a grant in a temp folder, where anything on the machine can swap a name
@@ -77,10 +80,10 @@ func resolve(floor Floor, dir, rel string) (string, error) {
 //     user racing the Floor's reads in that tree (docs/notes/read-temp-files.md).
 //
 // Anything refused is ErrNotExist: it may be a stranger's doing, so it is not worth a log line.
-func openTemp(floor Floor, e entry, rel string) (*os.File, string, error) {
+func openTemp(floor Floor, e entry, rel string) (*os.File, string, bool, error) {
 	root, err := fsx.OpenTree(floor.roots().TempRoot(e.dir), e.dir)
 	if err != nil {
-		return nil, "", fs.ErrNotExist
+		return nil, "", false, fs.ErrNotExist
 	}
 	defer func() { _ = root.Close() }()
 	name := strings.TrimPrefix(path.Clean("/"+rel), "/")
@@ -88,13 +91,14 @@ func openTemp(floor Floor, e entry, rel string) (*os.File, string, error) {
 		name = "."
 	}
 	f, fi, err := openIn(root, name)
-	if err == nil && fi.IsDir() && e.file == "" {
+	dir := err == nil && fi.IsDir() && e.file == ""
+	if dir {
 		_ = f.Close()
 		name = path.Join(name, "index.html")
 		f, fi, err = openIn(root, name)
 	}
 	if err != nil {
-		return nil, "", fs.ErrNotExist
+		return nil, "", false, fs.ErrNotExist
 	}
 	real, ok := "", fi.Mode().IsRegular() && (e.file == "" || atName(root, name, fi))
 	if ok {
@@ -102,9 +106,9 @@ func openTemp(floor Floor, e entry, rel string) (*os.File, string, error) {
 	}
 	if !ok {
 		_ = f.Close()
-		return nil, "", fs.ErrNotExist
+		return nil, "", false, fs.ErrNotExist
 	}
-	return f, real, nil
+	return f, real, dir, nil
 }
 
 // openIn opens name in root and stats what it opened.

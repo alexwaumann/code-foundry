@@ -165,13 +165,62 @@ func TestLoopbackHandlerServesNoPageRoutes(t *testing.T) {
 	}
 }
 
+// On a grant's own host every path is the grant's (own), which is given the routes but the
+// preview route for what it has no file at; a loopback name keeps the routes by prefix.
+func TestPagesHandlerGrantHost(t *testing.T) {
+	const g = "0123456789abcdef0123456789abcdef"
+	routes := map[string]http.Handler{
+		"/preview/": http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusTeapot) }),
+		"/cf/":      http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusAccepted) }),
+	}
+	own := func(missing http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Path == "/mine.html" {
+				w.WriteHeader(http.StatusCreated)
+				return
+			}
+			missing.ServeHTTP(w, r)
+		})
+	}
+	h := pagesHandler(routes, own)
+	tests := []struct {
+		name, host, path string
+		want             int
+	}{
+		{"the grant's file", g + ".localhost:4242", "/mine.html", http.StatusCreated},
+		{"the daemon's /cf/ where it has none", g + ".localhost:4242", "/cf/theme.css", http.StatusAccepted},
+		{"no preview route on a grant's host", g + ".localhost:4242", "/preview/abc/index.html", http.StatusNotFound},
+		{"nothing else", g + ".localhost:4242", "/x", http.StatusNotFound},
+		{"the preview route on a loopback name", "127.0.0.1:4242", "/preview/abc/index.html", http.StatusTeapot},
+		{"no grant's files on a loopback name", "127.0.0.1:4242", "/mine.html", http.StatusNotFound},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, tc.path, nil)
+			req.Host = tc.host
+			rec := httptest.NewRecorder()
+			h.ServeHTTP(rec, req)
+			if rec.Code != tc.want {
+				t.Errorf("status %d, want %d", rec.Code, tc.want)
+			}
+		})
+	}
+	req := httptest.NewRequest(http.MethodGet, "/mine.html", nil)
+	req.Host = g + ".localhost:4242"
+	rec := httptest.NewRecorder()
+	pagesHandler(routes, nil).ServeHTTP(rec, req)
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("without own: status %d, want 404", rec.Code)
+	}
+}
+
 func TestPagesHandlerServesOnlyPageRoutes(t *testing.T) {
 	routes := map[string]http.Handler{
 		"/preview/":     http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusTeapot) }),
 		"/cf/":          http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusAccepted) }),
 		"/cf/bridge.js": http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusCreated) }),
 	}
-	h := pagesHandler(routes)
+	h := pagesHandler(routes, nil)
 	tests := []struct {
 		name, path, auth string
 		want             int
@@ -257,6 +306,8 @@ func TestRequireBearerAndCORS(t *testing.T) {
 		{"pages port as localhost in dev", true, http.MethodOptions, preflight("http://localhost:9300"), http.StatusUnauthorized, ""},
 		{"pages port as ::1 in dev", true, http.MethodOptions, preflight("http://[::1]:9300"), http.StatusUnauthorized, ""},
 		{"pages port over https in dev", true, http.MethodOptions, preflight("https://127.0.0.1:9300"), http.StatusUnauthorized, ""},
+		{"a grant's own origin in dev", true, http.MethodOptions, preflight("http://0123456789abcdef0123456789abcdef.localhost:9300"), http.StatusUnauthorized, ""},
+		{"a grant's name on a listed port in dev", true, http.MethodOptions, preflight("http://0123456789abcdef0123456789abcdef.localhost:9245"), http.StatusUnauthorized, ""},
 		// An opaque-origin page and the web, never.
 		{"null origin preflight", true, http.MethodOptions, preflight("null"), http.StatusUnauthorized, ""},
 		{"null origin with token", true, http.MethodPost, withToken("null"), http.StatusTeapot, ""},
@@ -327,7 +378,7 @@ func TestParseDevOrigins(t *testing.T) {
 // revalidated, beside the theme and the bridge; none on the API listener.
 func TestPageLibraryRoutes(t *testing.T) {
 	routes := newPageRoutes(preview.NewGrants(preview.Floor{}), theme.NewLive(), slog.New(slog.DiscardHandler))
-	pages := pagesHandler(routes)
+	pages := pagesHandler(routes, nil)
 	api := loopbackHandler("secret", nil, slices.Collect(maps.Keys(routes)), 4242, nil,
 		http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) }), http.NotFoundHandler())
 	tests := []struct {

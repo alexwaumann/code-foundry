@@ -71,7 +71,9 @@ an opaque origin again, as before the bridge: it cannot read or script another f
 a ready with no thread, the theme and refusals). It still loads `/cf/theme.css` and
 `/cf/bridge.js` (classic, no-cors loads).
 
-**Accepted residual:** every thread's pages share the pages origin, so two pages of the
+**Accepted residual:** every thread's pages share the pages origin (since
+`page-preview-serving.md` each grant has its own origin, so this holds only for pages of one
+tree), so two pages of the
 user's own threads on screen can still reach each other's window, read each other's nonce
 and call each other's `cf`; the host then credits the frame that posted. A per-thread origin
 would need a listener (a port) per thread, which is not worth it for pages of the user's own

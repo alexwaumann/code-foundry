@@ -9,7 +9,8 @@ confirm dialog was open or queued, and the command still ran afterwards (high); 
 
 ### Why localStorage could not work
 
-The pages origin is `http://127.0.0.1:<pages port>`; the app's document is
+The pages origin is `http://127.0.0.1:<pages port>` (since `page-preview-serving.md`, a
+grant's own `http://<grant>.localhost:<pages port>`, kept across daemon restarts by `pages.key`); the app's document is
 `wails://localhost`. To WebKit the frame is a cross-site (third-party) frame, and WebKit
 keeps a third-party frame's localStorage and IndexedDB partitioned and **in memory for the
 session**. The stable pages port (bridge-1) keeps the origin the same across daemon

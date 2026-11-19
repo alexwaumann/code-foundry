@@ -43,7 +43,7 @@ function opaqueStorage() {
   };
 }
 
-function load(opts: { embedded?: boolean; navigation?: object; opaque?: boolean; resources?: string[]; observe?: (cb: () => void) => void } = {}) {
+function load(opts: { at?: string; embedded?: boolean; navigation?: object; nested?: boolean; opaque?: boolean; resources?: string[]; observe?: (cb: () => void) => void } = {}) {
   const posted: Msg[] = [];
   /** What the script says of the document (cf:here, cf:going), apart from the rest. */
   const notes: string[] = [];
@@ -96,11 +96,24 @@ function load(opts: { embedded?: boolean; navigation?: object; opaque?: boolean;
           },
         };
   win.parent = parent;
+  // The app's window is the top one; a frame inside the page has the page between.
+  win.top = opts.nested ? {} : parent;
+  /** The page's own frames' windows (window.frames). */
+  const frames: unknown[] = [];
+  win.frames = frames;
+  win.name = "";
+  /** What reached the browser's own window.open (a frame of the page by its name). */
+  const opened: unknown[][] = [];
+  win.open = (...args: unknown[]) => {
+    opened.push(args);
+    return null;
+  };
   if (opts.navigation) win.navigation = opts.navigation;
+  const at = new URL(opts.at ?? `http://${HOST}/preview/g/page.html`);
   const location = {
-    host: HOST,
+    host: at.host,
     get href() {
-      return `http://${HOST}/preview/g/page.html`;
+      return at.href;
     },
     set href(v: string) {
       went = v;
@@ -154,9 +167,19 @@ function load(opts: { embedded?: boolean; navigation?: object; opaque?: boolean;
     source = from;
     document.dispatchEvent(new MessageEvent("message", { data }));
   };
+  /** A frame of the page named name, as its window shows it (a window's own `window` is itself). */
+  const frame = (name: string) => {
+    const w: Record<string, unknown> = {};
+    w.window = w;
+    win[name] = w;
+    return w;
+  };
   return {
     message,
-    win: win as { open: (u?: string) => unknown; alert: (t?: unknown) => void; confirm: (t?: unknown) => boolean; prompt: (t?: unknown) => string | null; __cfFrame?: boolean },
+    frames,
+    frame,
+    opened,
+    win: win as { open: (u?: string, name?: string) => unknown; alert: (t?: unknown) => void; confirm: (t?: unknown) => boolean; prompt: (t?: unknown) => string | null; __cfFrame?: boolean },
     posted,
     notes,
     link,
@@ -235,8 +258,156 @@ describe("the frame script", () => {
     expect(f.posted).toEqual([{ type: "cf:open", url: "https://example.com/x" }]);
     f.win.open(`http://${HOST}/preview/g/b.html`);
     expect(f.went()).toBe(`http://${HOST}/preview/g/b.html`);
-    f.win.open();
     expect(f.posted).toHaveLength(1);
+  });
+
+  it("window.open with no page to load (a print view written in script) says it opened nothing", () => {
+    const f = load();
+    expect(f.win.open()).toBeNull();
+    expect(f.win.open("", "_blank")).toBeNull();
+    expect(f.win.open("about:blank")).toBeNull();
+    expect(f.posted).toEqual([
+      { type: "cf:unsupported", what: "window", text: "" },
+      { type: "cf:unsupported", what: "window", text: "" },
+      { type: "cf:unsupported", what: "window", text: "about:blank" },
+    ]);
+    expect(f.went()).toBeNull();
+    expect(f.opened).toEqual([]);
+  });
+
+  it("window.open into a frame of the page by its name is the browser's; any other name loads in this frame", () => {
+    const f = load();
+    f.frame("viewer");
+    f.win.open("b.html", "viewer");
+    expect(f.opened).toEqual([["b.html", "viewer"]]);
+    f.win.open("c.html", "nowhere");
+    expect(f.went()).toBe(`http://${HOST}/c.html`);
+    expect(f.opened).toHaveLength(1);
+    expect(f.notes).toEqual(["cf:going"]);
+  });
+
+  describe("a link's target", () => {
+    afterEach(() => {
+      document.head.querySelectorAll("base").forEach((b) => {
+        b.remove();
+      });
+    });
+
+    it.each([
+      ["_blank", {}],
+      ["_new (a name no frame has)", { target: "_new" }],
+      ["a name no frame has", { target: "viewer" }],
+      ["_top", { target: "_TOP" }],
+      ["_parent, from the page itself", { target: "_parent" }],
+      ["_blank, in any case", { target: "_Blank" }],
+    ])("loads the page's own file in the frame when it would open a window: %s", (_name, attrs) => {
+      const f = load();
+      expect(f.click(f.link({ href: "other.html", target: "_blank", ...attrs }))).toBe(true);
+      expect(f.went()).toBe(`http://${HOST}/other.html`);
+      expect(f.notes).toEqual(["cf:going"]);
+    });
+
+    it("takes the document's <base target> when the link names none, and the link's own over it", () => {
+      const base = document.createElement("base");
+      base.setAttribute("target", "_blank");
+      document.head.append(base);
+      const f = load();
+      expect(f.click(f.link({ href: "a.html" }))).toBe(true);
+      expect(f.went()).toBe(`http://${HOST}/a.html`);
+      expect(f.click(f.link({ href: "b.html", target: "_self" }))).toBe(false);
+      expect(f.went()).toBe(`http://${HOST}/a.html`);
+      expect(f.click(f.link({ href: "https://example.com/" }))).toBe(true);
+      expect(f.posted).toEqual([{ type: "cf:open", url: "https://example.com/" }]);
+    });
+
+    it("leaves a link into a frame of the page, by its name or this frame's own, to the browser, and says no going", () => {
+      const f = load();
+      f.frame("viewer");
+      (f.win as unknown as { name: string }).name = "me";
+      expect(f.click(f.link({ href: "a.html", target: "viewer" }))).toBe(false);
+      expect(f.click(f.link({ href: "a.html", target: "Viewer" }))).toBe(true);
+      expect(f.went()).toBe(`http://${HOST}/a.html`);
+      expect(f.click(f.link({ href: "b.html", target: "me" }))).toBe(false);
+      expect(f.notes).toEqual(["cf:going"]);
+    });
+
+    it("an element with the target's id is not a frame", () => {
+      const f = load();
+      (f.win as unknown as Record<string, unknown>).viewer = document.createElement("div");
+      expect(f.click(f.link({ href: "a.html", target: "viewer" }))).toBe(true);
+    });
+
+    it("in a frame inside the page, _parent is the page's and _top would be the app's", () => {
+      const f = load({ nested: true });
+      expect(f.click(f.link({ href: "a.html", target: "_parent" }))).toBe(false);
+      expect(f.click(f.link({ href: "b.html", target: "_top" }))).toBe(true);
+      expect(f.went()).toBe(`http://${HOST}/b.html`);
+    });
+  });
+
+  it("a GET form to the page's own file in a window loads it in the frame with its fields", () => {
+    const f = load();
+    expect(f.submit(f.form({ action: "results.html", target: "_blank" }, { q: "a b" }))).toBe(true);
+    expect(f.went()).toBe(`http://${HOST}/results.html?q=a+b`);
+    const button = document.createElement("button");
+    button.setAttribute("formtarget", "_self");
+    const own = f.form({ action: "next.html", target: "_blank" });
+    own.append(button);
+    expect(f.submit(own, "user", button)).toBe(false);
+    expect(f.posted).toEqual([]);
+  });
+
+  it("a POST to the page's own files, which nothing answers, says so and stays", () => {
+    const f = load();
+    expect(f.submit(f.form({ method: "post" }, { email: "a@b.c" }))).toBe(true);
+    f.form({ action: "save.html", method: "post" }).submit();
+    // A form with no action is sent to its document's URL (jsdom's own here).
+    expect(f.posted).toEqual([
+      { type: "cf:unsupported", what: "post", text: window.location.pathname },
+      { type: "cf:unsupported", what: "post", text: "/save.html" },
+    ]);
+    expect(submitted).toEqual([]);
+    expect(f.notes).toEqual([]);
+  });
+
+  describe("in a frame inside the page", () => {
+    it("sends on to the app what its own frames report, and nothing of anyone else's", () => {
+      const f = load();
+      const inner = {};
+      f.frames.push(inner);
+      f.message({ type: "cf:ping", seq: 1 });
+      f.message({ type: "cf:open", url: "http://localhost:1/x" }, inner);
+      f.message({ type: "cf:unsupported", what: "alert", text: "hi" }, inner);
+      f.message({ type: "cf:unsupported", what: "download", text: "x".repeat(500) }, inner);
+      f.message({ type: "cf:open", url: "javascript:alert(1)" }, inner);
+      f.message({ type: "cf:going" }, inner);
+      f.message({ type: "cf:here", seq: 1 }, inner);
+      f.message({ type: "cf:open", url: "https://example.com/" }, {});
+      f.message({ type: "cf:unsupported", what: "alert" }, {});
+      f.message("cf:open", inner);
+      expect(f.posted).toEqual([
+        { type: "cf:open", url: "http://localhost:1/x" },
+        { type: "cf:unsupported", what: "alert", text: "hi" },
+        { type: "cf:unsupported", what: "download", text: "x".repeat(200) },
+      ]);
+      expect(f.notes).toEqual(["cf:here"]);
+    });
+
+    it("sends on what its frames report before the app's ping once it answered it (the frame's load clears the strip in between)", () => {
+      const f = load();
+      const inner = {};
+      f.frames.push(inner);
+      f.message({ type: "cf:unsupported", what: "storage", text: "localStorage" }, inner);
+      expect(f.posted).toEqual([]);
+      f.message({ type: "cf:ping", seq: 1 });
+      expect(f.posted).toEqual([{ type: "cf:unsupported", what: "storage", text: "localStorage" }]);
+    });
+
+    it("tells the page of its own storage at once, with no ping to wait for", () => {
+      const f = load({ nested: true, opaque: true });
+      (f.win as unknown as { localStorage: Storage }).localStorage.setItem("k", "v");
+      expect(f.posted).toEqual([{ type: "cf:unsupported", what: "storage", text: "localStorage" }]);
+    });
   });
 
   it("alert, confirm and prompt answer as no dialog would and say so", () => {
@@ -313,6 +484,14 @@ describe("the frame script", () => {
     document.body.append(theme);
     f.message({ type: "cf:ping", seq: 2 });
     expect(got.at(-1)).toMatchObject({ theme: true });
+  });
+
+  it("on its grant's own host, lists the paths there, the app's theme and bridge among them", () => {
+    const own = "http://0123456789abcdef0123456789abcdef.localhost:9246";
+    const f = load({ at: `${own}/dist/index.html?cf-nonce=n#/about`, resources: [`${own}/assets/index.js`, `${own}/cf/theme.css`, `${own}/cf/bridge.js`, "http://127.0.0.1:9246/preview/g/x.css"] });
+    const got = answers(f);
+    f.message({ type: "cf:ping", seq: 1 });
+    expect(got).toEqual([{ type: "cf:here", seq: 1, files: ["/dist/index.html", "/assets/index.js", "/cf/theme.css", "/cf/bridge.js"], theme: true }]);
   });
 
   it("tells the app of files it fetched after it answered, not before", () => {
@@ -494,6 +673,14 @@ describe("the frame script", () => {
       ]);
     });
 
+    it("stops a POST to the page's own files there too", () => {
+      const n = navigation();
+      const f = load({ navigation: n.api });
+      expect(n.navigate(`http://${HOST}/preview/g/page.html`, { formData: {} })).toBe(true);
+      expect(f.posted).toEqual([{ type: "cf:unsupported", what: "post", text: "/preview/g/page.html" }]);
+      expect(f.notes).toEqual([]);
+    });
+
     it.each([
       ["the page's own file", `http://${HOST}/preview/g/other.html`, {}, true],
       ["the same document", "https://example.com/#x", { destination: { url: "https://example.com/#x", sameDocument: true } }, false],
@@ -533,7 +720,7 @@ describe("what the app reads from the frame script", () => {
   });
 
   it("names each call a page cannot make, and nothing else", () => {
-    for (const what of ["alert", "confirm", "prompt", "download", "form", "navigation"]) expect(pageUnsupported({ type: "cf:unsupported", what })?.message).toMatch(/page/);
+    for (const what of ["alert", "confirm", "prompt", "download", "form", "post", "navigation", "window"]) expect(pageUnsupported({ type: "cf:unsupported", what })?.message).toMatch(/page/);
     expect(pageUnsupported({ type: "cf:unsupported", what: "download" })?.message).toContain('cf.run("file.export"');
     expect(pageUnsupported({ type: "cf:unsupported", what: "toString" })).toBeNull();
     expect(pageUnsupported({ type: "cf:open", what: "alert" })).toBeNull();

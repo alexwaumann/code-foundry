@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"syscall"
 
@@ -34,9 +35,9 @@ type Filesystem struct {
 	text     *textsearch.Searcher
 	grants   *preview.Grants
 	writer   *fsx.Writer
-	// pagesOrigin is where the preview route is served (the daemon's pages listener);
-	// PreviewFile's URLs are on it. Empty: root-relative URLs.
-	pagesOrigin string
+	// pagesPort is the daemon's pages listener's port; PreviewFile's URLs are on it
+	// (previewURL). Zero: root-relative URLs on the preview route.
+	pagesPort int
 	// pagesRoot is the directory the threads' pages directories are made under
 	// (WithPagesRoot); PreviewFile names the thread a file under it belongs to. Empty: none.
 	pagesRoot string
@@ -74,11 +75,27 @@ func (h *Filesystem) WithRipgrep(engine *ripgrep.Engine) *Filesystem {
 	return h
 }
 
-// WithPagesOrigin makes PreviewFile's URLs absolute on origin
-// ("http://127.0.0.1:<port>"), the listener that serves the preview route.
-func (h *Filesystem) WithPagesOrigin(origin string) *Filesystem {
-	h.pagesOrigin = origin
+// WithPagesPort makes PreviewFile's URLs absolute on the pages listener at port (previewURL).
+func (h *Filesystem) WithPagesPort(port int) *Filesystem {
+	h.pagesPort = port
 	return h
+}
+
+// previewURL is where the pages listener serves rel under grant: on the grant's own origin,
+// http://<grant>.localhost:<port>/<rel> (preview.GrantURL), for a client that asked for it
+// (PreviewFileRequest.grant_host: its App Transport Security allows *.localhost); else under
+// the preview route on the listener's loopback origin, which every client loads, so a GUI
+// from before grant hosts that an update left running beside this daemon still shows pages
+// (docs/notes/page-preview-serving.md). Root-relative without a pages listener.
+func (h *Filesystem) previewURL(grant, rel string, grantHost bool) string {
+	switch {
+	case h.pagesPort == 0:
+		return preview.URL(grant, rel)
+	case grantHost:
+		return preview.GrantURL(grant, rel, h.pagesPort)
+	default:
+		return "http://127.0.0.1:" + strconv.Itoa(h.pagesPort) + preview.URL(grant, rel)
+	}
 }
 
 // WithIncludeIgnored makes file search list the git-ignored files that all's patterns
@@ -454,7 +471,7 @@ func (h *Filesystem) PreviewFile(ctx context.Context, req *connect.Request[v1.Pr
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("preview %s: %w", f.Path, err))
 	}
-	url := h.pagesOrigin + preview.URL(grant, filepath.ToSlash(rel))
+	url := h.previewURL(grant, filepath.ToSlash(rel), req.Msg.GetGrantHost())
 	return connect.NewResponse(&v1.PreviewFileResponse{Url: url, Scope: scope, SingleFile: single, PageThread: h.pageThread(f.RealPath),
 		Page: h.pageAccess(ctx, f.Path)}), nil
 }

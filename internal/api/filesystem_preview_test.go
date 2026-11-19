@@ -6,10 +6,13 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net"
 	"net/http"
 	"net/http/httptest"
+	neturl "net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"syscall"
 	"testing"
@@ -161,8 +164,10 @@ func TestFilesystemPreviewFile(t *testing.T) {
 	})
 }
 
-// With a pages origin (the daemon's pages listener), PreviewFile's URL is absolute on it,
-// and serves the file from there.
+// With a pages listener, PreviewFile's URL is absolute on it: on the grant's own origin,
+// http://<grant>.localhost:<port>/<path>, for a client that asks for it (grant_host), and
+// under the preview route on the loopback origin for one that does not (a GUI from before
+// grant hosts, which an update can leave running beside this daemon). Both serve the file.
 func TestFilesystemPreviewFilePagesOrigin(t *testing.T) {
 	root, err := filepath.EvalSymlinks(t.TempDir())
 	if err != nil {
@@ -178,25 +183,46 @@ func TestFilesystemPreviewFilePagesOrigin(t *testing.T) {
 	grants := testGrants(root)
 	pages := httptest.NewServer(preview.Handler(grants, nil, slog.Default()))
 	t.Cleanup(pages.Close)
-	route := NewFilesystem(root, projecttest.New(nil), grants).WithPagesOrigin(pages.URL).Route()
+	port := pages.Listener.Addr().(*net.TCPAddr).Port
+	route := NewFilesystem(root, projecttest.New(nil), grants).WithPagesPort(port).Route()
 	api := httptest.NewServer(route.Handler)
 	t.Cleanup(api.Close)
 	c := codefoundryv1connect.NewFilesystemServiceClient(api.Client(), api.URL)
-	res, err := c.PreviewFile(context.Background(), connect.NewRequest(&v1.PreviewFileRequest{Path: page}))
-	if err != nil {
-		t.Fatal(err)
+	tests := []struct {
+		name      string
+		grantHost bool
+		// want is the URL for the grant the answer names.
+		want func(grant string) string
+	}{
+		{"a client that loads grant hosts", true, func(g string) string { return preview.GrantOrigin(g, port) + "/index.html" }},
+		{"a client from before grant hosts", false, func(g string) string {
+			return "http://127.0.0.1:" + strconv.Itoa(port) + preview.URL(g, "index.html")
+		}},
 	}
-	url := res.Msg.GetUrl()
-	if !strings.HasPrefix(url, pages.URL+preview.Prefix) || !strings.HasSuffix(url, "/index.html") {
-		t.Fatalf("url %q, want one under %s%s", url, pages.URL, preview.Prefix)
-	}
-	r, err := pages.Client().Get(url)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = r.Body.Close() }()
-	if r.StatusCode != http.StatusOK {
-		t.Errorf("GET %s: %d", url, r.StatusCode)
+	grant, _ := grants.Grant(filepath.Dir(page))
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			res, err := c.PreviewFile(context.Background(), connect.NewRequest(&v1.PreviewFileRequest{Path: page, GrantHost: tc.grantHost}))
+			if err != nil {
+				t.Fatal(err)
+			}
+			url := res.Msg.GetUrl()
+			if want := tc.want(grant); url != want {
+				t.Fatalf("url %q, want %q (the scope is site)", url, want)
+			}
+			if _, err := neturl.Parse(url); err != nil {
+				t.Fatal(err)
+			}
+			r, err := pages.Client().Get(url)
+			if err != nil {
+				t.Fatal(err)
+			}
+			body, _ := io.ReadAll(r.Body)
+			_ = r.Body.Close()
+			if r.StatusCode != http.StatusOK || !strings.Contains(string(body), "<p>x</p>") {
+				t.Errorf("GET %s: %d %q", url, r.StatusCode, body)
+			}
+		})
 	}
 }
 
