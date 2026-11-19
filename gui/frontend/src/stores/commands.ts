@@ -176,6 +176,27 @@ export function commandSuccessNotice(title: string, message: string): { title: s
   return { title, description: message };
 }
 
+/**
+ * Watches the commands this window runs for the user (runCommandForResult without a `caller`:
+ * the palette, a key, a menu, a button, a drop; never a plugin's or a page's). Called before the
+ * command runs, with what it was given, a watcher answers what to do once it succeeded (null:
+ * nothing), so it can read the window as it was first (the put-away Undo toast reads the focused
+ * tab, stores/putAwayUndo.ts). That answer returns true when it reported the success itself:
+ * the generic success toast is then not shown. Nothing is called for a failure or a declined
+ * confirmation.
+ */
+export type CommandWatcher = (name: string, args: Readonly<Record<string, string>>, ctx: UiContextView) => ((res: InvokeResultView) => boolean) | null;
+
+const watchers = new Set<CommandWatcher>();
+
+/** Adds a CommandWatcher; returns its removal. */
+export function watchCommands(w: CommandWatcher): () => void {
+  watchers.add(w);
+  return () => {
+    watchers.delete(w);
+  };
+}
+
 /** Where a command was run from, for its success toast (docs/notes/toast-success-rule.md). */
 export interface CommandSource {
   /**
@@ -213,13 +234,16 @@ export async function runCommandForResult(
   try {
     const ctx = opts.ctx ?? getUiContext();
     // A plugin's call (`caller`) is not the user's: what it would end is kept, not asked about.
+    const done = opts.caller === undefined ? [...watchers].flatMap((w) => w(name, args, ctx) ?? []) : [];
     const guarded = opts.caller === undefined ? guardCommand(name, args, ctx) : true;
     if (guarded !== true && !(await guarded)) return null;
     // `asked` is the app's own dialog's yes, never a caller's (invokeConfirmed).
     const res = await invokeConfirmed(name, args, ctx, opts.caller, { asked: opts.asked === true && opts.caller === undefined });
     if (!res) return null;
+    let told = false;
+    for (const d of done) told = d(res) || told;
     // Git operations report through their own toast (gitops events); skip the duplicate.
-    const silent = opts.quiet || opts.inView || SHOWS_ITSELF.has(name);
+    const silent = told || opts.quiet || opts.inView || SHOWS_ITSELF.has(name);
     if (!silent && res.message && !isGitOpResult(res.resultJson)) notify({ level: "success", ...commandSuccessNotice(title, res.message) });
     return res;
   } catch (err) {

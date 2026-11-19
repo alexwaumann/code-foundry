@@ -1,0 +1,86 @@
+{
+  "doc": "Snoozing a thread whose tab was its pane's only tab, while the space's empty composer is open in another pane among other tabs: that composer moves into the thread tab's place (a space has one empty composer).",
+  "state": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Space A",
+        "root": {
+          "t": "split",
+          "id": "s-r",
+          "dir": "row",
+          "kids": [
+            {
+              "t": "pane",
+              "id": "p-o",
+              "tabs": [
+                {"id":"t-o","kind":"thread","thread":"th-o"},
+                {"id":"t-c","kind":"compose","params":{"project":"pj"}}
+              ],
+              "active": "t-c"
+            },
+            {
+              "t": "pane",
+              "id": "p-a",
+              "tabs": [{"id":"t-a","kind":"thread","thread":"th-a"}],
+              "active": "t-a"
+            }
+          ],
+          "sizes": [0.5,0.5]
+        },
+        "focus": "p-a"
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "op": {"op":"snooze_thread","thread":"th-a"},
+  "want": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Space A",
+        "root": {
+          "t": "split",
+          "id": "s-r",
+          "dir": "row",
+          "kids": [
+            {
+              "t": "pane",
+              "id": "p-o",
+              "tabs": [{"id":"t-o","kind":"thread","thread":"th-o"}],
+              "active": "t-o"
+            },
+            {
+              "t": "pane",
+              "id": "p-a",
+              "tabs": [{"id":"t-c","kind":"compose","params":{"project":"pj"}}],
+              "active": "t-c"
+            }
+          ],
+          "sizes": [0.5,0.5]
+        },
+        "focus": "p-a"
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a",
+    "threads": {
+      "th-a": {
+        "space": "sp-a",
+        "snoozed": true,
+        "snoozed_tab": {
+          "space": "sp-a",
+          "pane": "p-a",
+          "index": 0,
+          "active": true,
+          "beside": {"neighbours":["p-o"],"edge":"right","frac":0.5},
+          "composer": "t-c"
+        }
+      }
+    }
+  },
+  "result": {"space":"sp-a","pane":"p-a","tab":"t-a","closed":["t-a"]}
+}

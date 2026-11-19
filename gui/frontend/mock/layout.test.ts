@@ -248,4 +248,38 @@ describe("the mock's LayoutService", () => {
     const { result } = layout.apply({ op: "open_surface", tab: { id: "", kind: "diff", params: { project: "p", worktree: "other" } }, focus: true });
     expect(result).toMatchObject({ pane, rule });
   });
+
+  // The daemon's glue for a put-away (docs/notes/put-away-undo.md; Go's keep_pane.go cases).
+  describe("a thread put away keeps a pane whose only tab was its own", () => {
+    const tabsOf = (layout: MockLayout) => layout.state().spaces[0]?.root;
+
+    it("a snooze: New thread in its place (its diff, beside, closes), and the wake puts it back in place of that composer", () => {
+      const { layout } = service();
+      layout.seed("thread-and-diff");
+      layout.threadSnoozed("s-1");
+      expect(tabsOf(layout)).toMatchObject({ t: "pane", id: "p-1", tabs: [{ kind: "compose" }] });
+      layout.threadChanged("s-1", { woke: true, keep: true });
+      expect(tabsOf(layout)).toMatchObject({ t: "pane", id: "p-1", tabs: [{ kind: "thread", thread: "s-1" }] });
+    });
+
+    it("the wake leaves a composer the user typed in (a draft) and goes back beside it", () => {
+      const { layout } = service();
+      layout.seed("one-thread");
+      layout.threadSnoozed("s-1");
+      const composer = layout.state().spaces[0]?.root?.tabs?.[0]?.id ?? "";
+      layout.apply({ op: "start_draft", tab: composer, label: "hello" });
+      layout.threadChanged("s-1", { woke: true, keep: true });
+      expect(tabsOf(layout)?.tabs?.map((t) => t.kind)).toEqual(["thread", "compose"]);
+    });
+
+    it("an archive: the same, in every space, and a pane with other tabs shows its next one", () => {
+      const { layout } = service();
+      layout.seed("thread-and-diff");
+      layout.apply({ op: "open_thread", thread: "s-2", pane: "p-2" });
+      layout.threadArchived("s-2");
+      expect(tabsOf(layout)).toMatchObject({ t: "split", kids: [{ id: "p-1" }, { id: "p-2", tabs: [{ kind: "diff" }] }] });
+      layout.threadArchived("s-1");
+      expect(tabsOf(layout)).toMatchObject({ t: "pane", id: "p-1", tabs: [{ kind: "compose" }] });
+    });
+  });
 });

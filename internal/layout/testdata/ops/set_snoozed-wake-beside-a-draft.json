@@ -1,0 +1,81 @@
+{
+  "doc": "Undoing a snooze that kept the thread's pane, after the user typed in the composer it left (now a draft): the draft stays and the thread's tab goes back at its old place beside it.",
+  "state": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Space A",
+        "root": {
+          "t": "split",
+          "id": "s-r",
+          "dir": "row",
+          "kids": [
+            {
+              "t": "pane",
+              "id": "p-o",
+              "tabs": [{"id":"t-o","kind":"thread","thread":"th-o"}],
+              "active": "t-o"
+            },
+            {
+              "t": "pane",
+              "id": "p-a",
+              "tabs": [{"id":"t-n1","kind":"compose","params":{"draft":"d-1"}}],
+              "active": "t-n1"
+            }
+          ],
+          "sizes": [0.5,0.5]
+        },
+        "focus": "p-o",
+        "drafts": [{"id":"d-1","label":"hello"}]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a",
+    "threads": {
+      "th-a": {
+        "space": "sp-a",
+        "snoozed": true,
+        "snoozed_tab": {"space":"sp-a","pane":"p-a","index":0,"active":true,"composer":"t-n1"}
+      }
+    }
+  },
+  "op": {"op":"set_snoozed","thread":"th-a"},
+  "want": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Space A",
+        "root": {
+          "t": "split",
+          "id": "s-r",
+          "dir": "row",
+          "kids": [
+            {
+              "t": "pane",
+              "id": "p-o",
+              "tabs": [{"id":"t-o","kind":"thread","thread":"th-o"}],
+              "active": "t-o"
+            },
+            {
+              "t": "pane",
+              "id": "p-a",
+              "tabs": [
+                {"id":"t-n2","kind":"thread","thread":"th-a"},
+                {"id":"t-n1","kind":"compose","params":{"draft":"d-1"}}
+              ],
+              "active": "t-n2"
+            }
+          ],
+          "sizes": [0.5,0.5]
+        },
+        "focus": "p-o",
+        "drafts": [{"id":"d-1","label":"hello"}]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "result": {"space":"sp-a","pane":"p-a","tab":"t-n2"}
+}

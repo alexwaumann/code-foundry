@@ -1,0 +1,69 @@
+{
+  "doc": "Archiving a thread whose pane held only its tab and a linked tab keeps the pane: its linked tab closes, and the space's empty composer takes the thread tab's place, in front and with the focus it had (keep_pane.go). A pane with other tabs shows its next one.",
+  "state": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Space A",
+        "root": {
+          "t": "split",
+          "id": "s-r",
+          "dir": "row",
+          "kids": [
+            {
+              "t": "pane",
+              "id": "p-o",
+              "tabs": [{"id":"t-o","kind":"thread","thread":"th-o"},{"id":"t-b","kind":"prs"}],
+              "active": "t-o"
+            },
+            {
+              "t": "pane",
+              "id": "p-a",
+              "tabs": [
+                {"id":"t-a","kind":"thread","thread":"th-a"},
+                {"id":"t-d","kind":"diff","thread":"th-a","params":{"project":"pj","worktree":"w"}}
+              ],
+              "active": "t-a"
+            }
+          ],
+          "sizes": [0.6,0.4]
+        },
+        "focus": "p-a",
+        "mru": ["t-a","t-o"]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "op": {"op":"archive_thread","thread":"th-a"},
+  "want": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Space A",
+        "root": {
+          "t": "split",
+          "id": "s-r",
+          "dir": "row",
+          "kids": [
+            {
+              "t": "pane",
+              "id": "p-o",
+              "tabs": [{"id":"t-o","kind":"thread","thread":"th-o"},{"id":"t-b","kind":"prs"}],
+              "active": "t-o"
+            },
+            {"t":"pane","id":"p-a","tabs":[{"id":"t-n1","kind":"compose"}],"active":"t-n1"}
+          ],
+          "sizes": [0.6,0.4]
+        },
+        "focus": "p-a",
+        "mru": ["t-n1","t-o"]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "result": {"closed":["t-a","t-d"]}
+}

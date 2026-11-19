@@ -119,6 +119,16 @@ export function snoozeTimeShort(ms: number, now: number): string {
   return `${MONTHS[day.month] ?? ""} ${String(day.day)}${year}, ${formatClock(ms)}`;
 }
 
+/**
+ * A wake time after "until" in a sentence (the put-away Undo toast's "Snoozed until …"):
+ * "tomorrow, 9:00 AM" tomorrow, otherwise as snoozeTimeShort ("2:12 PM", "Thu 9:00 AM",
+ * "Oct 19, 9:00 AM").
+ */
+export function snoozeUntilPhrase(ms: number, now: number): string {
+  if (sameDay(dayOf(ms), addDays(dayOf(now), 1))) return `tomorrow, ${formatClock(ms)}`;
+  return snoozeTimeShort(ms, now);
+}
+
 /** "Fri, Oct 16" (and the year when it is not this year): the custom dialog's summary. */
 export function formatDay(d: Day, now: number): string {
   const wd = DAYS[new Date(d.year, d.month, d.day, 12).getDay()] ?? "";

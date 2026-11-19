@@ -4,9 +4,10 @@
  * Removing a thread drops its file drafts and its recent files entry, since nothing can reach
  * them after; a thread list that failed reports no removal, though it empties the store. Only a
  * transition counts (not archived or snoozed to so, on a thread this window already knew).
- * The selection follows the same rule: when the selected thread is archived, snoozed or
- * removed (a `removed` event, or a snapshot without it) the window selects HOME (the No
- * project composer) instead of showing a put-away or missing thread. Only the selected thread
+ * The selection follows the same rule, before the shell's layout has loaded: when the selected
+ * thread is archived, snoozed or removed (a `removed` event, or a snapshot without it) the window
+ * selects HOME (the No project composer) instead of showing a put-away or missing thread. Once
+ * it has, the layout decides (docs/notes/put-away-undo.md). Only the selected thread
  * counts; unarchiving and waking leave the selection alone.
  * See docs/notes/archive-threads-2-sidebar.md, snooze-threads-2-sidebar.md,
  * put-away-focuses-dashboard.md and remove-dashboard.md.
@@ -16,6 +17,7 @@ import { isSnoozed } from "@/lib/snooze";
 import { dropPanelDrafts } from "./fileEdit";
 import { targetOf } from "@/shell/host";
 import { useRecentFilesStore } from "./recentFiles";
+import { useLayoutStore } from "./layout";
 import { useThreadsStore, type ThreadsData } from "./threads";
 import { HOME, useUiStore, type Selection } from "./ui";
 
@@ -74,7 +76,10 @@ export function startArchiveCleanup(): () => void {
       putAway.add(id);
       if (s.loaded) forgetThread(id);
     }
+    // Once the shell draws, the layout decides what shows (its focused tab is the selection): a
+    // pane whose only tab was the thread's keeps New thread in its place, another shows its next
+    // tab (docs/notes/put-away-undo.md). Selecting HOME here would open a composer beside them.
     const ui = useUiStore.getState();
-    if (putAwaySelected(ui.selection, putAway)) ui.select(HOME);
+    if (!useLayoutStore.getState().loaded && putAwaySelected(ui.selection, putAway)) ui.select(HOME);
   });
 }

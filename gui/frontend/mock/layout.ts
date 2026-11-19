@@ -1835,6 +1835,59 @@ export function applyOp(st: State, op: Op, ids: IdSource, opts: Options = {}): {
 }
 
 /**
+ * Go's composerInPlace (internal/layout/keep_pane.go): the space's empty composer takes the place of
+ * tab id, its pane's only tab, so the pane stays; one open in another pane moves here unless it is
+ * that pane's only tab (then null: the caller closes the tab as before).
+ */
+function composerInPlace(t: Tx, sp: Space, pane: Node, id: string): Tab | null {
+  const tabs = pane.tabs ?? [];
+  const i = tabIndex(pane, id);
+  if (i < 0 || tabs.length !== 1) return null;
+  let c: Tab = { id: "", kind: "compose", key: "compose" };
+  const open = emptyComposer(sp);
+  if (open) {
+    if ((open.pane.tabs ?? []).length === 1) return null;
+    const focused = focusedTab(sp) === open.tab.id;
+    detach(sp, open.pane, open.tab.id);
+    if (focused) sp.focus = pane.id;
+    c = open.tab;
+  } else c.id = t.newID("t-");
+  tabs[i] = c;
+  if (pane.active === id || !pane.active) pane.active = c.id;
+  const mru = (sp.mru ?? []).filter((m) => m !== c.id);
+  const k = mru.indexOf(id);
+  if (k >= 0) mru[k] = c.id;
+  sp.mru = mru;
+  return c;
+}
+
+/**
+ * The daemon's put-away of a thread's tabs (Go's snooze_thread for its space, archive_thread for every
+ * space; docs/notes/put-away-undo.md): its linked tabs close, then its own tab, whose pane, when that
+ * was its only tab, stays with New thread in its place. Returns where its tab was and that composer.
+ */
+export function putAwayThread(st: State, thread: string, ids: IdSource, everySpace: boolean): { state: State; place: { space: string; pane: string; index: number; composer?: string } | null } {
+  const t = new Tx(structuredClone(st), ids, {});
+  let place: { space: string; pane: string; index: number; composer?: string } | null = null;
+  const home = t.spaceOf(thread);
+  for (const sp of t.st.spaces) {
+    if (!everySpace && sp.id !== home) continue;
+    const mine = panes(sp.root).flatMap((p) => (p.tabs ?? []).filter((tb) => tb.thread === thread && (everySpace || tb.kind === "thread" || isLinked(tb))));
+    const own = mine.find((tb) => tb.kind === "thread");
+    for (const tb of mine) if (tb !== own) ops.close_tab(t, { op: "close_tab", tab: tb.id });
+    if (!own) continue;
+    const at = t.findTabOrNull(own.id);
+    if (!at) continue;
+    place = { space: sp.id, pane: at.pane.id, index: tabIndex(at.pane, own.id) };
+    const c = composerInPlace(t, sp, at.pane, own.id);
+    if (c) place.composer = c.id;
+    else ops.close_tab(t, { op: "close_tab", tab: own.id });
+  }
+  t.finish();
+  return { state: t.st, place };
+}
+
+/**
  * A value's JSON with what Go's encoding leaves out dropped (empty strings, arrays and maps,
  * false, undefined) and object keys sorted, so two states that encode alike compare equal.
  */
@@ -2289,7 +2342,7 @@ export class MockLayout {
   }
 
   /** Where a snooze closed each thread's tab (Go's ThreadState.SnoozedTab), to put it back when it wakes. */
-  private snoozedTabs = new Map<string, { space: string; pane: string; index: number }>();
+  private snoozedTabs = new Map<string, { space: string; pane: string; index: number; composer?: string }>();
 
   /**
    * The daemon's glue for a thread just snoozed (Go's snooze_thread; docs/notes/snooze-without-teardown.md):
@@ -2297,16 +2350,20 @@ export class MockLayout {
    * is kept for the wake, and the layout marks it snoozed. Not an op: no GUI sends it.
    */
   threadSnoozed(thread: string): void {
-    let next = structuredClone(this.st);
-    for (const sp of next.spaces)
-      for (const p of panes(sp.root)) {
-        const index = (p.tabs ?? []).findIndex((tb) => tb.kind === "thread" && tb.thread === thread);
-        if (index >= 0) {
-          this.snoozedTabs.set(thread, { space: sp.id, pane: p.id, index });
-          next = applyOp(next, { op: "close_thread", thread }, this.deps.ids ?? randomIds).state;
-        }
-      }
+    const { state: next, place } = putAwayThread(this.st, thread, this.deps.ids ?? randomIds, false);
+    if (place) this.snoozedTabs.set(thread, place);
     ((next.threads ??= {})[thread] ??= { space: next.default_space }).snoozed = true;
+    this.commit(next, "");
+  }
+
+  /**
+   * The daemon's glue for a thread archived (Go's archive_thread through ShellsGoing): its tabs close
+   * in every space, a pane whose only tab was its own staying with New thread in its place. Not an op.
+   */
+  threadArchived(thread: string): void {
+    this.snoozedTabs.delete(thread);
+    const next = putAwayThread(this.st, thread, this.deps.ids ?? randomIds, true).state;
+    if (next.threads) next.threads = Object.fromEntries(Object.entries(next.threads).filter(([id]) => id !== thread));
     this.commit(next, "");
   }
 
@@ -2328,7 +2385,9 @@ export class MockLayout {
       const space = next.threads?.[thread]?.space ?? next.default_space;
       const sp = next.spaces.find((x) => x.id === space);
       const pane = away.space === space && sp ? panes(sp.root).find((p) => p.id === away.pane) : undefined;
-      next = applyOp(next, { op: "open_thread", thread, ...(pane ? { pane: pane.id, index: away.index } : {}) }, this.deps.ids ?? randomIds).state;
+      // In place of the composer the snooze left there while nothing was typed in it (Go's threadInPlace).
+      const composer = pane && away.composer ? (pane.tabs ?? []).find((tb) => tb.id === away.composer && tb.kind === "compose" && !draftOf(tb)) : undefined;
+      next = applyOp(next, composer ? { op: "open_thread", thread, compose: composer.id } : { op: "open_thread", thread, ...(pane ? { pane: pane.id, index: away.index } : {}) }, this.deps.ids ?? randomIds).state;
     }
     if (c.keep) keepThread(next, thread);
     this.commit(next, "");

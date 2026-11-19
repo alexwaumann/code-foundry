@@ -104,7 +104,8 @@ func (o *KeepTab) apply(t *tx) (Result, error) {
 // (snooze_thread marks it too). Marking one changes nothing else. Waking one keeps its tab
 // when that is a preview; when its tab is not open and a snooze closed it
 // (ThreadState.SnoozedTab), the tab goes back where it was: into its pane at its old place
-// while that pane is in the thread's space and can take it, into its pane rebuilt beside its
+// while that pane is in the thread's space and can take it (in place of the empty composer
+// the snooze left there while nothing was typed in it, keep_pane.go), into its pane rebuilt beside its
 // old neighbours when it was the pane's only tab, else where open_thread puts a thread's tab.
 // It goes back without the focus, the active tab of its pane again if it was then, except in
 // the focused pane, whose tab stays in front. Then its remembered set comes back beside it
@@ -172,7 +173,10 @@ func (t *tx) snoozedBack(thread string, a *SnoozedTab, w, h float64) (Result, er
 		if _, err := t.prepare(sp, tb); err != nil {
 			return Result{}, err
 		}
-		p.Tabs = slices.Insert(p.Tabs, clampIndex(a.Index, len(p.Tabs)), tb)
+		// In place of the composer the snooze left, while nothing was typed in it (keep_pane.go).
+		if !threadInPlace(sp, p, a.Composer, tb) {
+			p.Tabs = slices.Insert(p.Tabs, clampIndex(a.Index, len(p.Tabs)), tb)
+		}
 		res = Result{Space: sp.ID, Tab: tb.ID}
 	case a != nil && a.Beside != nil:
 		if _, err := t.prepare(sp, tb); err != nil {
