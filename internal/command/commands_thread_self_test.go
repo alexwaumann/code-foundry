@@ -11,7 +11,8 @@ import (
 )
 
 // A thread putting itself away mid-turn (docs/notes/self-put-away.md): asked nothing, told
-// it waits, and the daemon told who asks. Every other caller is as before.
+// an archive waits, and the daemon told who asks. A snooze never waits nor asks: it cuts
+// nothing off (docs/notes/snooze-without-teardown.md). Every other caller is as before.
 func TestThreadPutsItselfAway(t *testing.T) {
 	connected := v1.ThreadState_THREAD_STATE_CONNECTED
 	busy := &v1.Thread{Name: "drv", State: connected, Status: v1.ThreadStatus_THREAD_STATUS_BUSY, StatusReason: "working"}
@@ -41,11 +42,11 @@ func TestThreadPutsItselfAway(t *testing.T) {
 		{name: "archive at a prompt of its own", verb: "thread.archive", ctx: self, args: archive, current: asking,
 			wantMsg: "will archive thread drv (s5) when this turn ends", wantBy: "s5", wantDo: "archive"},
 		{name: "snooze mid-turn", verb: "thread.snooze", ctx: self, args: snooze, current: busy,
-			wantMsg: "will snooze thread drv (s5) until", wantBy: "s5", wantDo: "snooze"},
+			wantMsg: "snoozed thread drv (s5) until", wantBy: "s5"},
 		{name: "snooze with the context's id mid-turn", verb: "thread.snooze", ctx: self, args: map[string]string{"until": "2099-01-02T15:04:00Z"}, current: busy,
-			wantMsg: "when this turn ends", wantBy: "s5", wantDo: "snooze"},
+			wantMsg: "snoozed thread drv (s5) until", wantBy: "s5"},
 		{name: "save mid-turn", verb: "thread.snooze", ctx: self, args: save, current: busy,
-			wantMsg: "will save thread drv (s5) for later when this turn ends", wantBy: "s5", wantDo: "save"},
+			wantMsg: "saved thread drv (s5) for later", wantBy: "s5"},
 		// Deferring spares the thread its own turn, not the threads below it.
 		{name: "archive still asks about hidden children working", verb: "thread.archive", ctx: self, args: archive, current: busy,
 			cascade: []*v1.Thread{{Id: "s6", State: connected, Status: v1.ThreadStatus_THREAD_STATUS_BUSY}},
@@ -53,13 +54,14 @@ func TestThreadPutsItselfAway(t *testing.T) {
 		// Not mid-turn it is the plain call, and background work is cut off by it: it asks.
 		{name: "archive after the turn asks about background work", verb: "thread.archive", ctx: self, args: archive, current: background,
 			wantAsk: "background shell is running"},
-		{name: "snooze after the turn asks about background work", verb: "thread.snooze", ctx: self, args: snooze, current: background,
-			wantAsk: "background shell is running"},
-		// Another thread's call cuts the turn off, and the GUI's: both still ask.
+		{name: "snooze after the turn does not ask about background work", verb: "thread.snooze", ctx: self, args: snooze, current: background,
+			wantMsg: "snoozed thread drv (s5) until", wantBy: "s5"},
+		// Another thread's archive cuts the turn off, and the GUI's: both still ask. Their
+		// snoozes do not.
 		{name: "another thread archiving asks", verb: "thread.archive", ctx: other, args: archive, current: busy, wantAsk: "archiving ends the turn"},
-		{name: "another thread snoozing asks", verb: "thread.snooze", ctx: other, args: snooze, current: busy, wantAsk: "snoozing ends the turn"},
+		{name: "another thread snoozing does not ask", verb: "thread.snooze", ctx: other, args: snooze, current: busy, wantMsg: "snoozed thread drv (s5) until", wantBy: "s9"},
 		{name: "the GUI archiving asks", verb: "thread.archive", ctx: gui, args: archive, current: busy, wantAsk: "archiving ends the turn"},
-		{name: "the GUI snoozing asks", verb: "thread.snooze", ctx: gui, args: snooze, current: busy, wantAsk: "snoozing ends the turn"},
+		{name: "the GUI snoozing does not ask", verb: "thread.snooze", ctx: gui, args: snooze, current: busy, wantMsg: "snoozed thread drv (s5) until"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -80,11 +82,11 @@ func TestThreadPutsItselfAway(t *testing.T) {
 				t.Errorf("message = %q, want %q", res.Message, tt.wantMsg)
 			}
 			d, ok := res.JSON.(command.Deferred)
-			if !ok || !d.Deferred || d.ID != "s5" || d.Action != tt.wantDo {
+			switch {
+			case tt.wantDo == "" && ok:
+				t.Errorf("json = %+v, want it done now", res.JSON)
+			case tt.wantDo != "" && (!ok || !d.Deferred || d.ID != "s5" || d.Action != tt.wantDo):
 				t.Errorf("json = %+v, want deferred %s of s5", res.JSON, tt.wantDo)
-			}
-			if tt.wantDo == "snooze" && d.Until == "" {
-				t.Errorf("json = %+v, want the wake time", d)
 			}
 			by := ""
 			for _, m := range b.Requests() {

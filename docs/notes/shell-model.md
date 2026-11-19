@@ -334,13 +334,15 @@ when the first working version is whole. Nothing partial is released.
   behind the tab shown there when it lands in the focused pane, and the thread is told where; before any window has loaded the layout, the first load takes it
   into the thread's remembered set instead, and the thread is told that.
 - **Moving a thread** to another space takes the linked tabs that are in its space. Archiving closes
-  its linked tabs everywhere and ends its terminals. Snoozing closes them, ends its terminals and
-  keeps the set, so the terminals come back as fresh shells in the same places; an open quick
-  terminal comes back open, as a fresh shell. They come back when the thread stops being snoozed
-  (unsnoozed, its snooze ends, a message sent to it) while its tab is open in its space, placed as
-  any restore is; with no tab open then, when its tab next opens. A tab opened while the thread is
-  still snoozed (a preview or a kept tab) shows only the conversation and brings back nothing: no
-  linked tabs, no terminals, no quick terminal.
+  its linked tabs everywhere and ends its terminals. Snoozing (until a time, or saved for later)
+  closes the thread's tab and its linked tabs exactly as closing the thread's tab does: the linked
+  tabs join its remembered set and the terminals closed this way keep running, as do its quick
+  terminal and Claude itself (docs/notes/snooze-without-teardown.md). When the thread stops being
+  snoozed (unsnoozed, its snooze ends, the user's message), its tab goes back where the snooze
+  closed it, without taking the focus, and its set comes back beside it as opening it restores a
+  set, over the same terminals; when its tab was not open at the snooze, the set waits for its tab's
+  next open. A tab opened while the thread is still snoozed (a preview or a kept tab) shows only the
+  conversation and brings back nothing yet: the set comes back beside it when the snooze ends.
 - **The thread's header** in a pane holds the branch chip, the thread info toggle and one three-dot
   menu with submenus (Open, Move to space, rename, snooze, archive, close).
 - **Thread info is per thread.** The toggle (and cmd+shift+i, for the focused tab's thread) shows or
@@ -364,9 +366,10 @@ when the first working version is whole. Nothing partial is released.
   closed because its thread was closed keeps running, so reopening the thread brings it back.
   Reopening a closed terminal's tab (cmd+shift+t) starts a fresh shell, as "Reopening closed
   tabs" says.
-- A terminal restored after a snooze shows its idle name and one line with the last command and
-  "Run again". It never reruns by itself. The last command is the foreground job's command line as
-  the process list gives it; there is no shell integration.
+- A terminal a snooze closed comes back with its thread still running, as after any close of the
+  thread. (A layout saved before docs/notes/snooze-without-teardown.md may still hold terminals an
+  older build's snooze ended: those come back as fresh shells with their idle name and one line
+  with the last command and "Run again", which never reruns by itself.)
 
 ## Sidebar
 
@@ -456,7 +459,8 @@ when the first working version is whole. Nothing partial is released.
   replaced one is gone from the focus history (cmd+[ and cmd+] skip it, as they skip a tab that
   closed).
 - **Snoozed threads.** Its tab opened while the thread is still snoozed shows only the
-  conversation: the remembered set comes back when the thread wakes ("Moving a thread" above).
+  conversation: the remembered set comes back when the thread wakes ("Moving a thread" above),
+  over terminals that kept running.
   A child's preview shows only its conversation too: its remembered set (a surface placed beside
   it would keep it) waits for the child's next kept open.
   Archived threads keep no set. An open archived thread's tab moved to another space is an

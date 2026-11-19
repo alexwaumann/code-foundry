@@ -1441,8 +1441,9 @@ export const ArchiveThreadOpSchema: GenMessage<ArchiveThreadOp> = /*@__PURE__*/
   messageDesc(file_codefoundry_v1_layout, 28);
 
 /**
- * SnoozeThreadOp closes a thread's tab and linked tabs as CloseThreadOp does, and marks its
- * remembered terminals to come back as fresh shells.
+ * SnoozeThreadOp closes a thread's tab and linked tabs as CloseThreadOp does (their
+ * terminals keep running) and remembers where its tab was, to put it back when the snooze
+ * ends (docs/notes/snooze-without-teardown.md).
  *
  * @generated from message codefoundry.v1.SnoozeThreadOp
  */
@@ -1453,14 +1454,14 @@ export type SnoozeThreadOp = Message<"codefoundry.v1.SnoozeThreadOp"> & {
   threadId: string;
 
   /**
-   * The command each of its terminals ran last, by terminal id, shown with "Run again".
+   * Ignored: a snooze no longer ends terminals, so nothing comes back with "Run again".
    *
    * @generated from field: map<string, string> ran = 2;
    */
   ran: { [key: string]: string };
 
   /**
-   * The command its quick terminal ran last, for the same line when it comes back.
+   * Ignored, as ran.
    *
    * @generated from field: string quick_ran = 3;
    */

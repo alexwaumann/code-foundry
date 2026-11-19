@@ -1,5 +1,5 @@
 {
-  "doc": "Snoozing closes the thread like a close (its set remembered), ends its terminals while keeping them in the set as fresh shells, and takes its terminal tabs in other spaces into the set too, each with the space it was in.",
+  "doc": "Snoozing closes the thread as a close does: its tab and its linked tabs in its space go, into its set, their terminals running on (nothing ended, nothing fresh); its terminal tabs in other spaces stay open; where its tab was is remembered for the wake. Nothing is recorded for reopening.",
   "state": {
     "v": 1,
     "spaces": [
@@ -55,7 +55,7 @@
     "current_space": "sp-a",
     "default_space": "sp-a"
   },
-  "op": {"op":"snooze_thread","thread":"th-a","ran":{"term-x":"make dev"}},
+  "op": {"op":"snooze_thread","thread":"th-a"},
   "want": {
     "v": 1,
     "spaces": [
@@ -63,7 +63,15 @@
       {
         "id": "sp-b",
         "name": "Space B",
-        "root": {"t":"pane","id":"p-y","tabs":[{"id":"t-p","kind":"prs"}],"active":"t-p"},
+        "root": {
+          "t": "pane",
+          "id": "p-y",
+          "tabs": [
+            {"id":"t-p","kind":"prs"},
+            {"id":"t-y","kind":"terminal","thread":"th-a","params":{"terminal":"term-y"}}
+          ],
+          "active": "t-p"
+        },
         "focus": "p-y"
       }
     ],
@@ -99,28 +107,14 @@
               "index": 0,
               "active": true,
               "adjacent": true,
-              "beside": {"neighbours":["p-a"],"edge":"right","frac":0.4},
-              "fresh": {"name":"dev","ran":"make dev"}
-            },
-            {
-              "tab": {"id":"t-y","kind":"terminal","thread":"th-a","params":{"terminal":"term-y"}},
-              "space": "sp-b",
-              "pane": "p-y",
-              "index": 1,
-              "fresh": {}
+              "beside": {"neighbours":["p-a"],"edge":"right","frac":0.4}
             }
           ]
         },
-        "snoozed": true
+        "snoozed": true,
+        "snoozed_tab": {"space":"sp-a","pane":"p-a","index":0,"active":true}
       }
     }
   },
-  "result": {
-    "space": "sp-a",
-    "pane": "p-a",
-    "tab": "t-a",
-    "closed": ["t-a"],
-    "kept": ["t-d","t-x","t-y"],
-    "ended": ["t-x","t-y"]
-  }
+  "result": {"space":"sp-a","pane":"p-a","tab":"t-a","closed":["t-a"],"kept":["t-d","t-x"]}
 }

@@ -1,5 +1,9 @@
 # Snoozed threads, PR 1 of 2: daemon, command, API mapping
 
+Update 2026-11-19 (`snooze-without-teardown.md`): a snooze no longer closes Claude, ends the
+thread's shells or unpins it, and never asks for confirmation; the wake marks a thread running at
+its prompt "snooze ended" too. The teardown decisions below are history.
+
 Update 2026-11-19 (`snooze-holds-archive-refuses.md`): only the user's message unsnoozes;
 another thread's message or a wake starts the thread and leaves it snoozed with its time,
 so a snoozed thread can be live. A thread may clear or pin away a snooze only on a thread

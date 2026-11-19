@@ -2060,16 +2060,48 @@ export class MockLayout {
     this.commit(decodeState(make ? make() : raw), "");
   }
 
+  /** Where a snooze closed each thread's tab (Go's ThreadState.SnoozedTab), to put it back when it wakes. */
+  private snoozedTabs = new Map<string, { space: string; pane: string; index: number }>();
+
+  /**
+   * The daemon's glue for a thread just snoozed (Go's snooze_thread; docs/notes/snooze-without-teardown.md):
+   * its tab and linked tabs close as close_thread closes them (their terminals run on), where its tab was
+   * is kept for the wake, and the layout marks it snoozed. Not an op: no GUI sends it.
+   */
+  threadSnoozed(thread: string): void {
+    let next = structuredClone(this.st);
+    for (const sp of next.spaces)
+      for (const p of panes(sp.root)) {
+        const index = (p.tabs ?? []).findIndex((tb) => tb.kind === "thread" && tb.thread === thread);
+        if (index >= 0) {
+          this.snoozedTabs.set(thread, { space: sp.id, pane: p.id, index });
+          next = applyOp(next, { op: "close_thread", thread }, this.deps.ids ?? randomIds).state;
+        }
+      }
+    ((next.threads ??= {})[thread] ??= { space: next.default_space }).snoozed = true;
+    this.commit(next, "");
+  }
+
   /**
    * The daemon's glue for a thread that changed (internal/daemon/layout.go): a wake clears the
    * layout's snoozed mark (Go's set_snoozed, without bringing back a set: the mock's open never
-   * holds one back); `keep` (unarchived, woken, renamed or pinned) keeps its tab when that is a
-   * preview. Not an op: no GUI sends it.
+   * holds one back) and puts back the tab a snooze closed, where it was when its pane is still in
+   * the thread's space, without the focus; `keep` (unarchived, woken, renamed or pinned) keeps its
+   * tab when that is a preview. Not an op: no GUI sends it.
    */
   threadChanged(thread: string, c: { woke: boolean; keep: boolean }): void {
-    const next = structuredClone(this.st);
+    let next = structuredClone(this.st);
     const ts = next.threads?.[thread];
     if (c.woke && ts?.snoozed) delete ts.snoozed;
+    const away = c.woke ? this.snoozedTabs.get(thread) : undefined;
+    if (c.woke) this.snoozedTabs.delete(thread);
+    const open = next.spaces.some((sp) => panes(sp.root).some((p) => (p.tabs ?? []).some((tb) => tb.kind === "thread" && tb.thread === thread)));
+    if (away && !open) {
+      const space = next.threads?.[thread]?.space ?? next.default_space;
+      const sp = next.spaces.find((x) => x.id === space);
+      const pane = away.space === space && sp ? panes(sp.root).find((p) => p.id === away.pane) : undefined;
+      next = applyOp(next, { op: "open_thread", thread, ...(pane ? { pane: pane.id, index: away.index } : {}) }, this.deps.ids ?? randomIds).state;
+    }
     if (c.keep) keepThread(next, thread);
     this.commit(next, "");
   }

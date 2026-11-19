@@ -68,10 +68,10 @@ func TestActionCleanup(t *testing.T) {
 		{name: "a worktree still on disk (a failed refresh) keeps its runs", event: project.WorktreeRemoved{ProjectID: "web", Path: "/wt/main"}},
 		{name: "an archived thread's background runs are killed",
 			event: thread.Updated{Thread: thread.Thread{ID: "s2", ArchivedAt: time.Unix(1, 0)}}, wantKilled: []string{"r3"}},
-		{name: "a saved thread's background runs are killed",
-			event: thread.Updated{Thread: thread.Thread{ID: "s1", SavedAt: time.Unix(1, 0)}}, wantKilled: []string{"r1"}},
-		{name: "a snoozed thread's background runs are killed",
-			event: thread.Updated{Thread: thread.Thread{ID: "s1", SnoozedUntil: time.Unix(1, 0)}}, wantKilled: []string{"r1"}},
+		{name: "a saved thread's background runs run on",
+			event: thread.Updated{Thread: thread.Thread{ID: "s1", SavedAt: time.Unix(1, 0)}}},
+		{name: "a snoozed thread's background runs run on",
+			event: thread.Updated{Thread: thread.Thread{ID: "s1", SnoozedUntil: time.Unix(1, 0)}}},
 		{name: "other thread updates are ignored", event: thread.Updated{Thread: thread.Thread{ID: "s1"}}},
 	}
 	for _, tt := range tests {
@@ -102,11 +102,11 @@ func TestActionCleanup(t *testing.T) {
 	}
 }
 
-// A snoozed thread another thread's message started works on, snoozed: its updates while
-// it works must not kill the runs it starts. Only the snooze itself kills (and a snooze
-// after an unsnooze again). The last event, another thread's removal, orders the check:
-// the events go through one goroutine in order.
-func TestActionCleanupKillsOnlyAtTheSnooze(t *testing.T) {
+// A snooze only hides a thread (docs/notes/snooze-without-teardown.md): neither the snooze,
+// nor the updates of the thread working on snoozed, nor a save for later kill its runs. The
+// last event, another thread's removal, orders the check: the events go through one
+// goroutine in order.
+func TestActionCleanupNeverKillsAtASnooze(t *testing.T) {
 	runs := []action.Run{{ID: "r1", ThreadID: "s1"}, {ID: "r3", ThreadID: "s2"}}
 	b := bus.New()
 	rec := &recordingRuns{runs: runs}
@@ -114,16 +114,16 @@ func TestActionCleanupKillsOnlyAtTheSnooze(t *testing.T) {
 	defer stop()
 	until := time.Unix(1, 0)
 	for _, e := range []thread.Event{
-		thread.Updated{Thread: thread.Thread{ID: "s1", SnoozedUntil: until}},                                      // snoozed: kill
-		thread.Updated{Thread: thread.Thread{ID: "s1", SnoozedUntil: until, Status: thread.StatusBusy}},           // working, snoozed: keep
-		thread.Updated{Thread: thread.Thread{ID: "s1", SnoozedUntil: until, Status: thread.StatusNeedsAttention}}, // asks: keep
-		thread.Updated{Thread: thread.Thread{ID: "s1"}},                                                           // the user's message: keep
-		thread.Updated{Thread: thread.Thread{ID: "s1", SavedAt: until}},                                           // saved for later: kill
+		thread.Updated{Thread: thread.Thread{ID: "s1", SnoozedUntil: until}},
+		thread.Updated{Thread: thread.Thread{ID: "s1", SnoozedUntil: until, Status: thread.StatusBusy}},
+		thread.Updated{Thread: thread.Thread{ID: "s1", SnoozedUntil: until, Status: thread.StatusNeedsAttention}},
+		thread.Updated{Thread: thread.Thread{ID: "s1"}},
+		thread.Updated{Thread: thread.Thread{ID: "s1", SavedAt: until}},
 		thread.Removed{ID: "s2"}, // kill r3: the end
 	} {
 		bus.Publish(b, e)
 	}
-	want := []string{"r1", "r1", "r3"}
+	want := []string{"r3"}
 	deadline := time.Now().Add(5 * time.Second)
 	for _, killed := rec.state(); !slices.Contains(killed, "r3") && time.Now().Before(deadline); _, killed = rec.state() {
 		time.Sleep(5 * time.Millisecond)

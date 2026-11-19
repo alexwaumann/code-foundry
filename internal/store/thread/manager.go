@@ -146,11 +146,11 @@ type Options struct {
 	// (docs/notes/remove-cleans-worktrees.md).
 	Removed func(t Thread)
 	// ShellsGoing, when set, is called when a thread's shells are about to be killed and
-	// removed because it is archived, snoozed (or saved for later), or removed: after its
-	// process closed, before its shells go, without the store's lock (shells.go). It runs
-	// synchronously, so what it reads of the shells (what runs in them) is still there.
-	// The daemon's layout glue closes the thread's tabs there, a snooze keeping its
-	// terminal tabs to come back as fresh shells (docs/notes/shell-6-lifecycle.md).
+	// removed because it is archived or removed: after its process closed, before its
+	// shells go, without the store's lock (shells.go). It runs synchronously, so what it
+	// reads of the shells is still there. The daemon's layout glue closes the thread's
+	// tabs there (docs/notes/shell-6-lifecycle.md). A snooze removes nothing: the glue
+	// closes its tabs on the thread's update (docs/notes/snooze-without-teardown.md).
 	ShellsGoing func(ctx context.Context, id string, why ShellsGo)
 	// Home is the cwd of a thread without a project (CreateOptions.NoProject). Default:
 	// os.UserHomeDir().

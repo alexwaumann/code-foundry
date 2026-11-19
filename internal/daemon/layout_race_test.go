@@ -42,7 +42,7 @@ func steppedGlue(t *testing.T, threads []thread.Thread, seed func(e *glueEnv)) (
 	if err != nil {
 		t.Fatal(err)
 	}
-	e.goings = layoutShellsGoing(log, e.layout, e.terms)
+	e.goings = layoutShellsGoing(log, e.layout)
 	t.Cleanup(func() {
 		g.stop()
 		g.threadEvents.Close()
@@ -149,18 +149,13 @@ func reopenTab(e *glueEnv, g *layoutGlue) ([]string, []string) {
 	return c.Result.Fresh, []string{old}
 }
 
-// restoreSet snoozes th-a with two terminal tabs (their shells go), wakes it in the layout and
-// opens it again.
+// restoreSet snoozes th-a with two terminal tabs as an older build did (olderSnooze: their
+// shells go), wakes it in the layout and opens it again.
 func restoreSet(e *glueEnv, g *layoutGlue) ([]string, []string) {
 	e.t.Helper()
-	x, y := openWithSet(e)
+	openWithSet(e)
 	acted(g)
-	e.goings(e.ctx, "th-a", thread.ShellsSnoozed)
-	for _, id := range []string{x, y} {
-		if err := terminal.KillAndRemove(e.ctx, e.terms, id); err != nil {
-			e.t.Fatal(err)
-		}
-	}
+	e.olderSnooze("th-a")
 	acted(g)
 	e.apply(&core.SetSnoozed{Thread: "th-a"}) // it woke: opening it restores its set
 	c := e.apply(&core.OpenThread{Thread: "th-a", Focus: true})
@@ -177,7 +172,8 @@ func restoreSet(e *glueEnv, g *layoutGlue) ([]string, []string) {
 	return c.Result.Fresh, old
 }
 
-// The quick terminal a snooze ended comes back open with its thread's tab; a sweep, or the
+// The quick terminal an older build's snooze ended (olderSnooze) comes back open with its
+// thread's tab; a sweep, or the
 // old quick shell's removal, before the glue acts on that commit must not draw it closed.
 func TestLayoutGlueFreshQuickRace(t *testing.T) {
 	for _, tc := range []struct {
@@ -199,10 +195,7 @@ func TestLayoutGlueFreshQuickRace(t *testing.T) {
 			g.labels[q.ID] = q.Labels // the terminal event the loop would have read
 			e.apply(&core.SetQuick{Thread: "th-a", Open: true})
 			acted(g)
-			e.goings(e.ctx, "th-a", thread.ShellsSnoozed)
-			if err := terminal.KillAndRemove(e.ctx, e.terms, q.ID); err != nil {
-				t.Fatal(err)
-			}
+			e.olderSnooze("th-a")
 			acted(g)
 			e.apply(&core.SetSnoozed{Thread: "th-a"}) // it woke: opening it restores its quick terminal
 			if c := e.apply(&core.OpenThread{Thread: "th-a", Focus: true}); c.Result.FreshQuick != "th-a" {

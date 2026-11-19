@@ -14,7 +14,6 @@ type ShellsGo int
 // Why a thread's shells go.
 const (
 	ShellsArchived ShellsGo = iota + 1
-	ShellsSnoozed           // snoozed, or saved for later
 	ShellsRemoved           // removed, or its failed setup discarded
 )
 
@@ -22,8 +21,6 @@ func (w ShellsGo) String() string {
 	switch w {
 	case ShellsArchived:
 		return "archived"
-	case ShellsSnoozed:
-		return "snoozed"
 	case ShellsRemoved:
 		return "removed"
 	}
@@ -31,8 +28,8 @@ func (w ShellsGo) String() string {
 }
 
 // removeShells kills and removes every shell terminal.new started for thread id and
-// every action terminal run for it (termlabel.IsPanel). Closing a thread leaves them
-// running; removing it takes them along. Options.ShellsGoing hears of it first, why
+// every action terminal run for it (termlabel.IsPanel). Closing or snoozing a thread
+// leaves them running; archiving or removing it takes them along. Options.ShellsGoing hears of it first, why
 // saying what is happening to the thread.
 func (m *Manager) removeShells(ctx context.Context, id string, why ShellsGo) error {
 	if m.opts.ShellsGoing != nil {

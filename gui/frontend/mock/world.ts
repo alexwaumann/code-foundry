@@ -2569,14 +2569,16 @@ export class World {
   private layoutSeen = new Map<string, LayoutSeen>();
 
   /**
-   * The daemon's layout glue for a thread's change (internal/daemon/layout.go): unarchived, woken,
-   * renamed or pinned keeps its tab when that is a preview; a wake clears the layout's snoozed mark.
+   * The daemon's layout glue for a thread's change (internal/daemon/layout.go): a snooze closes its
+   * tabs as closing its tab does; unarchived, woken, renamed or pinned keeps its tab when that is a
+   * preview; a wake clears the layout's snoozed mark and puts back the tab the snooze closed.
    */
   private layoutGlue(s: MockThread): void {
     const now: LayoutSeen = { archived: s.archivedAt !== null, snoozed: s.snoozedUntil !== null || s.savedAt !== null, pinned: s.pinned, name: s.name };
     const was = this.layoutSeen.get(s.id);
     this.layoutSeen.set(s.id, now);
     if (!was) return;
+    if (!was.snoozed && now.snoozed) this.layout.threadSnoozed(s.id);
     const woke = was.snoozed && !now.snoozed;
     const keep = woke || (was.archived && !now.archived) || (!was.pinned && now.pinned) || was.name !== now.name;
     if (woke || keep) this.layout.threadChanged(s.id, { woke, keep });
@@ -3051,10 +3053,10 @@ export class World {
   }
 
   /**
-   * thread.snooze without its confirmation (POST /__mock/thread/snooze does what the CLI
-   * with --yes does). Snoozing closes Claude like archiving (busy becomes ERROR
-   * "interrupted"), removes the thread's shells, unpins and unarchives it and sets the wake
-   * time (a re-snooze replaces it); null unsnoozes (no attention). Returns the message.
+   * thread.snooze (POST /__mock/thread/snooze does what the CLI does). A snooze only hides the
+   * thread (docs/notes/snooze-without-teardown.md): Claude, its shells, its background runs and its
+   * pin stay as they are; it is unarchived and the wake time set (a re-snooze replaces it); null
+   * unsnoozes (no attention). Returns the message.
    */
   snoozeThread(id: string, until: Date | null): string {
     const s = this.thread(id);
@@ -3065,10 +3067,6 @@ export class World {
       this.publishThread(s);
       return `unsnoozed thread ${label}`;
     }
-    if (s.state !== ThreadState.DISCONNECTED) this.stopThread(s.id, "closed", 0);
-    this.closeShells((l) => l[LABEL_THREAD] === s.id);
-    this.actions.stopBackground((r) => r.threadId === s.id);
-    s.pinned = false;
     s.archivedAt = null;
     s.snoozedUntil = until;
     s.savedAt = null;
@@ -3078,9 +3076,9 @@ export class World {
   }
 
   /**
-   * POST /__mock/thread/snooze?…&live=1: the snooze set and nothing else, the thread left running.
-   * A message from another thread leaves a snooze in place while the thread works on it; the
-   * composer row's pill shows Working and the snooze together then.
+   * POST /__mock/thread/snooze?…&live=1: the snooze set and nothing else, the thread left running
+   * (now what any snooze does). A message from another thread leaves a snooze in place while the
+   * thread works on it; the composer row's pill shows Working and the snooze together then.
    */
   markSnoozed(id: string, until: Date | null, saved: boolean): void {
     const s = this.thread(id);
@@ -3089,13 +3087,9 @@ export class World {
     this.publishThread(s);
   }
 
-  /** thread.snooze with save, without its confirmation: a snooze with no wake time, so the tick never wakes it. Returns the message. */
+  /** thread.snooze with save: a snooze with no wake time, so the tick never wakes it; nothing else changes, as for a snooze. Returns the message. */
   saveThread(id: string): string {
     const s = this.thread(id);
-    if (s.state !== ThreadState.DISCONNECTED) this.stopThread(s.id, "closed", 0);
-    this.closeShells((l) => l[LABEL_THREAD] === s.id);
-    this.actions.stopBackground((r) => r.threadId === s.id);
-    s.pinned = false;
     s.archivedAt = null;
     s.snoozedUntil = null;
     s.savedAt ??= new Date();
@@ -3106,13 +3100,15 @@ export class World {
 
   /**
    * The daemon's wake (POST /__mock/thread/wake, or the tick once the time passed): the
-   * snooze is cleared and a stopped thread needs attention, "snooze ended", stamped
-   * now (re-stamped when it already read so).
+   * snooze is cleared and a thread that is stopped, or running at its prompt, needs attention,
+   * "snooze ended", stamped now (re-stamped when it already read so); one that works or asks
+   * keeps its status.
    */
   wakeThread(id: string): void {
     const s = this.thread(id);
     s.snoozedUntil = null;
-    if (s.state === ThreadState.DISCONNECTED) {
+    const atPrompt = s.state === ThreadState.CONNECTED && (s.status === ThreadStatus.IDLE || (s.status === ThreadStatus.NEEDS_ATTENTION && !/^(permission|question):/.test(s.statusReason)));
+    if (s.state === ThreadState.DISCONNECTED || atPrompt) {
       s.status = ThreadStatus.NEEDS_ATTENTION;
       s.statusReason = "snooze ended";
       s.statusChangedAt = new Date();
@@ -5080,7 +5076,7 @@ export class World {
           title: "Snooze or Unsnooze Thread",
           category: "Thread",
           description:
-            "Snooze a thread until a time: Claude is closed, its terminals are removed and it is unpinned and listed apart; when the time comes it returns needing attention (\"snooze ended\"). clear unsnoozes. Pinning, archiving or the user's message unsnoozes a thread too; another thread's message is delivered and leaves it snoozed.",
+            "Snooze a thread until a time: it is listed apart and its tabs close, while Claude, its terminals and its pin are left as they are; when the time comes it returns needing attention (\"snooze ended\"). clear unsnoozes. Pinning, archiving or the user's message unsnoozes a thread too; another thread's message is delivered and leaves it snoozed.",
           keybindings: [],
           args: [
             { name: "until", type: ArgType.STRING, required: false, description: "When the thread wakes: 1h, 90m, tomorrow, next-week, mon..sun, 2026-10-20, 2026-10-20 14:00 or RFC 3339" },
@@ -5088,32 +5084,7 @@ export class World {
             { name: "clear", type: ArgType.BOOL, required: false, description: "Unsnooze instead" },
             { name: "ids", type: ArgType.STRING, required: false, description: "Comma-separated thread ids, to act on several" },
           ],
-          // Like the daemon: only snoozing (a valid time, or save) a thread that is mid-turn asks;
-          // given several ids, one question naming the busy ones (snoozeManyConfirm).
-          confirmIf: (ctx, args) => {
-            const ids = idsArg(args);
-            if (ids.length > 1) return args.clear !== "true" && this.busyNames(ids).length > 0;
-            const s = ids.length === 1 ? this.threads.get(ids[0] ?? "") : activeThread(ctx);
-            if (s === undefined || args.clear === "true" || this.interrupts(s).why === "") return false;
-            if (args.save === "true") return args.until === undefined;
-            try {
-              return snoozeUntil(args) !== null;
-            } catch {
-              return false;
-            }
-          },
-          confirm: (ctx, args) => {
-            const ids = idsArg(args);
-            if (ids.length > 1) {
-              const save = args.save === "true";
-              return manyConfirm(save ? "Save" : "Snooze", `${String(ids.length)} threads${save ? " for later" : ""}`, save ? "Saving" : "Snoozing", this.busyNames(ids));
-            }
-            const s = ids.length === 1 ? this.threads.get(ids[0] ?? "") : activeThread(ctx);
-            const { why, ends } = s ? this.interrupts(s) : { why: "", ends: "" };
-            const name = s?.name || (s?.id ?? "");
-            if (args.save === "true") return `Save thread ${name} for later? ${why}; saving ${ends}.`;
-            return `Snooze thread ${name}? ${why}; snoozing ${ends}.`;
-          },
+          // Like the daemon: a snooze never asks (it cuts nothing off).
         },
         when: (ctx) => activeThread(ctx) !== undefined,
         run: (ctx, args) => {

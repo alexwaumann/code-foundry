@@ -1,5 +1,9 @@
 # A thread putting itself away
 
+Update 2026-11-19 (`snooze-without-teardown.md`): a snooze closes nothing now, so a thread's
+snooze or save of itself happens at once, even mid-turn; only an archive of itself waits for
+the turn's end.
+
 A user told a thread to archive itself and it ended up Interrupted. Now the thread's archive
 or snooze of itself waits for the end of its turn.
 

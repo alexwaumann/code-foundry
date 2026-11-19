@@ -78,11 +78,12 @@ type ThreadDoc struct {
 	Last       map[string]string `json:"last,omitempty"`
 	Info       *bool             `json:"info,omitempty"`
 	Snoozed    bool              `json:"snoozed,omitempty"`
+	SnoozedTab *SnoozedTab       `json:"snoozed_tab,omitempty"`
 }
 
 // EncodeThreadDoc writes a thread's document.
 func EncodeThreadDoc(ts *ThreadState) ([]byte, error) {
-	b, err := json.Marshal(ThreadDoc{V: Version, Quick: ts.Quick, Remembered: ts.Remembered, Last: ts.Last, Info: ts.Info, Snoozed: ts.Snoozed})
+	b, err := json.Marshal(ThreadDoc{V: Version, Quick: ts.Quick, Remembered: ts.Remembered, Last: ts.Last, Info: ts.Info, Snoozed: ts.Snoozed, SnoozedTab: ts.SnoozedTab})
 	if err != nil {
 		return nil, fmt.Errorf("encode thread state: %w", err)
 	}
@@ -98,7 +99,7 @@ func DecodeThreadDoc(space string, data []byte) (*ThreadState, error) {
 	if d.V > Version {
 		return nil, fmt.Errorf("decode thread state: version %d: %w", d.V, ErrNewerVersion)
 	}
-	return &ThreadState{Space: space, Quick: d.Quick, Remembered: d.Remembered, Last: d.Last, Info: d.Info, Snoozed: d.Snoozed}, nil
+	return &ThreadState{Space: space, Quick: d.Quick, Remembered: d.Remembered, Last: d.Last, Info: d.Info, Snoozed: d.Snoozed, SnoozedTab: d.SnoozedTab}, nil
 }
 
 // FromNewerBuild lists what in st only a newer build writes: a node of a type this build

@@ -2,8 +2,10 @@ import { expect, test } from "@playwright/test";
 import { appPath, mockUrl, resetMock } from "./fixtures";
 
 /**
- * SHOTS=<dir> only: a quick terminal back after a snooze (docs/notes/shell-24d-spec-differences.md,
- * 1), a fresh shell with the old one's last command and Run again; dark and light. The snooze
+ * SHOTS=<dir> only: a quick terminal back after an older build's snooze, which ended the thread's
+ * shells (docs/notes/shell-24d-spec-differences.md, 1; a snooze now leaves them running:
+ * docs/notes/snooze-without-teardown.md), a fresh shell with the old one's last command and Run
+ * again; dark and light. The snooze
  * itself is the daemon's (Go tests); the line, its actions and when it shows are vitest's
  * (components/shell/QuickTerminal.test.tsx, shell/terminalActions.test.ts).
  */

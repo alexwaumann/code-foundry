@@ -164,6 +164,8 @@ type threadCmd struct {
 	unread    bool     // MarkUnread (unread.go)
 	verb      *Item    // ShowHTML, ShowTheme: an item a verb adds (html.go verbItem)
 	putAway   *PutAway // PutAwaySelf (putaway.go)
+	// snoozeEnded sets (true) or clears the "snooze ended" attention (snooze.go).
+	snoozeEnded *bool
 	// reuse, with verb, may answer with an item already in the log instead.
 	reuse     func(itemWriter) (Item, bool)
 	requestID string
@@ -825,6 +827,8 @@ func (r *runner) onThreadCmd(cmd threadCmd) {
 		rep.item = r.onVerbItem(*cmd.verb, cmd.reuse)
 	case cmd.putAway != nil:
 		rep.deferred = r.onPutAway(*cmd.putAway)
+	case cmd.snoozeEnded != nil:
+		r.onSnoozeEnded(*cmd.snoozeEnded)
 	default:
 		rep.item, rep.err = r.respond(cmd.requestID, cmd.decision)
 	}

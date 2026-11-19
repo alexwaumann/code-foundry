@@ -2,6 +2,7 @@ package layout
 
 import (
 	"fmt"
+	"slices"
 )
 
 // Preview tabs (docs/notes/shell-model.md, "Preview tabs"; decisions in
@@ -101,8 +102,13 @@ func (o *KeepTab) apply(t *tx) (Result, error) {
 
 // SetSnoozed tells the layout whether a thread is snoozed, as the daemon's glue sees it
 // (snooze_thread marks it too). Marking one changes nothing else. Waking one keeps its tab
-// when that is a preview and, when its tab is open, brings back its remembered set beside it
-// as open_thread does (Result.Back, Placed, Fresh) and a quick terminal a snooze ended
+// when that is a preview; when its tab is not open and a snooze closed it
+// (ThreadState.SnoozedTab), the tab goes back where it was: into its pane at its old place
+// while that pane is in the thread's space and can take it, into its pane rebuilt beside its
+// old neighbours when it was the pane's only tab, else where open_thread puts a thread's tab.
+// It goes back without the focus, the active tab of its pane again if it was then, except in
+// the focused pane, whose tab stays in front. Then its remembered set comes back beside it
+// as open_thread restores it (Result.Back, Placed, Fresh) and a quick terminal a snooze ended
 // (Result.FreshQuick); with no tab open, they come back when it next opens. W and H are the
 // pane area (default DefaultW x DefaultH).
 type SetSnoozed struct {
@@ -125,23 +131,93 @@ func (o *SetSnoozed) apply(t *tx) (Result, error) {
 		threadState(t.st, o.Thread).Snoozed = true
 		return Result{}, nil
 	}
+	var away *SnoozedTab
 	if ts := t.st.Threads[o.Thread]; ts != nil {
 		ts.Snoozed = false
+		away, ts.SnoozedTab = ts.SnoozedTab, nil
 		prune(t.st, o.Thread)
 	}
+	w, h := viewport(o.W, o.H)
 	id := threadTabID(t.st, o.Thread)
 	if id == "" {
-		return Result{}, nil
+		if away == nil {
+			return Result{}, nil
+		}
+		return t.snoozedBack(o.Thread, away, w, h)
 	}
 	sp, p, tb := t.st.FindTab(id)
 	keepTab(tb)
 	res := Result{Space: sp.ID, Pane: p.ID, Tab: id}
-	w, h := viewport(o.W, o.H)
 	if err := t.restore(sp, o.Thread, w, h, &res); err != nil {
 		return Result{}, err
 	}
 	t.freshQuick(o.Thread, &res)
 	return res, nil
+}
+
+// snoozedBack opens thread's tab again where a snooze closed it (SetSnoozed), with its
+// remembered set, without the focus.
+func (t *tx) snoozedBack(thread string, a *SnoozedTab, w, h float64) (Result, error) {
+	sp := t.st.Space(t.st.SpaceOf(thread))
+	if sp == nil {
+		return Result{}, nil
+	}
+	tb := &Tab{Kind: "thread", Thread: thread}
+	var res Result
+	if a.Space != sp.ID {
+		a = nil // it moved to another space meanwhile: it opens as a thread's tab opens there
+	}
+	switch p := t.snoozedPane(sp, a, w, h); {
+	case p != nil:
+		if _, err := t.prepare(sp, tb); err != nil {
+			return Result{}, err
+		}
+		p.Tabs = slices.Insert(p.Tabs, clampIndex(a.Index, len(p.Tabs)), tb)
+		res = Result{Space: sp.ID, Tab: tb.ID}
+	case a != nil && a.Beside != nil:
+		if _, err := t.prepare(sp, tb); err != nil {
+			return Result{}, err
+		}
+		np := &Node{T: NodePane, ID: t.paneID(a.Pane), Tabs: []*Tab{tb}, Active: tb.ID}
+		if t.rebuild(sp, a.Beside, np) {
+			np.Collapsed = !Fits(sp.Root, w, h)
+			res = Result{Space: sp.ID, Tab: tb.ID, Collapsed: np.Collapsed}
+			break
+		}
+		fallthrough
+	default:
+		r, err := (&OpenThread{Thread: thread, W: w, H: h}).apply(t)
+		if err != nil {
+			return Result{}, err
+		}
+		return r, nil
+	}
+	if err := t.restore(sp, thread, w, h, &res); err != nil {
+		return Result{}, err
+	}
+	t.freshQuick(thread, &res)
+	_, p, _ := t.st.FindTab(tb.ID)
+	if a.Active {
+		t.show(sp, p, tb.ID, false)
+	} else if sp.Focus == "" {
+		sp.Focus = p.ID
+	}
+	prune(t.st, thread)
+	res.Pane = p.ID
+	return res, nil
+}
+
+// snoozedPane is the pane a snoozed thread's tab goes back into (snoozedBack): its old pane,
+// while it is in space sp and has room for the tab; nil otherwise.
+func (t *tx) snoozedPane(sp *Space, a *SnoozedTab, w, h float64) *Node {
+	if a == nil {
+		return nil
+	}
+	p := paneByID(sp, a.Pane)
+	if p == nil || !canTake(sp, p, w, h, &Tab{Kind: "thread"}) {
+		return nil
+	}
+	return p
 }
 
 // freshQuick opens thread's quick terminal again when a snooze ended it (Quick.Fresh): the

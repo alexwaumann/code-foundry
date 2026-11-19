@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -62,8 +63,14 @@ type putAwayForm struct {
 	done func(Thread) bool
 }
 
+// putAwayForms are the put-aways a thread's own request defers to its turn's end: an
+// archive only. A snooze closes nothing, so it happens at once (snoozeForms).
 var putAwayForms = []putAwayForm{
 	{"archive", func(time.Time) PutAway { return PutAway{Kind: PutAwayArchive} }, func(s Thread) bool { return !s.ArchivedAt.IsZero() }},
+}
+
+// snoozeForms are the two forms of a snooze.
+var snoozeForms = []putAwayForm{
 	{"snooze", func(now time.Time) PutAway { return PutAway{Kind: PutAwaySnooze, Until: now.Add(time.Hour)} }, func(s Thread) bool { return !s.SnoozedUntil.IsZero() }},
 	{"save", func(time.Time) PutAway { return PutAway{Kind: PutAwaySave} }, func(s Thread) bool { return !s.SavedAt.IsZero() }},
 }
@@ -357,44 +364,80 @@ func TestPutAwaySelfFailedTurn(t *testing.T) {
 	}
 }
 
-// A snooze whose time passed during the turn is dropped: the thread would wake at once.
-func TestPutAwaySelfSnoozeTimePassed(t *testing.T) {
-	clk := newTestClock()
-	e, s := midTurnAt(t, fixturePath("write-allow"), nil, func(o *Options) { o.Now = clk.Now })
-	e.putAwaySelf(s, PutAway{Kind: PutAwaySnooze, Until: clk.Now().Add(time.Hour)})
-	clk.advance(2 * time.Hour)
-	e.allow(s)
-	got := e.waitFor(s.ID, "the turn's end", func(s Thread) bool { return s.StatusReason == "finished" })
-	if got.State != StateConnected || got.Snoozed() || e.pendingPutAway(s.ID) != nil {
-		t.Errorf("end state %+v", got)
+// A thread snoozing or saving itself mid-turn is snoozed at once (nothing is cut off, so
+// nothing waits for the turn's end): the turn goes on, its request still pending, and ends
+// as any turn does, the thread still snoozed and running.
+func TestPutAwaySelfSnoozeAtOnce(t *testing.T) {
+	for _, f := range snoozeForms {
+		t.Run(f.name, func(t *testing.T) {
+			e, s := midTurnAt(t, fixturePath("write-allow"), nil)
+			got, deferred, err := e.m.PutAwaySelf(e.ctx(), s.ID, f.p(time.Now()))
+			if err != nil || deferred || !f.done(got) {
+				t.Fatalf("PutAwaySelf = %+v, deferred %v, %v; want it done at once", got, deferred, err)
+			}
+			if got.State != StateConnected || got.PendingRequestID == "" || e.pendingPutAway(s.ID) != nil {
+				t.Errorf("after the snooze %v %q, pending %+v; want the turn going on at its prompt", got.State, got.StatusReason, e.pendingPutAway(s.ID))
+			}
+			e.allow(s)
+			end := e.waitFor(s.ID, "the turn's end", func(s Thread) bool { return s.StatusReason == "finished" })
+			if end.State != StateConnected || !f.done(end) {
+				t.Errorf("end state %v, snoozed %v; want connected, still snoozed", end.State, end.Snoozed())
+			}
+		})
 	}
 }
 
-// A second call replaces the first.
+// A snooze of itself replaces an archive of itself waiting for the turn's end: the
+// thread changed its mind.
 func TestPutAwaySelfSecondReplaces(t *testing.T) {
 	e, s := midTurnAt(t, fixturePath("write-allow"), nil)
 	e.putAwaySelf(s, PutAway{Kind: PutAwayArchive})
-	until := time.Now().Add(time.Hour)
-	e.putAwaySelf(s, PutAway{Kind: PutAwaySnooze, Until: until})
+	if _, deferred, err := e.m.PutAwaySelf(e.ctx(), s.ID, PutAway{Kind: PutAwaySnooze, Until: time.Now().Add(time.Hour)}); err != nil || deferred {
+		t.Fatalf("snooze itself: deferred %v, %v", deferred, err)
+	}
+	if p := e.pendingPutAway(s.ID); p != nil {
+		t.Errorf("still pending: %+v", p)
+	}
 	e.allow(s)
-	got := e.waitFor(s.ID, "snoozed", func(s Thread) bool { return s.Snoozed() })
-	if !got.ArchivedAt.IsZero() {
-		t.Errorf("archived too: %+v", got)
+	got := e.waitFor(s.ID, "the turn's end", func(s Thread) bool { return s.StatusReason == "finished" })
+	time.Sleep(100 * time.Millisecond) // an archive at the turn's end would land now
+	if got, _ = e.m.Get(e.ctx(), s.ID); !got.ArchivedAt.IsZero() || !got.Snoozed() || got.State != StateConnected {
+		t.Errorf("end state %v archived %v snoozed %v; want it snoozed and running", got.State, got.ArchivedAt, got.Snoozed())
 	}
 }
 
-// The user putting the thread away differently, now, wins: the turn is cut off and what
-// was pending goes with the process.
+// The user putting the thread away differently, now, wins over what the thread asked for
+// itself. Archiving cuts the turn off and what was pending goes with the process; snoozing
+// cuts nothing off, and drops what was pending.
 func TestPutAwaySelfOverruledByTheUser(t *testing.T) {
-	e, s := midTurnAt(t, fixturePath("write-allow"), nil)
-	e.putAwaySelf(s, PutAway{Kind: PutAwaySnooze, Until: time.Now().Add(time.Hour)})
-	got, err := e.m.Archive(e.ctx(), s.ID, true)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got.ArchivedAt.IsZero() || got.Snoozed() || got.Status != StatusIdle || got.StatusReason != ReasonArchived || e.pendingPutAway(s.ID) != nil {
-		t.Errorf("end state %v %q, archived %v, snoozed %v, pending %+v", got.Status, got.StatusReason, got.ArchivedAt, got.Snoozed(), e.pendingPutAway(s.ID))
-	}
+	t.Run("archive", func(t *testing.T) {
+		e, s := midTurnAt(t, fixturePath("write-allow"), nil)
+		e.putAwaySelf(s, PutAway{Kind: PutAwayArchive})
+		got, err := e.m.Archive(e.ctx(), s.ID, true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got.ArchivedAt.IsZero() || got.Status != StatusIdle || got.StatusReason != ReasonArchived || e.pendingPutAway(s.ID) != nil {
+			t.Errorf("end state %v %q, archived %v, pending %+v", got.Status, got.StatusReason, got.ArchivedAt, e.pendingPutAway(s.ID))
+		}
+	})
+	t.Run("snooze", func(t *testing.T) {
+		e, s := midTurnAt(t, fixturePath("write-allow"), nil)
+		e.putAwaySelf(s, PutAway{Kind: PutAwayArchive})
+		got, err := e.m.Snooze(e.ctx(), s.ID, time.Now().Add(time.Hour))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !got.Snoozed() || got.State != StateConnected || e.pendingPutAway(s.ID) != nil {
+			t.Errorf("end state %v, snoozed %v, pending %+v", got.State, got.Snoozed(), e.pendingPutAway(s.ID))
+		}
+		e.allow(s)
+		e.waitFor(s.ID, "the turn's end", func(s Thread) bool { return s.StatusReason == "finished" })
+		time.Sleep(100 * time.Millisecond) // an archive at the turn's end would land now
+		if got, _ := e.m.Get(e.ctx(), s.ID); !got.ArchivedAt.IsZero() || !got.Snoozed() {
+			t.Errorf("archived %v snoozed %v; want it snoozed only", got.ArchivedAt, got.Snoozed())
+		}
+	})
 }
 
 // A result with a turn queued behind it is not the end of the thread's work: the last
@@ -471,8 +514,6 @@ func TestPutAwayAtTurnEndGivesWayToANewProcess(t *testing.T) {
 		p    PutAway
 	}{
 		{name: "archive", p: PutAway{Kind: PutAwayArchive}},
-		{name: "snooze", p: PutAway{Kind: PutAwaySnooze, Until: time.Now().Add(time.Hour)}},
-		{name: "save", p: PutAway{Kind: PutAwaySave}},
 	} {
 		t.Run(form.name, func(t *testing.T) {
 			e := newFixtureEnvAt(t, fixturePath("write-allow"), nil)
@@ -502,15 +543,20 @@ func TestPutAwayAtTurnEndGivesWayToANewProcess(t *testing.T) {
 	}
 }
 
-// A thread not mid-turn is put away at once, as any caller's would be.
+// A thread not mid-turn is put away at once, as any caller's would be: archived and
+// stopped, or snoozed and still running.
 func TestPutAwaySelfNotMidTurn(t *testing.T) {
-	for _, f := range putAwayForms {
+	for _, f := range append(slices.Clone(putAwayForms), snoozeForms...) {
 		t.Run(f.name, func(t *testing.T) {
 			e := newFixtureEnvAt(t, fixturePath("text-table"), nil)
 			s := e.create(CreateOptions{})
 			e.waitFor(s.ID, "at its prompt", func(s Thread) bool { return s.State == StateConnected && s.Status == StatusIdle })
 			got, deferred, err := e.m.PutAwaySelf(e.ctx(), s.ID, f.p(time.Now()))
-			if err != nil || deferred || !f.done(got) || got.State != StateDisconnected {
+			want := StateDisconnected
+			if f.name != "archive" {
+				want = StateConnected
+			}
+			if err != nil || deferred || !f.done(got) || got.State != want {
 				t.Errorf("PutAwaySelf = %+v, deferred %v, %v", got, deferred, err)
 			}
 		})
@@ -534,7 +580,7 @@ func TestPutAwaySelfRefusals(t *testing.T) {
 	rec.s.Kind, rec.s.ResidentName = KindResident, "ember"
 	e.m.commitLocked(rec, false)
 	e.m.mu.Unlock()
-	for _, f := range putAwayForms {
+	for _, f := range append(slices.Clone(putAwayForms), snoozeForms...) {
 		if _, _, err := e.m.PutAwaySelf(e.ctx(), s.ID, f.p(time.Now())); !errors.Is(err, ErrFailedPrecondition) {
 			t.Errorf("%s of a resident: %v", f.name, err)
 		}
@@ -589,8 +635,9 @@ func TestPutAwaySelfArchiveWakesNoOne(t *testing.T) {
 	}
 }
 
-// Snoozing shares archive's guard: a cut-off turn reads idle "snoozed", published that way
-// from the first, and what was wrong before the snooze stays.
+// Snoozing leaves the status as it is (docs/notes/snooze-without-teardown.md): a working
+// thread works on, one asking still asks, an idle one is idle, and what was wrong before
+// stays. Nothing reads "interrupted" or "snoozed".
 func TestSnoozeStatus(t *testing.T) {
 	snooze := func(e *env, id string) (Thread, error) { return e.m.Snooze(e.ctx(), id, time.Now().Add(time.Hour)) }
 	save := func(e *env, id string) (Thread, error) { return e.m.SaveForLater(e.ctx(), id) }
@@ -600,13 +647,14 @@ func TestSnoozeStatus(t *testing.T) {
 		do         func(e *env, id string) (Thread, error)
 		before     func(e *env, s Thread)
 		want       Status
-		wantReason string
+		wantReason string // a prefix
+		wantState  State
 	}{
-		{name: "busy", setup: busySetup, do: snooze, want: StatusIdle, wantReason: ReasonSnoozed},
-		{name: "busy, saved", setup: busySetup, do: save, want: StatusIdle, wantReason: ReasonSnoozed},
-		{name: "at a permission prompt", setup: permissionSetup, do: snooze, want: StatusIdle, wantReason: ReasonSnoozed},
-		{name: "idle", setup: idleSetup, do: snooze, want: StatusIdle, wantReason: "at prompt"},
-		{name: "crashed before", setup: busySetup, do: snooze, want: StatusError, wantReason: ReasonCrashed,
+		{name: "busy", setup: busySetup, do: snooze, want: StatusBusy, wantReason: "working", wantState: StateConnected},
+		{name: "busy, saved", setup: busySetup, do: save, want: StatusBusy, wantReason: "working", wantState: StateConnected},
+		{name: "at a permission prompt", setup: permissionSetup, do: snooze, want: StatusNeedsAttention, wantReason: "permission:", wantState: StateConnected},
+		{name: "idle", setup: idleSetup, do: snooze, want: StatusIdle, wantReason: "at prompt", wantState: StateConnected},
+		{name: "crashed before", setup: busySetup, do: snooze, want: StatusError, wantReason: ReasonCrashed, wantState: StateDisconnected,
 			before: func(e *env, s Thread) {
 				e.exit(s.ID, 1)
 				e.waitFor(s.ID, "crashed", func(s Thread) bool { return s.State == StateDisconnected })
@@ -624,43 +672,32 @@ func TestSnoozeStatus(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if got.Status != tt.want || got.StatusReason != tt.wantReason {
-				t.Errorf("snoozed status %v %q, want %v %q", got.Status, got.StatusReason, tt.want, tt.wantReason)
+			if got.Status != tt.want || !strings.HasPrefix(got.StatusReason, tt.wantReason) || got.State != tt.wantState {
+				t.Errorf("snoozed %v %v %q, want %v %v %q", got.State, got.Status, got.StatusReason, tt.wantState, tt.want, tt.wantReason)
 			}
 			for drained := false; !drained; {
 				select {
 				case ev := <-sub.C():
-					if u, ok := ev.(Updated); ok && u.Thread.ID == s.ID && u.Thread.StatusReason == ReasonInterrupted {
-						t.Errorf("published %v %q while snoozing", u.Thread.Status, u.Thread.StatusReason)
+					if u, ok := ev.(Updated); ok && u.Thread.ID == s.ID && (u.Thread.StatusReason == ReasonInterrupted || u.Thread.StatusReason == ReasonSnoozed || u.Thread.State != tt.wantState) {
+						t.Errorf("published %v %v %q while snoozing", u.Thread.State, u.Thread.Status, u.Thread.StatusReason)
 					}
 				default:
 					drained = true
 				}
 			}
-			rows, err := loadThreads(e.ctx(), e.m.opts.DB)
-			if err != nil || len(rows) != 1 {
-				t.Fatalf("load = %v, %v", rows, err)
-			}
-			if r := rows[0]; r.Status != tt.want || r.StatusReason != tt.wantReason {
-				t.Errorf("persisted %v %q, want %v %q", r.Status, r.StatusReason, tt.want, tt.wantReason)
-			}
 		})
 	}
 }
 
-// A plain snooze or archive whose own request ends mid-close fails, and the turn it cut
-// off reads what it is: the thread is not put away, so nothing explains it otherwise.
+// A plain archive whose own request ends mid-close fails, and the turn it cut off reads
+// what it is: the thread is not put away, so nothing explains it otherwise. (A snooze
+// closes nothing.)
 func TestPutAwayFailedRequestReadsInterrupted(t *testing.T) {
 	tests := []struct {
 		name string
 		do   func(ctx context.Context, e *env, id string) error
 	}{
 		{"archive", func(ctx context.Context, e *env, id string) error { _, err := e.m.Archive(ctx, id, true); return err }},
-		{"snooze", func(ctx context.Context, e *env, id string) error {
-			_, err := e.m.Snooze(ctx, id, time.Now().Add(time.Hour))
-			return err
-		}},
-		{"save", func(ctx context.Context, e *env, id string) error { _, err := e.m.SaveForLater(ctx, id); return err }},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

@@ -1,0 +1,72 @@
+{
+  "doc": "A thread moved to another space while snoozed opens there at the wake, where a thread's tab opens, not in its old pane.",
+  "state": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Space A",
+        "root": {
+          "t": "pane",
+          "id": "p-o",
+          "tabs": [{"id":"t-o","kind":"thread","thread":"th-o"}],
+          "active": "t-o"
+        },
+        "focus": "p-o"
+      },
+      {
+        "id": "sp-b",
+        "name": "Space B",
+        "root": {"t":"pane","id":"p-b","tabs":[{"id":"t-p","kind":"prs"}],"active":"t-p"},
+        "focus": "p-b"
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a",
+    "threads": {
+      "th-a": {
+        "space": "sp-b",
+        "snoozed": true,
+        "snoozed_tab": {
+          "space": "sp-a",
+          "pane": "p-a",
+          "index": 0,
+          "active": true,
+          "beside": {"neighbours":["p-o"],"edge":"right","frac":0.3}
+        }
+      }
+    }
+  },
+  "op": {"op":"set_snoozed","thread":"th-a"},
+  "want": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Space A",
+        "root": {
+          "t": "pane",
+          "id": "p-o",
+          "tabs": [{"id":"t-o","kind":"thread","thread":"th-o"}],
+          "active": "t-o"
+        },
+        "focus": "p-o"
+      },
+      {
+        "id": "sp-b",
+        "name": "Space B",
+        "root": {
+          "t": "pane",
+          "id": "p-b",
+          "tabs": [{"id":"t-p","kind":"prs"},{"id":"t-n1","kind":"thread","thread":"th-a"}],
+          "active": "t-p"
+        },
+        "focus": "p-b"
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a",
+    "threads": {"th-a":{"space":"sp-b"}}
+  },
+  "result": {"space":"sp-b","pane":"p-b","tab":"t-n1","rule":"focused"}
+}

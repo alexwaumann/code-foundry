@@ -25,8 +25,8 @@ export function useDefaultSnooze(): DefaultSnooze {
 
 /**
  * thread.snooze.default's presenter (the chord, the palette): the thread snoozes to the default
- * preset's time as the menu computes it now, through thread.snooze like a menu pick (its
- * confirmation mid-turn, its toast), or is saved for later. Toasted (`inView` false): the key
+ * preset's time as the menu computes it now, through thread.snooze like a menu pick (no
+ * confirmation, its toast), or is saved for later. Toasted (`inView` false): the key
  * leaves nothing on screen that says where the thread went. False without such a thread, so the
  * command falls back to the daemon's own run.
  */

@@ -25,11 +25,8 @@ func TestThreadSnooze(t *testing.T) {
 	busy := live(v1.ThreadStatus_THREAD_STATUS_BUSY, "working")
 	far := time.Date(2099, time.January, 2, 15, 4, 0, 0, time.UTC)
 	farMsg := "snoozed thread drv (s5) until " + far.In(time.Local).Format("Mon Jan 2 2006 3:04 PM")
-	get := &v1.GetThreadRequest{Id: "s5"}
 	snoozeFar := &v1.SnoozeThreadRequest{Id: "s5", Until: timestamppb.New(far)}
 	unsnooze := &v1.SnoozeThreadRequest{Id: "s5"}
-	const working = "Snooze thread drv? Claude is still working; snoozing ends the turn."
-	const waiting = "Snooze thread drv? Claude is waiting on your answer; snoozing ends the turn."
 
 	tests := []struct {
 		name       string
@@ -48,7 +45,7 @@ func TestThreadSnooze(t *testing.T) {
 		wantUntil time.Duration
 	}{
 		{name: "an idle thread snoozes without asking", ctx: command.Context{ActiveThreadID: "s5"}, args: map[string]string{"until": "2099-01-02T15:04:00Z"},
-			current: idle, wantMsg: farMsg, wantReqs: []proto.Message{get, &v1.SnoozeThreadRequest{Id: "s5", Until: timestamppb.New(far), ByThreadId: "s5"}}},
+			current: idle, wantMsg: farMsg, wantReqs: []proto.Message{&v1.SnoozeThreadRequest{Id: "s5", Until: timestamppb.New(far), ByThreadId: "s5"}}},
 		{name: "a duration is from now", args: map[string]string{"id": "s5", "until": "90m"},
 			current: idle, wantUntil: 90 * time.Minute},
 		{name: "a finished turn snoozes without asking", args: map[string]string{"id": "s5", "until": "2099-01-02T15:04:00Z"},
@@ -56,32 +53,26 @@ func TestThreadSnooze(t *testing.T) {
 		{name: "a disconnected thread snoozes without asking", args: map[string]string{"id": "s5", "until": "2099-01-02T15:04:00Z"},
 			current: &v1.Thread{Name: "drv", State: v1.ThreadState_THREAD_STATE_DISCONNECTED, Status: v1.ThreadStatus_THREAD_STATUS_ERROR, StatusReason: "interrupted"},
 			wantMsg: farMsg},
-		{name: "a working thread asks", args: map[string]string{"id": "s5", "until": "1h"}, current: busy,
-			wantAsk: working, wantReqs: []proto.Message{get, get}},
-		{name: "a starting thread asks", args: map[string]string{"id": "s5", "until": "tomorrow"},
-			current: &v1.Thread{Name: "drv", State: v1.ThreadState_THREAD_STATE_STARTING}, wantAsk: working},
-		{name: "a pending permission asks", args: map[string]string{"id": "s5", "until": "mon"},
-			current: live(v1.ThreadStatus_THREAD_STATUS_NEEDS_ATTENTION, "permission: Bash rm -rf x"), wantAsk: waiting},
-		{name: "a pending question asks", args: map[string]string{"id": "s5", "until": "next-week"},
-			current: live(v1.ThreadStatus_THREAD_STATUS_NEEDS_ATTENTION, "question: Which one?"), wantAsk: waiting},
-		{name: "background agents ask", args: map[string]string{"id": "s5", "until": "1h"},
-			current: &v1.Thread{Name: "drv", State: connected, Status: v1.ThreadStatus_THREAD_STATUS_IDLE, BackgroundAgentsRunning: 2},
-			wantAsk: "Snooze thread drv? 2 background agents are running; snoozing stops them."},
-		{name: "an unnamed thread is asked about by id", args: map[string]string{"id": "s5", "until": "1h"},
-			current: &v1.Thread{State: connected, Status: v1.ThreadStatus_THREAD_STATUS_BUSY},
-			wantAsk: "Snooze thread s5? Claude is still working; snoozing ends the turn."},
-		{name: "a working thread snoozes once confirmed", args: map[string]string{"id": "s5", "until": "2099-01-02T15:04:00Z"},
-			current: busy, confirmed: true, wantMsg: farMsg, wantReqs: []proto.Message{snoozeFar}},
+		// A snooze cuts nothing off (docs/notes/snooze-without-teardown.md): never a question.
+		{name: "a working thread snoozes without asking", args: map[string]string{"id": "s5", "until": "2099-01-02T15:04:00Z"}, current: busy,
+			wantMsg: farMsg, wantReqs: []proto.Message{snoozeFar}},
+		{name: "a starting thread snoozes without asking", args: map[string]string{"id": "s5", "until": "2099-01-02T15:04:00Z"},
+			current: &v1.Thread{Name: "drv", State: v1.ThreadState_THREAD_STATE_STARTING}, wantMsg: farMsg, wantReqs: []proto.Message{snoozeFar}},
+		{name: "a pending permission snoozes without asking", args: map[string]string{"id": "s5", "until": "2099-01-02T15:04:00Z"},
+			current: live(v1.ThreadStatus_THREAD_STATUS_NEEDS_ATTENTION, "permission: Bash rm -rf x"), wantMsg: farMsg, wantReqs: []proto.Message{snoozeFar}},
+		{name: "a pending question snoozes without asking", args: map[string]string{"id": "s5", "until": "2099-01-02T15:04:00Z"},
+			current: live(v1.ThreadStatus_THREAD_STATUS_NEEDS_ATTENTION, "question: Which one?"), wantMsg: farMsg, wantReqs: []proto.Message{snoozeFar}},
+		{name: "background agents snooze without asking", args: map[string]string{"id": "s5", "until": "2099-01-02T15:04:00Z"},
+			current: &v1.Thread{Name: "drv", State: connected, Status: v1.ThreadStatus_THREAD_STATUS_IDLE, BackgroundAgentsRunning: 2, BackgroundShellsRunning: 1},
+			wantMsg: farMsg, wantReqs: []proto.Message{snoozeFar}},
 		{name: "clear unsnoozes without asking, even a working thread", args: map[string]string{"id": "s5", "clear": "true"},
 			current: busy, wantMsg: "unsnoozed thread drv (s5)", wantReqs: []proto.Message{unsnooze}},
 		{name: "save puts an idle thread away without asking", args: map[string]string{"id": "s5", "save": "true"},
-			current: idle, wantMsg: "saved thread drv (s5) for later", wantReqs: []proto.Message{get, &v1.SnoozeThreadRequest{Id: "s5", Save: true}}},
-		{name: "save asks while Claude works", args: map[string]string{"id": "s5", "save": "true"}, current: busy,
-			wantAsk: "Save thread drv for later? Claude is still working; saving ends the turn."},
-		{name: "save asks while Claude waits on an answer", args: map[string]string{"id": "s5", "save": "true"},
+			current: idle, wantMsg: "saved thread drv (s5) for later", wantReqs: []proto.Message{&v1.SnoozeThreadRequest{Id: "s5", Save: true}}},
+		{name: "save does not ask while Claude works", args: map[string]string{"id": "s5", "save": "true"}, current: busy,
+			wantMsg: "saved thread drv (s5) for later", wantReqs: []proto.Message{&v1.SnoozeThreadRequest{Id: "s5", Save: true}}},
+		{name: "save does not ask while Claude waits on an answer", args: map[string]string{"id": "s5", "save": "true"},
 			current: live(v1.ThreadStatus_THREAD_STATUS_NEEDS_ATTENTION, "question: Which one?"),
-			wantAsk: "Save thread drv for later? Claude is waiting on your answer; saving ends the turn."},
-		{name: "save runs once confirmed", args: map[string]string{"id": "s5", "save": "true"}, current: busy, confirmed: true,
 			wantMsg: "saved thread drv (s5) for later", wantReqs: []proto.Message{&v1.SnoozeThreadRequest{Id: "s5", Save: true}}},
 		{name: "clear ends a save", args: map[string]string{"id": "s5", "clear": "true"},
 			current: &v1.Thread{Name: "drv", SavedAt: timestamppb.New(far)}, wantMsg: "unsnoozed thread drv (s5)", wantReqs: []proto.Message{unsnooze}},
@@ -153,10 +144,12 @@ func TestThreadSnooze(t *testing.T) {
 	}
 }
 
-func TestThreadSnoozeListsAsConfirmable(t *testing.T) {
+// A snooze cuts nothing off, so thread.snooze has no confirmation of any kind
+// (docs/notes/snooze-without-teardown.md).
+func TestThreadSnoozeNeverConfirms(t *testing.T) {
 	reg, _, _ := newLifecycleRegistry(t)
 	c, ok := reg.Get("thread.snooze")
-	if !ok || c.Confirm == "" || c.Category != "Thread" {
+	if !ok || c.Confirm != "" || c.ConfirmIf != nil || c.DynamicConfirm != nil || c.Category != "Thread" {
 		t.Fatalf("thread.snooze = %+v", c)
 	}
 }

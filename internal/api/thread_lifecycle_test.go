@@ -321,9 +321,9 @@ func TestThreadPutAwaySelf(t *testing.T) {
 		{name: "archive, by another thread", do: archive, archived: true, by: "s-2", status: thread.StatusBusy, wantCall: "Archive s-1 true"},
 		{name: "archive, by the user", do: archive, archived: true, status: thread.StatusBusy, wantCall: "Archive s-1 true"},
 		{name: "unarchive, by itself", do: archive, by: "s-1", status: thread.StatusBusy, wantCall: "Archive s-1 false"},
-		{name: "snooze, by itself, mid-turn", do: snooze(&v1.SnoozeThreadRequest{Until: until}), by: "s-1", status: thread.StatusBusy, wantCall: "PutAwaySelf s-1 snooze", wantDeferred: true},
+		{name: "snooze, by itself, mid-turn", do: snooze(&v1.SnoozeThreadRequest{Until: until}), by: "s-1", status: thread.StatusBusy, wantCall: "PutAwaySelf s-1 snooze"},
 		{name: "snooze, by the user", do: snooze(&v1.SnoozeThreadRequest{Until: until}), status: thread.StatusBusy, wantCall: "Snooze s-1 "},
-		{name: "save, by itself, mid-turn", do: snooze(&v1.SnoozeThreadRequest{Save: true}), by: "s-1", status: thread.StatusBusy, wantCall: "PutAwaySelf s-1 save", wantDeferred: true},
+		{name: "save, by itself, mid-turn", do: snooze(&v1.SnoozeThreadRequest{Save: true}), by: "s-1", status: thread.StatusBusy, wantCall: "PutAwaySelf s-1 save"},
 		{name: "save, by the user", do: snooze(&v1.SnoozeThreadRequest{Save: true}), status: thread.StatusBusy, wantCall: "SaveForLater s-1"},
 		{name: "unsnooze, by itself", do: snooze(&v1.SnoozeThreadRequest{}), by: "s-1", status: thread.StatusBusy, wantCall: "Snooze s-1 -"},
 	}
@@ -387,9 +387,9 @@ func TestThreadSnoozeSave(t *testing.T) {
 				return
 			}
 			s := res.Msg.GetThread()
-			if !s.GetSavedAt().AsTime().Equal(now) || s.GetSnoozedUntil() != nil || s.GetArchivedAt() != nil || s.GetPinned() ||
-				s.GetState() != v1.ThreadState_THREAD_STATE_DISCONNECTED {
-				t.Errorf("saved = %v; want saved_at %v, no snoozed_until, not archived, unpinned, disconnected", s, now)
+			if !s.GetSavedAt().AsTime().Equal(now) || s.GetSnoozedUntil() != nil || s.GetArchivedAt() != nil || !s.GetPinned() ||
+				s.GetState() != v1.ThreadState_THREAD_STATE_CONNECTED {
+				t.Errorf("saved = %v; want saved_at %v, no snoozed_until, not archived, still pinned and connected", s, now)
 			}
 		})
 	}
@@ -443,9 +443,9 @@ func TestThreadSnooze(t *testing.T) {
 				}
 				return
 			}
-			if !s.GetSnoozedUntil().AsTime().Equal(tt.wantUntil) || s.GetArchivedAt() != nil || s.GetPinned() ||
-				s.GetState() != v1.ThreadState_THREAD_STATE_DISCONNECTED {
-				t.Errorf("snoozed = %v; want snoozed_until %v, not archived, unpinned, disconnected", s, tt.wantUntil)
+			if !s.GetSnoozedUntil().AsTime().Equal(tt.wantUntil) || s.GetArchivedAt() != nil || !s.GetPinned() ||
+				s.GetState() != v1.ThreadState_THREAD_STATE_CONNECTED {
+				t.Errorf("snoozed = %v; want snoozed_until %v, not archived, still pinned and connected", s, tt.wantUntil)
 			}
 		})
 	}

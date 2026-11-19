@@ -1,8 +1,6 @@
 package api
 
 import (
-	"maps"
-
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	core "github.com/alexwaumann/code-foundry/internal/layout"
 )
@@ -43,6 +41,6 @@ func init() {
 	})
 	registerLayoutOp("snooze_thread", func(m *v1.LayoutOp) (core.Op, error) {
 		o := m.GetSnoozeThread()
-		return &core.SnoozeThread{Thread: o.GetThreadId(), Ran: maps.Clone(o.GetRan()), QuickRan: o.GetQuickRan()}, nil
+		return &core.SnoozeThread{Thread: o.GetThreadId()}, nil
 	})
 }

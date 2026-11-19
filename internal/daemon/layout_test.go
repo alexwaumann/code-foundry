@@ -1,6 +1,7 @@
 package daemon
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"log/slog"
@@ -68,7 +69,7 @@ func newGlueEnvWith(t *testing.T, threads []thread.Thread, seed func(e *glueEnv)
 		t.Fatal(err)
 	}
 	e.stop = stop
-	e.goings = layoutShellsGoing(log, e.layout, e.terms)
+	e.goings = layoutShellsGoing(log, e.layout)
 	t.Cleanup(stop)
 	return e
 }
@@ -230,44 +231,162 @@ func openWithSet(e *glueEnv) (string, string) {
 	return x, y
 }
 
-// A snooze, in the thread store's order: the hook first (what runs in each shell is read,
-// the tabs close into the set marked fresh), then the shells go. Their removals must not
-// forget the fresh terminals. Opening the thread again brings the set back, with a new shell
-// under each terminal tab and the command it ran kept for "Run again".
-func TestLayoutGlueSnoozeKeepsTheSetWithFreshShells(t *testing.T) {
-	e := newGlueEnv(t, []thread.Thread{th("th-a")}, nil)
-	x, y := openWithSet(e)
-	e.goings(e.ctx, "th-a", thread.ShellsSnoozed)
-	// removeShells, as the thread store does it after the hook:
-	for _, id := range []string{x, y} {
-		if err := terminal.KillAndRemove(e.ctx, e.terms, id); err != nil {
-			t.Fatal(err)
+// olderSnooze leaves thread as an older build's snooze left it, before a snooze left its
+// terminals running (docs/notes/snooze-without-teardown.md): its tabs closed into its set
+// (its action runs' tabs dropped), each remembered terminal marked to come back as a fresh
+// shell with the command it ran, its quick terminal, when open, the same, the thread marked
+// snoozed; then its shells ended, as that build's thread store ended them. A layout saved
+// then still restores so.
+func (e *glueEnv) olderSnooze(thread string) {
+	e.t.Helper()
+	st := e.state()
+	var terms []string
+	for _, sp := range st.Spaces {
+		for _, p := range core.Panes(sp.Root) {
+			for _, tb := range p.Tabs {
+				if tb.Kind == "terminal" && tb.Thread == thread {
+					terms = append(terms, tb.Params[core.TerminalParam])
+				}
+			}
 		}
 	}
+	ran := map[string]string{}
+	for _, id := range terms {
+		tm, err := e.terms.Get(e.ctx, id)
+		if err != nil {
+			continue
+		}
+		if termlabel.IsAction(tm.Labels) {
+			e.apply(&core.DropTerminal{Terminal: id})
+			continue
+		}
+		ran[id] = cmp.Or(tm.Foreground, tm.LastCommand)
+	}
+	quickRan := ""
+	for _, tm := range e.terms.List(e.ctx) {
+		if termlabel.IsQuick(tm.Labels) && tm.Labels[termlabel.Thread] == thread && tm.State != terminal.StateExited {
+			quickRan = cmp.Or(tm.Foreground, tm.LastCommand)
+		}
+	}
+	if threadOpen(e.state(), thread) {
+		e.apply(&core.CloseThread{Thread: thread})
+	}
+	next := e.state().Clone()
+	if next.Threads == nil {
+		next.Threads = map[string]*core.ThreadState{}
+	}
+	ts := next.Threads[thread]
+	if ts == nil {
+		ts = &core.ThreadState{Space: next.SpaceOf(thread)}
+		next.Threads[thread] = ts
+	}
+	if ts.Remembered != nil {
+		for i, rt := range ts.Remembered.Tabs {
+			if rt.Tab.Kind == "terminal" && rt.Fresh == nil {
+				ts.Remembered.Tabs[i].Fresh = &core.Fresh{Name: rt.Tab.Name, Ran: ran[rt.Tab.Params[core.TerminalParam]]}
+			}
+		}
+	}
+	if ts.Quick != nil && ts.Quick.Open {
+		ts.Quick.Open, ts.Quick.Fresh, ts.Quick.Ran = false, true, quickRan
+	}
+	ts.Snoozed = true
+	e.layout.Put(next)
+	for _, tm := range e.terms.List(e.ctx) {
+		if termlabel.IsPanel(tm.Labels) && tm.Labels[termlabel.Thread] == thread {
+			if err := terminal.KillAndRemove(e.ctx, e.terms, tm.ID); err != nil {
+				e.t.Fatal(err)
+			}
+		}
+	}
+}
+
+// A snooze (docs/notes/snooze-without-teardown.md) closes the thread's tab and its linked
+// tabs as closing its tab does: they join its set, their terminals running on. Undoing it
+// (the user's unsnooze) puts its tab back where it was, its set beside it as before, over the
+// same terminals: no fresh shell. Saving for later does the same.
+func TestLayoutGlueSnoozeAndUndo(t *testing.T) {
+	for _, form := range []string{"until", "save"} {
+		t.Run(form, func(t *testing.T) {
+			e := newGlueEnv(t, []thread.Thread{th("th-a")}, nil)
+			x, y := openWithSet(e)
+			before := e.state().Clone()
+			sp := before.Space(before.CurrentSpace)
+			put := th("th-a")
+			if form == "save" {
+				put.SavedAt = time.Unix(1, 0)
+			} else {
+				put = snoozedTh("th-a")
+			}
+			e.publish(thread.Updated{Thread: put})
+			e.eventually("the thread's tabs close", func() bool { return !threadOpen(e.state(), "th-a") })
+			settle()
+			st := e.state()
+			if n := len(core.Panes(st.Space(st.CurrentSpace).Root)); n != 0 {
+				t.Fatalf("%d panes still open: %+v", n, st.Space(st.CurrentSpace).Root)
+			}
+			ts := st.Threads["th-a"]
+			if ts == nil || !ts.Snoozed || ts.SnoozedTab == nil || ts.Remembered == nil || len(ts.Remembered.Tabs) != 3 {
+				t.Fatalf("thread state %+v, want snoozed with its tab's place and the diff and two terminals", ts)
+			}
+			for _, rt := range ts.Remembered.Tabs {
+				if rt.Fresh != nil {
+					t.Errorf("remembered %s marked fresh", rt.Tab.ID)
+				}
+			}
+			if !e.running(x) || !e.running(y) {
+				t.Fatal("the snooze ended the thread's terminals")
+			}
+			if len(st.Space(st.CurrentSpace).Closed) != 0 {
+				t.Errorf("the snooze was recorded for reopening: %+v", st.Space(st.CurrentSpace).Closed)
+			}
+
+			e.publish(thread.Updated{Thread: th("th-a")})
+			e.woken("th-a")
+			e.eventually("the thread's tab back", func() bool { return threadOpen(e.state(), "th-a") })
+			settle()
+			if !e.running(x) || !e.running(y) {
+				t.Fatal("the undo ended the thread's terminals")
+			}
+			after := e.state()
+			if ts := after.Threads["th-a"]; ts != nil && (ts.Remembered != nil || ts.SnoozedTab != nil || ts.Snoozed) {
+				t.Errorf("thread state after the undo %+v, want nothing remembered", ts)
+			}
+			if got, want := tabsByPane(after.Space(after.CurrentSpace)), tabsByPane(sp); !slices.Equal(got, want) {
+				t.Errorf("tabs after the undo %v, want as before %v", got, want)
+			}
+			if len(e.terms.List(e.ctx)) != 2 {
+				t.Errorf("terminals %+v, want the two shells only", e.terms.List(e.ctx))
+			}
+		})
+	}
+}
+
+// tabsByPane is each pane's tabs in order, as "pane:kind/thread/terminal" lines, for
+// comparing a layout before and after.
+func tabsByPane(sp *core.Space) []string {
+	var out []string
+	for _, p := range core.Panes(sp.Root) {
+		for _, tb := range p.Tabs {
+			out = append(out, p.ID+":"+tb.Kind+"/"+tb.Thread+"/"+tb.Params[core.TerminalParam])
+		}
+	}
+	return out
+}
+
+// A layout an older build's snooze left (olderSnooze): opening the thread again brings the
+// set back, with a new shell under each terminal tab and the command it ran kept for "Run
+// again".
+func TestLayoutGlueOlderSnoozeComesBackWithFreshShells(t *testing.T) {
+	e := newGlueEnv(t, []thread.Thread{th("th-a")}, nil)
+	x, y := openWithSet(e)
+	e.olderSnooze("th-a")
 	settle()
 	st := e.state()
-	if threadOpen(st, "th-a") || len(core.Panes(st.Space(st.CurrentSpace).Root)) != 0 {
-		t.Fatalf("the thread's tabs are still open: %+v", st.Space(st.CurrentSpace).Root)
-	}
 	rem := st.Threads["th-a"].Remembered
 	if rem == nil || len(rem.Tabs) != 3 {
 		t.Fatalf("remembered %+v, want the diff and two terminals", rem)
 	}
-	ran := map[string]string{}
-	for _, rt := range rem.Tabs {
-		if rt.Tab.Kind == "terminal" {
-			if rt.Fresh == nil {
-				t.Errorf("terminal %s not marked fresh", rt.Tab.Params[core.TerminalParam])
-				continue
-			}
-			ran[rt.Tab.Params[core.TerminalParam]] = rt.Fresh.Ran
-		}
-	}
-	if ran[x] != "make dev" || ran[y] != "ls" {
-		t.Errorf("ran %v: the foreground job, else the last command", ran)
-	}
-
-	// Unsnoozing with no tab open only wakes the thread in the layout; opening brings the set.
 	e.publish(thread.Updated{Thread: th("th-a")})
 	e.woken("th-a")
 	c := e.apply(&core.OpenThread{Thread: "th-a", Focus: true})
@@ -297,43 +416,33 @@ func TestLayoutGlueSnoozeKeepsTheSetWithFreshShells(t *testing.T) {
 	}
 }
 
-// A snooze drops the thread's action runs, running or finished, as an archive does: a fresh
-// shell under the action's tab would be an unrelated empty shell. Its shells come back.
-func TestLayoutGlueSnoozeDropsActionRuns(t *testing.T) {
+// A snooze leaves the thread's action runs running, their tabs in its set as its shells'
+// are; the undo puts them back over the same terminals.
+func TestLayoutGlueSnoozeKeepsActionRuns(t *testing.T) {
 	e := newGlueEnv(t, []thread.Thread{th("th-a")}, nil)
 	e.apply(&core.OpenThread{Thread: "th-a", Focus: true})
-	sh := e.shell("th-a")
-	e.termTab("th-a", sh)
-	var runs []string
-	for i, name := range []string{"Dev", "Fail"} {
-		tm, err := e.terms.Create(e.ctx, terminal.Spec{Argv: []string{"zsh", "-lc", "x"}, Cwd: glueWT, Labels: termlabel.ActionTerminal("th-a", "pj", glueWT, "ac-"+name, name, "run-"+name)})
-		if err != nil {
-			t.Fatal(err)
-		}
-		e.termTab("th-a", tm.ID)
-		runs = append(runs, tm.ID)
-		if i == 1 {
-			if err := e.terms.Exit(tm.ID, 3); err != nil {
-				t.Fatal(err)
-			}
-		}
+	tm, err := e.terms.Create(e.ctx, terminal.Spec{Argv: []string{"zsh", "-lc", "x"}, Cwd: glueWT, Labels: termlabel.ActionTerminal("th-a", "pj", glueWT, "ac-Dev", "Dev", "run-Dev")})
+	if err != nil {
+		t.Fatal(err)
 	}
-	e.goings(e.ctx, "th-a", thread.ShellsSnoozed)
-	for _, id := range append([]string{sh}, runs...) {
-		if err := terminal.KillAndRemove(e.ctx, e.terms, id); err != nil {
-			t.Fatal(err)
-		}
-	}
+	e.termTab("th-a", tm.ID)
+	e.publish(thread.Updated{Thread: snoozedTh("th-a")})
+	e.eventually("the thread's tabs close", func() bool { return !threadOpen(e.state(), "th-a") })
 	settle()
-	rem := e.state().Threads["th-a"].Remembered
-	if rem == nil || len(rem.Tabs) != 1 || rem.Tabs[0].Tab.Params[core.TerminalParam] != sh || rem.Tabs[0].Fresh == nil {
-		t.Fatalf("remembered %+v, want only the shell, marked fresh", rem)
+	if !e.running(tm.ID) {
+		t.Fatal("the snooze ended the action run")
 	}
 	e.publish(thread.Updated{Thread: th("th-a")})
-	e.woken("th-a")
-	if c := e.apply(&core.OpenThread{Thread: "th-a", Focus: true}); len(c.Result.Fresh) != 1 {
-		t.Fatalf("fresh %v, want the shell's tab only", c.Result.Fresh)
-	}
+	e.eventually("the action's tab back over its run", func() bool {
+		for _, p := range core.Panes(e.state().Space(e.state().CurrentSpace).Root) {
+			for _, tb := range p.Tabs {
+				if tb.Kind == "terminal" && tb.Params[core.TerminalParam] == tm.ID {
+					return true
+				}
+			}
+		}
+		return false
+	})
 }
 
 // Archiving closes the thread's tabs everywhere, forgets its record, and ends its terminals:
@@ -514,7 +623,7 @@ func TestLayoutGlueQuickAndSweep(t *testing.T) {
 func TestLayoutGlueFreshWithoutACheckout(t *testing.T) {
 	e := newGlueEnv(t, []thread.Thread{th("th-a")}, nil)
 	x, y := openWithSet(e)
-	e.goings(e.ctx, "th-a", thread.ShellsSnoozed)
+	e.olderSnooze("th-a")
 	e.eventually("the snooze ends its shells", func() bool { return e.gone(x) && e.gone(y) })
 	noCheckout := th("th-a")
 	noCheckout.WorktreePath = ""
@@ -538,9 +647,9 @@ func TestLayoutGlueFreshWithoutACheckout(t *testing.T) {
 	}
 }
 
-// A snooze in the thread store's order with the quick terminal open: the hook reads what runs
-// in it and marks it fresh, then its shell goes (and must not settle the mark). Opening the
-// thread's tab while it is still snoozed brings nothing back; when it wakes with its tab open,
+// An older build's snooze with the quick terminal open (olderSnooze): it was marked fresh,
+// then its shell went (which must not settle the mark). Opening the thread's tab while it is
+// still snoozed brings nothing back; when it wakes with its tab open,
 // the quick terminal comes back open over a fresh quick shell in the checkout, the command
 // kept for "Run again". One started meanwhile (terminal.quick) is kept: no second shell.
 func TestLayoutGlueSnoozeBringsTheQuickTerminalBack(t *testing.T) {
@@ -567,10 +676,7 @@ func TestLayoutGlueSnoozeBringsTheQuickTerminalBack(t *testing.T) {
 			}
 			e.apply(&core.SetQuick{Thread: "th-a", Open: true, Height: 200})
 
-			e.goings(e.ctx, "th-a", thread.ShellsSnoozed)
-			if err := terminal.KillAndRemove(e.ctx, e.terms, old); err != nil {
-				t.Fatal(err)
-			}
+			e.olderSnooze("th-a")
 			settle()
 			if q := e.state().Threads["th-a"].Quick; q == nil || q.Open || !q.Fresh || q.Ran != "npm run dev" || q.Height != 200 {
 				t.Fatalf("quick after the snooze: %+v, want closed, fresh, ran npm run dev, 200 high", q)

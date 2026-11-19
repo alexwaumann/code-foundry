@@ -248,7 +248,6 @@ func randomOp(s *bytesrc, st *State) Op {
 		o.Thread = pick(s, threads...)
 	case *SnoozeThread:
 		o.Thread = pick(s, threads...)
-		o.Ran = map[string]string{"term-1": "make dev"}
 		o.W, o.H = viewportOf(s)
 	case *NewThread:
 		o.Space, o.Focus = pick(s, "", "", spaces[len(spaces)-1]), s.n(2) == 0

@@ -91,6 +91,17 @@ describe("the shell sidebar's sections", () => {
     expect(rows.filter((r) => r.startsWith("needs") || r.startsWith("# Needs"))).toEqual([]);
   });
 
+  // docs/notes/snooze-without-teardown.md: a snooze keeps the pin for when the thread wakes.
+  it("a pinned snoozed or saved thread is under Snoozed, not among the pinned, and back in its pinned place once it wakes", () => {
+    const until = Date.now() + 60_000;
+    const world = (o: Partial<ShellListThread>) => [t("p", { pinned: true, ...o }), t("q", { pinned: true }), t("i", { lastActivityAtMs: 1 })];
+    expect(view(world({ snoozedUntilMs: until }))).toEqual(["# Active 2", "pinned:q", "idle:i", "# Snoozed 1", "snoozed:p"]);
+    expect(view(world({ savedAtMs: 1 }))).toEqual(["# Active 2", "pinned:q", "idle:i", "# Snoozed 1", "snoozed:p"]);
+    expect(view(world({}))).toEqual(["# Active 3", "pinned:q", "pinned:p", "idle:i"]);
+    // Asking while snoozed, it is under Needs you, as any snoozed thread that asks.
+    expect(view(world({ snoozedUntilMs: until, group: "prompt" }))).toEqual(["# Needs you 1", "needs:p", "# Active 2", "pinned:q", "idle:i"]);
+  });
+
   it("a snoozed thread that asks is under Needs you, not Snoozed, until it is answered (the snooze holds)", () => {
     const until = Date.now() + 60_000;
     const asking = view([t("s", { group: "prompt", snoozedUntilMs: until }), t("z", { snoozedUntilMs: until })]);
