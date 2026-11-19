@@ -453,6 +453,107 @@
   zoom: var(--cf-zoom);
 }
 
+/* Toasts under page zoom (docs/notes/toast-zoom.md). These rules exist ONLY because the page
+   zoom is CSS `zoom` on <html> (lib/zoom.ts): delete them all, with the swipe keyframes,
+   when the zoom stops being CSS `zoom`. sonner (2.0.8) measures each card with
+   getBoundingClientRect, in viewport px, and writes the numbers into inline properties its
+   stylesheet uses as lengths inside the zoomed page, where they are scaled again: a hovered
+   (expanded) card was pinned to zoom x its height (at 90% its buttons fell off the bottom
+   edge), a stacked card behind the front one too, and the stack's offsets drifted. Each rule
+   below restates one of sonner's, one attribute more specific, with the measured length
+   divided by --cf-zoom:
+   - --initial-height, --front-toast-height (heights) and --swipe-amount-x/y (pointer
+     deltas, from clientX/Y) are viewport px: divided.
+   - --offset is index x --gap (layout px, sonner's `gap` prop) plus the heights of the cards
+     in front (viewport px), so only its measured part is divided: --cf-toast-offset adds
+     back what dividing took off the gaps. --toasts-before is that index.
+   --gap, --width and --offset-top/right/bottom/left are props, already layout px; the hover
+   bridge (::after, --gap high) is right once the offsets are. */
+[data-sonner-toaster] [data-sonner-toast] {
+  --cf-toast-offset: calc(var(--offset) / var(--cf-zoom) + var(--toasts-before) * var(--gap) * (1 - 1 / var(--cf-zoom)));
+  --cf-toast-swipe-x: calc(var(--swipe-amount-x, 0px) / var(--cf-zoom));
+  --cf-toast-swipe-y: calc(var(--swipe-amount-y, 0px) / var(--cf-zoom));
+}
+/* Expanded (the stack hovered): each card at its own height, `gap` apart. A removed card
+   keeps sonner's exit --y (below), so the offset is not set on it here. */
+[data-sonner-toaster] [data-sonner-toast][data-mounted="true"][data-expanded="true"] {
+  height: calc(var(--initial-height) / var(--cf-zoom));
+}
+[data-sonner-toaster] [data-sonner-toast][data-mounted="true"][data-expanded="true"]:not([data-removed="true"]) {
+  --y: translateY(calc(var(--lift) * var(--cf-toast-offset)));
+}
+/* Collapsed: a card behind the front one takes the front one's height. */
+[data-sonner-toaster] [data-sonner-toast][data-expanded="false"][data-front="false"] {
+  height: calc(var(--front-toast-height) / var(--cf-zoom));
+}
+/* Removed: an expanded card behind the front one leaves from its own place; the hit area
+   sonner keeps under a leaving card. */
+[data-sonner-toaster] [data-sonner-toast][data-removed="true"][data-front="false"][data-swipe-out="false"][data-expanded="true"] {
+  --y: translateY(calc(var(--lift) * var(--cf-toast-offset) + var(--lift) * -100%));
+}
+[data-sonner-toaster] [data-sonner-toast][data-removed="true"][data-front="false"]::before {
+  height: calc(var(--initial-height) / var(--cf-zoom) + 20%);
+}
+/* Swiped (dragged with the pointer): the card follows the pointer, not zoom x its moves, and
+   leaves from where it was let go. */
+[data-sonner-toaster] [data-sonner-toast][data-swiping="true"] {
+  transform: var(--y) translateY(var(--cf-toast-swipe-y)) translateX(var(--cf-toast-swipe-x));
+}
+[data-sonner-toaster] [data-sonner-toast][data-swipe-out="true"][data-swipe-direction="left"] {
+  animation-name: toast-zoom-swipe-out-left;
+}
+[data-sonner-toaster] [data-sonner-toast][data-swipe-out="true"][data-swipe-direction="right"] {
+  animation-name: toast-zoom-swipe-out-right;
+}
+[data-sonner-toaster] [data-sonner-toast][data-swipe-out="true"][data-swipe-direction="up"] {
+  animation-name: toast-zoom-swipe-out-up;
+}
+[data-sonner-toaster] [data-sonner-toast][data-swipe-out="true"][data-swipe-direction="down"] {
+  animation-name: toast-zoom-swipe-out-down;
+}
+/* sonner's swipe-out-* with the divided amounts. Not named cf-*: the page library copies
+   index.css's cf-* keyframes into pages (pagelib/theme.ts), which have no zoom. */
+@keyframes toast-zoom-swipe-out-left {
+  from {
+    transform: var(--y) translateX(var(--cf-toast-swipe-x));
+    opacity: 1;
+  }
+  to {
+    transform: var(--y) translateX(calc(var(--cf-toast-swipe-x) - 100%));
+    opacity: 0;
+  }
+}
+@keyframes toast-zoom-swipe-out-right {
+  from {
+    transform: var(--y) translateX(var(--cf-toast-swipe-x));
+    opacity: 1;
+  }
+  to {
+    transform: var(--y) translateX(calc(var(--cf-toast-swipe-x) + 100%));
+    opacity: 0;
+  }
+}
+@keyframes toast-zoom-swipe-out-up {
+  from {
+    transform: var(--y) translateY(var(--cf-toast-swipe-y));
+    opacity: 1;
+  }
+  to {
+    transform: var(--y) translateY(calc(var(--cf-toast-swipe-y) - 100%));
+    opacity: 0;
+  }
+}
+@keyframes toast-zoom-swipe-out-down {
+  from {
+    transform: var(--y) translateY(var(--cf-toast-swipe-y));
+    opacity: 1;
+  }
+  to {
+    transform: var(--y) translateY(calc(var(--cf-toast-swipe-y) + 100%));
+    opacity: 0;
+  }
+}
+
 /* A Progress without a value (components/ui/progress.tsx): the update dialog's bar. */
 @keyframes cf-indeterminate {
   0% {
