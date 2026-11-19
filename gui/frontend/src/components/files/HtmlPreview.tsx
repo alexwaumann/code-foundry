@@ -21,8 +21,9 @@ import { FileEmptyState, FileLoading } from "./states";
  * is open for CDNs. A srcdoc frame could do none of that: its links resolved against the
  * app's own URL and navigated the frame into the app's blank shell (docs/notes/
  * html-preview-interactive.md). The frame (HtmlFrame, shared with a thread's inline pages)
- * reloads when the file's text changes (the thread edited it). A footer says what the page
- * can reach.
+ * reloads when the file's text changes (the thread edited it), and the page in it when a file
+ * it loaded under its scope is written (its stylesheet, its script). A footer says what the
+ * page can reach.
  *
  * Whom the page acts for comes with the grant (usePageThread; docs/notes/page-ownership-gui.md):
  * its owning thread's bridge, named in the footer when that is not the tab's thread; for a
@@ -94,6 +95,7 @@ export function HtmlPreview({ path, text, name, page: own, reloads = 0 }: { path
       <HtmlFrame
         key={`${String(version)}:${String(reloads)}`}
         url={grant.preview.url}
+        scope={grant.preview.singleFile ? null : grant.preview.scope}
         name={page.title || name}
         thread={page.thread}
         page={page.bridge}

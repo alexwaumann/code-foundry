@@ -50,6 +50,7 @@ import { useDebounced, useFileChanges, useOnWindowVisible, useTabRead, useWorktr
 // "stream" is ReadFile too: a media file's read is its facts, no bytes; the player asks for its URL itself.
 const READS: Record<PreviewRead, typeof readFile> = { whole: readFile, tail: readFileTail, stream: readFile };
 const readOf = (p: string) => READS[previewKindOf(p, null)?.read ?? "whole"];
+const GONE_TOO = { gone: true } as const;
 
 export function FileTab({ target }: { target: FileTarget }) {
   const { project, base, path, line, page, ask } = target;
@@ -106,8 +107,9 @@ export function FileTab({ target }: { target: FileTarget }) {
   // The file's own stamp too, in a project as well: outside every project (a thread's pages,
   // the welcome page) no worktree reports a write (docs/notes/welcome-page.md), and inside
   // one a write that leaves the git summary as it was (a gitignored log growing, a video
-  // being written) reports none either. It also reads at once after a thread's own edit.
-  useFileChanges(abs, later);
+  // being written) reports none either. It also reads at once after a thread's own edit, and
+  // when the file goes away, so the tab says it is not there (docs/notes/page-frame-states.md).
+  useFileChanges(abs, later, GONE_TOO);
 
   const name = fileName(abs) || abs;
   const rel = project ? relativeTo(abs, base) : null;

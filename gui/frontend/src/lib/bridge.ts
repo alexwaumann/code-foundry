@@ -3,10 +3,11 @@
  * shown in a thread posts to its parent through `/cf/bridge.js`, and what the host
  * (stores/bridgeHost.ts) posts back. Parsing, arg filling and the reply shapes; pure.
  *
- * Every frame's src carries a nonce in its fragment (`#cf=<nonce>`, withNonce), and the
+ * Every frame's src carries a nonce in its query (`?cf-nonce=<nonce>`, withNonce), and the
  * script sends it back on every message: the host hears only its own frame's window, at
  * its origin, with its nonce (docs/notes/bridge-fix-frames.md). A frame navigated to any
- * other URL (another page's grant included) loses the fragment, so it gets no bridge.
+ * other URL (another page's grant included) loses it, so it gets no bridge. The query, not
+ * the fragment: the fragment is the page's own (`#/route`, `:target`; docs/notes/page-frame-states.md).
  *
  * Page → host (every message carries `cf: 1` and `nonce`):
  * - `{ type: "cf:run", id, verb, args }`, args an object of strings
@@ -94,8 +95,8 @@ export const BRIDGE_LIMITS = {
   fetchMaxTimeoutMs: 120_000,
 } as const;
 
-/** The fragment key of a frame's nonce. */
-const NONCE_KEY = "cf";
+/** The query parameter of a frame's nonce (internal/bridge/bridge.js reads it). */
+export const NONCE_PARAM = "cf-nonce";
 
 /** A fresh nonce for one frame: 128 random bits, URL-safe. */
 export function frameNonce(): string {
@@ -103,11 +104,22 @@ export function frameNonce(): string {
   return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-/** The frame's src: `url` with `cf=<nonce>` in its fragment (after the URL's own fragment, if it has one). */
+/**
+ * The frame's src: `url` with `cf-nonce=<nonce>` in its query (after the URL's own
+ * parameters; its fragment, the page's own, untouched). A URL that does not parse gets it
+ * appended before any fragment.
+ */
 export function withNonce(url: string, nonce: string): string {
-  const hash = url.indexOf("#");
-  if (hash < 0) return `${url}#${NONCE_KEY}=${nonce}`;
-  return hash === url.length - 1 ? `${url}${NONCE_KEY}=${nonce}` : `${url}&${NONCE_KEY}=${nonce}`;
+  try {
+    const u = new URL(url);
+    u.searchParams.set(NONCE_PARAM, nonce);
+    return u.toString();
+  } catch {
+    const hash = url.indexOf("#");
+    const head = hash < 0 ? url : url.slice(0, hash);
+    const tail = hash < 0 ? "" : url.slice(hash);
+    return `${head}${head.includes("?") ? "&" : "?"}${NONCE_PARAM}=${nonce}${tail}`;
+  }
 }
 
 /**

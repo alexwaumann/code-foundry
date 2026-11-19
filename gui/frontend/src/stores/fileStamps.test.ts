@@ -77,6 +77,26 @@ describe("createFileWatcher", () => {
     expect(onChange).toHaveBeenCalledTimes(1);
   });
 
+  it("a view that asked to hear it is told when the file goes away, and when it is back; the others only when it is back", async () => {
+    const s = setup();
+    const tab = vi.fn();
+    const card = vi.fn();
+    s.w.watch("/h/p.html", tab, { gone: true });
+    s.w.watch("/h/p.html", card);
+    await vi.advanceTimersByTimeAsync(0);
+    s.disk.delete("/h/p.html");
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(tab).toHaveBeenCalledTimes(1);
+    expect(card).toHaveBeenCalledTimes(0);
+    // Still gone: no more calls.
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(tab).toHaveBeenCalledTimes(1);
+    s.disk.set("/h/p.html", "11:5");
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(tab).toHaveBeenCalledTimes(2);
+    expect(card).toHaveBeenCalledTimes(1);
+  });
+
   it("the first read is the baseline, not a change", async () => {
     const s = setup();
     const onChange = vi.fn();

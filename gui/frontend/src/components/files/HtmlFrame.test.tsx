@@ -23,13 +23,25 @@ vi.mock("@/stores/gh", () => ({
     return Promise.resolve();
   },
 }));
-const { FRAME_REVEAL_MS, HTML_PREVIEW_SANDBOX, HtmlFrame, LEFT_WAIT_MS, OPEN_GAP_MS, THREAD_PAGE_SANDBOX } = await import("./HtmlFrame");
+/** The files the frame watches, with the call that says one was written. */
+const watched = vi.hoisted(() => new Map<string, () => void>());
+vi.mock("@/stores/fileStamps", () => ({
+  fileWatcher: {
+    watch: (abs: string, fn: () => void) => {
+      watched.set(abs, fn);
+      return () => watched.delete(abs);
+    },
+    check: () => {},
+  },
+}));
+const { FILES_RELOAD_MS, FRAME_REVEAL_MS, HTML_PREVIEW_SANDBOX, HtmlFrame, LEFT_WAIT_MS, OPEN_GAP_MS, THREAD_PAGE_SANDBOX } = await import("./HtmlFrame");
 
 const URL_ = "http://127.0.0.1:4100/preview/g1/page.html";
 const PAGES = "http://127.0.0.1:4100";
 
 beforeEach(() => {
   hosts.length = 0;
+  watched.clear();
   user.present = true;
   user.opened.length = 0;
 });
@@ -38,7 +50,7 @@ afterEach(cleanup);
 function mount(thread: string | null, onResize?: (h: number) => void) {
   const view = render(<HtmlFrame url={URL_} name="page.html" thread={thread} onResize={onResize} testId="frame" />);
   const frame = () => screen.getByTestId<HTMLIFrameElement>("frame");
-  const nonce = () => /#cf=([0-9a-f]+)$/.exec(frame().getAttribute("src") ?? "")?.[1] ?? "";
+  const nonce = () => /[?&]cf-nonce=([0-9a-f]+)$/.exec(frame().getAttribute("src") ?? "")?.[1] ?? "";
   const send = (data: unknown, opts: { origin?: string; source?: MessageEventSource | null } = {}) => {
     act(() => {
       window.dispatchEvent(new MessageEvent("message", { data, origin: opts.origin ?? (thread === null ? "null" : PAGES), source: opts.source === undefined ? frame().contentWindow : opts.source }));
@@ -65,7 +77,7 @@ describe("HtmlFrame", () => {
     const a = mount("t-1");
     expect(a.frame().getAttribute("sandbox")).toBe(THREAD_PAGE_SANDBOX);
     expect(THREAD_PAGE_SANDBOX).toContain("allow-same-origin");
-    expect(a.frame().getAttribute("src")).toMatch(/#cf=[0-9a-f]{32}$/);
+    expect(a.frame().getAttribute("src")).toMatch(/\?cf-page=1&cf-nonce=[0-9a-f]{32}$/);
     const first = a.nonce();
     cleanup();
     const b = mount(null);
@@ -149,6 +161,99 @@ describe("HtmlFrame", () => {
       { call: "form", code: "unavailable", count: 1 },
       { call: "location", code: "unavailable", count: 1 },
     ]);
+  });
+
+  it("tells a page with no thread to open a download in a browser, and a thread's page to export it into the checkout", () => {
+    const seen: Record<string, string> = {};
+    for (const thread of [null, "t-1"]) {
+      render(<HtmlFrame url={URL_} name="page.html" thread={thread} onPageErrors={(list) => {
+            if (list.length > 0) seen[String(thread)] = list.map((e) => e.message).join("|");
+          }} testId="frame" />);
+      act(() => {
+        window.dispatchEvent(new MessageEvent("message", { data: { type: "cf:unsupported", what: "download", text: "rows.csv" }, origin: thread === null ? "null" : PAGES, source: screen.getByTestId<HTMLIFrameElement>("frame").contentWindow }));
+      });
+      cleanup();
+    }
+    expect(seen.null).toContain("open the file in a browser");
+    expect(seen.null).not.toContain("file.export");
+    expect(seen["t-1"]).toContain('cf.run("file.export"');
+  });
+
+  it("names each storage API an opaque page used, and says its data is not kept", () => {
+    const seen: { call: string; message: string }[][] = [];
+    render(<HtmlFrame url={URL_} name="page.html" thread={null} onPageErrors={(list) => seen.push(list.map(({ call, message }) => ({ call, message })))} testId="frame" />);
+    const win = screen.getByTestId<HTMLIFrameElement>("frame").contentWindow;
+    for (const text of ["localStorage", "indexedDB", "nonsense"]) {
+      act(() => {
+        window.dispatchEvent(new MessageEvent("message", { data: { type: "cf:unsupported", what: "storage", text }, origin: "null", source: win }));
+      });
+    }
+    const list = seen.at(-1) ?? [];
+    expect(list.map((e) => e.call)).toEqual(["localStorage", "indexedDB", "storage"]);
+    expect(list[0]?.message).toMatch(/lasts until it reloads.*Open the file in a browser/);
+    expect(list[1]?.message).toMatch(/^indexedDB fails/);
+  });
+
+  describe("the files its document loaded", () => {
+    const SCOPE = "/Users/me/site";
+    function withScope(scope: string | null) {
+      render(<HtmlFrame url={URL_} scope={scope} name="page.html" thread={null} testId="frame" />);
+      const frame = screen.getByTestId<HTMLIFrameElement>("frame");
+      const win = frame.contentWindow;
+      if (!win) throw new Error("no frame window");
+      const posts: unknown[] = [];
+      vi.spyOn(win, "postMessage").mockImplementation((m: unknown) => {
+        if ((m as { type?: string }).type === "cf:reload") posts.push(m);
+      });
+      const says = (data: unknown) => {
+        act(() => {
+          window.dispatchEvent(new MessageEvent("message", { data, origin: "null", source: win }));
+        });
+      };
+      return { frame, posts, says };
+    }
+
+    it("watches those under its grant and asks the document to reload once when they are written", () => {
+      vi.useFakeTimers();
+      try {
+        const f = withScope(SCOPE);
+        fireEvent.load(f.frame);
+        f.says({ type: "cf:here", seq: 1, files: ["/preview/g1/page.html", "/preview/g1/css/a%20b.css", "/cf/theme.css", "/preview/g2/x.js"], theme: false });
+        expect([...watched.keys()]).toEqual(["/Users/me/site/css/a b.css"]);
+        // Fetched after the load: watched too.
+        f.says({ type: "cf:files", files: ["/preview/g1/page.html", "/preview/g1/css/a%20b.css", "/preview/g1/data/rows.json"], theme: false });
+        expect([...watched.keys()].sort()).toEqual(["/Users/me/site/css/a b.css", "/Users/me/site/data/rows.json"]);
+        act(() => {
+          watched.get("/Users/me/site/css/a b.css")?.();
+          watched.get("/Users/me/site/data/rows.json")?.();
+        });
+        expect(f.posts).toEqual([]);
+        act(() => {
+          vi.advanceTimersByTime(FILES_RELOAD_MS);
+        });
+        expect(f.posts).toEqual([{ type: "cf:reload" }]);
+        // Reloaded in place: the frame is the same element and load.
+        expect(screen.getByTestId("frame")).toBe(f.frame);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("watches nothing for a one-file grant (no scope)", () => {
+      const f = withScope(null);
+      fireEvent.load(f.frame);
+      f.says({ type: "cf:here", seq: 1, files: ["/preview/g1/page.html", "/preview/g1/app.js"], theme: false });
+      expect(watched.size).toBe(0);
+    });
+
+    it("stops watching when it unmounts", () => {
+      const f = withScope(SCOPE);
+      fireEvent.load(f.frame);
+      f.says({ type: "cf:here", seq: 1, files: ["/preview/g1/app.js"], theme: false });
+      expect(watched.size).toBe(1);
+      cleanup();
+      expect(watched.size).toBe(0);
+    });
   });
 
   describe("a frame that went to another site", () => {
@@ -261,10 +366,10 @@ describe("HtmlFrame", () => {
 
   it("asks for a thread's page painted in the theme (cf-page=1) and any other page as written", () => {
     const a = mount("t-1");
-    expect(a.frame().getAttribute("src")).toMatch(/^http:\/\/127\.0\.0\.1:4100\/preview\/g1\/page\.html\?cf-page=1#cf=[0-9a-f]{32}$/);
+    expect(a.frame().getAttribute("src")).toMatch(/^http:\/\/127\.0\.0\.1:4100\/preview\/g1\/page\.html\?cf-page=1&cf-nonce=[0-9a-f]{32}$/);
     cleanup();
     const b = mount(null);
-    expect(b.frame().getAttribute("src")).toMatch(/^http:\/\/127\.0\.0\.1:4100\/preview\/g1\/page\.html#cf=[0-9a-f]{32}$/);
+    expect(b.frame().getAttribute("src")).toMatch(/^http:\/\/127\.0\.0\.1:4100\/preview\/g1\/page\.html\?cf-nonce=[0-9a-f]{32}$/);
   });
 
   it("hides the frame over the surface until it loads, then shows it; white only for an opaque frame", () => {

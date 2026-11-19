@@ -37,7 +37,7 @@ inline-html-2-fixes.md), in the card, the lightbox and the File tab's preview.
   `bg-white` only once shown. Loaded, such a page looks as it would in a browser; its
   loading state is the surface.
 - **Themed frames** (a thread's page, in the card, the lightbox or the File tab) ask for the
-  page with `?cf-page=1` (`previewGrant.ts` `themedUrl`, before the nonce fragment).
+  page with `?cf-page=1` (`previewGrant.ts` `themedUrl`, before the nonce: `page-frame-states.md`).
   - The grant cannot tell the two apart: PreviewFile has no thread, and the File tab and a
     card share one grant per file.
   - The query reaches only the document. Relative subresources drop it, and a link

@@ -21,7 +21,29 @@ const HOST = window.location.host;
 /** The listeners a load added to the shared document, removed after each test. */
 const added: [string, EventListener, boolean | undefined][] = [];
 
-function load(opts: { embedded?: boolean; navigation?: object } = {}) {
+/** What an opaque origin has of storage: every use throws, as WebKit's does in a sandbox without allow-same-origin. */
+function opaqueStorage() {
+  const insecure = () => {
+    throw new DOMException("The operation is insecure.", "SecurityError");
+  };
+  const proto = { userActivation: null };
+  Object.defineProperty(proto, "serviceWorker", { configurable: true, get: insecure });
+  return {
+    win: {
+      get localStorage(): unknown {
+        return insecure();
+      },
+      get sessionStorage(): unknown {
+        return insecure();
+      },
+      indexedDB: { open: insecure, deleteDatabase: insecure },
+      caches: {},
+    },
+    navigator: Object.create(proto) as object,
+  };
+}
+
+function load(opts: { embedded?: boolean; navigation?: object; opaque?: boolean; resources?: string[]; observe?: (cb: () => void) => void } = {}) {
   const posted: Msg[] = [];
   /** What the script says of the document (cf:here, cf:going), apart from the rest. */
   const notes: string[] = [];
@@ -48,6 +70,22 @@ function load(opts: { embedded?: boolean; navigation?: object } = {}) {
       document.addEventListener(type, seen, capture);
     },
   };
+  const opaque = opts.opaque ? opaqueStorage() : null;
+  if (opaque) Object.defineProperties(win, Object.getOwnPropertyDescriptors(opaque.win));
+  const resources = opts.resources ?? [];
+  win.performance = { getEntriesByType: (t: string) => (t === "resource" ? resources.map((name) => ({ name })) : []) };
+  if (opts.observe) {
+    const observe = opts.observe;
+    win.PerformanceObserver = class {
+      constructor(cb: () => void) {
+        observe(() => {
+          cb();
+        });
+      }
+      observe() {}
+    };
+  }
+  let reloads = 0;
   const parent =
     opts.embedded === false
       ? win
@@ -67,11 +105,15 @@ function load(opts: { embedded?: boolean; navigation?: object } = {}) {
     set href(v: string) {
       went = v;
     },
+    reload: () => {
+      reloads++;
+    },
   };
   // The script under test, as the daemon inlines it, with these globals.
   // oxlint-disable-next-line typescript/no-implied-eval
   const run = new Function("window", "document", "location", "navigator", SRC) as (...globals: unknown[]) => void;
-  run(win, document, location, { userActivation: null });
+  const nav = opaque?.navigator ?? { userActivation: null };
+  run(win, document, location, nav);
   const link = (attrs: Record<string, string>, connected = true) => {
     const a = document.createElement("a");
     for (const [k, v] of Object.entries(attrs)) a.setAttribute(k, v);
@@ -123,6 +165,8 @@ function load(opts: { embedded?: boolean; navigation?: object } = {}) {
     form,
     submit,
     went: () => went,
+    reloads: () => reloads,
+    nav,
   };
 }
 
@@ -138,6 +182,8 @@ beforeEach(() => {
   };
 });
 afterEach(() => {
+  // An opaque load's cookie jar is the document's own property: the prototype's comes back.
+  delete (document as { cookie?: string }).cookie;
   for (const [type, fn, capture] of added.splice(0)) document.removeEventListener(type, fn, capture);
   document.body.replaceChildren();
   HTMLAnchorElement.prototype.click = realClick;
@@ -237,7 +283,127 @@ describe("the frame script", () => {
     f.message({ type: "cf:ping", seq: 4 }, {});
     f.message({ type: "cf:ping", seq: "5" });
     f.message({ type: "cf:theme" });
-    expect(got).toEqual([{ type: "cf:here", seq: 3 }]);
+    expect(got).toEqual([{ type: "cf:here", seq: 3, files: ["/preview/g/page.html"], theme: false }]);
+  });
+
+  /** The script's answers to the app's ping, and its later file lists. */
+  function answers(f: ReturnType<typeof load>) {
+    const got: { type: string; files?: string[]; theme?: boolean }[] = [];
+    const parent = (f.win as unknown as { parent: { postMessage: (m: { type: string }) => void } }).parent;
+    const post = parent.postMessage;
+    parent.postMessage = (m) => {
+      if (m.type === "cf:here" || m.type === "cf:files") got.push(m);
+      post(m);
+    };
+    return got;
+  }
+
+  it("says in its answer what it loaded from its own origin, itself first, and whether it uses the app's theme", () => {
+    const f = load({ resources: [`http://${HOST}/preview/g/js/app.js`, "https://cdn.example.com/lib.js", `http://${HOST}/preview/g/data.json?x=1`] });
+    const css = document.createElement("link");
+    css.rel = "stylesheet";
+    css.href = "/preview/g/css/site.css";
+    document.body.append(css);
+    const got = answers(f);
+    f.message({ type: "cf:ping", seq: 1 });
+    expect(got).toEqual([{ type: "cf:here", seq: 1, files: ["/preview/g/page.html", "/preview/g/js/app.js", "/preview/g/data.json", "/preview/g/css/site.css"], theme: false }]);
+    const theme = document.createElement("link");
+    theme.rel = "stylesheet";
+    theme.href = "/cf/theme.css";
+    document.body.append(theme);
+    f.message({ type: "cf:ping", seq: 2 });
+    expect(got.at(-1)).toMatchObject({ theme: true });
+  });
+
+  it("tells the app of files it fetched after it answered, not before", () => {
+    const fire: (() => void)[] = [];
+    const resources: string[] = [];
+    const f = load({ resources, observe: (cb) => fire.push(cb) });
+    const got = answers(f);
+    resources.push(`http://${HOST}/preview/g/early.js`);
+    fire[0]?.();
+    expect(got).toEqual([]);
+    f.message({ type: "cf:ping", seq: 1 });
+    resources.push(`http://${HOST}/preview/g/rows.json`);
+    fire[0]?.();
+    // Nothing new: nothing said.
+    fire[0]?.();
+    expect(got.map((m) => [m.type, m.files])).toEqual([
+      ["cf:here", ["/preview/g/page.html", "/preview/g/early.js"]],
+      ["cf:files", ["/preview/g/page.html", "/preview/g/early.js", "/preview/g/rows.json"]],
+    ]);
+  });
+
+  it("reloads itself when the app asks (one of its files was written), and only the app", () => {
+    const f = load();
+    f.message({ type: "cf:reload" }, {});
+    expect(f.reloads()).toBe(0);
+    f.message({ type: "cf:reload" });
+    expect(f.reloads()).toBe(1);
+  });
+
+  describe("in an opaque origin (a page no thread owns)", () => {
+    const storage = (f: ReturnType<typeof load>) => f.posted.filter((m) => m.what === "storage").map((m) => m.text);
+
+    it("keeps localStorage and sessionStorage in memory, each its own, and says so at the first use of each", () => {
+      const f = load({ opaque: true });
+      f.message({ type: "cf:ping", seq: 1 });
+      const w = f.win as unknown as { localStorage: Storage & Record<string, string>; sessionStorage: Storage };
+      expect(w.localStorage.getItem("todos")).toBeNull();
+      w.localStorage.setItem("todos", "[1]");
+      w.localStorage.n = "2";
+      expect(w.localStorage.getItem("todos")).toBe("[1]");
+      expect(w.localStorage.getItem("n")).toBe("2");
+      expect(w.localStorage.todos).toBe("[1]");
+      expect(Object.keys(w.localStorage).sort()).toEqual(["n", "todos"]);
+      expect(w.localStorage.length).toBe(2);
+      expect(w.sessionStorage.getItem("todos")).toBeNull();
+      w.localStorage.removeItem("todos");
+      expect(w.localStorage.key(0)).toBe("n");
+      w.localStorage.clear();
+      expect(w.localStorage.length).toBe(0);
+      expect(storage(f)).toEqual(["localStorage", "sessionStorage"]);
+    });
+
+    it("tells of a use before the app's ping once it answered it (the frame's load clears the strip in between)", () => {
+      const f = load({ opaque: true });
+      const w = f.win as unknown as { localStorage: Storage };
+      w.localStorage.getItem("todos");
+      expect(storage(f)).toEqual([]);
+      f.message({ type: "cf:ping", seq: 1 });
+      expect(storage(f)).toEqual(["localStorage"]);
+      f.message({ type: "cf:ping", seq: 2 });
+      expect(storage(f)).toEqual(["localStorage"]);
+    });
+
+    it("keeps cookies in memory, a past expiry removing one", () => {
+      const f = load({ opaque: true });
+      f.message({ type: "cf:ping", seq: 1 });
+      document.cookie = "a=1; path=/";
+      document.cookie = "b=2";
+      expect(document.cookie).toBe("a=1; b=2");
+      document.cookie = "a=; max-age=0";
+      document.cookie = "b=; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+      expect(document.cookie).toBe("");
+      expect(storage(f)).toEqual(["document.cookie"]);
+    });
+
+    it("says indexedDB fails, which still throws, and takes the service worker and caches away", () => {
+      const f = load({ opaque: true });
+      f.message({ type: "cf:ping", seq: 1 });
+      const w = f.win as unknown as { indexedDB: { open: (n: string) => unknown }; caches?: unknown };
+      expect(() => w.indexedDB.open("db")).toThrow(/insecure/);
+      expect(() => w.indexedDB.open("db")).toThrow(/insecure/);
+      expect(storage(f)).toEqual(["indexedDB"]);
+      expect("caches" in w).toBe(false);
+      expect("serviceWorker" in f.nav).toBe(false);
+    });
+
+    it("leaves a page with storage alone", () => {
+      const f = load();
+      expect((f.win as { localStorage?: unknown }).localStorage).toBeUndefined();
+      expect(f.posted).toEqual([]);
+    });
   });
 
   it("says going before a link to its own origin, not to another site", () => {

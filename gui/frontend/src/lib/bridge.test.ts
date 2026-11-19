@@ -57,10 +57,11 @@ describe("the frame's nonce", () => {
   });
 
   it.each([
-    ["a URL without a fragment", "http://h/preview/g/a.html", "http://h/preview/g/a.html#cf=n1"],
-    ["after the URL's own fragment", "http://h/preview/g/a.html#top", "http://h/preview/g/a.html#top&cf=n1"],
-    ["an empty fragment", "http://h/preview/g/a.html#", "http://h/preview/g/a.html#cf=n1"],
-  ])("goes in the fragment of %s", (_name, url, want) => {
+    ["a URL without a query", "http://h/preview/g/a.html", "http://h/preview/g/a.html?cf-nonce=n1"],
+    ["after the URL's own parameters", "http://h/preview/g/a.html?cf-page=1", "http://h/preview/g/a.html?cf-page=1&cf-nonce=n1"],
+    ["a URL with a fragment, which stays the page's", "http://h/preview/g/a.html#/about", "http://h/preview/g/a.html?cf-nonce=n1#/about"],
+    ["a URL that does not parse", "preview/g/a.html?x=1#top", "preview/g/a.html?x=1&cf-nonce=n1#top"],
+  ])("goes in the query of %s, never the fragment", (_name, url, want) => {
     expect(withNonce(url, "n1")).toBe(want);
   });
 

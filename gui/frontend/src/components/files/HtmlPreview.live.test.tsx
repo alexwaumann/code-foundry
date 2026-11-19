@@ -54,7 +54,7 @@ function hello(): unknown[] {
   vi.spyOn(win, "postMessage").mockImplementation((m: unknown) => {
     posts.push(m);
   });
-  const nonce = /#cf=([0-9a-f]+)$/.exec(frame.getAttribute("src") ?? "")?.[1] ?? "";
+  const nonce = /[?&]cf-nonce=([0-9a-f]+)$/.exec(frame.getAttribute("src") ?? "")?.[1] ?? "";
   const origin = frame.getAttribute("sandbox")?.includes("allow-same-origin") ? "http://127.0.0.1:1" : "null";
   act(() => {
     window.dispatchEvent(new MessageEvent("message", { data: { cf: 1, type: "cf:hello", nonce }, source: win, origin }));

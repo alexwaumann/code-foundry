@@ -52,7 +52,7 @@ function framePage() {
   vi.spyOn(win, "postMessage").mockImplementation((m: unknown) => {
     posts.push(m as Record<string, unknown>);
   });
-  const nonce = /#cf=([0-9a-f]+)$/.exec(frame.getAttribute("src") ?? "")?.[1] ?? "";
+  const nonce = /[?&]cf-nonce=([0-9a-f]+)$/.exec(frame.getAttribute("src") ?? "")?.[1] ?? "";
   const say = (type: string) => {
     act(() => {
       window.dispatchEvent(new MessageEvent("message", { data: { cf: 1, type, nonce }, source: win, origin: frame.getAttribute("sandbox")?.includes("allow-same-origin") ? "http://127.0.0.1:1" : "null" }));
