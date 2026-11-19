@@ -80,7 +80,7 @@ describe("a thread pane's header row", () => {
     const row = header();
     expect(row?.getAttribute("data-tab-id")).toBe("t-th");
     expect(screen.getByTestId("thread-pane-header-name").textContent).toBe("Refactor sidebar tree");
-    expect(buttons()).toEqual(["Open a tab", "Thread info", "Thread menu", "Collapse pane", "Full screen"]);
+    expect(buttons()).toEqual(["Open", "Thread info", "Thread menu", "Collapse pane", "Full screen"]);
     expect(screen.queryByTestId("shell-tab-close")).toBeNull();
     // The pane is named by the thread's name, as its tab named it.
     expect(screen.getByTestId("shell-pane").getAttribute("aria-labelledby")).toBe(screen.getByTestId("thread-pane-header-name").id);
@@ -91,7 +91,7 @@ describe("a thread pane's header row", () => {
     await showing([tab("t-c", "compose")]);
     render(<PaneView paneId="p-1" rect={RECT} focused />);
     expect(screen.getByTestId("thread-pane-header-name").textContent).toBe("New thread");
-    expect(buttons()).toEqual(["Open a tab", "Collapse pane", "Full screen"]);
+    expect(buttons()).toEqual(["Open", "Collapse pane", "Full screen"]);
   });
 
   it("a pane of other tabs, or of more than one tab, keeps its strip", async () => {

@@ -86,6 +86,8 @@ describe("the actions", () => {
     expect(newTerminalAction("s-1")).toEqual({ terminal: "new", thread: "s-1", pane: "" });
     expect(newTerminalAction("s-1", "p-2")).toEqual({ terminal: "new", thread: "s-1", pane: "p-2" });
     expect(plusAction("new-thread", "p-2")).toEqual({ run: "composer.new", args: { pane: "p-2" } });
+    // A thread pane's New thread beside (Panes): a composer in a new pane on its right.
+    expect(plusAction("new-thread-beside", "p-2")).toEqual({ run: "composer.new", args: { beside: "p-2" } });
     expect(plusAction("terminal", "p-2")).toEqual({ terminal: "new", thread: "", pane: "p-2" });
     expect(showTerminalAction("t-9", "p-2")).toEqual({ terminal: "show", id: "t-9", pane: "p-2" });
     expect(plusAction("prs", "p-2")).toEqual({ run: "view.pullrequests", args: { pane: "p-2" } });

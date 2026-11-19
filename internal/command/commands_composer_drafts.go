@@ -24,11 +24,14 @@ func (l layout) composerCommands() []Command {
 		{
 			Name: "composer.new", Title: "New Thread in a Tab", Category: layoutCategory, Page: PageState,
 			Description: "Focus the space's empty composer, or open one where a thread's tab opens (thread.open) (--pane: that pane, which an " +
-				"empty composer open elsewhere in the space moves to). --project, --workspace or --like say what the " +
-				"thread will start from.",
+				"empty composer open elsewhere in the space moves to; --beside: a new pane on the right of that pane, or of " +
+				"that thread's pane, which keeps its thread, as thread.open --beside; refused when layout.threads_open_as " +
+				"is single). --project, --workspace or --like say what the thread will start from.",
 			Args: []ArgSpec{
 				spaceArg("The space (default: the pane's, else the current one)"),
 				paneIDArg("pane", "The pane it opens in"),
+				{Name: "beside", Type: String, Description: "In a new pane on the right of this pane, or of this thread's pane (a pane id or a thread id, " +
+					"in the space); refused when layout.threads_open_as is single"},
 				{Name: "project", Type: String, Description: "The project the thread starts in"},
 				{Name: "workspace", Type: String, Description: "The workspace the thread starts in"},
 				{Name: "like", Type: String, ID: ThreadID, Description: "A thread the new one starts like" + IDHelp},
@@ -45,12 +48,19 @@ func (l layout) composerCommands() []Command {
 				if len(params) == 0 {
 					params = nil
 				}
+				if a.String("beside") != "" && a.String("pane") != "" {
+					return Result{}, InvalidArg("beside", "--beside is a place of its own: no --pane")
+				}
 				focus := wantsFocus(uctx, a)
-				c, err := l.apply(ctx, &core.NewThread{Space: a.String("space"), Pane: a.String("pane"), Params: params, Focus: focus}, !focus)
+				c, err := l.apply(ctx, &core.NewThread{Space: a.String("space"), Pane: a.String("pane"), Beside: a.String("beside"), Params: params, Focus: focus}, !focus)
 				if err != nil {
 					return Result{}, err
 				}
-				return layoutResult(uctx, c, fmt.Sprintf("composer tab %s in pane %s of space %s", c.Result.Tab, c.Result.Pane, c.Result.Space)), nil
+				msg := fmt.Sprintf("composer tab %s in pane %s of space %s", c.Result.Tab, c.Result.Pane, c.Result.Space)
+				if c.Result.Collapsed {
+					msg += " (folded: no room for another open pane)"
+				}
+				return layoutResult(uctx, c, msg), nil
 			},
 		},
 		{

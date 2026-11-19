@@ -145,14 +145,20 @@ export function untabbedTerminals(terminals: Readonly<Record<string, TerminalVie
   });
 }
 
-/** The "+" menu's general items. */
-export type PlusItem = "new-thread" | "terminal" | "prs" | "projects";
+/** The "+" menu's general items; "new-thread-beside" is a thread pane's under Panes (New thread beside). */
+export type PlusItem = "new-thread" | "new-thread-beside" | "terminal" | "prs" | "projects";
 
-/** A general item of the "+" menu: it opens in that pane. The terminal is a free one (cmd+t's with no thread: in the home folder, linked to nothing). */
+/**
+ * A general item of the "+" menu: it opens in that pane, except New thread beside, a composer
+ * in a new pane on the pane's right (composer.new --beside). The terminal is a free one (cmd+t's
+ * with no thread: in the home folder, linked to nothing).
+ */
 export function plusAction(item: PlusItem, pane: string): LinkedAction {
   switch (item) {
     case "new-thread":
       return { run: "composer.new", args: { pane } };
+    case "new-thread-beside":
+      return { run: "composer.new", args: { beside: pane } };
     case "terminal":
       return { terminal: "new", thread: "", pane };
     case "prs":

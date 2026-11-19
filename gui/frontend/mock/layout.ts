@@ -922,6 +922,48 @@ function openPanes(t: Tx, o: Op, thread: string): Result {
   return { ...res, pane: pane.id, tab: tb.id, ...(closed.length ? { closed } : {}) };
 }
 
+/**
+ * new_thread with beside (Go's NewThread.beside): a composer in a new pane on the right of that
+ * pane (or of that thread's pane), which keeps what it shows; the space's empty composer open
+ * elsewhere moves there, one already in that pane is focused; folded without room; refused under
+ * Single and with a pane.
+ */
+function newThreadBeside(t: Tx, o: Op, params: Record<string, string> | undefined): Result {
+  const beside = str(o, "beside");
+  if (str(o, "pane")) fail("invalid_argument", "beside is a place of its own: no pane");
+  if (t.opts.mode === "single") fail("failed_precondition", SINGLE_BESIDE);
+  let sp: Space;
+  let anchor: Node;
+  const found = t.st.spaces.flatMap((s) => panes(s.root).map((p) => ({ sp: s, pane: p }))).find((x) => x.pane.id === beside);
+  if (found) {
+    if (str(o, "space") && found.sp.id !== str(o, "space")) fail("invalid_argument", `pane ${found.pane.id} is not in space ${str(o, "space")}`);
+    sp = found.sp;
+    anchor = found.pane;
+  } else {
+    const s = t.space(str(o, "space"));
+    sp = s;
+    anchor = panes(s.root).find((p) => (p.tabs ?? []).some((tb) => tb.kind === "thread" && tb.thread === beside)) ?? fail("not_found", `beside "${beside}": no pane of space ${s.id}, nor a thread open in it`);
+  }
+  let tb: Tab = { id: "", kind: "compose", ...(params ? { params } : {}) };
+  const same = t.prepare(sp, tb);
+  if (same) {
+    if (params) same.params = params;
+    const from = t.findTab(same.id).pane;
+    if (from === anchor) {
+      t.show(sp, anchor, same.id, o.focus === true);
+      return { space: sp.id, pane: anchor.id, tab: same.id, existing: true, rule: "1" };
+    }
+    detach(sp, from, same.id);
+    tb = same;
+  }
+  const pane: Node = { t: "pane", id: t.newID("p-"), tabs: [tb], active: tb.id };
+  insertBeside(sp, anchor.id, "right", pane, undefined, t.newID("s-"));
+  const fold = !fitsSpace(sp, areaOf(o));
+  t.show(sp, pane, tb.id, o.focus === true);
+  if (fold) pane.collapsed = true;
+  return { space: sp.id, pane: pane.id, tab: tb.id, rule: "edge", ...(fold ? { collapsed: true } : {}) };
+}
+
 /** Puts every space in the mode's form (Go's conform): one thread per pane, one thread pane per space under Single, other tabs out of a thread's pane into a new pane on its right. */
 function conform(t: Tx, res: Result): void {
   const all: Conformed = { thread_tabs: 0, composers: 0, panes: 0, moved: 0, spaces: 0 };
@@ -1651,6 +1693,7 @@ const ops = {
   new_thread(t: Tx, o: Op): Result {
     const params = o.params && typeof o.params === "object" ? { ...(o.params as Record<string, string>) } : undefined;
     if (params?.draft) fail("invalid_argument", "new_thread opens the empty composer; a draft opens with open_draft");
+    if (str(o, "beside")) return newThreadBeside(t, o, params);
     return ops.open_surface(t, { op: "open_surface", space: str(o, "space"), pane: str(o, "pane"), tab: { id: "", kind: "compose", ...(params ? { params } : {}) }, focus: o.focus === true, ...areaOf(o) });
   },
 

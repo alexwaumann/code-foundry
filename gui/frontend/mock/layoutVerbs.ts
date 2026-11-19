@@ -621,17 +621,19 @@ function verbs(world: LayoutVerbsWorld): Entry[] {
         name: "composer.new",
         title: "New Thread in a Tab",
         category: CATEGORY,
-        description: "Focus the space's empty composer, or open one where a thread's tab opens (thread.open). --project, --workspace or --like say what the thread will start from.",
+        description:
+          "Focus the space's empty composer, or open one where a thread's tab opens (thread.open) (--beside: a new pane on the right of that pane, refused when layout.threads_open_as is single). --project, --workspace or --like say what the thread will start from.",
         keybindings: [],
         noPalette: true,
-        args: [str("space", "The space"), str("pane", "The pane it opens in"), str("project", "The project the thread starts in"), str("workspace", "The workspace the thread starts in"), str("like", "A thread the new one starts like"), focusArg],
+        args: [str("space", "The space"), str("pane", "The pane it opens in"), str("beside", "In a new pane on the right of this pane, or of this thread's pane; refused when layout.threads_open_as is single"), str("project", "The project the thread starts in"), str("workspace", "The workspace the thread starts in"), str("like", "A thread the new one starts like"), focusArg],
       },
       when: always,
       run: (_c, a) => {
         const params: Record<string, string> = {};
         for (const k of ["project", "workspace", "like"]) if (a[k]) params[k] = a[k];
+        if (a.beside && a.pane) refuse("invalid argument: --beside is a place of its own: no --pane");
         return run(
-          { op: "new_thread", ...(a.space ? { space: a.space } : {}), ...(a.pane ? { pane: resolvePane(L.state(), a.pane).pane.id } : {}), ...(Object.keys(params).length > 0 ? { params } : {}), focus: a.focus !== "false" },
+          { op: "new_thread", ...(a.space ? { space: a.space } : {}), ...(a.pane ? { pane: resolvePane(L.state(), a.pane).pane.id } : {}), ...(a.beside ? { beside: a.beside } : {}), ...(Object.keys(params).length > 0 ? { params } : {}), focus: a.focus !== "false" },
           (r) => `composer tab ${r.result.tab ?? ""} in pane ${r.result.pane ?? ""}`,
         );
       },

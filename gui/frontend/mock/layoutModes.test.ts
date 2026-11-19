@@ -63,6 +63,19 @@ describe("threads open as", () => {
     expect(w.threadPanes()).toEqual([{ id: "p-1", threads: ["s-8"] }]);
   });
 
+  it("panes: composer.new --beside opens a composer in a new pane on the thread pane's right, which keeps its thread; single refuses it", async () => {
+    const w = world("panes");
+    w.layout.apply({ op: "conform" });
+    const r = await w.run("composer.new", { beside: "p-1", focus: "true" });
+    const kinds = panes(w.layout.state().spaces[0]?.root).map((p) => (p.tabs ?? []).map((t) => (t.kind === "thread" ? t.thread : t.kind)));
+    expect(kinds.slice(0, 2)).toEqual([["s-1"], ["compose"]]);
+    expect(w.layout.state().spaces[0]?.focus).toBe((r as { pane?: string }).pane);
+    await expect(w.run("composer.new", { beside: "p-1", pane: "p-1" })).rejects.toThrow(/place of its own/);
+    w.setting.mode = "single";
+    w.layout.apply({ op: "conform" });
+    await expect(w.run("composer.new", { beside: "p-1" })).rejects.toThrow(/threads open as single/);
+  });
+
   it("the preview verb counts what a switch would close, and changes nothing; the conform does it", async () => {
     const w = world("tabs");
     const rev = w.layout.rev;
