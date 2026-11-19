@@ -1,5 +1,5 @@
 {
-  "doc": "Rule 3 tries the thread pane's sides right, left, below, above: the right neighbour wins over a nearer left one and the one below.",
+  "doc": "Rule 3 tries the thread pane's sides right, left, below, above: the right neighbour wins over a nearer left one and the one below. Smart placement off: with it on, a pane holding a tab of the same kind comes first (placement-by-kind cases).",
   "state": {
     "v": 1,
     "spaces": [
@@ -65,6 +65,7 @@
     "op": "open_surface",
     "tab": {"kind":"diff","thread":"th-a","params":{"project":"pj","worktree":"w"}}
   },
+  "options": {"no_smart_placement": true},
   "want": {
     "v": 1,
     "spaces": [

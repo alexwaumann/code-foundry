@@ -83,3 +83,8 @@ nothing.
   today; the check stays so the rule does not depend on that.
 - The mock's open_thread passes a pane to `add_tab` only when smart placement chose another pane,
   so its fallback (a focused pane of terminals without room) is still `add_tab`'s own `hostPane`.
+
+## Later
+
+- The same setting also places other surfaces by kind (a pull request with the pull requests):
+  `docs/notes/placement-by-kind.md`.

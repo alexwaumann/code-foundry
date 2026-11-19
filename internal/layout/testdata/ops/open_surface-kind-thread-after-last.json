@@ -1,0 +1,112 @@
+{
+  "doc": "Smart placement, rule kind: a pane holding a tab of the same kind for this thread wins over a nearer pane of this thread's other tabs (rule 2), and the tab goes right after the last of that kind, not at the end.",
+  "state": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Space A",
+        "root": {
+          "t": "split",
+          "id": "s-r",
+          "dir": "row",
+          "kids": [
+            {
+              "t": "pane",
+              "id": "p-a",
+              "tabs": [
+                {"id":"t-a","kind":"thread","thread":"th-a"},
+                {
+                  "id": "t-d",
+                  "kind": "diff",
+                  "thread": "th-a",
+                  "params": {"project":"pj","worktree":"w-th-a"}
+                }
+              ],
+              "active": "t-a"
+            },
+            {
+              "t": "pane",
+              "id": "p-b",
+              "tabs": [
+                {
+                  "id": "t-p1",
+                  "kind": "pullrequest",
+                  "params": {"slug":"o/r","number":"1"},
+                  "thread": "th-a"
+                },
+                {"id":"t-f","kind":"file","params":{"path":"/r/f"},"thread":"th-a"},
+                {"id":"t-g","kind":"file","params":{"path":"/r/g"},"thread":"th-b"}
+              ],
+              "active": "t-p1"
+            }
+          ],
+          "sizes": [0.5,0.5]
+        },
+        "focus": "p-a"
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "op": {
+    "op": "open_surface",
+    "tab": {"kind":"pullrequest","params":{"slug":"o/r","number":"2"},"thread":"th-a"}
+  },
+  "want": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Space A",
+        "root": {
+          "t": "split",
+          "id": "s-r",
+          "dir": "row",
+          "kids": [
+            {
+              "t": "pane",
+              "id": "p-a",
+              "tabs": [
+                {"id":"t-a","kind":"thread","thread":"th-a"},
+                {
+                  "id": "t-d",
+                  "kind": "diff",
+                  "thread": "th-a",
+                  "params": {"project":"pj","worktree":"w-th-a"}
+                }
+              ],
+              "active": "t-a"
+            },
+            {
+              "t": "pane",
+              "id": "p-b",
+              "tabs": [
+                {
+                  "id": "t-p1",
+                  "kind": "pullrequest",
+                  "thread": "th-a",
+                  "params": {"number":"1","slug":"o/r"}
+                },
+                {
+                  "id": "t-n1",
+                  "kind": "pullrequest",
+                  "thread": "th-a",
+                  "params": {"number":"2","slug":"o/r"}
+                },
+                {"id":"t-f","kind":"file","thread":"th-a","params":{"path":"/r/f"}},
+                {"id":"t-g","kind":"file","thread":"th-b","params":{"path":"/r/g"}}
+              ],
+              "active": "t-n1"
+            }
+          ],
+          "sizes": [0.5,0.5]
+        },
+        "focus": "p-a"
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "result": {"space":"sp-a","pane":"p-b","tab":"t-n1","rule":"kind"}
+}

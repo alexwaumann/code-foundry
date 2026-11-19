@@ -58,8 +58,9 @@ func (o tabs) open(ctx context.Context, tb *core.Tab, pane string, focus bool) (
 // now holds that its message must not get wrong (docs/notes/shell-24d-spec-differences.md,
 // 3 and 4): the thread of an open tab it used (another thread's, or none: a file is one per
 // path), and, when thread's own tab is open in no space, where its tab went instead of beside
-// it. A closed thread's surface goes to its space's focused pane, behind the tab shown there
-// when the call keeps the user's focus; before any window has loaded the layout (the first-load
+// it. A closed thread's surface goes to its space's focused pane (or, by smart placement, a
+// pane holding tabs of its kind), behind the tab shown there when the call keeps the user's
+// focus; before any window has loaded the layout (the first-load
 // import has not run), the import takes it into the thread's remembered set, so it shows when
 // the thread is opened.
 func (o tabs) where(r *PanelResult, thread string) {
@@ -186,6 +187,7 @@ var rulePhrases = map[string]string{
 	"2": "beside the thread's other tabs", "3": "in a pane next to the thread's", "4": "in a pane of linked tabs",
 	"5": "in a new pane right of the thread", "6": "in the thread's own pane", "pane": "in the pane asked for",
 	"focused": "in the focused pane", "near": "in the pane of the nearest thread",
+	"kind": "beside the thread's other tabs of its kind", "kind-any": "with the open tabs of its kind",
 }
 
 // tabMessage is an item verb's text: where its tab is, and the windows that show the layout.
@@ -209,7 +211,11 @@ func (r PanelResult) tabMessage() string {
 		msg = fmt.Sprintf("thread %s's tab is not open, and no app window has loaded the layout yet: tab %s joins the thread's set of tabs "+
 			"when one does, and shows beside the thread when the thread is opened", r.Thread, r.Tab)
 	case r.ThreadNotOpen:
-		msg = fmt.Sprintf("thread %s's tab is not open, so tab %s opened in pane %s, the focused pane of its space", r.Thread, r.Tab, r.Pane)
+		where := "the focused pane of its space"
+		if r.Rule == "kind" || r.Rule == "kind-any" {
+			where = "with the open tabs of its kind"
+		}
+		msg = fmt.Sprintf("thread %s's tab is not open, so tab %s opened in pane %s, %s", r.Thread, r.Tab, r.Pane, where)
 		if r.OtherSpace {
 			msg += " (" + r.Space + ", not the space the user is in)"
 		}

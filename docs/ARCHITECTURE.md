@@ -1554,11 +1554,14 @@ what depends on the drawn frame (rails, full screen, tab fitting, drag targets, 
   its default size. Opening a tab whose identity is open uses the open one. `kinds.json` and
   `identity.json` hold the GUI's port to it (`docs/notes/shell-gaps-c-identity.md`).
 * **Placement** (`place.go`): a linked surface opened by a key, a menu, the palette or a model
-  goes, in order, to the open tab; a pane holding this thread's linked tabs; a pane beside
+  goes, in order, to the open tab; with smart placement on, a pane holding a tab of its kind
+  for this thread, then (not a terminal) one holding a tab of its kind for any thread or none
+  (`kindHost`, which an unlinked tab gets too; `docs/notes/placement-by-kind.md`); a pane
+  holding this thread's linked tabs; a pane beside
   the thread's holding linked tabs (right, left, below, above); any pane holding them; a new
   pane right of the thread's at the kind's size when the conversation keeps 480 px; else the
-  thread's own pane. A closed thread's surface goes to the focused pane, and so does a
-  thread's own tab. A joined pane is never resized. Placement measures in the pane area the
+  thread's own pane. A closed thread's surface and an unlinked tab go to the focused pane
+  when no kind rule placed them. A joined pane is never resized. Placement measures in the pane area the
   window reports (`SetViewport`; the newest report of a visible window, else 1180 × 820).
   `Result.rule` says which rule placed it (`docs/notes/shell-2-placement.md`).
 * **A thread's tabs**: `close_thread` closes its linked tabs in its space and remembers where
@@ -1581,7 +1584,8 @@ what depends on the drawn frame (rails, full screen, tab fitting, drag targets, 
   that pane switches to it. **Smart placement** (`place.go` `threadHost`, setting
   `layout.smart_placement`): a thread's own tab or a composer opened with no pane chosen goes
   to the focused pane only when it holds a thread or composer tab, else to the nearest pane
-  that does (`rank`'s centre distance), else to the focused pane (`hostPane`).
+  that does (`rank`'s centre distance), else to the focused pane (`hostPane`); the same
+  setting turns the kind rules of placement off.
 * **Focus from a thread**: `Options.KeepFocus` runs any op and puts back the user's current
   space, focused tabs and MRU, so a model's tab waits behind the user's focused tab. The
   commands use it for every call not made by the user in person (§7).

@@ -409,11 +409,12 @@ func checkRoom(t *testing.T, step int, opJSON string, op Op, before, after *Stat
 }
 
 // checkPlacement pins what placement and the thread ops promise on any state: a pane that is
-// joined is never resized (rules 2, 3, 4, 6 and the caller's or focused pane change no split),
-// a kept tab is in its thread's remembered set, and the tabs a thread brought back are open.
+// joined is never resized (rules 2, 3, 4, 6, the kind rules and the caller's or focused pane
+// change no split), a kept tab is in its thread's remembered set, and the tabs a thread brought
+// back are open.
 func checkPlacement(t *testing.T, step int, opJSON string, before, after *State, res Result) {
 	t.Helper()
-	if _, ok := map[string]bool{"2": true, "3": true, "4": true, "6": true, "pane": true, "focused": true}[res.Rule]; ok && len(res.Back)+len(res.Placed) == 0 {
+	if _, ok := map[string]bool{"2": true, "3": true, "4": true, "6": true, "kind": true, "kind-any": true, "pane": true, "focused": true}[res.Rule]; ok && len(res.Back)+len(res.Placed) == 0 {
 		if b, a := splitSizes(before), splitSizes(after); !maps.EqualFunc(b, a, slices.Equal[[]float64]) {
 			t.Fatalf("step %d %s: rule %s resized a split:\n%v\n%v", step, opJSON, res.Rule, b, a)
 		}

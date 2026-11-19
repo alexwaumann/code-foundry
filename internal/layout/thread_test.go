@@ -307,7 +307,8 @@ func TestOpenThreadSwapSetting(t *testing.T) {
 // TestSmartPlacement pins where a thread's own tab and a composer open with the setting
 // layout.smart_placement on (the default) and off: on, the focused pane only when it holds a
 // thread or a composer, else the nearest pane that does, else the focused pane; off, the
-// focused pane. A pane the caller chose wins either way.
+// focused pane. A pane the caller chose wins either way. Another surface goes, with it on, to a
+// pane holding a tab of its kind (place.go kindHost), and with it off to the focused pane.
 func TestSmartPlacement(t *testing.T) {
 	two := func(left, right, focus string) string {
 		return `{"v":1,"spaces":[{"id":"sp-a","name":"Main","root":{"t":"split","id":"s-1","dir":"row","sizes":[0.5,0.5],"kids":[
@@ -321,6 +322,7 @@ func TestSmartPlacement(t *testing.T) {
 		term = `{"id":"t-t","kind":"terminal","params":{"terminal":"term-1"}}`
 		dif  = `{"id":"t-d","kind":"diff","thread":"th-a","params":{"project":"p","worktree":"w"}}`
 		prs  = `{"id":"t-p","kind":"prs"}`
+		pr   = `{"id":"t-r","kind":"pullrequest","thread":"th-b","params":{"slug":"o/r","number":"3"}}`
 	)
 	open := &OpenThread{Thread: "th-x", Focus: true, W: 1600, H: 900}
 	cases := []struct {
@@ -338,6 +340,8 @@ func TestSmartPlacement(t *testing.T) {
 		{"explicit pane wins", two(th, dif, "p-b"), &OpenThread{Thread: "th-x", Pane: "p-b", Focus: true, W: 1600, H: 900}, "p-b", "p-b", "pane"},
 		{"new thread composer", two(th, dif, "p-b"), &NewThread{Focus: true, W: 1600, H: 900}, "p-a", "p-b", "near"},
 		{"another surface keeps the focused pane", two(th, dif, "p-b"), &OpenSurface{Tab: &Tab{Kind: "prs"}, Focus: true, W: 1600, H: 900}, "p-b", "p-b", "focused"},
+		{"a pull request joins the pull requests", two(th, pr, "p-a"), &OpenSurface{Tab: &Tab{Kind: "pullrequest", Params: map[string]string{"slug": "o/r", "number": "5"}}, Focus: true, W: 1600, H: 900}, "p-b", "p-a", "kind-any"},
+		{"a thread's terminal keeps off another thread's", two(th, `{"id":"t-t","kind":"terminal","thread":"th-b","params":{"terminal":"term-1"}}`, "p-a"), &OpenSurface{Tab: &Tab{Kind: "terminal", Thread: "th-c", Params: map[string]string{"terminal": "term-2"}}, Focus: true, W: 1600, H: 900}, "p-a", "p-a", "focused"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

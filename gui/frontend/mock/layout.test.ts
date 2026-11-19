@@ -82,7 +82,7 @@ describe("the mock's layout ops against internal/layout's cases", () => {
     expect(skipped("smart swap")).toEqual(["close_tab-smart-swap-on-return", "focus_tab-smart-swap", "focus_tab-smart-swap-last", "focus_tab-smart-swap-mru"]);
     // remove_space puts a moved thread's linked tabs into its set (Result.kept).
     expect(skipped("a remembered set")).toEqual(["close_pane-closes-threads", "open_surface-drops-remembered", "remove_space-default", "remove_space-keeps-linked-terminals"]);
-    expect(skipped("placement rules 2 to 6").every((n) => /^open_surface-rule[2-6]-/.test(n))).toBe(true);
+    expect(skipped("placement rules 2 to 6").every((n) => /^open_surface-(rule[2-6]|kind)-/.test(n))).toBe(true);
     expect(skipped("linked tabs placed by the rules")).toEqual(["move_pane-thread-to-space"]);
   });
 
@@ -234,5 +234,18 @@ describe("the mock's LayoutService", () => {
     expect(opened({ op: "open_thread", thread: "s-x", pane: "p-2", focus: true })).toMatchObject({ pane: "p-2" });
     // Another surface of no thread keeps going to the focused pane.
     expect(opened({ op: "open_surface", tab: { id: "", kind: "prs" }, focus: true })).toMatchObject({ pane: "p-2", rule: "focused" });
+  });
+
+  // With it on, a surface goes to a pane holding tabs of its kind (Go's kindHost): a diff of no
+  // thread opened from the thread's pane joins the diff; with it off, the focused pane.
+  it.each([
+    { name: "on", on: true, pane: "p-2", rule: "kind-any" },
+    { name: "off", on: false, pane: "p-1", rule: "focused" },
+  ])("places a surface by its kind with smart placement $name", ({ on, pane, rule }) => {
+    const layout = new MockLayout({ publish: () => {}, ids: seqIds(), smartPlacement: () => on });
+    layout.seed("thread-and-diff");
+    layout.apply({ op: "focus_pane", pane: "p-1" });
+    const { result } = layout.apply({ op: "open_surface", tab: { id: "", kind: "diff", params: { project: "p", worktree: "other" } }, focus: true });
+    expect(result).toMatchObject({ pane, rule });
   });
 });

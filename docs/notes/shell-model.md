@@ -279,6 +279,13 @@ when the first working version is whole. Nothing partial is released.
   space by itself and waits there.
 - **Placement** of a linked surface opened by a key, a menu or the palette, in order:
   1. It is already open in this space: focus it.
+  - **By kind** (smart placement on; `docs/notes/placement-by-kind.md`): a pane holds a tab of the
+    same kind for this thread: add a tab there, after the last of them. Otherwise, for any kind but
+    a terminal, a pane holds a tab of the same kind for any thread or for none: add a tab there,
+    at the end. A pane holding this thread's linked tabs wins, then the nearest to the thread's
+    pane; a collapsed pane and one that cannot take the tab ("Room for panes") are skipped. "Same
+    kind" is the exact kind: two plugin surfaces of different kinds are not the same kind. A
+    terminal never joins another thread's terminals by kind; it keeps the rules below.
   2. A pane holds this thread's linked tabs: add a tab there.
   3. A pane next to the thread's pane holds linked surfaces (any thread): add a tab there. Sides in
      order: right, left, below, above.
@@ -306,9 +313,12 @@ when the first working version is whole. Nothing partial is released.
   The focus follows the tab into its pane. A pane that was chosen wins: a pane's "+" menu
   (`--pane`), a drop, a tab already open (focused where it is), a composer the thread is sent
   from. On by default; a user setting (`layout.smart_placement`, Appearance › Panes): off, only
-  rule 3 applies.
+  rule 3 applies. The same setting turns placement by kind off.
 - **A surface that belongs to no thread** (a checkout's diff opened from Projects, a pull request
-  opened from Pull Requests) opens as an unlinked tab in the pane of the page it was opened from.
+  opened from Pull Requests) opens as an unlinked tab. With smart placement on it goes by kind
+  first, as a linked surface does (ranked from the focused pane): a pane holding a tab of its
+  kind, of any thread or none; a terminal of no thread never does. Otherwise it opens in the
+  focused pane, which is the pane of the page it was opened from.
 - **Smart swap.** When a thread tab gains focus, every pane whose active tab is another thread's
   surface of the same type switches to this thread's, if that one is already open in that pane.
   Nothing is opened, moved or closed. On by default; a user setting.
@@ -317,10 +327,11 @@ when the first working version is whole. Nothing partial is released.
   was in, otherwise placed fresh beside it. A pane of theirs the user had collapsed comes back
   collapsed. Terminals closed this way keep running. No settings.
 - **A thread whose tab is not open** can still have its surfaces opened from its sidebar menu
-  (Open ▸ …); they go to the focused pane. For an open thread the same menu follows the placement
+  (Open ▸ …); they go by kind first (smart placement on, ranked from the focused pane), else to
+  the focused pane. For an open thread the same menu follows the placement
   rules. Plugins will add thread actions to this menu. A thread's own call for its surface while its
-  tab is not open goes the same way, to the focused pane of the thread's space, behind the tab shown
-  there, and the thread is told so; before any window has loaded the layout, the first load takes it
+  tab is not open goes the same way, by kind or else to the focused pane of the thread's space,
+  behind the tab shown there when it lands in the focused pane, and the thread is told where; before any window has loaded the layout, the first load takes it
   into the thread's remembered set instead, and the thread is told that.
 - **Moving a thread** to another space takes the linked tabs that are in its space. Archiving closes
   its linked tabs everywhere and ends its terminals. Snoozing closes them, ends its terminals and

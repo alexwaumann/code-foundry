@@ -100,7 +100,7 @@ export interface Result {
   tab?: string;
   existing?: boolean;
   closed?: Tab[];
-  /** How placement chose: "1" (already open), "pane", "focused", "near" (smart placement), "compose"; the mock's linked placement says "mock". */
+  /** How placement chose: "1" (already open), "pane", "focused", "near", "kind", "kind-any" (smart placement), "compose"; the mock's linked placement says "mock". */
   rule?: string;
   /** The draft the op started, opened or ended. */
   draft?: string;
@@ -724,18 +724,50 @@ function threadHost(t: Tx, sp: Space, a: Area, tb: Tab): { pane: Node | undefine
   if (holdsThread(fp) && canTake(sp, fp, a, [tb])) return { pane: fp, near: false };
   const cands = all.filter((p) => p !== fp && !p.collapsed && holdsThread(p) && canTake(sp, p, a, [tb]));
   if (cands.length === 0) return { pane: hostPane(sp, a, tb), near: false };
+  return { pane: nearest(sp, a, fp, "", cands), near: true };
+}
+
+/**
+ * The first of cands by Go's rank without sides: a pane holding a linked tab of thread first,
+ * then the nearest to `from` by the distance between centres, then layout order.
+ */
+function nearest(sp: Space, a: Area, from: Node, thread: string, cands: readonly Node[]): Node | undefined {
   const rects = plainRects((sp.root ?? null) as GeoNode | null, a.w, a.h).rects;
   const centre = (id: string): { x: number; y: number } => {
     const r = rects[id];
     return r ? { x: r.x + r.w / 2, y: r.y + r.h / 2 } : { x: 0, y: 0 };
   };
-  const c = centre(fp.id);
+  const c = centre(from.id);
   const dist = (p: Node): number => {
     const o = centre(p.id);
     return Math.abs(o.x - c.x) + Math.abs(o.y - c.y);
   };
-  // The sort is stable, so equal distances keep layout order.
-  return { pane: [...cands].sort((x, y) => dist(x) - dist(y))[0], near: true };
+  const mine = (p: Node): number => (thread && (p.tabs ?? []).some((x) => isLinked(x) && x.thread === thread) ? 0 : 1);
+  // The sort is stable, so equal ranks keep layout order.
+  return [...cands].sort((x, y) => mine(x) - mine(y) || dist(x) - dist(y))[0];
+}
+
+/**
+ * Where smart placement puts tb by its kind (Go's kindHost; docs/notes/placement-by-kind.md): a
+ * pane holding a tab of its kind for its thread, after the last of them (rule "kind"); else, but
+ * for a terminal, a pane holding a tab of its kind for any thread or none, at the end ("kind-any").
+ * Open panes that can take tb, ranked from `own` (the thread's pane), else the focused pane.
+ */
+function kindHost(t: Tx, sp: Space, a: Area, own: Node | undefined, tb: Tab): { pane: Node; at: number; rule: string } | undefined {
+  if (t.opts.no_smart_placement || tb.kind === "compose") return undefined;
+  const all = panes(sp.root);
+  const from = own ?? all.find((p) => p.id === sp.focus);
+  if (!from) return undefined;
+  const holding = (match: (x: Tab) => boolean): Node[] => all.filter((p) => !p.collapsed && (p.tabs ?? []).some(match) && canTake(sp, p, a, [tb]));
+  const thread = isLinked(tb) ? (tb.thread ?? "") : "";
+  if (thread) {
+    const mine = (x: Tab): boolean => x.kind === tb.kind && isLinked(x) && x.thread === thread;
+    const p = nearest(sp, a, from, thread, holding(mine));
+    if (p) return { pane: p, at: (p.tabs ?? []).reduce((n, x, i) => (mine(x) ? i : n), -1) + 1, rule: "kind" };
+  }
+  if (tb.kind === "terminal") return undefined;
+  const p = nearest(sp, a, from, thread, holding((x) => x.kind === tb.kind));
+  return p ? { pane: p, at: (p.tabs ?? []).length, rule: "kind-any" } : undefined;
 }
 
 type OpFn = (t: Tx, o: Op) => Result;
@@ -1484,8 +1516,9 @@ function needDraft(t: Tx, id: string): { sp: Space; draft: Draft } {
 
 /**
  * Opens a surface in space sp (internal/layout/place.go): rule 1 (already open: focused where it
- * is, or moved into the caller's pane when unlinked), the caller's pane, else the focused pane,
- * else the first pane of an empty space. A linked tab of a thread whose tab is open in the space
+ * is, or moved into the caller's pane when unlinked), the caller's pane, else with smart placement
+ * a pane holding tabs of its kind (kindHost), else the focused pane, else the first pane of an
+ * empty space. A linked tab of a thread whose tab is open in the space
  * is placed the mock's way, not by rules 2 to 6: after the last of its thread's linked tabs, else
  * in a new pane right of the thread's at 0.45 while the result fits, else after the thread's tab
  * (rule "mock"). A pane of terminals that has no room for the tab is skipped, as in Go (canTake).
@@ -1518,6 +1551,8 @@ function place(t: Tx, sp: Space, chosen: Node | null, tb: Tab, focus: boolean, a
   }
   const all = panes(sp.root);
   const own = isLinked(tb) ? all.find((p) => (p.tabs ?? []).some((x) => x.kind === "thread" && x.thread === tb.thread)) : undefined;
+  const byKind = kindHost(t, sp, a, own, tb);
+  if (byKind) return put(byKind.pane, byKind.at, byKind.rule);
   if (!own) {
     // A composer is a thread to be: it opens where a thread's own tab opens.
     const host = tb.kind === "compose" ? threadHost(t, sp, a, tb) : { pane: hostPane(sp, a, tb), near: false };

@@ -8,9 +8,20 @@ import (
 )
 
 // Placement (docs/notes/shell-model.md, "Linked surfaces"; decisions in
-// docs/notes/shell-2-placement.md). A surface opened by a key, a menu or the palette lands:
+// docs/notes/shell-2-placement.md and docs/notes/placement-by-kind.md). A surface opened by a
+// key, a menu or the palette lands:
 //
 //  1. where it is already open in this space (focused, no second copy);
+//
+// then, with smart placement on (Options.NoSmartPlacement unset; kindHost), a surface other
+// than a composer:
+//
+//     "kind": in a pane holding a tab of its kind for this thread, after the last of them;
+//     "kind-any": in a pane holding a tab of its kind for any thread or none (not a terminal),
+//     at the end of its strip;
+//
+// and otherwise, for a tab whose thread's tab is open in the space:
+//
 //  2. in a pane holding this thread's linked tabs, after the last of them;
 //  3. in a pane next to the thread's pane holding linked surfaces of any thread;
 //  4. in any pane of the space holding linked surfaces;
@@ -20,11 +31,13 @@ import (
 //
 // In 2 to 4 a pane that holds a linked tab of this thread ranks first, then (rule 3) the side
 // in the order right, left, below, above, then the nearest by centre distance; a pane of
-// terminals the tab would not fit in (canTake) is no candidate. A joined pane is never
-// resized. The caller's pane ("+") wins over 2 to 6, and is refused when it cannot take the
-// tab; a tab whose thread has no tab in the space, and a tab of no thread, go to the focused
-// pane, or the most recently focused pane that can take it (hostPane). A composer tab goes
-// where a thread's own tab goes (threadHost: smart placement).
+// terminals the tab would not fit in (canTake) is no candidate. The kind rules rank the same
+// way, from the thread's pane (from the focused pane for a tab of no thread or of a thread whose
+// tab is not in the space), and skip a collapsed pane. A joined pane is never resized. The
+// caller's pane ("+") wins over all of them, and is refused when it cannot take the tab; a tab
+// whose thread has no tab in the space, and a tab of no thread, go to the focused pane, or the
+// most recently focused pane that can take it (hostPane), when no kind rule placed them. A
+// composer tab goes where a thread's own tab goes (threadHost: smart placement).
 
 // The pane area placement measures when the op names none (plan section 2.4), and the width
 // the rest keeps when a new pane's size is raised to its kind's floor: a pane's minimum.
@@ -137,6 +150,12 @@ func (t *tx) place(sp *Space, chosen *Node, tb *Tab, focus bool, w, h float64) (
 	}
 	tsp, tp, _ := t.st.FindTab(threadTabID(t.st, tb.Thread))
 	if !tb.IsLinked() || tp == nil || tsp != sp {
+		tp = nil // the thread's pane is not in this space: the kind rules rank from the focused pane
+	}
+	if p, at, rule := t.kindHost(sp, tp, tb, w, h); p != nil {
+		return put(p, at, rule)
+	}
+	if tp == nil {
 		fp, rule := hostPane(sp, w, h, tb), "focused"
 		if tb.Kind == "compose" {
 			// A composer is a thread to be: it opens where a thread's own tab opens.
@@ -227,10 +246,65 @@ func (t *tx) placeExisting(sp *Space, chosen *Node, same, req *Tab, focus bool) 
 	return Result{Space: ssp.ID, Pane: sp2.ID, Tab: same.ID, Existing: true, Rule: "1"}
 }
 
+// kindHost is where smart placement puts tb by its kind (docs/notes/placement-by-kind.md), and
+// the index it goes at, or nil when no rule applies: a pane holding a tab of tb's kind for tb's
+// thread, after the last of them (rule "kind"); else, for any kind but a terminal, a pane
+// holding a tab of tb's kind for any thread or none, at the end of its strip ("kind-any"). Kind
+// is the exact kind string. Candidates are open (not collapsed) panes that can take tb
+// (canTake), ranked by rank from tp, the thread's pane, or from the focused pane when tp is nil.
+// Off with Options.NoSmartPlacement, and for a composer (threadHost places it).
+func (t *tx) kindHost(sp *Space, tp *Node, tb *Tab, w, h float64) (*Node, int, string) {
+	if t.opts.NoSmartPlacement || tb.Kind == "compose" {
+		return nil, 0, ""
+	}
+	from := tp
+	if from == nil {
+		from = focusedPane(sp)
+	}
+	if from == nil {
+		return nil, 0, ""
+	}
+	holding := func(match func(*Tab) bool) []*Node {
+		var out []*Node
+		for _, p := range Panes(sp.Root) {
+			if !p.Collapsed && slices.ContainsFunc(p.Tabs, match) && canTake(sp, p, w, h, tb) {
+				out = append(out, p)
+			}
+		}
+		return out
+	}
+	L := Rects(sp.Root, w, h)
+	if tb.IsLinked() {
+		mine := func(x *Tab) bool { return x.Kind == tb.Kind && x.IsLinked() && x.Thread == tb.Thread }
+		if c := holding(mine); len(c) > 0 {
+			p := rank(L, from, tb.Thread, c, false)[0]
+			return p, lastIndexFunc(p.Tabs, mine) + 1, "kind"
+		}
+	}
+	if tb.Kind == "terminal" {
+		return nil, 0, "" // terminals keep their own room rules (canTake), not another thread's terminals
+	}
+	if c := holding(func(x *Tab) bool { return x.Kind == tb.Kind }); len(c) > 0 {
+		p := rank(L, from, tb.Thread, c, false)[0]
+		return p, len(p.Tabs), "kind-any"
+	}
+	return nil, 0, ""
+}
+
+// lastIndexFunc is the index of the last tab of tabs that match, or -1.
+func lastIndexFunc(tabs []*Tab, match func(*Tab) bool) int {
+	for i := len(tabs) - 1; i >= 0; i-- {
+		if match(tabs[i]) {
+			return i
+		}
+	}
+	return -1
+}
+
 // sideOrder is the order rule 3 tries the thread pane's sides in.
 var sideOrder = []Edge{Right, Left, Bottom, Top}
 
-// rank orders candidate panes for rules 2 to 4: a pane holding a linked tab of thread first;
+// rank orders candidate panes for rules 2 to 4 and the kind rules: a pane holding a linked tab of thread first;
 // then, with bySide, the side of the thread's pane it touches in sideOrder; then the nearest
 // by the distance between centres (|dx| + |dy|); then layout order.
 func rank(L *Layout, tp *Node, thread string, cands []*Node, bySide bool) []*Node {

@@ -781,7 +781,10 @@ export type ApplyLayoutResponse = Message<"codefoundry.v1.ApplyLayoutResponse"> 
 
   /**
    * How placement chose where a tab went: "1" to "6" (the spec's rules), "pane" (the
-   * caller's pane), "focused" (the focused pane), "compose" (it replaced a composer).
+   * caller's pane), "focused" (the focused pane), "near" (smart placement: the pane holding
+   * a thread nearest the focused one), "kind" and "kind-any" (smart placement: a pane holding
+   * a tab of its kind, for its thread or for any), "compose" (it replaced a composer),
+   * "edge" (a new pane on the edge the caller gave).
    *
    * @generated from field: string rule = 7;
    */

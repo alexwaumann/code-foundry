@@ -567,7 +567,7 @@ var staticFields = []Field{
 	},
 	{
 		Key: KeySmartPlacement, Group: GroupLayout, Page: PageAppearance, Section: "panes", Type: Bool, Title: "Smart placement",
-		Description: "A thread you open or start goes to the focused pane only if it already has a thread open, otherwise to the nearest pane that has one. Choosing a pane yourself still wins.",
+		Description: "A thread you open or start goes to the focused pane only if it already has a thread open, otherwise to the nearest pane that has one. Another tab goes to a pane that already shows tabs of its kind (a terminal only to its own thread's terminals). Choosing a pane yourself still wins.",
 		Default:     "true",
 		bind:        func(s *Settings) any { return &s.Layout.SmartPlacement },
 	},
