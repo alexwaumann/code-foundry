@@ -10,7 +10,8 @@ import { RailSectionCard } from "./RailSectionCard";
  * while the expanded sidebar shows that section, no count on the rail. Hovering one opens its
  * card listing the section's rows (RailSectionCard). Their icons: Working the working status's,
  * in its colour; Snoozed and Archived those of the row's own Snooze and Archive actions
- * (SidebarRow RowActions).
+ * (SidebarRow RowActions). An icon takes the selected fill while the selected thread is one of
+ * its rows (RailSectionCard).
  */
 
 interface RailSectionProps {

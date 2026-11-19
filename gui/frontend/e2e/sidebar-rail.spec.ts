@@ -255,3 +255,27 @@ for (const scheme of ["dark", "light"] as const) {
     await page.screenshot({ path: at("rail-long") });
   });
 }
+
+/** SHOTS=<dir>: the rail with a working, a snoozed and an archived thread focused (its section's icon selected); dark and light. */
+for (const scheme of ["dark", "light"] as const) {
+  test(`sidebar rail selected section screenshots (${scheme})`, async ({ page }, info) => {
+    const shots = process.env.SHOTS;
+    test.skip(!shots || info.project.name !== "webkit", "SHOTS=<dir> with WebKit only");
+    const at = (name: string) => `${shots ?? ""}/${name}${scheme === "light" ? "-light" : ""}.png`;
+    await page.emulateMedia({ colorScheme: scheme });
+    await mockPost("threads?project=repo-cf&count=2&status=busy");
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await openApp(page);
+    await collapse(page);
+    for (const section of ["working", "snoozed", "archived"]) {
+      await page.mouse.move(900, 700);
+      await expect(page.locator('[data-testid$="-card"][data-state]')).toHaveCount(0);
+      await page.getByTestId(`rail-${section}`).hover();
+      await page.getByTestId(`rail-${section}-card`).locator("[data-row-key]").first().click();
+      await page.mouse.move(900, 700);
+      await expect(page.getByTestId(`rail-${section}-card`)).toHaveCount(0);
+      await still(page);
+      await page.screenshot({ path: at(`rail-selected-${section}`) });
+    }
+  });
+}

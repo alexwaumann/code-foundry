@@ -50,6 +50,24 @@ Working uses the working status's icon in the info colour; Snoozed and Archived 
 row's own Snooze (AlarmClock) and Archive (Check) actions, one small component each in
 `rail/RailSections.tsx`, named (for a screen reader) with their count; the rail draws no counts.
 
+## Selected section tile
+
+A user found the rail lost the open thread whenever it was working, waiting, snoozed or archived
+(an Archived or Snoozed row opens as the preview tab): its row is inside a section's card, so no
+icon was selected. A Working, Snoozed or Archived tile now takes a thread icon's selected fill
+(`railTileClass(true, …)`) while the selected thread is one of that section's rows, and follows the
+selection live (the thread starts or stops working, is archived, snoozed or woken, focus moves).
+
+- The selected row is the expanded list's: `RailSectionCard` reads `useSelectedRowKey` (what
+  `ThreadListbox` hands both lists as `selectedKey`: the focused pane's thread, its nearest shown
+  ancestor for a hidden child, or the composer's draft) and checks it against the section's rows.
+  No rule of its own, so at most one thing on the rail is selected: the rows are split between
+  the icons and the cards.
+- Selected wins over the open card's hover fill, as it does over a thread icon's hover; the focus
+  ring stays. Inside the card the row shows as selected as before.
+- The tile is a button with `aria-haspopup="listbox"`, not an option, so it carries
+  `aria-current="true"` (and `data-selected` for tests), never `aria-selected`.
+
 ## Working, Snoozed and Archived cards
 
 `rail/RailSectionCard.tsx`. Hovering or focusing a section's icon opens a card to the right of the
