@@ -236,7 +236,7 @@ const staticFields: FieldInit[] = [
     section: "threads",
     type: S.ENUM,
     title: "Archive saved threads",
-    description: "A thread that has sat in Snoozed with no alarm for this long is archived. Its work is kept.",
+    description: "A thread that has sat in Snoozed with no alarm or event for this long is archived. Its work is kept.",
     enumValues: ["off", "1w", "2w", "1mo", "3mo"],
     enumLabels: ["Off", "After 1 week", "After 2 weeks", "After 1 month", "After 3 months"],
     defaultValue: "off",

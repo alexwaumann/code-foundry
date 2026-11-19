@@ -444,7 +444,7 @@ var staticFields = []Field{
 		// Auto-tidy's second step: counted from when the thread was saved, by the user or the
 		// first step.
 		Key: KeyAutoArchiveAfter, Group: GroupThreads, Page: PageGeneral, Section: "threads", Type: Enum, Title: "Archive saved threads",
-		Description: "A thread that has sat in Snoozed with no alarm for this long is archived. Its work is kept.",
+		Description: "A thread that has sat in Snoozed with no alarm or event for this long is archived. Its work is kept.",
 		Enum:        AutoArchiveAfterValues, EnumLabels: []string{"Off", "After 1 week", "After 2 weeks", "After 1 month", "After 3 months"},
 		Default: TidyOff,
 		bind:    func(s *Settings) any { return &s.Threads.AutoArchiveAfter },
