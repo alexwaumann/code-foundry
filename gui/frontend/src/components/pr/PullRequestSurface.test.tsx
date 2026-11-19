@@ -1007,17 +1007,18 @@ describe("the header's status and the Overview's cards", () => {
     expect(queryTestId("pr-check")).toBeNull();
   });
 
-  it("#163: the running checks' card leads with the still dashed circle and lists them, each with its dot, queued or ticking, and All N checks unfolds the rest", async () => {
+  it("#163: the running checks' card leads with the turning working circle and lists them, each with its dot, queued or ticking, and All N checks unfolds the rest", async () => {
     renderPrPanel();
     await openPr(163);
     const card = byTestId("pr-readiness").querySelector<HTMLElement>('[data-row="checks"]') as HTMLElement;
     expect(card.dataset.tone).toBe("pending");
-    // The card leads with the app's running mark (the sidebar's Working icon), still, in the
+    // The card leads with the app's running mark (the sidebar's Working icon), turning, in the
     // warning tone; no spinner.
     const icon = within(card).getByTestId("pr-ready-icon");
     expect(icon.getAttribute("class")).toContain("lucide-circle-dashed");
+    expect(icon.getAttribute("class")).toContain("animate-status-working");
     expect(icon.getAttribute("class")).toContain("text-cf-warning-text");
-    expect(icon.getAttribute("class")).not.toMatch(/animate-|lucide-loader/);
+    expect(icon.getAttribute("class")).not.toMatch(/animate-spin|lucide-loader/);
     const running = within(card).getAllByTestId("pr-check");
     // A single running or queued check keeps its own dot, unlike the card's mark.
     for (const c of running) expect(c.querySelector("svg")?.getAttribute("class")).toContain("lucide-circle-dot");

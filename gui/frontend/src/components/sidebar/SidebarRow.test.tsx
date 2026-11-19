@@ -96,6 +96,8 @@ describe("SidebarRow title first", () => {
     expect(status.className.split(" ")).toEqual(expect.arrayContaining([tone, "font-medium"]));
     expect(screen.getByTestId("row-status-icon").getAttribute("class")).toContain(icon);
     expect(screen.getByTestId("row-status-icon").getAttribute("class")).toContain("size-3.5");
+    // Working and waiting turn (components/status/StatusCircle); every other status stands still.
+    expect(screen.getByTestId("row-status-icon").getAttribute("data-status-circle")).toBe(kind === "working" || kind === "waiting" ? kind : null);
     expect(screen.getByTestId("row-status-word").textContent).toBe(word);
     expect(screen.getByTestId("row-status-word").className).toContain("sr-only");
   });
