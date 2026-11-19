@@ -60,6 +60,16 @@ export function prKey(slug: string, n: number | string): string {
   return `pr:${slug.toLowerCase()}#${String(n)}`;
 }
 
+/** A tab naming one pull request (identity.go prKey): prefix, the slug in lower case, "#", the number. */
+function prTabKey(t: IdentityTab, prefix: string): string | Refusal {
+  const v = need(t, "slug", "number");
+  if (isRefusal(v)) return v;
+  const [slug = "", number = ""] = v;
+  // strconv.Atoi's range and Itoa's spelling: no sign, no leading zero, positive.
+  if (!/^[1-9]\d{0,17}$/.test(number)) return refused(`param number "${number}" is not a pull request number`);
+  return `${prefix}${slug.toLowerCase()}#${number}`;
+}
+
 export const IDENTITY_KINDS: Readonly<Record<string, IdentityKind>> = {
   thread: { link: "self", scope: "global", key: (t) => `thread:${t.thread}` },
   diff: {
@@ -80,19 +90,9 @@ export const IDENTITY_KINDS: Readonly<Record<string, IdentityKind>> = {
       return isRefusal(v) ? v : `file:${v[0] ?? ""}`;
     },
   },
-  pullrequest: {
-    link: "optional",
-    scope: "space",
-    keyParams: ["slug", "number"],
-    key: (t) => {
-      const v = need(t, "slug", "number");
-      if (isRefusal(v)) return v;
-      const [slug = "", number = ""] = v;
-      // strconv.Atoi's range and Itoa's spelling: no sign, no leading zero, positive.
-      if (!/^[1-9]\d{0,17}$/.test(number)) return refused(`param number "${number}" is not a pull request number`);
-      return prKey(slug, number);
-    },
-  },
+  pullrequest: { link: "optional", scope: "space", keyParams: ["slug", "number"], key: (t) => prTabKey(t, "pr:") },
+  // A pull request's diff, one per pull request as its tab is; the file it shows is not identity.
+  prdiff: { link: "optional", scope: "space", keyParams: ["slug", "number"], key: (t) => prTabKey(t, "prdiff:") },
   terminal: {
     link: "optional",
     scope: "global",

@@ -99,16 +99,14 @@ var kinds = map[string]*Kind{
 	"pullrequest": {
 		Link: LinkOptional, Scope: ScopeSpace, KeyParams: []string{"slug", "number"},
 		DefaultFrac: 0.45, FloorPx: 480,
-		key: func(t *Tab) (string, error) {
-			slug, number, err := need2(t, "slug", "number")
-			if err != nil {
-				return "", err
-			}
-			if n, err := strconv.Atoi(number); err != nil || n <= 0 || strconv.Itoa(n) != number {
-				return "", fmt.Errorf("param number %q is not a pull request number: %w", number, ErrInvalidArgument)
-			}
-			return "pr:" + strings.ToLower(slug) + "#" + number, nil
-		},
+		key: prKey("pr:"),
+	},
+	// A pull request's diff from GitHub, beside its pull request's tab: one per pull request,
+	// as that tab is. The file it shows is a param that never changes which tab it is.
+	"prdiff": {
+		Link: LinkOptional, Scope: ScopeSpace, KeyParams: []string{"slug", "number"},
+		DefaultFrac: 0.45, FloorPx: 480,
+		key: prKey("prdiff:"),
 	},
 	"terminal": {
 		Link: LinkOptional, Scope: ScopeGlobal, KeyParams: []string{"terminal"}, Renameable: true,
@@ -169,6 +167,21 @@ func init() {
 
 func kindKey(name string) func(*Tab) (string, error) {
 	return func(*Tab) (string, error) { return name, nil }
+}
+
+// prKey keys a tab naming one pull request: prefix, the slug in lower case (GitHub's are
+// case-insensitive), "#" and the number, which is strconv's spelling of a positive int.
+func prKey(prefix string) func(*Tab) (string, error) {
+	return func(t *Tab) (string, error) {
+		slug, number, err := need2(t, "slug", "number")
+		if err != nil {
+			return "", err
+		}
+		if n, err := strconv.Atoi(number); err != nil || n <= 0 || strconv.Itoa(n) != number {
+			return "", fmt.Errorf("param number %q is not a pull request number: %w", number, ErrInvalidArgument)
+		}
+		return prefix + strings.ToLower(slug) + "#" + number, nil
+	}
 }
 
 func need(t *Tab, p string) (string, error) {

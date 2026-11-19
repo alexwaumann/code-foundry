@@ -13,12 +13,12 @@ import { useCodeTheme } from "@/lib/codeTheme";
 import { cn } from "@/lib/utils";
 import { setDiffStyle, setWrap, useCodeViewStore, type DiffStyle } from "@/stores/codeView";
 import { openUrl, pullRequestDetailResource, pullRequestKey } from "@/stores/gh";
-import { expandFailed, pullRequestDiffResource, readPullRequestFile, refreshPullRequestDiff, syncPullRequestDiff, usePrDiffStore } from "@/stores/prDiff";
+import { pullRequestDiffResource, pullRequestFileLoader, refreshPullRequestDiff, syncPullRequestDiff, usePrDiffStore } from "@/stores/prDiff";
 import { sectionOpenByDefault, toggleSection, usePrPanelStore } from "@/stores/prPanel";
 import { useResource } from "@/stores/resource";
 import type { PrRef } from "@/surfaces/pullrequestTarget";
 import { Banner } from "./Banner";
-import { parsePrDiff, prFileLoader, type PrDiffFile, type PrDiffModel } from "./diffModel";
+import { parsePrDiff, type PrDiffFile, type PrDiffModel } from "./diffModel";
 import "@/components/code/code.css";
 
 const FILE_ROW_H = 24;
@@ -336,16 +336,7 @@ export function PrCode({ prRef, tabKey, url }: { prRef: PrRef; tabKey: string; u
   }, [key, detailHead, data]);
   const model = useMemo(() => (data ? parsePrDiff(data.diff, data.headSha) : null), [data]);
   const head = data?.headSha || detailHead;
-  // The head side of a fork's pull request lives in the fork; GitHub also keeps the head
-  // commit in the base repository, which serves when the fork is unknown (closed, deleted).
-  const loader = useMemo((): FileDiffContentsLoader => {
-    const load = prFileLoader(headRepo || prRef.slug, head, readPullRequestFile);
-    return (fd) =>
-      load(fd).catch((err: unknown) => {
-        expandFailed(fd.name, err);
-        throw err;
-      });
-  }, [headRepo, prRef.slug, head]);
+  const loader = useMemo(() => pullRequestFileLoader(prRef.slug, headRepo, head), [headRepo, prRef.slug, head]);
   const viewRef = useRef<CodeViewHandle<undefined, undefined>>(null);
   const pick = useCallback((id: string) => {
     viewRef.current?.scrollTo({ type: "item", id, align: "start" });

@@ -89,6 +89,26 @@
     "refused": true
   },
   {
+    "name": "pull request diff slug in lower case",
+    "kind": "prdiff",
+    "params": {"number":"12","path":"a.go","slug":"Acme/App"},
+    "key": "prdiff:acme/app#12"
+  },
+  {
+    "name": "pull request diff of a thread",
+    "kind": "prdiff",
+    "thread": "th-1",
+    "params": {"number":"7","slug":"a/b"},
+    "key": "prdiff:a/b#7"
+  },
+  {
+    "name": "pull request diff number is a number",
+    "kind": "prdiff",
+    "params": {"number":"07","slug":"a/b"},
+    "refused": true
+  },
+  {"name":"pull request diff needs its slug","kind":"prdiff","params":{"number":"7"},"refused":true},
+  {
     "name": "terminal by its terminal id",
     "kind": "terminal",
     "thread": "th-1",

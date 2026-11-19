@@ -2,7 +2,7 @@ import { useCallback, useEffect, useEffectEvent, useMemo, useRef } from "react";
 import { parseDiffFromFile } from "@pierre/diffs";
 import { FileDiff, FileText, FileX, GitCompare, TriangleAlert } from "lucide-react";
 import { getCompareFile, type CompareFileSidesView, type CompareTarget } from "@/api/compare";
-import { CodeDiff, CodeScroll } from "@/components/code/CodeDiff";
+import { CodeDiff, CodeScroll, type CodeDiffInput } from "@/components/code/CodeDiff";
 import { VIRTUALIZE_LINES } from "@/components/files/CodeBody";
 import type { FilePlace } from "@/components/files/fileActions";
 import { FileActions, FileHeader, HeaderAction, WrapToggle } from "@/components/files/FileHeader";
@@ -45,18 +45,20 @@ function Body({ d, error, reload, parsed, row, listed, compared }: { d: CompareF
   if (d.status === "R" && parsed?.lines === 0) return <FileEmptyState icon={GitCompare} heading="Renamed" detail={`From ${row.oldPath}; the contents are the same.`} testId="diff-renamed" />;
   if ((!parsed || !d.status || parsed.lines === 0) && !listed) return <FileEmptyState icon={GitCompare} heading="No changes" detail={`${row.path} is no longer in this comparison.`} testId="diff-unlisted" />;
   if (!parsed || !d.status || parsed.lines === 0) return <FileEmptyState icon={GitCompare} heading="No changes in the contents" detail={`${compared}.`} testId="diff-none" />;
-  return <DiffCode parsed={parsed} />;
+  return <DiffCode input={parsed} lines={parsed.lines} />;
 }
 
 /**
- * The two sides' code, in its scroller. Its top row stays across a change of its width (a zoom, a
- * resize of the pane), as the File tab's top line does (components/files/useKeepTopLine.ts).
+ * One file's diff, in its scroller: both sides (a checkout's), or a pull request's parsed patch.
+ * Past VIRTUALIZE_LINES rows (`lines`) only what shows is laid out. Its top row stays across a
+ * change of its width (a zoom, a resize of the pane), as the File tab's top line does
+ * (components/files/useKeepTopLine.ts).
  */
-function DiffCode({ parsed }: { parsed: NonNullable<ReturnType<typeof useParsed>> }) {
+export function DiffCode({ input, lines }: { input: CodeDiffInput; lines: number }) {
   const box = useRef<HTMLDivElement>(null);
-  const virtual = parsed.lines > VIRTUALIZE_LINES;
+  const virtual = lines > VIRTUALIZE_LINES;
   useKeepTopLine(box, virtual, "index");
-  const diff = <CodeDiff oldFile={parsed.oldFile} newFile={parsed.newFile} />;
+  const diff = "fileDiff" in input ? <CodeDiff fileDiff={input.fileDiff} loadDiffFiles={input.loadDiffFiles} /> : "patch" in input ? <CodeDiff patch={input.patch} /> : <CodeDiff oldFile={input.oldFile} newFile={input.newFile} />;
   return virtual ? (
     <div ref={box} className="flex min-h-0 flex-1 flex-col" data-testid="diff-code" data-virtual="">
       <CodeScroll className="min-h-0 flex-1 overflow-auto">{diff}</CodeScroll>
