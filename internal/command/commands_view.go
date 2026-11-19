@@ -77,6 +77,10 @@ type ViewDeps struct {
 	// view.projects open their tabs in it, and view.thread-diff moves between a thread and
 	// its diff (commands_view_open.go). Nil: those verbs refuse (there is nowhere to open a tab).
 	Layout layoutstore.Store
+	// PageShown records a thread as the owner of a page view.open.page showed
+	// (docs/notes/page-ownership-daemon.md); view.inline's ShowHtml records its own. Nil:
+	// not recorded.
+	PageShown func(ctx context.Context, threadID, path string)
 }
 
 // noFileEdits is FileEdits when nothing backs it.

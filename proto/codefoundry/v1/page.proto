@@ -1,0 +1,137 @@
+syntax = "proto3";
+
+package codefoundry.v1;
+
+// PageService answers for the HTML pages the GUI shows in frames with the bridge
+// (docs/notes/page-ownership-daemon.md): who owns a page file, whether the user allowed a
+// page no thread owns, and the bridge's cf.storage and cf.fetch for such a page. The
+// daemon keeps every answer, so the GUI never needs a thread's log to decide. The user's
+// answer is changed only by the page.allow and page.disallow commands
+// (CommandService.Invoke), so the GUI's question, the palette and the CLI run the same
+// thing.
+//
+// A page is named by its file's path (absolute, or "~/"-prefixed); the daemon resolves
+// its symlinks, and every answer is keyed by the resolved path (PageAccess.path). A path
+// that is not a regular .html or .htm file under home (or a thread's pages directory) is
+// InvalidArgument, a missing file NotFound, and a file in a folder the preview never
+// serves (Code Foundry's own data, credentials, ~/Library) PermissionDenied.
+service PageService {
+  // GetPage says who owns the page and whether it may use the bridge.
+  rpc GetPage(GetPageRequest) returns (GetPageResponse) {}
+  // PageStorage is what a page no thread owns keeps with cf.storage: one JSON object per
+  // page file, handed back to the page as it loads. FailedPrecondition while the user has
+  // not answered for the page (NOT_ASKED), PermissionDenied when they did not allow it.
+  // A page a thread owns may use it too, but its frame uses ThreadService.PageStorage of
+  // its owner instead.
+  rpc PageStorage(PageFileStorageRequest) returns (PageFileStorageResponse) {}
+  // SetPageStorage sets or removes one key of a page's storage and returns the storage
+  // after. The limits of a thread's: InvalidArgument for an empty or too long key (1
+  // KiB), a value that is not JSON, or a storage that would grow over 256 KiB per page
+  // (nothing is written then). The consent errors of PageStorage.
+  rpc SetPageStorage(SetPageFileStorageRequest) returns (SetPageFileStorageResponse) {}
+  // ProxyFetch is ThreadService.ProxyFetch for a page no thread owns: the same rules,
+  // limits and errors, at most 8 requests at once per page file (more wait). The consent
+  // errors of PageStorage.
+  rpc ProxyFetch(PageProxyFetchRequest) returns (PageProxyFetchResponse) {}
+}
+
+// The user's answer for a page, and whether the page may use the bridge.
+enum PageConsent {
+  // An older daemon: no answer; read FilesystemService.PreviewFile's page_thread alone.
+  PAGE_CONSENT_UNSPECIFIED = 0;
+  // A thread owns the page (owner_thread): allowed without asking.
+  PAGE_CONSENT_OWNED = 1;
+  // No thread owns it and the user allowed it: the bridge without a thread.
+  PAGE_CONSENT_ALLOWED = 2;
+  // No thread owns it and the user did not allow it: no bridge, not asked again.
+  PAGE_CONSENT_REFUSED = 3;
+  // No thread owns it and the user has not answered: ask (page.allow, page.disallow).
+  PAGE_CONSENT_NOT_ASKED = 4;
+  // Not a page the bridge is ever given (a file outside home, not .html or .htm, a link
+  // whose target is gone): no bridge, nothing to ask. Only in PreviewFileResponse.page.
+  PAGE_CONSENT_UNAVAILABLE = 5;
+}
+
+// How a thread came to own a page.
+enum PageOwnerSource {
+  PAGE_OWNER_SOURCE_UNSPECIFIED = 0;
+  // The thread last showed it (view.inline, view.open.page).
+  PAGE_OWNER_SOURCE_SHOWN = 1;
+  // The thread's Claude last wrote or edited it (Write, Edit, MultiEdit).
+  PAGE_OWNER_SOURCE_WRITTEN = 2;
+  // It lies in the thread's pages directory (<home>/pages/<thread id>/) and no thread
+  // showed or wrote it since.
+  PAGE_OWNER_SOURCE_PAGES_DIRECTORY = 3;
+}
+
+// PageAccess is what the daemon says about one page file.
+message PageAccess {
+  // The file's absolute path with its symlinks resolved: the key the answer, the storage
+  // and the fetch cap are kept by. Empty with UNAVAILABLE when it could not be resolved.
+  string path = 1;
+  // The thread that owns the page, whose bridge it gets (the thread named), whatever
+  // thread the tab showing it is linked to. Empty: no thread owns it.
+  string owner_thread = 2;
+  PageOwnerSource owner_source = 3;
+  // Whether the page may use the bridge: OWNED and ALLOWED may.
+  PageConsent consent = 4;
+  // The user's own answer, kept even while a thread owns the page (it counts once none
+  // does): ALLOWED, REFUSED or NOT_ASKED.
+  PageConsent answer = 5;
+  // Why the page is UNAVAILABLE, for the frame's notice.
+  string unavailable_reason = 6;
+}
+
+message GetPageRequest {
+  string path = 1;
+}
+
+message GetPageResponse {
+  PageAccess page = 1;
+}
+
+message PageFileStorageRequest {
+  string path = 1;
+}
+
+message PageFileStorageResponse {
+  // Key → the value's JSON text, as the page stored it.
+  map<string, string> values = 1;
+}
+
+message SetPageFileStorageRequest {
+  string path = 1;
+  string key = 2;
+  // The value's JSON text; unset removes the key.
+  optional string value = 3;
+}
+
+message SetPageFileStorageResponse {
+  // The page's storage after the change.
+  map<string, string> values = 1;
+}
+
+message PageProxyFetchRequest {
+  // The page's file.
+  string path = 1;
+  // An absolute http or https URL.
+  string url = 2;
+  // GET when empty.
+  string method = 3;
+  // Header name → value, as the page set them.
+  map<string, string> headers = 4;
+  bytes body = 5;
+  // 30 s when zero; at most 120 s.
+  uint32 timeout_ms = 6;
+}
+
+message PageProxyFetchResponse {
+  uint32 status = 1;
+  // Lower-case header name → value, several values joined with ", "; no Set-Cookie.
+  map<string, string> headers = 2;
+  bytes body = 3;
+  // The URL answered, after redirects.
+  string url = 4;
+  // The status's text ("Not Found"), without the code.
+  string status_text = 5;
+}

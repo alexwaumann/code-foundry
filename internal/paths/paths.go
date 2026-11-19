@@ -171,6 +171,12 @@ func (p Paths) Pages() string { return filepath.Join(p.home, "pages") }
 // stored values (an API token) are not a page's to fetch as a file.
 func (p Paths) PageStorage() string { return filepath.Join(p.home, "page-storage") }
 
+// PageFileStorage holds what each page no thread owns keeps through cf.storage, one
+// directory per page file, named by a hash of its path (internal/store/page). Removed when
+// the page's file is gone, at the daemon's start. Not under PageStorage, whose directories
+// are threads' and are reaped when no thread has their name.
+func (p Paths) PageFileStorage() string { return filepath.Join(p.home, "page-file-storage") }
+
 // Residents holds each resident thread's own directory, its cwd: <Residents>/<name>
 // (internal/store/thread resident.go).
 func (p Paths) Residents() string { return filepath.Join(p.home, "residents") }

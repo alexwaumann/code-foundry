@@ -37,11 +37,14 @@ import (
 //   - thread.look: a waiting thread is told of it by the line thread.subscribe prints when it
 //     adds a subscription, the moment it matters (docs/notes/waiting-thread-look.md); listing
 //     it put the guide over its budget.
+//   - The user's answers for pages no thread owns (page.allow, page.disallow) and page.get,
+//     which shows them: the user's, asked by the GUI (docs/notes/page-ownership-daemon.md);
+//     listing them put the guide over its budget.
 var noIndex = []string{
 	"action.last", "composer.draft.clear", "composer.draft.discard", "composer.draft.label", "composer.draft.open",
 	"composer.draft.start", "composer.history", "composer.new", "file.export", "layout.threads-open-as.preview",
 	"notification.act", "notification.clear", "notification.dismiss", "notification.list", "notification.post",
-	"notification.seen", "notification.snooze", "notification.withdraw",
+	"notification.seen", "notification.snooze", "notification.withdraw", "page.allow", "page.disallow", "page.get",
 	"pane.focus", "pane.focus.down", "pane.focus.left", "pane.focus.right", "pane.focus.up", "pane.fullscreen", "pane.move.down",
 	"pane.move.left", "pane.move.right", "pane.move.up", "pane.split", "space.move", "tab.auto-name", "tab.next", "tab.previous", "tab.rename", "tab.reopen",
 	"terminal.cycle", "terminal.quick", "thread.look",

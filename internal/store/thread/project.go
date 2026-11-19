@@ -85,6 +85,9 @@ type projector struct {
 	async map[string]bool
 	// busy are the top-level tool calls in flight (busytool.go): Thread.BusyTool.
 	busy busyCalls
+	// wrotePage is told the HTML file a Write, Edit or MultiEdit call wrote, when its
+	// result says it succeeded (pageowners.go); nil: no one.
+	wrotePage func(path string)
 }
 
 type openBlock struct {
@@ -397,7 +400,7 @@ func (p *projector) user(e *claudestream.User) {
 		async := len(blocks) == 1 && !b.IsError && isAsyncLaunch(e.ToolUseResult)
 		// A subagent's own background shell is not the thread's: its item ends here.
 		shell := len(blocks) == 1 && !b.IsError && e.ParentToolUseID == "" && isShellLaunch(e.ToolUseResult)
-		p.w.change(b.ToolUseID, func(it *Item) {
+		done, ok := p.w.change(b.ToolUseID, func(it *Item) {
 			if it.Tool == nil {
 				return
 			}
@@ -418,6 +421,9 @@ func (p *projector) user(e *claudestream.User) {
 				p.async[it.ID] = true
 			}
 		})
+		if path := writtenPage(done.Tool); ok && path != "" && p.wrotePage != nil {
+			p.wrotePage(path)
+		}
 	}
 	if results {
 		return

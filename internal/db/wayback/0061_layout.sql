@@ -19,7 +19,9 @@
 -- was seen) goes with that table; 0065 (snoozes until an event)
 -- loses what event snoozed threads wait on, so they stay saved for later
 -- (docs/notes/snooze-until-event.md); 0066 (auto-tidy's state per thread) loses its marks, so
--- threads it saved read as saved by the user (docs/notes/auto-tidy.md).
+-- threads it saved read as saved by the user (docs/notes/auto-tidy.md); 0067 (pages' owners
+-- and the user's answers for pages) loses them, so a page outside a thread's pages directory
+-- is asked about again (docs/notes/page-ownership-daemon.md).
 BEGIN;
 DROP TABLE IF EXISTS layout_spaces;
 DROP TABLE IF EXISTS layout_threads;
@@ -29,5 +31,7 @@ DROP TABLE IF EXISTS notifications;
 DROP TABLE IF EXISTS thread_snooze_events;
 DROP TABLE IF EXISTS snooze_recent_events;
 DROP TABLE IF EXISTS thread_tidy;
-DELETE FROM schema_migrations WHERE version IN (61, 62, 63, 64, 65, 66);
+DROP TABLE IF EXISTS page_owners;
+DROP TABLE IF EXISTS page_consent;
+DELETE FROM schema_migrations WHERE version IN (61, 62, 63, 64, 65, 66, 67);
 COMMIT;

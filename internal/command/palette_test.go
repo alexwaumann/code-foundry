@@ -29,7 +29,7 @@ var noPalette = []string{
 	"ember.status", "ember.task.add", "ember.task.cancel", "ember.task.done", "ember.task.list",
 	"ember.task.show", "ember.task.start", "ember.task.update", "file.export", "memory.add", "memory.remove",
 	"memory.show", "notification.act", "notification.dismiss", "notification.list", "notification.post", "notification.seen", "notification.snooze",
-	"notification.withdraw", "plugin.act", "plugin.browse", "plugin.dev", "plugin.disable", "plugin.enable",
+	"notification.withdraw", "page.allow", "page.disallow", "page.get", "plugin.act", "plugin.browse", "plugin.dev", "plugin.disable", "plugin.enable",
 	"plugin.env", "plugin.install", "plugin.list", "plugin.logs", "plugin.new", "plugin.removals", "plugin.restart",
 	"plugin.secrets.delete", "plugin.secrets.list", "plugin.surface", "plugin.terminals",
 	"plugin.threads", "plugin.uninstall", "plugin.wakes", "pr.ask", "pr.auto-merge", "pr.checkbox", "pr.checks", "pr.close", "pr.comment", "pr.draft",

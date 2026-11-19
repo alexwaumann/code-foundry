@@ -14,8 +14,9 @@ import (
 // conversation (docs/notes/page-verbs.md). It takes view.inline --panel's panel half
 // alone: the File tab (view.open.file's check and the same frame, reloaded on
 // every edit), with params page=1 and the title, which tell the GUI the tab is the thread's
-// page. Without a card in the log, that flag is what gives the page its thread's bridge and
-// storage (components/files/usePageThread.ts). So, as for view.inline, the file must be under
+// page. The daemon also records the thread as the page's owner (PageShown,
+// docs/notes/page-ownership-daemon.md), so the page keeps its bridge without a card in the
+// log or the flag (components/files/usePageThread.ts). So, as for view.inline, the file must be under
 // home: view.open.file also shows the temp folders, as plain pages without the bridge.
 
 // panelPageCommand is view.open.page.
@@ -52,6 +53,9 @@ func (d ViewDeps) runPanelPage(ctx context.Context, uctx Context, a Args) (Resul
 	})
 	if err != nil {
 		return Result{}, err
+	}
+	if d.PageShown != nil {
+		d.PageShown(ctx, id, a.Path("path"))
 	}
 	// The tab's frame fills it, so a page without the bridge is not cut short there.
 	res.Warnings = slices.DeleteFunc(d.pageWarnings(ctx, base, a.Path("path")), func(w string) bool { return w == WarnNoResize })

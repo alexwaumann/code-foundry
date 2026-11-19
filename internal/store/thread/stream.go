@@ -216,6 +216,7 @@ func (m *Manager) spawnStream(ctx context.Context, s Thread, r *runner, argv, en
 		effort:   s.Effort, wantEffort: s.Effort,
 	}
 	st.proj = newProjector(itemWriter{log: log, save: func(it Item) { m.saveItem(s.ID, it) }}, restoredTotals(m.opts.Paths, r.cwd, r.launch))
+	st.proj.wrotePage = func(path string) { m.recordPage(s.ID, path, pageWritten) }
 	r.st = st
 	// A run the daemon lost (crash) may have left items open.
 	closeUnfinished(st.proj.w, "the thread's process ended")

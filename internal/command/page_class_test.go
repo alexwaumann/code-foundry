@@ -48,6 +48,7 @@ var pageState = []string{
 	"dictation.toggle", "ember.disable", "ember.enable", "ember.task.cancel", "ember.task.done",
 	"file.find", "file.find.text", "file.save", "file.search", "file.search.next", "file.search.previous", "memory.clear", "memory.remove", "notifications.test",
 	"notification.clear", "notification.dismiss", "notification.post", "notification.seen", "notification.snooze", "notification.withdraw",
+	"page.allow", "page.disallow",
 	"plugin.act", "plugin.browse", "plugin.disable", "plugin.reload", "plugin.restart",
 	"plugin.surface", "pr.close", "pr.draft", "pr.open", "pr.ready", "pr.refresh", "pr.reopen", "project.add",
 	"project.create", "project.files.include", "project.refresh", "project.rename", "project.unregister", "search.clear",

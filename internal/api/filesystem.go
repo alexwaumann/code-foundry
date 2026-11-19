@@ -39,6 +39,9 @@ type Filesystem struct {
 	// pagesRoot is the directory the threads' pages directories are made under
 	// (WithPagesRoot); PreviewFile names the thread a file under it belongs to. Empty: none.
 	pagesRoot string
+	// pages says who owns a previewed page and whether it may use the bridge (WithPages);
+	// nil: PreviewFile leaves page unset, as an older daemon.
+	pages PageStore
 	// includeAll reads the files.include_ignored setting's patterns (WithIncludeIgnored);
 	// nil: none.
 	includeAll func() []string
@@ -110,6 +113,29 @@ func (h *Filesystem) WithPagesRoot(root string) *Filesystem {
 		h.pagesRoot = real
 	}
 	return h
+}
+
+// WithPages makes PreviewFile answer, with the grant, who owns the page and whether it may
+// use the bridge (docs/notes/page-ownership-daemon.md).
+func (h *Filesystem) WithPages(pages PageStore) *Filesystem {
+	h.pages = pages
+	return h
+}
+
+// pageAccess is PreviewFile's page: the page store's answer for the file at p, UNAVAILABLE
+// with the reason for a file it refuses; nil without a store.
+func (h *Filesystem) pageAccess(ctx context.Context, p string) *v1.PageAccess {
+	if h.pages == nil {
+		return nil
+	}
+	a, err := h.pages.Access(ctx, p)
+	if err != nil {
+		if ce := pageError(err); connect.CodeOf(ce) == connect.CodeInternal {
+			h.log.Warn("a page's owner and consent", "path", p, "err", err)
+		}
+		return UnavailablePage(err)
+	}
+	return PageAccessProto(a)
 }
 
 // pageThread is the id of the thread whose pages directory holds the file at real (its
@@ -394,7 +420,7 @@ func fileError(err error) error {
 // (home itself, a temp folder, an ancestor of the config home) the file alone. A file in a
 // guarded folder (the config home outside its checkouts, ~/.ssh, ~/Library), or a link from
 // outside the temp folders into one, is refused.
-func (h *Filesystem) PreviewFile(_ context.Context, req *connect.Request[v1.PreviewFileRequest]) (*connect.Response[v1.PreviewFileResponse], error) {
+func (h *Filesystem) PreviewFile(ctx context.Context, req *connect.Request[v1.PreviewFileRequest]) (*connect.Response[v1.PreviewFileResponse], error) {
 	m := req.Msg
 	f, err := fsx.ReadFile(h.readRoots(), m.GetBaseDir(), m.GetPath(), 1)
 	if err != nil {
@@ -425,7 +451,8 @@ func (h *Filesystem) PreviewFile(_ context.Context, req *connect.Request[v1.Prev
 		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("preview %s: %w", f.Path, err))
 	}
 	url := h.pagesOrigin + preview.URL(grant, filepath.ToSlash(rel))
-	return connect.NewResponse(&v1.PreviewFileResponse{Url: url, Scope: scope, SingleFile: single, PageThread: h.pageThread(f.RealPath)}), nil
+	return connect.NewResponse(&v1.PreviewFileResponse{Url: url, Scope: scope, SingleFile: single, PageThread: h.pageThread(f.RealPath),
+		Page: h.pageAccess(ctx, f.Path)}), nil
 }
 
 // previewGuarded reports whether the file at p, or where its symlinks lead, is guarded;
