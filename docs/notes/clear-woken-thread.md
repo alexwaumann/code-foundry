@@ -1,5 +1,7 @@
 # Clearing a woken thread
 
+> **Superseded in part (2026-11-19, composer-row-pill.md):** in the thread, the woken strip is now the snooze segment of the pill above the composer ("Snooze ended 2m ago", amber); Clear and the snooze presets are in its menu. The sidebar part below is unchanged.
+
 A thread whose snooze ran out reads needs attention "snooze ended" (Woke) until the user
 sends, snoozes again or archives. There was no way to just say "seen it". Agreed design: the
 sketch's option A in the sidebar and in the thread.

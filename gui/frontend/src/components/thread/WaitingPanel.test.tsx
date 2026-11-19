@@ -13,7 +13,8 @@ const { run, openAgentRun } = vi.hoisted(() => ({ run: vi.fn(), openAgentRun: vi
 vi.mock("@/stores/commands", async (orig) => ({ ...(await orig<typeof import("@/stores/commands")>()), runCommandForResult: run }));
 vi.mock("@/stores/subagentActions", async (orig) => ({ ...(await orig<typeof import("@/stores/subagentActions")>()), openAgentRun }));
 
-const { WaitingStrip } = await import("./WaitingStrip");
+const { ComposerRow } = await import("./ComposerRow");
+const { TimelineBridge } = await import("./timelineBridge");
 
 const wake = (id: string, kind: WakeKind, o: Partial<WakeSubscriptionView> = {}): WakeSubscriptionView => ({
   id,
@@ -33,7 +34,7 @@ const agent = (id: string, o: Partial<AgentRunView> = {}) => ({ id, description:
 const thread = (id: string, o: Partial<ThreadView> = {}) =>
   ({ id, name: id, projectId: "", worktreePath: "/w", state: "connected", status: "idle", statusReason: "at prompt", statusChangedAtMs: null, archivedAtMs: null, busyTool: "", backgroundShells: [], ...o }) as unknown as ThreadView;
 
-function setup(o: { wakes?: WakeSubscriptionView[]; shells?: BackgroundShellView[]; agents?: AgentRunView[]; self?: Partial<ThreadView>; others?: ThreadView[]; synced?: boolean; watch?: StreamStatus }) {
+function setup(o: { wakes?: WakeSubscriptionView[]; shells?: BackgroundShellView[]; agents?: AgentRunView[]; self?: Partial<ThreadView>; others?: ThreadView[]; synced?: boolean; watch?: StreamStatus; working?: boolean }) {
   const others = o.others ?? [];
   useThreadsStore.setState({
     byId: { s: thread("s", { backgroundShells: o.shells ?? [], ...o.self }), ...Object.fromEntries(others.map((t) => [t.id, t])) },
@@ -46,13 +47,13 @@ function setup(o: { wakes?: WakeSubscriptionView[]; shells?: BackgroundShellView
   });
   render(
     <TooltipProvider>
-      <WaitingStrip threadId="s" />
+      <ComposerRow threadId="s" working={o.working ?? false} bridge={new TimelineBridge()} />
     </TooltipProvider>,
   );
 }
 
 const expand = () => {
-  fireEvent.click(screen.getByTestId("waiting-toggle"));
+  fireEvent.click(screen.getByTestId("pill-waiting"));
 };
 const rows = () => screen.getAllByTestId("waiting-row");
 const rowOf = (id: string) => {
@@ -72,11 +73,44 @@ afterEach(() => {
   cleanup();
 });
 
-describe("WaitingStrip", () => {
-  it("shows for a wake on a thread that reads plain idle, collapsed", () => {
+// The waiting segment of the pill above the composer and the panel it opens
+// (docs/notes/composer-row-pill.md); the list's rules are docs/notes/waiting-strip.md's.
+describe("the waiting segment and its panel", () => {
+  it("shows for a wake on a thread that reads plain idle, closed, with Stop waiting beside it", () => {
     setup({ wakes: [wake("sub-1", "pullRequest")] });
     expect(screen.getByTestId("waiting-sentence").textContent).toBe("Waiting on 1 PR");
     expect(screen.queryByTestId("waiting-row")).toBeNull();
+    expect(screen.getByTestId("waiting-stop").textContent).toBe("Stop waiting");
+  });
+
+  it("while working, Stop waiting is only in the opened panel", () => {
+    setup({ wakes: [wake("sub-1", "pullRequest")], working: true });
+    expect(screen.queryByTestId("waiting-stop")).toBeNull();
+    expand();
+    expect(screen.getByTestId("waiting-panel-title").textContent).toBe("Waiting on 1");
+    expect(screen.getByTestId("waiting-stop-all").textContent).toBe("Stop waiting on all");
+  });
+
+  it("the panel's Stop waiting on all runs thread.stop-waiting, once", async () => {
+    setup({ wakes: [wake("sub-1", "timer"), wake("sub-2", "thread")], working: true });
+    expand();
+    const all = screen.getByTestId<HTMLButtonElement>("waiting-stop-all");
+    fireEvent.click(all);
+    fireEvent.click(all);
+    expect(run).toHaveBeenCalledTimes(1);
+    expect(run).toHaveBeenCalledWith("thread.stop-waiting", { id: "s" }, expect.objectContaining({ quiet: true }));
+    await waitFor(() => {
+      expect(all.disabled).toBe(false);
+    });
+  });
+
+  it("the chevron turns up while the panel is open", () => {
+    setup({ wakes: [wake("sub-1", "timer")] });
+    const trigger = screen.getByTestId("pill-waiting");
+    expect(trigger.querySelector(".lucide-chevron-right")).not.toBeNull();
+    expand();
+    expect(trigger.getAttribute("aria-expanded")).toBe("true");
+    expect(trigger.querySelector(".lucide-chevron-up")).not.toBeNull();
   });
 
   it.each([
@@ -84,7 +118,7 @@ describe("WaitingStrip", () => {
     ["on an archived thread", { wakes: [wake("sub-1", "timer")], self: { archivedAtMs: 1 } }],
   ])("is not there %s", (_name, o) => {
     setup(o);
-    expect(screen.queryByTestId("waiting-strip")).toBeNull();
+    expect(screen.queryByTestId("pill-waiting")).toBeNull();
   });
 
   // A closed Watch keeps its log for the next visit: rows from then must not show as current.
@@ -95,7 +129,7 @@ describe("WaitingStrip", () => {
     ["after its Watch stopped for good", { ...stale, watch: "stopped" as const }],
   ])("shows no rows and no Stop waiting %s", (_name, o) => {
     setup(o);
-    expect(screen.queryByTestId("waiting-strip")).toBeNull();
+    expect(screen.queryByTestId("pill-waiting")).toBeNull();
     expect(screen.queryByTestId("waiting-stop")).toBeNull();
   });
 
@@ -124,7 +158,7 @@ describe("WaitingStrip", () => {
     act(() => {
       useThreadStore.setState({ watches: { s: { status: "retrying", error: null } } });
     });
-    expect(screen.queryByTestId("waiting-strip")).toBeNull();
+    expect(screen.queryByTestId("pill-waiting")).toBeNull();
     act(() => {
       useThreadStore.setState({ watches: { s: { status: "open", error: null } } });
     });
@@ -133,7 +167,7 @@ describe("WaitingStrip", () => {
 
   it("is not there for finished subagents", () => {
     setup({ agents: [agent("a1", { status: "done" })] });
-    expect(screen.queryByTestId("waiting-strip")).toBeNull();
+    expect(screen.queryByTestId("pill-waiting")).toBeNull();
   });
 
   it("says everything in one line and rows go in the same order", () => {
@@ -257,11 +291,12 @@ describe("WaitingStrip", () => {
     });
   });
 
-  it("with only subagents left there is nothing to stop: the strip stays, without the button", () => {
+  it("with only subagents left there is nothing to stop: the segment stays, without Stop waiting", () => {
     setup({ agents: [agent("a1")] });
     expect(screen.getByTestId("waiting-sentence").textContent).toBe("Waiting on 1 subagent");
     expect(screen.queryByTestId("waiting-stop")).toBeNull();
     expand();
+    expect(screen.queryByTestId("waiting-stop-all")).toBeNull();
     expect(rows().map((r) => r.dataset.kind)).toEqual(["subagent"]);
   });
 

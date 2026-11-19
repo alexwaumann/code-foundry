@@ -25,8 +25,8 @@ import { useAskStrip } from "@/shell/askStrip";
 import { PaneOverlay } from "./InlineHtml";
 import { Timeline } from "./Timeline";
 import { ThreadComposer } from "./ThreadComposer";
-import { SnoozeStrip } from "./SnoozeStrip";
-import { WaitingStrip } from "./WaitingStrip";
+import { ComposerRow } from "./ComposerRow";
+import { useTimelineBridge } from "./timelineBridge";
 import "./thread.css";
 
 /**
@@ -90,6 +90,7 @@ function ThreadBody({ threadId }: { threadId: string }) {
   const setupRow = useThreadsStore((s) => setupRowPhase(s.byId[threadId]?.setup, shown) !== "");
   const { loaded, empty, catchingUp, watchError, open, busy, working, timelineWorking, timelineStrips } = useThreadActivity(threadId);
   const [dockAttach, dockHeight] = useElementHeight();
+  const bridge = useTimelineBridge();
   const bodyRef = useRef<HTMLDivElement>(null);
   const dockEl = useRef<HTMLDivElement>(null);
   const dockRef = useCallback(
@@ -151,6 +152,7 @@ function ThreadBody({ threadId }: { threadId: string }) {
                 working={timelineWorking}
                 strips={timelineStrips}
                 bottomInset={dockHeight}
+                bridge={bridge}
                 rail
                 pinnedLayer={
                   findOpen || (infoOpen && infoFits) ? (
@@ -162,8 +164,7 @@ function ThreadBody({ threadId }: { threadId: string }) {
                 }
               />
               <div className="dock" ref={dockRef}>
-                <WaitingStrip key={`wait:${threadId}`} threadId={threadId} />
-                <SnoozeStrip key={`snooze:${threadId}`} threadId={threadId} />
+                <ComposerRow key={`row:${threadId}`} threadId={threadId} working={working} bridge={bridge} />
                 <ThreadComposer key={threadId} threadId={threadId} pending={open} busy={busy} askStrip={askStrip && shellPane ? shellPane.paneId : null} />
               </div>
               <CiteLayer key={`cite:${threadId}`} threadId={threadId} paneRef={bodyRef} />

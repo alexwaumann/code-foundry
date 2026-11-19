@@ -119,7 +119,7 @@ test("a thread left scrolled up opens at the same row, every frame, on each visi
   await open(page, "s-r1");
   await expect(timeline(page).locator('[data-index="119"]')).toBeVisible();
   await expect(timeline(page)).toHaveAttribute("data-at-bottom", "true");
-  await expect(chip(page)).not.toHaveAttribute("data-shown", "true");
+  await expect(chip(page)).toHaveCount(0);
 });
 
 // Short rows at the end (folded turns, wake notes): more of them fill the pane than the
@@ -138,19 +138,19 @@ test("a thread ending in short rows opens with its pane full, the same rows in e
   expect(frames.filter((f) => f.first !== settled.first || Math.abs(f.top - settled.top) >= 1 || f.inView !== settled.inView)).toEqual([]);
 });
 
-// The strip is drawn from the list kept from the last visit, not when the Watch's snapshot
-// arrives a moment later (its actions wait for that: src/components/thread/WaitingStrip.test.tsx).
-test("a thread waiting on something opens with its waiting strip: the dock is the same height in every frame", async ({ page }) => {
+// The waiting segment is drawn from the list kept from the last visit, not when the Watch's snapshot
+// arrives a moment later (its actions wait for that: src/components/thread/WaitingPanel.test.tsx).
+test("a thread waiting on something opens with its waiting segment: the dock is the same height in every frame", async ({ page }) => {
   await mockPost("thread?state=waiting");
   await openApp(page);
   await open(page, "s-r1");
-  await expect(page.getByTestId("waiting-strip")).toBeVisible();
+  await expect(page.getByTestId("pill-waiting")).toBeVisible();
   await expect(page.getByTestId("waiting-stop")).toBeEnabled();
   await open(page, "s-4");
   const frames = await framesDuring(page, "s-r1", () => open(page, "s-r1"));
   expect(frames.length).toBeGreaterThan(3);
   const dock = frames.at(-1)?.dock ?? 0;
   expect(frames.filter((f) => f.dock !== dock)).toEqual([]);
-  await expect(page.getByTestId("waiting-strip")).toBeVisible();
+  await expect(page.getByTestId("pill-waiting")).toBeVisible();
   await expect(page.getByTestId("waiting-stop")).toBeEnabled();
 });

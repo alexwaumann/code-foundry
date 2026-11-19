@@ -6,7 +6,8 @@ import { useElementHeight, useThreadActivity } from "./activity";
 import { ThreadContext } from "./context";
 import { PaneOverlay } from "./InlineHtml";
 import { Timeline } from "./Timeline";
-import { SnoozeStrip } from "./SnoozeStrip";
+import { ComposerRow } from "./ComposerRow";
+import { useTimelineBridge } from "./timelineBridge";
 import { ThreadComposer } from "./ThreadComposer";
 import "./thread.css";
 
@@ -40,6 +41,7 @@ export function InlineThread({ threadId, readOnly = false, placeholder, ask }: I
   const cwd = useThreadsStore((s) => s.byId[threadId]?.worktreePath ?? "");
   const { loaded, empty, catchingUp, watchError, open, busy, working, timelineWorking, timelineStrips } = useThreadActivity(threadId);
   const [dockRef, dockHeight] = useElementHeight();
+  const bridge = useTimelineBridge();
   const ctx = useMemo(() => ({ threadId, cwd }), [threadId, cwd]);
   const docked = useMemo(() => {
     if (ask === undefined) return open;
@@ -63,10 +65,10 @@ export function InlineThread({ threadId, readOnly = false, placeholder, ask }: I
               No messages yet.
             </p>
           )}
-          <Timeline key={threadId} threadId={threadId} working={timelineWorking} strips={timelineStrips} bottomInset={readOnly ? 0 : dockHeight} inset={INLINE_INSET} />
+          <Timeline key={threadId} threadId={threadId} working={timelineWorking} strips={timelineStrips} bottomInset={readOnly ? 0 : dockHeight} inset={INLINE_INSET} bridge={readOnly ? undefined : bridge} />
           {!readOnly && (
             <div className="dock" ref={dockRef}>
-              <SnoozeStrip key={`snooze:${threadId}`} threadId={threadId} />
+              <ComposerRow key={`row:${threadId}`} threadId={threadId} working={working} bridge={bridge} />
               <ThreadComposer key={threadId} threadId={threadId} pending={docked} busy={busy} placeholder={placeholder} focusRequests={false} />
             </div>
           )}

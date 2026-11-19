@@ -987,13 +987,25 @@ html[data-thread-width="full"] {
   max-width: var(--thread-dock);
   margin: 0 auto;
 }
-/* The agents' strip (Ember) and the dock strips (waiting, snoozed) sit on the composer, 8px apart when there are two (docs/sketches/agents-panel). */
-.cf-thread .dock:has(> .agents-strip, > .dock-strip) {
+/* The agents' strip (Ember) sits on the composer (docs/sketches/agents-panel). */
+.cf-thread .dock:has(> .agents-strip) {
   padding-top: 8px;
 }
-.cf-thread .dock > .agents-strip,
-.cf-thread .dock > .dock-strip {
+.cf-thread .dock > .agents-strip {
   margin-bottom: 8px;
+}
+/* The row above a thread's composer (ComposerRow, docs/notes/composer-row-pill.md): always there at
+   its fixed height, so the pill coming and going moves nothing. It takes the place of the dock's
+   32px top padding (the pill at its top, 4px above the composer), so the dock is as tall as it was
+   without it. Only the pill takes the pointer. */
+.cf-thread .dock:has(> .composer-row) {
+  padding-top: 0;
+}
+.cf-thread .dock > .composer-row {
+  pointer-events: none;
+}
+.cf-thread .dock > .composer-row > [data-testid="composer-pill"] {
+  pointer-events: auto;
 }
 .cf-thread .ccard {
   position: relative;

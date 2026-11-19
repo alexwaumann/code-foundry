@@ -1,5 +1,7 @@
 # The waiting strip: see what a thread waits on, and end the wait (2026-11-04)
 
+> **Superseded in part (2026-11-19, composer-row-pill.md):** the strip is gone. What it said is the waiting segment of the pill in the row above the composer; its rows are the panel that segment opens (`WaitingPanel.tsx`), with "Stop waiting on all" in the panel's header and Stop waiting as its own segment while the thread is idle. The rules below (what counts, when it shows, disabled until current, rows and statuses) still hold.
+
 A user asked to see what will wake a thread and to be able to kill the wait. GUI half; the
 list and `thread.stop-waiting` are docs/notes/wait-list-daemon.md. Option A of the renders:
 a strip above the composer, collapsed by default, one row per thing when expanded.

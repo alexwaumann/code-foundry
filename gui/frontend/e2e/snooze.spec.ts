@@ -15,7 +15,7 @@ const list = (page: Page) => page.getByTestId("thread-list");
 function box(page: Page, testId: string) {
   return page.getByTestId(testId).evaluate((el) => {
     const r = el.getBoundingClientRect();
-    return { top: r.top, bottom: r.bottom, height: r.height };
+    return { top: r.top, bottom: r.bottom, height: r.height, left: r.left, right: r.right };
   });
 }
 
@@ -45,8 +45,8 @@ test("Snoozed section: stacked between Working and Archived; quiet rows at the l
 // (src/components/thread/ThreadMenuItems.test.tsx, src/lib/snooze.test.ts), the daemon asking only
 // mid-turn (internal/command/commands_thread_snooze_test.go) and the retry confirmed
 // (src/stores/commands.test.ts, src/components/confirm/ConfirmDialog.test.tsx), its panels dropped and
-// the window landing home, whoever snoozed it (src/stores/archiveCleanup.test.ts), the dock's
-// strip, "Snoozed until …" and Dismiss snooze (src/components/thread/SnoozeStrip.test.tsx), the title menu's Unsnooze
+// the window landing home, whoever snoozed it (src/stores/archiveCleanup.test.ts), the pill's snooze
+// segment, "Snoozed until …" and Dismiss snooze (src/components/thread/ComposerRow.test.tsx), the title menu's Unsnooze
 // (ThreadMenuItems.test.tsx), back in the main list's waiting band (src/components/sidebar/Sidebar.test.tsx).
 
 // Pick a date and time: the dialog for the row's thread and the local time it sends, unit-tested in
@@ -54,8 +54,8 @@ test("Snoozed section: stacked between Working and Archived; quiet rows at the l
 
 // A wake: back on top of the main list, Woke in amber, snooze ended (src/components/sidebar/Sidebar.test.tsx,
 // src/components/sidebar/shell/ShellSidebarList.test.tsx), counted in the title (src/stores/threads.test.ts),
-// the row's Snooze and Clear (src/components/sidebar/SidebarRow.test.tsx), the dock's strip with Snooze again
-// and Clear (src/components/thread/SnoozeStrip.test.tsx); snoozing again from the title menu
+// the row's Snooze and Clear (src/components/sidebar/SidebarRow.test.tsx), the pill's snooze segment with Clear
+// and the snooze menu (src/components/thread/ComposerRow.test.tsx); snoozing again from the title menu
 // (ThreadMenuItems.test.tsx); a message unsnoozing and Clear are the daemon's (internal/store/thread snooze_test.go).
 
 // Which actions a woken row has and what they run: SidebarRow.test.tsx. This is where they sit: in the
@@ -141,29 +141,31 @@ test("the open thread keeps its one-line row under the collapsed header, and cmd
   await expect(row(page, "s:s-9")).toHaveCount(0);
 });
 
-// What the strip says and does: src/components/thread/SnoozeStrip.test.tsx. This is the dock's geometry.
-test("the snooze and waiting strips stack on the composer, and the list clears them; dismissed, the dock and the list follow", async ({ page }) => {
+// What the snooze segment says and does: src/components/thread/ComposerRow.test.tsx. This is the dock's geometry.
+test("a saved thread waiting on things shows both in the one pill above the composer; dismissed, the dock keeps its height", async ({ page }) => {
   await mockPost("thread?state=waiting");
   await mockPost("thread/snooze?id=s-r1&save=true");
   await openApp(page);
   await page.getByTestId("snoozed-header").click();
   await row(page, "s:s-r1").click();
   await page.getByTestId("snoozed-header").click();
-  await expect(page.getByTestId("snooze-strip")).toBeVisible();
-  await expect(page.getByTestId("waiting-strip")).toBeVisible();
-  const waiting = await box(page, "waiting-strip");
-  const snooze = await box(page, "snooze-strip");
+  await expect(page.getByTestId("pill-snooze")).toBeVisible();
+  await expect(page.getByTestId("pill-waiting")).toBeVisible();
+  const snooze = await box(page, "pill-snooze");
+  const waiting = await box(page, "pill-waiting");
   const composer = await box(page, "thread-composer");
-  expect(snooze.top - waiting.bottom).toBe(8);
-  expect(composer.top - snooze.bottom).toBe(8);
-  // The dock's height is the list's bottom inset: the last row scrolls clear of the strips.
+  expect(snooze.top).toBe(waiting.top);
+  expect(snooze.right).toBeLessThanOrEqual(waiting.left + 1);
+  expect(snooze.bottom).toBeLessThan(composer.top);
+  // The dock's height is the list's bottom inset: the row is always in it, so nothing moves when the snooze goes.
   const dock = () => page.locator(".dock").evaluate((el) => el.getBoundingClientRect().height);
   const both = await dock();
+  await page.getByTestId("pill-snooze").click();
   await page.getByTestId("snooze-dismiss").click();
-  await expect(page.getByTestId("snooze-strip")).toHaveCount(0);
+  await expect(page.getByTestId("pill-snooze")).toHaveCount(0);
   await expect(row(page, "s:s-r1")).toHaveAttribute("data-section", /^(?!snoozed).*/);
-  await expect.poll(dock).toBe(both - snooze.height - 8);
-  expect((await box(page, "waiting-strip")).bottom).toBe((await box(page, "thread-composer")).top - 8);
+  expect(await dock()).toBe(both);
+  expect((await box(page, "thread-composer")).top).toBe(composer.top);
 });
 
 // The palette's Snooze opening the custom dialog for the selected thread: src/stores/snoozeDialog.test.ts;

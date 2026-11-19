@@ -14,6 +14,7 @@ import { FoldInPlaceContext, HoldTopContext, KeepRowContext } from "./context";
 import { PromptRail } from "./PromptRail";
 import { RowBoundary } from "./RowError";
 import { TimelineRowView } from "./rows";
+import type { TimelineBridge } from "./timelineBridge";
 import { createTurnActivity, TurnActivityContext, turnActivityHandlers } from "./turnActivity";
 import { cn } from "@/lib/utils";
 
@@ -111,7 +112,8 @@ function useRows(threadId: string, working: boolean, strips: boolean): TimelineR
  * runs of work show as strip rows (docs/notes/live-tool-strip.md).
  * `bottomInset` is the floating composer's height: the last row scrolls clear of it.
  * Away from the bottom, a "Jump to bottom" chip floats above the composer; it scrolls
- * down and pins the list again.
+ * down and pins the list again. With a `bridge` the row above the composer has it instead
+ * (ComposerRow), and the live turn's message is told to it for the elapsed time.
  */
 export function Timeline({
   threadId,
@@ -121,12 +123,15 @@ export function Timeline({
   inset,
   rail = false,
   pinnedLayer,
+  bridge,
 }: {
   threadId: string;
   working: boolean;
   strips: boolean;
   bottomInset: number;
   inset?: number;
+  /** The row above the composer (ComposerRow): it shows Jump to bottom and the live turn's time; no chip then. */
+  bridge?: TimelineBridge | undefined;
   /** The prompt rail in the left gutter (PromptRail): the content pane's thread only, not the inline view. */
   rail?: boolean;
   /** A layer inside the scroller, pinned to its top (TimelineList's pinnedLayer): the thread info card. */
@@ -139,6 +144,20 @@ export function Timeline({
   );
   const unfold = useMemo(() => unfoldTurnOf(threadId), [threadId]);
   const turnOf = useMemo(() => rowTurns(rows), [rows]);
+  // The live header's message, the start of the turn's elapsed time (rows.tsx HeaderRow).
+  const since = useMemo(() => {
+    const live = rows.find((r) => r.type === "header" && r.id === "");
+    return live?.type === "header" ? live.since : "";
+  }, [rows]);
+  useLayoutEffect(() => {
+    bridge?.setSince(since);
+  }, [bridge, since]);
+  useLayoutEffect(
+    () => () => {
+      bridge?.setSince("");
+    },
+    [bridge],
+  );
   return (
     <TimelineList
       threadId={threadId}
@@ -152,6 +171,7 @@ export function Timeline({
       inset={inset}
       overlay={rail ? overlay : undefined}
       pinnedLayer={pinnedLayer}
+      bridge={bridge}
     />
   );
 }
@@ -217,6 +237,7 @@ export function TimelineList<R extends ListRow>({
   inset = 40,
   overlay,
   pinnedLayer,
+  bridge,
 }: {
   threadId: string;
   rows: readonly R[];
@@ -254,6 +275,8 @@ export function TimelineList<R extends ListRow>({
    * padding can keep a fixed distance from the pane's edge.
    */
   pinnedLayer?: ReactNode;
+  /** Jump to bottom is the composer row's (ComposerRow): the list tells it when it is away and draws no chip. */
+  bridge?: TimelineBridge | undefined;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const innerRef = useRef<HTMLDivElement>(null);
@@ -497,6 +520,28 @@ export function TimelineList<R extends ListRow>({
     [v],
   );
 
+  // The composer row's Jump to bottom (bridge): the chip's own action, and when it shows.
+  useLayoutEffect(() => {
+    if (!bridge) return;
+    bridge.setJump(() => {
+      pin();
+      setSpacer(0);
+      toBottom();
+    });
+    return () => {
+      bridge.setJump(null);
+    };
+  }, [bridge, pin, setSpacer, toBottom]);
+  useLayoutEffect(() => {
+    bridge?.setAway(!atBottom);
+  }, [bridge, atBottom]);
+  useLayoutEffect(
+    () => () => {
+      bridge?.setAway(false);
+    },
+    [bridge],
+  );
+
   // After every render, before its paint: the rows a render brings are measured as they
   // mount, shorter or taller than their estimates, so the bottom (or the place the list was
   // left at) has moved. Scrolling there now, and telling the virtualizer (syncOffset), renders
@@ -718,26 +763,28 @@ export function TimelineList<R extends ListRow>({
           <div ref={spacerRef} aria-hidden data-testid="thread-timeline-spacer" style={{ height: 0 }} />
         </div>
         {/* Outside the scroller: it floats over the list's bottom, just above the composer. */}
-        <button
-          type="button"
-          className="jump-bottom"
-          data-testid="thread-jump-bottom"
-          data-shown={!atBottom || undefined}
-          aria-hidden={atBottom || undefined}
-          tabIndex={atBottom ? -1 : undefined}
-          style={{ bottom: Math.max(bottomInset - 20, 12) }}
-          onMouseDown={(e) => {
-            e.preventDefault();
-          }}
-          onClick={() => {
-            pin();
-            setSpacer(0);
-            toBottom();
-          }}
-        >
-          <ArrowDown aria-hidden />
-          Jump to bottom
-        </button>
+        {!bridge && (
+          <button
+            type="button"
+            className="jump-bottom"
+            data-testid="thread-jump-bottom"
+            data-shown={!atBottom || undefined}
+            aria-hidden={atBottom || undefined}
+            tabIndex={atBottom ? -1 : undefined}
+            style={{ bottom: Math.max(bottomInset - 20, 12) }}
+            onMouseDown={(e) => {
+              e.preventDefault();
+            }}
+            onClick={() => {
+              pin();
+              setSpacer(0);
+              toBottom();
+            }}
+          >
+            <ArrowDown aria-hidden />
+            Jump to bottom
+          </button>
+        )}
         {overlay?.({ list: listApi, rows, bottomInset })}
       </HoldTopContext.Provider>
     </KeepRowContext.Provider>
