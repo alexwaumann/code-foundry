@@ -5,6 +5,10 @@ still showed every text written between tool calls. The agreed design (turn sket
 section 1, and 4, section 5) moves the turn's details and its Copy into a fixed-height row
 under the turn, and folds a turn down to its final reply. It also tells the model so.
 
+Update 2026-11-19 (`worker-card.md`): a turn the thread's own workers started has no header;
+its gutter's steps count is its fold toggle, and a turn that left nothing hands "latest" to the
+gutter before it.
+
 This replaces parts of the earlier fold notes: thread-fold-3-header.md's header text and
 "copy on the answer", and thread-fold-5-text-and-html.md's "the fold never hides text"
 (pages, theme cards, notes and steers still never fold).

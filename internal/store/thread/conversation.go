@@ -147,7 +147,7 @@ func (m *Manager) send(ctx context.Context, id string, msg Message) (Item, error
 		prompt = note + "\n\n" + prompt
 	}
 	rel, who, fromThread := m.sender(s, msg)
-	if from := fromNote(rel, who, strings.TrimSpace(msg.ByThreadID), msg.Reply); fromThread && from != "" {
+	if from := withWorkerReplyNote(s, rel, fromNote(rel, who, strings.TrimSpace(msg.ByThreadID), msg.Reply)); fromThread && from != "" {
 		prompt = from + "\n\n" + prompt
 	}
 	o := &outgoing{text: strings.TrimSpace(msg.Text), composer: strings.TrimSpace(msg.ComposerText), attachments: attachments, prompt: prompt,

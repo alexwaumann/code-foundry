@@ -46,6 +46,7 @@ import {
 } from "../src/gen/codefoundry/v1/thread_pb";
 import { scriptAgents, type AgentRunInit } from "./agents";
 import { scriptEmberChat } from "./emberChat";
+import type { WorkerCardScript } from "./workerCard";
 import { CommandError } from "./errors";
 import { Hub } from "./hub";
 import { mcpFixture, type McpStatusInit } from "./mcp";
@@ -1247,6 +1248,31 @@ export class MockThreadLogs {
    * Ember's chat (mock/emberChat.ts): the resident thread's history, matching the seeded
    * board. Leaves the thread's status alone (idle at its prompt, as World.addResident makes it).
    */
+  /**
+   * A history written by a script (mock/workerCard.ts) in place of the thread's log; `live`
+   * appends to it instead, publishing each item to the thread's watchers.
+   */
+  script(id: string, write: (s: WorkerCardScript) => void, live = false): void {
+    if (!live) {
+      this.logs.delete(id);
+      this.agents.delete(id);
+      this.shells.delete(id);
+    }
+    const l = this.log(id);
+    const it = (payload: ItemInit["payload"], over: Partial<ItemInit> & { at?: Date; until?: Date } = {}) => {
+      const x = this.item(id, payload, over);
+      if (live) return this.append(id, x);
+      l.items.push(x);
+      return x;
+    };
+    const tool = (name: string, input: object, value: { output?: string; status?: ToolCallStatus }, over: Partial<ItemInit> & { at?: Date; until?: Date } = {}) => {
+      const toolUseId = `toolu_${name.toLowerCase()}_${id}_${String(l.nextOrdinal)}`;
+      return it({ case: "toolCall", value: { toolUseId, name, inputJson: JSON.stringify(input), status: ToolCallStatus.DONE, ...value } }, { id: toolUseId, ...over });
+    };
+    write({ it, tool });
+    if (!live) l.seq = l.items.length;
+  }
+
   seedEmber(id: string): void {
     this.logs.delete(id);
     this.agents.delete(id);

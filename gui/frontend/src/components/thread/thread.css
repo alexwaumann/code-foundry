@@ -892,6 +892,129 @@ html[data-thread-width="full"] {
 .cf-thread .tgut .sep {
   opacity: 0.5;
 }
+/* A worker run's turn has no header: the gutter's steps count is its fold toggle
+   (rows.tsx GutterRow, lib/workerRuns), a chevron before it like the header's. */
+.cf-thread .tgut .steps {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+  height: 22px;
+  padding: 0 6px 0 4px;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+.cf-thread .tgut .steps:hover {
+  background: var(--t-hover);
+  color: var(--cf-text);
+}
+.cf-thread .tgut .steps:focus-visible {
+  outline: 2px solid color-mix(in oklab, var(--cf-focus) 60%, transparent);
+  outline-offset: -2px;
+}
+.cf-thread .tgut .steps svg {
+  width: 12px;
+  height: 12px;
+  transition: transform 0.12s;
+}
+.cf-thread .tgut .steps[aria-expanded="true"] svg {
+  transform: rotate(90deg);
+}
+/* ---------- the card a run of the thread's own workers reads as (WorkerCard.tsx,
+   docs/notes/worker-card.md): a title line (a fold toggle once frozen), then a line per
+   worker that opens its thread: the mark and the name, which takes the width, the state's
+   word and how long it worked at the right. */
+.cf-thread .wcard {
+  margin: 6px 0 12px;
+  border: 1px solid var(--cf-border);
+  border-radius: 10px;
+  overflow: hidden;
+  font-variant-numeric: tabular-nums;
+}
+.cf-thread .wcard .wh {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  height: 30px;
+  padding: 0 10px;
+  text-align: left;
+}
+.cf-thread .wcard .wh .ttl {
+  color: var(--cf-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cf-thread .wcard .wh .rt {
+  margin-left: auto;
+  flex: none;
+  white-space: nowrap;
+}
+.cf-thread .wcard button.wh:hover {
+  background: var(--t-hover);
+}
+.cf-thread .wcard button.wh:focus-visible,
+.cf-thread .wcard button.wl:focus-visible {
+  outline: 2px solid color-mix(in oklab, var(--cf-focus) 60%, transparent);
+  outline-offset: -2px;
+}
+.cf-thread .wcard .chev {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  transition: transform 0.12s;
+}
+.cf-thread .wcard .wh[aria-expanded="true"] .chev {
+  transform: rotate(90deg);
+}
+.cf-thread .wcard .wl {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto 44px;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  height: 25px;
+  padding: 0 10px;
+  border-top: 1px solid var(--cf-border);
+  text-align: left;
+}
+.cf-thread .wcard button.wl:hover {
+  background: var(--t-hover);
+}
+.cf-thread .wcard .wl .nm {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  color: var(--cf-text);
+}
+.cf-thread .wcard .wl.gone .nm {
+  color: var(--cf-text-muted);
+}
+.cf-thread .wcard .wl .tx {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cf-thread .wcard .wl .mk {
+  flex: none;
+  width: 11px;
+  height: 11px;
+}
+.cf-thread .wcard .wl .dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  margin: 0 2px;
+  border-radius: 9999px;
+}
+.cf-thread .wcard .wl .st,
+.cf-thread .wcard .wl .tm {
+  white-space: nowrap;
+  text-align: right;
+}
 /* Ember's reply (lib/ember: a text row with `answer`) copies from a button in the gutter at
    its top right, shown while the reply is hovered (or the button has the keyboard, or
    shows its check after a copy: useCopied). Outside the text, so it never covers a code

@@ -53,6 +53,7 @@ import { MockSkills } from "./skills";
 import { EMBER_THREAD, emberWorkers, MockEmber } from "./ember";
 import { MockDictation } from "./dictation";
 import { MockSearches } from "./agentSearch";
+import { LEAD as WORKER_LEAD, WORKERS, scriptLead, scriptStep, workerPlans, type WorkerCardState } from "./workerCard";
 import { CRASH_STDERR, MockThreadLogs, type SeedHistory, type ThreadState as ScriptedThreadState } from "./thread";
 import { contextFields, recordCompaction, recordResult, type MockContext } from "./context";
 import { intoUsersDiff, panelItemCommands, type PlaceTab } from "./panelItemVerbs";
@@ -1478,6 +1479,46 @@ export class World {
    * a permission, which is under Needs you. POST /__mock/snooze-holds. Idempotent; returns the
    * two ids. Not in the default world, whose rows e2e pins.
    */
+  /**
+   * Scenario: a lead with three workers (mock/workerCard.ts, docs/notes/worker-card.md):
+   * s-wl-lead and its workers s-wl-1..3, created by it (so out of the sidebar), in `state`.
+   * POST /__mock/workers?state=live|needs|frozen. Replaces them when they exist; returns the
+   * lead's id. Held, so the clock leaves their statuses alone.
+   */
+  addWorkerCard(state: WorkerCardState): string {
+    const ago = (min: number) => new Date(Date.now() - min * 60_000);
+    for (const p of workerPlans(state)) {
+      const status = p.state === "working" ? ThreadStatus.BUSY : ThreadStatus.NEEDS_ATTENTION;
+      const statusReason = p.state === "working" ? "working" : p.state === "needs" ? "permission: Bash rm -rf dist" : "finished";
+      this.threads.delete(p.id);
+      const s = this.addThread({ id: p.id, projectId: "repo-cf", worktreePath: CF, name: p.name, model: "claude-sonnet-5-5[1m]", effort: "medium", status, statusReason,
+        statusChangedAt: ago(p.atMin), createdAt: ago(p.createdMin), lastActivityAt: ago(p.atMin), createdBy: WORKER_LEAD, createdByName: "Ship the three fixes", held: true });
+      this.publishThread(s);
+    }
+    this.threads.delete(WORKER_LEAD);
+    const lead = this.addThread({ id: WORKER_LEAD, projectId: "repo-cf", worktreePath: CF, name: "Ship the three fixes", model: "claude-sonnet-5-5[1m]", effort: "medium",
+      status: ThreadStatus.IDLE, statusReason: "at prompt", statusChangedAt: ago(1), createdAt: ago(27), lastActivityAt: ago(1), held: true });
+    this.logs.script(WORKER_LEAD, (sc) => {
+      scriptLead(sc, state);
+    });
+    this.publishThread(lead);
+    return WORKER_LEAD;
+  }
+
+  /**
+   * The step after the "live" worker card: its working worker finishes now and the lead's
+   * turn for it lands in the open timeline (POST /__mock/workers/step), so the card updates
+   * in place and one more reply stacks under it.
+   */
+  stepWorkerCard(): void {
+    const w = this.threads.get(WORKERS[2].id);
+    if (w) {
+      this.setStatus(w, ThreadStatus.NEEDS_ATTENTION, "finished");
+      this.publishThread(w);
+    }
+    this.logs.script(WORKER_LEAD, scriptStep, true);
+  }
+
   addSnoozeHolds(): string[] {
     const ago = (min: number) => new Date(Date.now() - min * 60_000);
     const s8 = this.threads.get("s-8");

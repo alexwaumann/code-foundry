@@ -64,6 +64,7 @@ import { ToolPathChip } from "./PathChip";
 import { AgentReport, ToolDetail } from "./ToolDetail";
 import { useTurnActive } from "./turnActivity";
 import { UserBubble } from "./UserBubble";
+import { WorkerCardRow } from "./WorkerCard";
 import { openThread } from "@/stores/openThread";
 
 /** A ticking or whole-second time: "12s", "1m 4s", "1h 5m". */
@@ -1020,6 +1021,7 @@ const HeaderRow = memo(function HeaderRow({ row }: { row: Extract<TimelineRow, {
  */
 const GutterRow = memo(function GutterRow({ row }: { row: Extract<TimelineRow, { type: "gutter" }> }) {
   const { threadId } = useThreadCtx();
+  const keep = useContext(KeepRowContext);
   const it = useThreadItem(threadId, row.id);
   const active = useTurnActive(row.turn);
   const models = useModelChoices();
@@ -1028,7 +1030,9 @@ const GutterRow = memo(function GutterRow({ row }: { row: Extract<TimelineRow, {
   const shown = row.latest || active || copied || fork.held;
   const end = it?.kind === "turnEnd" ? it : undefined;
   const info: string[] = [];
-  if (row.steps > 0) info.push(stepsLabel(row.steps));
+  // A turn of a worker run has no header: its steps count is its fold toggle (lib/workerRuns).
+  const toggle = row.fold === "folded" || row.fold === "open";
+  if (row.steps > 0 && !toggle) info.push(stepsLabel(row.steps));
   // The daemon's measure of the turn and the model that replied. Without them (the daemon
   // could not tell the cost, the turn had no reply, an older daemon recorded it) the gutter
   // says nothing rather than guess: cost_usd is a running total whose base a restart
@@ -1059,6 +1063,22 @@ const GutterRow = memo(function GutterRow({ row }: { row: Extract<TimelineRow, {
           </Tip>
         )}
         <ForkFromHereButton threadId={threadId} held={fork.held} onFork={fork.fork} />
+        {toggle && (
+          <button
+            type="button"
+            className="steps"
+            aria-expanded={row.fold === "open"}
+            aria-label={`${row.fold === "open" ? "Hide" : "Show"} this turn's work`}
+            data-testid="thread-gutter-steps"
+            onClick={() => {
+              keep(row.key);
+              setTurnFolded(threadId, row.turn, row.fold === "open");
+            }}
+          >
+            <ChevronRight aria-hidden />
+            {row.steps > 0 ? stepsLabel(row.steps) : "Work"}
+          </button>
+        )}
         {info.length > 0 && (
           <span className="info">
             <Parts parts={info} />
@@ -1080,6 +1100,8 @@ export function TimelineRowView({ row }: { row: TimelineRow }) {
       return <GutterRow row={row} />;
     case "setup":
       return <SetupRow row={row} />;
+    case "workers":
+      return <WorkerCardRow row={row} />;
     default:
       return <WorkNodeView node={row} />;
   }

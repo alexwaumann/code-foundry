@@ -34,6 +34,8 @@ function shape(rows: readonly TimelineRow[]): string[] {
         return `strip(${String(r.steps)})[${shape(r.nodes).join(" ")}]`;
       case "setup":
         return `setup${r.folded ? "(folded)" : ""}`;
+      case "workers":
+        return `workers(${r.lines.map((l) => l.id).join(",")})`;
       default:
         return `${r.type}:${r.id}`;
     }

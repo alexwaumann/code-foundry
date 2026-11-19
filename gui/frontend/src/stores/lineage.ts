@@ -3,9 +3,11 @@
  * all derived from the thread list: no RPC. Each selects a value or a few fields
  * (shallow-compared), so a related thread's unrelated change re-renders nothing.
  */
+import { useMemo } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { creatorOf, noteCreator, type Creator } from "@/lib/lineage";
 import { liveCount } from "@/lib/liveCount";
+import { decodeWorkers, workersKey, type WorkerNow } from "@/lib/workerRuns";
 import { useThreadsStore } from "./threads";
 
 /**
@@ -38,4 +40,14 @@ export function useMadeByThread(id: string): boolean {
  */
 export function useNoteCreator(createdBy: string, recorded: string): Creator {
   return useThreadsStore(useShallow((s) => noteCreator(s, createdBy, recorded)));
+}
+
+/**
+ * The threads a thread created, as the worker card reads them (lib/workerRuns): their state
+ * now and since when. One string out of the store, so the timeline rebuilds only when a
+ * worker's state changes.
+ */
+export function useWorkers(threadId: string): ReadonlyMap<string, WorkerNow> {
+  const key = useThreadsStore((s) => workersKey(s.byId, threadId));
+  return useMemo(() => decodeWorkers(key), [key]);
 }
