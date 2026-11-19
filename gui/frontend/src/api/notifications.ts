@@ -56,6 +56,8 @@ export interface NotificationView {
   arrivedAtMs: number | null;
   createdAtMs: number | null;
   snoozedUntilMs: number | null;
+  /** The user has seen it since it last arrived (the bell's panel showed it, or they acted on it). */
+  seen: boolean;
 }
 
 /** Every active notification in the daemon's order: shown first (time-sensitive, then newest), then snoozed and scheduled. */
@@ -63,6 +65,8 @@ export interface NotificationSnapshotView {
   notifications: NotificationView[];
   /** The shown time-sensitive ones: the dock badge's share. */
   timeSensitive: number;
+  /** The shown ones the user has not seen: the bell's corner badge shows while there are any. 0 from a daemon that does not keep seen. */
+  unseen: number;
   version: number;
 }
 
@@ -111,6 +115,7 @@ export function toNotificationView(n: Notification): NotificationView {
     arrivedAtMs: ms(n.arrivedAt),
     createdAtMs: ms(n.createdAt),
     snoozedUntilMs: ms(n.snoozedUntil),
+    seen: n.seen,
   };
 }
 
@@ -118,6 +123,7 @@ export function toNotificationSnapshotView(s: NotificationSnapshot | undefined):
   return {
     notifications: (s?.notifications ?? []).map(toNotificationView),
     timeSensitive: s?.timeSensitive ?? 0,
+    unseen: s?.unseen ?? 0,
     version: Number(s?.version ?? 0n),
   };
 }

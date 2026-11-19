@@ -20,6 +20,7 @@ describe("toNotificationView", () => {
         arrivedAt: timestampFromMs(1_000),
         createdAt: timestampFromMs(500),
         snoozedUntil: timestampFromMs(9_000),
+        seen: true,
       }),
     );
     expect(v).toEqual({
@@ -36,6 +37,7 @@ describe("toNotificationView", () => {
       arrivedAtMs: 1_000,
       createdAtMs: 500,
       snoozedUntilMs: 9_000,
+      seen: true,
     });
   });
 
@@ -89,22 +91,23 @@ describe("toNotificationView", () => {
 });
 
 describe("toNotificationEventView", () => {
-  it("keeps the snapshot's order, its time-sensitive count, the arrived and updated ids", () => {
+  it("keeps the snapshot's order, its time-sensitive and unseen counts, the arrived and updated ids", () => {
     const ev = toNotificationEventView(
       create(NotificationEventSchema, {
-        snapshot: { notifications: [{ id: "n-b", timeSensitive: true }, { id: "n-a" }], timeSensitive: 1, version: 7n },
+        snapshot: { notifications: [{ id: "n-b", timeSensitive: true }, { id: "n-a" }], timeSensitive: 1, unseen: 2, version: 7n },
         arrivedIds: ["n-b"],
         updatedIds: ["n-a"],
       }),
     );
     expect(ev.snapshot.notifications.map((n) => n.id)).toEqual(["n-b", "n-a"]);
     expect(ev.snapshot.timeSensitive).toBe(1);
+    expect(ev.snapshot.unseen).toBe(2);
     expect(ev.snapshot.version).toBe(7);
     expect(ev.arrivedIds).toEqual(["n-b"]);
     expect(ev.updatedIds).toEqual(["n-a"]);
   });
 
   it("an event without a snapshot is an empty bell", () => {
-    expect(toNotificationEventView(create(NotificationEventSchema, {})).snapshot).toEqual({ notifications: [], timeSensitive: 0, version: 0 });
+    expect(toNotificationEventView(create(NotificationEventSchema, {})).snapshot).toEqual({ notifications: [], timeSensitive: 0, unseen: 0, version: 0 });
   });
 });

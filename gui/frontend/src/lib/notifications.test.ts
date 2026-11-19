@@ -12,6 +12,7 @@ import {
   threadMark,
   threadNotifications,
   timeSensitiveArrivals,
+  unseenIds,
   type ArrivalBurst,
   type ThreadMarkTone,
 } from "./notifications";
@@ -31,12 +32,30 @@ describe("shownNotifications", () => {
 
 describe("bellCount", () => {
   it.each([
-    ["none", [], { count: 0, urgent: false }],
-    ["normal ones", [note("a"), note("b")], { count: 2, urgent: false }],
-    ["one time-sensitive", [note("a", { timeSensitive: true }), note("b")], { count: 2, urgent: true }],
-    ["a snoozed time-sensitive one neither counts nor tones", [{ ...snoozed("a"), timeSensitive: true }, note("b")], { count: 1, urgent: false }],
+    ["none", [], { count: 0, urgent: false, unseen: false, unseenUrgent: false }],
+    ["normal ones", [note("a"), note("b")], { count: 2, urgent: false, unseen: false, unseenUrgent: false }],
+    ["one time-sensitive", [note("a", { timeSensitive: true }), note("b")], { count: 2, urgent: true, unseen: false, unseenUrgent: false }],
+    ["a snoozed time-sensitive one neither counts nor tones", [{ ...snoozed("a"), timeSensitive: true }, note("b")], { count: 1, urgent: false, unseen: false, unseenUrgent: false }],
+    ["an unseen one", [note("a", { seen: false }), note("b")], { count: 2, urgent: false, unseen: true, unseenUrgent: false }],
+    ["an unseen time-sensitive one", [note("a", { seen: false, timeSensitive: true }), note("b")], { count: 2, urgent: true, unseen: true, unseenUrgent: true }],
+    ["a seen time-sensitive one beside an unseen one", [note("a", { timeSensitive: true }), note("b", { seen: false })], { count: 2, urgent: true, unseen: true, unseenUrgent: false }],
+    ["an unseen snoozed time-sensitive one", [{ ...snoozed("a"), timeSensitive: true, seen: false }, note("b")], { count: 1, urgent: false, unseen: false, unseenUrgent: false }],
   ])("%s", (_, notes, want) => {
     expect(bellCount(noteEvent(notes).snapshot)).toEqual(want);
+  });
+
+  it("a daemon without the unseen count lights nothing, whatever the flags say", () => {
+    const s = noteEvent([note("a", { seen: false, timeSensitive: true })]).snapshot;
+    expect(bellCount({ ...s, unseen: 0 })).toMatchObject({ unseen: false, unseenUrgent: false });
+    expect(unseenIds({ ...s, unseen: 0 })).toEqual([]);
+  });
+});
+
+describe("unseenIds", () => {
+  it("lists the shown unseen ones in the daemon's order", () => {
+    const ev = noteEvent([note("n-c", { seen: false }), note("n-a"), note("n-b", { seen: false }), { ...snoozed("n-s"), seen: false }]);
+    expect(unseenIds(ev.snapshot)).toEqual(["n-c", "n-b"]);
+    expect(unseenIds(null)).toEqual([]);
   });
 });
 

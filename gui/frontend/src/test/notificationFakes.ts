@@ -19,12 +19,14 @@ export function note(id: string, o: Partial<NotificationView> = {}): Notificatio
     arrivedAtMs: 0,
     createdAtMs: 0,
     snoozedUntilMs: null,
+    seen: true,
     ...o,
   };
 }
 
-/** The source's event: the snapshot in the order given, the time-sensitive count from it. */
+/** The source's event: the snapshot in the order given, the time-sensitive and unseen counts from it. */
 export function noteEvent(notes: NotificationView[], arrivedIds: string[] = [], updatedIds: string[] = []): NotificationEventView {
   const timeSensitive = notes.filter((n) => n.timeSensitive && n.status === "shown").length;
-  return { snapshot: { notifications: notes, timeSensitive, version: 1 }, arrivedIds, updatedIds };
+  const unseen = notes.filter((n) => !n.seen && n.status === "shown").length;
+  return { snapshot: { notifications: notes, timeSensitive, unseen, version: 1 }, arrivedIds, updatedIds };
 }
