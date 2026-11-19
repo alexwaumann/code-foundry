@@ -8,6 +8,7 @@ import (
 
 	"connectrpc.com/connect"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/durationpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
@@ -323,6 +324,9 @@ func threadToProto(s thread.Thread) *v1.Thread {
 	p.SnoozedUntil = timestamp(s.SnoozedUntil)
 	p.SavedAt = timestamp(s.SavedAt)
 	p.SnoozeEvent, p.SnoozeEndedBy = snoozeEventToProto(s.SnoozeEvent), s.SnoozeEndedBy // thread_snooze_event.go
+	if s.AutoSavedAfter > 0 {
+		p.AutoSavedAfter = durationpb.New(s.AutoSavedAfter)
+	}
 	for _, l := range s.LinkedPullRequests {
 		p.LinkedPullRequests = append(p.LinkedPullRequests, linkedPullRequestToProto(l))
 	}

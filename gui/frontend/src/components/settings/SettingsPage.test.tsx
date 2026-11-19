@@ -56,6 +56,19 @@ const fields: SettingFieldView[] = [
   f("threads.default_model", "Model", "enum", "general", "threads", { ...models, defaultValue: "claude-sonnet-5[1m]", row: "model", description: "The default for new threads." }),
   f("threads.default_effort", "Effort", "enum", "general", "threads", { enumValues: ["low", "medium", "high"], defaultValue: "medium", row: "model", description: "The default effort for new threads." }),
   f("threads.default_worktree", "New threads work in", "enum", "general", "threads", { enumValues: ["worktree", "current"], enumLabels: ["A fresh copy of the project", "The project folder itself"], defaultValue: "current" }),
+  // Auto-tidy's two rows, as the daemon's schema has them (docs/notes/auto-tidy.md).
+  f("threads.auto_save_after", "Save idle threads for later", "enum", "general", "threads", {
+    description: "A thread with no activity for this long (no message to or from Claude) moves to Snoozed with no alarm. Pinned threads, and threads that are working or asking, stay.",
+    enumValues: ["off", "1d", "3d", "1w", "2w", "1mo"],
+    enumLabels: ["Off", "After 1 day", "After 3 days", "After 1 week", "After 2 weeks", "After 1 month"],
+    defaultValue: "off",
+  }),
+  f("threads.auto_archive_after", "Archive saved threads", "enum", "general", "threads", {
+    description: "A thread that has sat in Snoozed with no alarm for this long is archived. Its work is kept.",
+    enumValues: ["off", "1w", "2w", "1mo", "3mo"],
+    enumLabels: ["Off", "After 1 week", "After 2 weeks", "After 1 month", "After 3 months"],
+    defaultValue: "off",
+  }),
   f("threads.auto_name", "Name threads automatically", "bool", "general", "threads", { defaultValue: "true" }),
   f("models.utility", "Utility model", "enum", "general", "textgen", { ...models, defaultValue: "claude-sonnet-5[1m]" }),
   // A field in another section that depends on a toggle (no real one does today).
@@ -196,6 +209,22 @@ describe("the settings page", () => {
     expect(options("threads.default_worktree")).toEqual(["A fresh copy of the project", "The project folder itself (default)"]);
     // Escape in the open list closes the list, not the page.
     expect(screen.getByTestId("settings-page")).toBeTruthy();
+  });
+
+  it("auto-tidy's two rows: dropdowns after New threads work in, Off by default, their descriptions under them", () => {
+    setValues({ "threads.auto_save_after": "3d" });
+    open();
+    const keys = Array.from(body().querySelectorAll<HTMLElement>("[data-setting]")).map((e) => e.dataset.setting);
+    expect(keys.indexOf("threads.auto_save_after")).toBe(keys.indexOf("threads.default_worktree") + 1);
+    expect(keys.indexOf("threads.auto_archive_after")).toBe(keys.indexOf("threads.auto_save_after") + 1);
+    expect(row("threads.auto_save_after").textContent).toContain("Save idle threads for later");
+    expect(row("threads.auto_save_after").textContent).toContain("no activity for this long");
+    expect(row("threads.auto_save_after").textContent).not.toContain("opened");
+    expect(trigger("threads.auto_save_after").dataset.value).toBe("3d");
+    expect(options("threads.auto_save_after")).toEqual(["Off (default)", "After 1 day", "After 3 days", "After 1 week", "After 2 weeks", "After 1 month"]);
+    expect(row("threads.auto_archive_after").textContent).toContain("Its work is kept.");
+    expect(trigger("threads.auto_archive_after").dataset.value).toBe("off");
+    expect(options("threads.auto_archive_after")).toEqual(["Off (default)", "After 1 week", "After 2 weeks", "After 1 month", "After 3 months"]);
   });
 
   it("model and effort share a row, with the model's description under them", () => {

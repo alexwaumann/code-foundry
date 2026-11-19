@@ -100,7 +100,7 @@ func threadDetail(s *v1.Thread, names map[string]string) string {
 		lines = append(lines, "snoozed until: "+at.AsTime().Local().Format(time.DateTime))
 	}
 	if s.GetSavedAt() != nil {
-		lines = append(lines, "saved for later")
+		lines = append(lines, "saved for later"+autoSavedWords(s.GetAutoSavedAfter()))
 	}
 	if s.GetPinned() {
 		lines = append(lines, "pinned")

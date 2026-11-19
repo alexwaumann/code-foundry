@@ -52,7 +52,7 @@ func (m *Manager) Snooze(ctx context.Context, id string, until time.Time) (Threa
 		return Thread{}, err
 	}
 	s, err := m.putAway(ctx, id, func(rec *record) {
-		rec.s.SnoozedUntil, rec.s.SavedAt = until, time.Time{}
+		rec.s.SnoozedUntil, rec.s.SavedAt, rec.s.AutoSavedAfter = until, time.Time{}, 0
 	})
 	if err != nil {
 		return Thread{}, err
@@ -65,10 +65,11 @@ func (m *Manager) Snooze(ctx context.Context, id string, until time.Time) (Threa
 // (docs/notes/save-for-later-1-daemon.md): what Snooze does, except that it stamps
 // SavedAt (kept on a thread already saved, so saving twice does not reorder the list)
 // and clears SnoozedUntil, so wakeSnoozed never sees it. It lasts until a call that
-// unsnoozes.
+// unsnoozes. A thread auto-tidy saved (AutoSave) becomes one saved by the caller: its mark
+// goes.
 func (m *Manager) SaveForLater(ctx context.Context, id string) (Thread, error) {
 	s, err := m.putAway(ctx, id, func(rec *record) {
-		rec.s.SnoozedUntil = time.Time{}
+		rec.s.SnoozedUntil, rec.s.AutoSavedAfter = time.Time{}, 0
 		if rec.s.SavedAt.IsZero() {
 			rec.s.SavedAt = m.opts.Now().Round(0).Truncate(time.Millisecond)
 		}
@@ -124,15 +125,16 @@ func (m *Manager) putAway(ctx context.Context, id string, set func(*record)) (Th
 	return m.Get(ctx, id)
 }
 
-// unsnoozeLocked clears rec's SnoozedUntil and SavedAt (and an event it waited on) and reports whether either was
-// set, so the caller commits. Pin(true), the user's Send and Archive(true) unsnooze
+// unsnoozeLocked clears rec's SnoozedUntil and SavedAt (and an event it waited on, and
+// auto-tidy's mark) and reports whether either was set, so the caller commits. Pin(true), the user's Send and Archive(true) unsnooze
 // implicitly; another thread's Send or a wake does not (holds.go). Callers hold m.mu.
 func (m *Manager) unsnoozeLocked(rec *record) bool {
 	if !rec.s.Snoozed() {
 		return false
 	}
 	m.dropSnoozeEventLocked(rec) // what an event snooze waited on (snooze_event.go)
-	rec.s.SnoozedUntil, rec.s.SavedAt = time.Time{}, time.Time{}
+	rec.s.SnoozedUntil, rec.s.SavedAt, rec.s.AutoSavedAfter = time.Time{}, time.Time{}, 0
+	rec.s.ReturnedAt = m.opts.Now().Round(0).Truncate(time.Millisecond) // auto-tidy's clock restarts
 	return true
 }
 
@@ -254,7 +256,7 @@ func (m *Manager) wakeSnoozed() {
 			continue
 		}
 		until := rec.s.SnoozedUntil
-		rec.s.SnoozedUntil = time.Time{}
+		rec.s.SnoozedUntil, rec.s.ReturnedAt = time.Time{}, now.Truncate(time.Millisecond)
 		if rec.run == nil && rec.s.State == StateDisconnected {
 			rec.s.Status, rec.s.StatusReason, rec.s.StatusChangedAt = StatusNeedsAttention, ReasonSnoozeEnded, now
 		} else {

@@ -132,14 +132,47 @@ type Ember struct {
 // naming), when a thread's prompt cache has expired, and how long a closing one waits for
 // Claude to exit.
 type Threads struct {
-	DefaultModel      string // default model.Default
-	DefaultEffort     string // default "medium"
-	DefaultWorktree   string // WorktreeNew or WorktreeCurrent; read by the GUI's composer and by a thread move without a placement
-	AutoName          bool
-	DefaultSnooze     string // command.SnoozeDefaults; thread.snooze.default's preset, default "tomorrow"
-	SnoozeEvents      string // the Until event menu's events (KeySnoozeEvents); the GUI reads it
-	CacheTTLSeconds   int    // the API's prompt cache lifetime; default 3600
+	DefaultModel    string // default model.Default
+	DefaultEffort   string // default "medium"
+	DefaultWorktree string // WorktreeNew or WorktreeCurrent; read by the GUI's composer and by a thread move without a placement
+	AutoName        bool
+	DefaultSnooze   string // command.SnoozeDefaults; thread.snooze.default's preset, default "tomorrow"
+	SnoozeEvents    string // the Until event menu's events (KeySnoozeEvents); the GUI reads it
+	// AutoSaveAfter and AutoArchiveAfter are auto-tidy's two times (TidyAfter reads them):
+	// TidyOff, the default, or how long before the daemon saves an idle thread for later,
+	// and archives a thread saved for later (internal/daemon/auto_tidy.go).
+	AutoSaveAfter     string
+	AutoArchiveAfter  string
+	CacheTTLSeconds   int // the API's prompt cache lifetime; default 3600
 	CloseGraceSeconds int
+}
+
+// TidyOff turns an auto-tidy step off (threads.auto_save_after, threads.auto_archive_after).
+const TidyOff = "off"
+
+// AutoSaveAfterValues and AutoArchiveAfterValues are the values threads.auto_save_after and
+// threads.auto_archive_after take: TidyOff or a number of days, weeks or months (TidyAfter).
+var (
+	AutoSaveAfterValues    = []string{TidyOff, "1d", "3d", "1w", "2w", "1mo"}
+	AutoArchiveAfterValues = []string{TidyOff, "1w", "2w", "1mo", "3mo"}
+)
+
+// TidyAfter is the time an auto-tidy value stands for: "<n>d" days, "<n>w" weeks, "<n>mo"
+// months of 30 days; 0 for TidyOff and anything else.
+func TidyAfter(v string) time.Duration {
+	const day = 24 * time.Hour
+	for _, u := range []struct {
+		suffix string
+		len    time.Duration
+	}{{"mo", 30 * day}, {"w", 7 * day}, {"d", day}} {
+		if n, ok := strings.CutSuffix(v, u.suffix); ok {
+			if k, err := strconv.Atoi(n); err == nil && k > 0 {
+				return time.Duration(k) * u.len
+			}
+			return 0
+		}
+	}
+	return 0
 }
 
 // Models are the models Code Foundry runs for its own jobs.

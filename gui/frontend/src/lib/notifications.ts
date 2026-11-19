@@ -17,12 +17,16 @@ export const APP_SOURCE = "app";
 export const PLUGINS_SOURCE = "plugins";
 export const PLUGINS_SOURCE_LABEL = "Plugins";
 
+/** The daemon's own source for threads it put away on its own, auto-tidy (docs/notes/auto-tidy.md). */
+export const THREADS_SOURCE = "threads";
+
 /** The app's own sources (never a plugin's name) and how a card names them. */
 const HOST_SOURCE_LABELS: Readonly<Record<string, string>> = {
   [COMMAND_SOURCE]: COMMAND_SOURCE_LABEL,
   [PLUGINS_SOURCE]: PLUGINS_SOURCE_LABEL,
   [GITHUB_SOURCE]: "GitHub",
   [APP_SOURCE]: COMMAND_SOURCE_LABEL,
+  [THREADS_SOURCE]: "Threads",
 };
 
 /**
@@ -76,7 +80,7 @@ export function unseenIds(s: NotificationSnapshotView | null): readonly string[]
     .map((n) => n.id);
 }
 
-/** A card's source: "Code Foundry" for notification.post, "Plugins" for the daemon's plugin health, "GitHub" for its GitHub notifications, else the plugin's display name, else the source as given. */
+/** A card's source: "Code Foundry" for notification.post, "Plugins" for the daemon's plugin health, "GitHub" for its GitHub notifications, "Threads" for its auto-tidy reports, else the plugin's display name, else the source as given. */
 export function sourceLabel(source: string, pluginDisplayName: string | undefined): string {
   const host = Object.hasOwn(HOST_SOURCE_LABELS, source) ? HOST_SOURCE_LABELS[source] : undefined;
   if (host) return host;

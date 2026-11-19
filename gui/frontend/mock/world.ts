@@ -32,6 +32,7 @@ import { themesFor } from "../src/themes";
 import { MockUpdater, type RestartCost } from "./update";
 import { pageUsage, retiredUsage, sampleUsage, usageFields, type MockUsage } from "./usage";
 import { ENTER_ALT, prompt, RESET, topFrame } from "./screens";
+import { tidyAfterMs, tidyCard, tidyPlan } from "./autoTidy";
 import { CommandError } from "./errors";
 import { snoozePresets } from "../src/lib/snooze";
 
@@ -220,6 +221,14 @@ interface MockThread {
   snoozeEvent: MockSnoozeEvent | null;
   /** Why the last event snooze ended ("#812 was merged"). */
   snoozeEndedBy: string;
+  /**
+   * Auto-tidy saved it (World.autoTidy, mock/autoTidy.ts): the save it made and the setting's
+   * time. It holds only while savedAt is that very save, so whatever clears or replaces savedAt
+   * ends it; the user's own save (saveThread) drops it.
+   */
+  autoSaved: { savedAt: Date; afterMs: number } | null;
+  /** When it last came back from Snoozed or Archived (unsnooze, wake, unarchive): auto-tidy's idle clock starts no earlier. */
+  returnedAt: Date | null;
   /** An effort change waiting for the turn to end (thread.set-effort). */
   effortPending: boolean;
   /** Mock-only: a new thread's first message, sent once it connects (the daemon sends it after the handshake). */
@@ -2562,6 +2571,8 @@ export class World {
       savedAt: null,
       snoozeEvent: null,
       snoozeEndedBy: "",
+      autoSaved: null,
+      returnedAt: null,
       effortPending: false,
       firstMessage: null,
       onReady: [],
@@ -2701,6 +2712,9 @@ export class World {
       ...(s.savedAt ? { savedAt: timestampFromDate(s.savedAt) } : {}),
       ...(s.savedAt && s.snoozeEvent ? { snoozeEvent: { ...s.snoozeEvent, since: timestampFromDate(s.snoozeEvent.since) } } : {}),
       snoozeEndedBy: s.snoozeEndedBy,
+      ...(s.savedAt !== null && s.autoSaved?.savedAt === s.savedAt
+        ? { autoSavedAfter: { seconds: BigInt(Math.floor(s.autoSaved.afterMs / 1000)), nanos: (s.autoSaved.afterMs % 1000) * 1_000_000 } }
+        : {}),
       effortPending: s.effortPending,
       linkedPullRequests: s.linkedPullRequests.map((l) => ({ slug: l.slug, number: l.number, url: l.url, linkedAt: timestampFromDate(l.linkedAt) })),
       ...usageFields(s.usage),
@@ -3126,6 +3140,7 @@ export class World {
     const label = s.name ? `${s.name} (${s.id})` : s.id;
     if (!archived) {
       // Like the daemon: unarchiving does not cascade.
+      if (s.archivedAt !== null) s.returnedAt = new Date();
       s.archivedAt = null;
       this.publishThread(s);
       return `unarchived thread ${label}`;
@@ -3252,6 +3267,7 @@ export class World {
     const label = s.name ? `${s.name} (${s.id})` : s.id;
     s.snoozeEvent = null;
     if (until === null) {
+      if (s.snoozedUntil !== null || s.savedAt !== null) s.returnedAt = new Date();
       s.snoozedUntil = null;
       s.savedAt = null;
       this.publishThread(s);
@@ -3287,6 +3303,7 @@ export class World {
     s.snoozeEvent = null;
     s.snoozeEndedBy = "";
     s.savedAt ??= new Date();
+    s.autoSaved = null; // the user's save: theirs now
     this.clearWake(s);
     this.publishThread(s);
     return `saved thread ${s.name ? `${s.name} (${s.id})` : s.id} for later`;
@@ -3355,6 +3372,7 @@ export class World {
     s.savedAt ??= new Date();
     s.snoozeEvent = ev;
     s.snoozeEndedBy = "";
+    s.autoSaved = null; // the user's snooze now, not auto-tidy's save
     this.clearWake(s);
     this.publishThread(s);
     return `snoozed thread ${label} until ${ev.waitingFor}`;
@@ -3376,6 +3394,35 @@ export class World {
   }
 
   /**
+   * One auto-tidy pass (POST /__mock/auto-tidy; the daemon's tick, internal/daemon/auto_tidy.go),
+   * as if `days` more days had passed: with the settings on, idle threads at rest are saved for
+   * later (marked automatic) and old saves archived, and one card per kind replaces the last.
+   */
+  autoTidy(days = 0): { saved: string[]; archived: string[] } {
+    const saveMs = tidyAfterMs(this.settings.value("threads.auto_save_after"));
+    const archiveMs = tidyAfterMs(this.settings.value("threads.auto_archive_after"));
+    const now = Date.now() + days * 86_400_000;
+    const facts = [...this.threads.values()].map((t) => ({
+      ...t,
+      inSidebar: this.inSidebar(t),
+      settingUp: t.setup !== null && t.setup.phase !== ThreadSetupPhase.DONE && t.setup.phase !== ThreadSetupPhase.UNSPECIFIED,
+    }));
+    const plan = tidyPlan(facts, this.notifications.namedThreads(), now, saveMs, archiveMs);
+    const label = (id: string) => this.thread(id).name || id;
+    for (const id of plan.save) {
+      const s = this.thread(id);
+      s.savedAt = new Date();
+      s.autoSaved = { savedAt: s.savedAt, afterMs: saveMs };
+      this.publishThread(s);
+    }
+    const archivedNames = plan.archive.map(label);
+    for (const id of plan.archive) this.archiveThread(id, true);
+    if (plan.save.length > 0) this.notifications.replace(tidyCard("saved", plan.save.map(label)));
+    if (plan.archive.length > 0) this.notifications.replace(tidyCard("archived", archivedNames));
+    return { saved: plan.save, archived: plan.archive };
+  }
+
+  /**
    * The daemon's wake (POST /__mock/thread/wake, or the tick once the time passed): the
    * snooze is cleared and a thread that is stopped, or running at its prompt, needs attention,
    * "snooze ended", stamped now (re-stamped when it already read so); one that works or asks
@@ -3384,6 +3431,7 @@ export class World {
   wakeThread(id: string): void {
     const s = this.thread(id);
     s.snoozedUntil = null;
+    s.returnedAt = new Date();
     const atPrompt = s.state === ThreadState.CONNECTED && (s.status === ThreadStatus.IDLE || (s.status === ThreadStatus.NEEDS_ATTENTION && !/^(permission|question):/.test(s.statusReason)));
     if (s.state === ThreadState.DISCONNECTED || atPrompt) {
       s.status = ThreadStatus.NEEDS_ATTENTION;

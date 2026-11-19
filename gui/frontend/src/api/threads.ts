@@ -206,6 +206,12 @@ export interface ThreadView {
   /** Why the last snooze until an event ended ("#812 was merged"); "" otherwise. Meaningful while the status reason is "snooze ended". */
   snoozeEndedBy?: string;
   /**
+   * Set (ms) while the thread is saved for later because the daemon saved it on its own
+   * (auto-tidy, Settings › General › Threads): how long it had been without activity by that
+   * setting then. Null (or absent) when the user saved it, or it is not saved. docs/notes/auto-tidy.md.
+   */
+  autoSavedAfterMs?: number | null;
+  /**
    * An effort change (thread.set-effort) not applied yet: `effort` is the
    * new level; Claude restarts with it once the running turn ends.
    */
@@ -579,6 +585,7 @@ export function toThreadView(s: Thread): ThreadView {
     savedAtMs: ms(s.savedAt),
     snoozeEvent: toSnoozeEventView(s.snoozeEvent),
     snoozeEndedBy: s.snoozeEndedBy,
+    autoSavedAfterMs: s.autoSavedAfter ? Number(s.autoSavedAfter.seconds) * 1000 + Math.round(s.autoSavedAfter.nanos / 1e6) : null,
     effortPending: s.effortPending,
     linkedPullRequests: s.linkedPullRequests.map((l) => ({
       slug: l.slug,

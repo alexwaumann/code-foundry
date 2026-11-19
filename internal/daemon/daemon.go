@@ -355,6 +355,16 @@ func Run(ctx context.Context, opts Options) (retErr error) {
 	// A plugin that failed for good or that the daemon turned off has a card in the bell
 	// until it runs again (plugin_health.go).
 	defer startPluginHealth(ctx, log.With("component", "plugins"), events, st.notification, plugins.Snapshot, nil)()
+	// Idle threads saved for later and saved ones archived, each after the user's setting
+	// (auto_tidy.go); off by default.
+	defer startAutoTidy(ctx, autoTidyOptions{
+		Log: log.With("component", "auto-tidy"), Threads: st.thread, Notes: st.notification,
+		Settings: func() tidySettings {
+			t := st.settings.Settings().Threads
+			return tidySettings{SaveAfter: t.AutoSaveAfter, ArchiveAfter: t.AutoArchiveAfter}
+		},
+		Day: devTidyDay(log, opts.Dev),
+	})()
 	commandAPI := api.NewCommand(commands)
 	installSkills(ctx, log.With("component", "skills"), p.Claude(), p.Pages(), opts.Version, commandAPI, settingsAPI, st.settings)
 	placeWelcome(log.With("component", "skills"), p.Pages())

@@ -69,6 +69,7 @@ describe("sourceLabel", () => {
     ["github", "Some plugin", "GitHub"],
     ["app", undefined, "Code Foundry"],
     ["app", "Some plugin", "Code Foundry"],
+    ["threads", undefined, "Threads"],
     ["constructor", undefined, "constructor"],
     ["jenkins", "Jenkins", "Jenkins"],
     ["jenkins", undefined, "jenkins"],

@@ -30,6 +30,9 @@
  *   POST /__mock/status-kinds                     (one thread per status kind: approval, question,
  *        plan, finished, Claude error, busy, idle, interrupted, and a stopped one still asking
  *        a question)
+ *   POST /__mock/auto-tidy[?days=4]               (one auto-tidy pass, as if that many more days had passed: with
+ *                                                 threads.auto_save_after / auto_archive_after on, idle threads are saved
+ *                                                 for later (Auto) and old saves archived, one card per kind; mock/autoTidy.ts)
  *   POST /__mock/snooze-holds                     (snoozed s-8 working, and a snoozed thread asking for
  *        a permission: docs/notes/snooze-holds-archive-refuses.md)
  *   POST /__mock/workers?state=live|needs|frozen|passup|passup-working  (a lead with three workers for the worker card: s-wl-lead and
@@ -1486,6 +1489,9 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       break;
     case "POST /__mock/snooze-holds":
       json(res, 200, world.addSnoozeHolds());
+      break;
+    case "POST /__mock/auto-tidy":
+      json(res, 200, world.autoTidy(Number(q.get("days") ?? 0)));
       break;
     case "POST /__mock/shell-sidebar":
       json(res, 200, world.addShellSidebar());

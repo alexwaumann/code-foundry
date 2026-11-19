@@ -1334,8 +1334,14 @@ type Thread struct {
 	// #812 (2 of 14)", "#812 was merged", "Deploy finished (Hello)"); "" when it ended
 	// otherwise. Shown while status_reason is "snooze ended". Persisted.
 	SnoozeEndedBy string `protobuf:"bytes,81,opt,name=snooze_ended_by,json=snoozeEndedBy,proto3" json:"snooze_ended_by,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	// Set while the thread is saved for later because the daemon saved it on its own
+	// (auto-tidy: the setting threads.auto_save_after): how long it had been without activity
+	// by that setting then. Unset when the user (or a thread) saved it, or it is not saved;
+	// whatever clears saved_at clears it, and so does saving it again. Persisted. See
+	// docs/notes/auto-tidy.md.
+	AutoSavedAfter *durationpb.Duration `protobuf:"bytes,82,opt,name=auto_saved_after,json=autoSavedAfter,proto3" json:"auto_saved_after,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *Thread) Reset() {
@@ -1912,6 +1918,13 @@ func (x *Thread) GetSnoozeEndedBy() string {
 		return x.SnoozeEndedBy
 	}
 	return ""
+}
+
+func (x *Thread) GetAutoSavedAfter() *durationpb.Duration {
+	if x != nil {
+		return x.AutoSavedAfter
+	}
+	return nil
 }
 
 // ThreadSnoozeEvent is the event a snoozed thread waits on (Thread.snooze_event).
@@ -8279,7 +8292,7 @@ const file_codefoundry_v1_thread_lifecycle_proto_rawDesc = "" +
 	"\x05error\x18\x05 \x01(\tR\x05error\x12\x1e\n" +
 	"\n" +
 	"background\x18\x06 \x01(\bR\n" +
-	"background\"\x9b\x1b\n" +
+	"background\"\xe0\x1b\n" +
 	"\x06Thread\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12*\n" +
 	"\x11claude_session_id\x18\x02 \x01(\tR\x0fclaudeSessionId\x12\x1d\n" +
@@ -8369,7 +8382,8 @@ const file_codefoundry_v1_thread_lifecycle_proto_rawDesc = "" +
 	"\x0fturn_started_at\x18N \x01(\v2\x1a.google.protobuf.TimestampR\rturnStartedAt\x12+\n" +
 	"\x12busy_under_pass_up\x18O \x01(\bR\x0fbusyUnderPassUp\x12D\n" +
 	"\fsnooze_event\x18P \x01(\v2!.codefoundry.v1.ThreadSnoozeEventR\vsnoozeEvent\x12&\n" +
-	"\x0fsnooze_ended_by\x18Q \x01(\tR\rsnoozeEndedByB\b\n" +
+	"\x0fsnooze_ended_by\x18Q \x01(\tR\rsnoozeEndedBy\x12C\n" +
+	"\x10auto_saved_after\x18R \x01(\v2\x19.google.protobuf.DurationR\x0eautoSavedAfterB\b\n" +
 	"\x06_depthJ\x04\b\t\x10\n" +
 	"J\x04\b\x1f\x10 J\x04\b>\x10?R\vterminal_idR\x06renderR\n" +
 	"in_sidebar\"\xf7\x02\n" +
@@ -9058,8 +9072,8 @@ var file_codefoundry_v1_thread_lifecycle_proto_goTypes = []any{
 	nil,                                   // 105: codefoundry.v1.SnoozeEvent.ArgsEntry
 	nil,                                   // 106: codefoundry.v1.SnoozePluginEvent.ArgsEntry
 	(*timestamppb.Timestamp)(nil),         // 107: google.protobuf.Timestamp
-	(*structpb.Value)(nil),                // 108: google.protobuf.Value
-	(*durationpb.Duration)(nil),           // 109: google.protobuf.Duration
+	(*durationpb.Duration)(nil),           // 108: google.protobuf.Duration
+	(*structpb.Value)(nil),                // 109: google.protobuf.Value
 	(*GitStatus)(nil),                     // 110: codefoundry.v1.GitStatus
 }
 var file_codefoundry_v1_thread_lifecycle_proto_depIdxs = []int32{
@@ -9097,84 +9111,85 @@ var file_codefoundry_v1_thread_lifecycle_proto_depIdxs = []int32{
 	13,  // 31: codefoundry.v1.Thread.setup:type_name -> codefoundry.v1.ThreadSetup
 	107, // 32: codefoundry.v1.Thread.turn_started_at:type_name -> google.protobuf.Timestamp
 	15,  // 33: codefoundry.v1.Thread.snooze_event:type_name -> codefoundry.v1.ThreadSnoozeEvent
-	104, // 34: codefoundry.v1.ThreadSnoozeEvent.args:type_name -> codefoundry.v1.ThreadSnoozeEvent.ArgsEntry
-	107, // 35: codefoundry.v1.ThreadSnoozeEvent.since:type_name -> google.protobuf.Timestamp
-	107, // 36: codefoundry.v1.BackgroundShell.started_at:type_name -> google.protobuf.Timestamp
-	7,   // 37: codefoundry.v1.ThreadFlag.level:type_name -> codefoundry.v1.ThreadFlagLevel
-	107, // 38: codefoundry.v1.ThreadFlag.set_at:type_name -> google.protobuf.Timestamp
-	107, // 39: codefoundry.v1.ApiRetry.retry_at:type_name -> google.protobuf.Timestamp
-	9,   // 40: codefoundry.v1.AgentRun.status:type_name -> codefoundry.v1.AgentRunStatus
-	107, // 41: codefoundry.v1.AgentRun.started_at:type_name -> google.protobuf.Timestamp
-	22,  // 42: codefoundry.v1.AgentRun.usage:type_name -> codefoundry.v1.UsageBucket
-	107, // 43: codefoundry.v1.LinkedPullRequest.linked_at:type_name -> google.protobuf.Timestamp
-	0,   // 44: codefoundry.v1.CreateThreadRequest.permission_mode:type_name -> codefoundry.v1.PermissionMode
-	25,  // 45: codefoundry.v1.CreateThreadRequest.new_worktree:type_name -> codefoundry.v1.NewWorktree
-	14,  // 46: codefoundry.v1.RetryThreadSetupResponse.thread:type_name -> codefoundry.v1.Thread
-	14,  // 47: codefoundry.v1.CancelThreadSetupResponse.thread:type_name -> codefoundry.v1.Thread
-	35,  // 48: codefoundry.v1.DiscardThreadSetupResponse.first:type_name -> codefoundry.v1.ThreadSetupMessage
-	35,  // 49: codefoundry.v1.DiscardThreadSetupResponse.queued:type_name -> codefoundry.v1.ThreadSetupMessage
-	14,  // 50: codefoundry.v1.CreateThreadResponse.thread:type_name -> codefoundry.v1.Thread
-	14,  // 51: codefoundry.v1.ForkThreadResponse.thread:type_name -> codefoundry.v1.Thread
-	41,  // 52: codefoundry.v1.ListThreadsRequest.filter:type_name -> codefoundry.v1.ThreadFilter
-	5,   // 53: codefoundry.v1.ThreadFilter.status:type_name -> codefoundry.v1.ThreadStatus
-	1,   // 54: codefoundry.v1.ThreadFilter.state:type_name -> codefoundry.v1.ThreadState
-	14,  // 55: codefoundry.v1.ListThreadsResponse.threads:type_name -> codefoundry.v1.Thread
-	22,  // 56: codefoundry.v1.ListThreadsResponse.retired_usage:type_name -> codefoundry.v1.UsageBucket
-	44,  // 57: codefoundry.v1.ListThreadsResponse.removed:type_name -> codefoundry.v1.RemovedThread
-	43,  // 58: codefoundry.v1.ListThreadsResponse.totals:type_name -> codefoundry.v1.ThreadTotals
-	107, // 59: codefoundry.v1.RemovedThread.removed_at:type_name -> google.protobuf.Timestamp
-	8,   // 60: codefoundry.v1.RemovedThread.report_status:type_name -> codefoundry.v1.ThreadReportStatus
-	107, // 61: codefoundry.v1.RemovedThread.report_at:type_name -> google.protobuf.Timestamp
-	108, // 62: codefoundry.v1.ThreadPendingDetail.input:type_name -> google.protobuf.Value
-	47,  // 63: codefoundry.v1.ThreadPendingDetail.questions:type_name -> codefoundry.v1.ThreadPendingQuestion
-	14,  // 64: codefoundry.v1.GetThreadResponse.thread:type_name -> codefoundry.v1.Thread
-	10,  // 65: codefoundry.v1.WaitThreadRequest.until:type_name -> codefoundry.v1.ThreadWaitCondition
-	109, // 66: codefoundry.v1.WaitThreadRequest.timeout:type_name -> google.protobuf.Duration
-	14,  // 67: codefoundry.v1.WaitThreadResponse.thread:type_name -> codefoundry.v1.Thread
-	44,  // 68: codefoundry.v1.WaitThreadResponse.removed:type_name -> codefoundry.v1.RemovedThread
-	50,  // 69: codefoundry.v1.WaitThreadResponse.asked:type_name -> codefoundry.v1.ThreadAsk
-	14,  // 70: codefoundry.v1.RenameThreadResponse.thread:type_name -> codefoundry.v1.Thread
-	14,  // 71: codefoundry.v1.RegenerateNameResponse.thread:type_name -> codefoundry.v1.Thread
-	14,  // 72: codefoundry.v1.RunInThreadResponse.thread:type_name -> codefoundry.v1.Thread
-	25,  // 73: codefoundry.v1.MoveThreadRequest.new_worktree:type_name -> codefoundry.v1.NewWorktree
-	14,  // 74: codefoundry.v1.MoveThreadResponse.thread:type_name -> codefoundry.v1.Thread
-	14,  // 75: codefoundry.v1.AddThreadProjectResponse.thread:type_name -> codefoundry.v1.Thread
-	14,  // 76: codefoundry.v1.LinkThreadPullRequestResponse.thread:type_name -> codefoundry.v1.Thread
-	23,  // 77: codefoundry.v1.LinkThreadPullRequestResponse.link:type_name -> codefoundry.v1.LinkedPullRequest
-	14,  // 78: codefoundry.v1.RemoveThreadProjectResponse.thread:type_name -> codefoundry.v1.Thread
-	110, // 79: codefoundry.v1.ThreadCheckout.status:type_name -> codefoundry.v1.GitStatus
-	11,  // 80: codefoundry.v1.MemberPlacement.outcome:type_name -> codefoundry.v1.PlacementOutcome
-	73,  // 81: codefoundry.v1.CheckPlacementResponse.members:type_name -> codefoundry.v1.MemberPlacement
-	14,  // 82: codefoundry.v1.ThreadCheckoutsResponse.thread:type_name -> codefoundry.v1.Thread
-	71,  // 83: codefoundry.v1.ThreadCheckoutsResponse.checkouts:type_name -> codefoundry.v1.ThreadCheckout
-	14,  // 84: codefoundry.v1.PinThreadResponse.thread:type_name -> codefoundry.v1.Thread
-	14,  // 85: codefoundry.v1.ArchiveThreadResponse.thread:type_name -> codefoundry.v1.Thread
-	14,  // 86: codefoundry.v1.SetThreadWorkspaceResponse.thread:type_name -> codefoundry.v1.Thread
-	107, // 87: codefoundry.v1.SnoozeThreadRequest.until:type_name -> google.protobuf.Timestamp
-	83,  // 88: codefoundry.v1.SnoozeThreadRequest.event:type_name -> codefoundry.v1.SnoozeEvent
-	105, // 89: codefoundry.v1.SnoozeEvent.args:type_name -> codefoundry.v1.SnoozeEvent.ArgsEntry
-	86,  // 90: codefoundry.v1.SnoozeEventsResponse.pull_requests:type_name -> codefoundry.v1.SnoozePullRequestEvents
-	87,  // 91: codefoundry.v1.SnoozeEventsResponse.plugins:type_name -> codefoundry.v1.SnoozePluginEvent
-	106, // 92: codefoundry.v1.SnoozePluginEvent.args:type_name -> codefoundry.v1.SnoozePluginEvent.ArgsEntry
-	14,  // 93: codefoundry.v1.SnoozeThreadResponse.thread:type_name -> codefoundry.v1.Thread
-	14,  // 94: codefoundry.v1.ClearSnoozeEndedResponse.thread:type_name -> codefoundry.v1.Thread
-	14,  // 95: codefoundry.v1.MarkUnreadResponse.thread:type_name -> codefoundry.v1.Thread
-	14,  // 96: codefoundry.v1.LabelThreadResponse.thread:type_name -> codefoundry.v1.Thread
-	14,  // 97: codefoundry.v1.AskThreadResponse.creator:type_name -> codefoundry.v1.Thread
-	8,   // 98: codefoundry.v1.ReportThreadRequest.status:type_name -> codefoundry.v1.ThreadReportStatus
-	14,  // 99: codefoundry.v1.ReportThreadResponse.thread:type_name -> codefoundry.v1.Thread
-	14,  // 100: codefoundry.v1.SetThreadBudgetResponse.thread:type_name -> codefoundry.v1.Thread
-	102, // 101: codefoundry.v1.ThreadListEvent.snapshot:type_name -> codefoundry.v1.ThreadListSnapshot
-	14,  // 102: codefoundry.v1.ThreadListEvent.updated:type_name -> codefoundry.v1.Thread
-	103, // 103: codefoundry.v1.ThreadListEvent.retired_usage:type_name -> codefoundry.v1.RetiredUsage
-	14,  // 104: codefoundry.v1.ThreadListSnapshot.threads:type_name -> codefoundry.v1.Thread
-	22,  // 105: codefoundry.v1.ThreadListSnapshot.retired_usage:type_name -> codefoundry.v1.UsageBucket
-	22,  // 106: codefoundry.v1.RetiredUsage.buckets:type_name -> codefoundry.v1.UsageBucket
-	107, // [107:107] is the sub-list for method output_type
-	107, // [107:107] is the sub-list for method input_type
-	107, // [107:107] is the sub-list for extension type_name
-	107, // [107:107] is the sub-list for extension extendee
-	0,   // [0:107] is the sub-list for field type_name
+	108, // 34: codefoundry.v1.Thread.auto_saved_after:type_name -> google.protobuf.Duration
+	104, // 35: codefoundry.v1.ThreadSnoozeEvent.args:type_name -> codefoundry.v1.ThreadSnoozeEvent.ArgsEntry
+	107, // 36: codefoundry.v1.ThreadSnoozeEvent.since:type_name -> google.protobuf.Timestamp
+	107, // 37: codefoundry.v1.BackgroundShell.started_at:type_name -> google.protobuf.Timestamp
+	7,   // 38: codefoundry.v1.ThreadFlag.level:type_name -> codefoundry.v1.ThreadFlagLevel
+	107, // 39: codefoundry.v1.ThreadFlag.set_at:type_name -> google.protobuf.Timestamp
+	107, // 40: codefoundry.v1.ApiRetry.retry_at:type_name -> google.protobuf.Timestamp
+	9,   // 41: codefoundry.v1.AgentRun.status:type_name -> codefoundry.v1.AgentRunStatus
+	107, // 42: codefoundry.v1.AgentRun.started_at:type_name -> google.protobuf.Timestamp
+	22,  // 43: codefoundry.v1.AgentRun.usage:type_name -> codefoundry.v1.UsageBucket
+	107, // 44: codefoundry.v1.LinkedPullRequest.linked_at:type_name -> google.protobuf.Timestamp
+	0,   // 45: codefoundry.v1.CreateThreadRequest.permission_mode:type_name -> codefoundry.v1.PermissionMode
+	25,  // 46: codefoundry.v1.CreateThreadRequest.new_worktree:type_name -> codefoundry.v1.NewWorktree
+	14,  // 47: codefoundry.v1.RetryThreadSetupResponse.thread:type_name -> codefoundry.v1.Thread
+	14,  // 48: codefoundry.v1.CancelThreadSetupResponse.thread:type_name -> codefoundry.v1.Thread
+	35,  // 49: codefoundry.v1.DiscardThreadSetupResponse.first:type_name -> codefoundry.v1.ThreadSetupMessage
+	35,  // 50: codefoundry.v1.DiscardThreadSetupResponse.queued:type_name -> codefoundry.v1.ThreadSetupMessage
+	14,  // 51: codefoundry.v1.CreateThreadResponse.thread:type_name -> codefoundry.v1.Thread
+	14,  // 52: codefoundry.v1.ForkThreadResponse.thread:type_name -> codefoundry.v1.Thread
+	41,  // 53: codefoundry.v1.ListThreadsRequest.filter:type_name -> codefoundry.v1.ThreadFilter
+	5,   // 54: codefoundry.v1.ThreadFilter.status:type_name -> codefoundry.v1.ThreadStatus
+	1,   // 55: codefoundry.v1.ThreadFilter.state:type_name -> codefoundry.v1.ThreadState
+	14,  // 56: codefoundry.v1.ListThreadsResponse.threads:type_name -> codefoundry.v1.Thread
+	22,  // 57: codefoundry.v1.ListThreadsResponse.retired_usage:type_name -> codefoundry.v1.UsageBucket
+	44,  // 58: codefoundry.v1.ListThreadsResponse.removed:type_name -> codefoundry.v1.RemovedThread
+	43,  // 59: codefoundry.v1.ListThreadsResponse.totals:type_name -> codefoundry.v1.ThreadTotals
+	107, // 60: codefoundry.v1.RemovedThread.removed_at:type_name -> google.protobuf.Timestamp
+	8,   // 61: codefoundry.v1.RemovedThread.report_status:type_name -> codefoundry.v1.ThreadReportStatus
+	107, // 62: codefoundry.v1.RemovedThread.report_at:type_name -> google.protobuf.Timestamp
+	109, // 63: codefoundry.v1.ThreadPendingDetail.input:type_name -> google.protobuf.Value
+	47,  // 64: codefoundry.v1.ThreadPendingDetail.questions:type_name -> codefoundry.v1.ThreadPendingQuestion
+	14,  // 65: codefoundry.v1.GetThreadResponse.thread:type_name -> codefoundry.v1.Thread
+	10,  // 66: codefoundry.v1.WaitThreadRequest.until:type_name -> codefoundry.v1.ThreadWaitCondition
+	108, // 67: codefoundry.v1.WaitThreadRequest.timeout:type_name -> google.protobuf.Duration
+	14,  // 68: codefoundry.v1.WaitThreadResponse.thread:type_name -> codefoundry.v1.Thread
+	44,  // 69: codefoundry.v1.WaitThreadResponse.removed:type_name -> codefoundry.v1.RemovedThread
+	50,  // 70: codefoundry.v1.WaitThreadResponse.asked:type_name -> codefoundry.v1.ThreadAsk
+	14,  // 71: codefoundry.v1.RenameThreadResponse.thread:type_name -> codefoundry.v1.Thread
+	14,  // 72: codefoundry.v1.RegenerateNameResponse.thread:type_name -> codefoundry.v1.Thread
+	14,  // 73: codefoundry.v1.RunInThreadResponse.thread:type_name -> codefoundry.v1.Thread
+	25,  // 74: codefoundry.v1.MoveThreadRequest.new_worktree:type_name -> codefoundry.v1.NewWorktree
+	14,  // 75: codefoundry.v1.MoveThreadResponse.thread:type_name -> codefoundry.v1.Thread
+	14,  // 76: codefoundry.v1.AddThreadProjectResponse.thread:type_name -> codefoundry.v1.Thread
+	14,  // 77: codefoundry.v1.LinkThreadPullRequestResponse.thread:type_name -> codefoundry.v1.Thread
+	23,  // 78: codefoundry.v1.LinkThreadPullRequestResponse.link:type_name -> codefoundry.v1.LinkedPullRequest
+	14,  // 79: codefoundry.v1.RemoveThreadProjectResponse.thread:type_name -> codefoundry.v1.Thread
+	110, // 80: codefoundry.v1.ThreadCheckout.status:type_name -> codefoundry.v1.GitStatus
+	11,  // 81: codefoundry.v1.MemberPlacement.outcome:type_name -> codefoundry.v1.PlacementOutcome
+	73,  // 82: codefoundry.v1.CheckPlacementResponse.members:type_name -> codefoundry.v1.MemberPlacement
+	14,  // 83: codefoundry.v1.ThreadCheckoutsResponse.thread:type_name -> codefoundry.v1.Thread
+	71,  // 84: codefoundry.v1.ThreadCheckoutsResponse.checkouts:type_name -> codefoundry.v1.ThreadCheckout
+	14,  // 85: codefoundry.v1.PinThreadResponse.thread:type_name -> codefoundry.v1.Thread
+	14,  // 86: codefoundry.v1.ArchiveThreadResponse.thread:type_name -> codefoundry.v1.Thread
+	14,  // 87: codefoundry.v1.SetThreadWorkspaceResponse.thread:type_name -> codefoundry.v1.Thread
+	107, // 88: codefoundry.v1.SnoozeThreadRequest.until:type_name -> google.protobuf.Timestamp
+	83,  // 89: codefoundry.v1.SnoozeThreadRequest.event:type_name -> codefoundry.v1.SnoozeEvent
+	105, // 90: codefoundry.v1.SnoozeEvent.args:type_name -> codefoundry.v1.SnoozeEvent.ArgsEntry
+	86,  // 91: codefoundry.v1.SnoozeEventsResponse.pull_requests:type_name -> codefoundry.v1.SnoozePullRequestEvents
+	87,  // 92: codefoundry.v1.SnoozeEventsResponse.plugins:type_name -> codefoundry.v1.SnoozePluginEvent
+	106, // 93: codefoundry.v1.SnoozePluginEvent.args:type_name -> codefoundry.v1.SnoozePluginEvent.ArgsEntry
+	14,  // 94: codefoundry.v1.SnoozeThreadResponse.thread:type_name -> codefoundry.v1.Thread
+	14,  // 95: codefoundry.v1.ClearSnoozeEndedResponse.thread:type_name -> codefoundry.v1.Thread
+	14,  // 96: codefoundry.v1.MarkUnreadResponse.thread:type_name -> codefoundry.v1.Thread
+	14,  // 97: codefoundry.v1.LabelThreadResponse.thread:type_name -> codefoundry.v1.Thread
+	14,  // 98: codefoundry.v1.AskThreadResponse.creator:type_name -> codefoundry.v1.Thread
+	8,   // 99: codefoundry.v1.ReportThreadRequest.status:type_name -> codefoundry.v1.ThreadReportStatus
+	14,  // 100: codefoundry.v1.ReportThreadResponse.thread:type_name -> codefoundry.v1.Thread
+	14,  // 101: codefoundry.v1.SetThreadBudgetResponse.thread:type_name -> codefoundry.v1.Thread
+	102, // 102: codefoundry.v1.ThreadListEvent.snapshot:type_name -> codefoundry.v1.ThreadListSnapshot
+	14,  // 103: codefoundry.v1.ThreadListEvent.updated:type_name -> codefoundry.v1.Thread
+	103, // 104: codefoundry.v1.ThreadListEvent.retired_usage:type_name -> codefoundry.v1.RetiredUsage
+	14,  // 105: codefoundry.v1.ThreadListSnapshot.threads:type_name -> codefoundry.v1.Thread
+	22,  // 106: codefoundry.v1.ThreadListSnapshot.retired_usage:type_name -> codefoundry.v1.UsageBucket
+	22,  // 107: codefoundry.v1.RetiredUsage.buckets:type_name -> codefoundry.v1.UsageBucket
+	108, // [108:108] is the sub-list for method output_type
+	108, // [108:108] is the sub-list for method input_type
+	108, // [108:108] is the sub-list for extension type_name
+	108, // [108:108] is the sub-list for extension extendee
+	0,   // [0:108] is the sub-list for field type_name
 }
 
 func init() { file_codefoundry_v1_thread_lifecycle_proto_init() }

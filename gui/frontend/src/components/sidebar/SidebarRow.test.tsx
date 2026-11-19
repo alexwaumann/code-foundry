@@ -733,6 +733,23 @@ describe("SidebarRow snoozed", () => {
     expect(screen.queryByTestId("row-snooze-left")).toBeNull();
   });
 
+  it("saved automatically (auto-tidy): the bookmark and Auto, nothing longer on the row", () => {
+    const row = renderSnoozed({ name: "Later work", savedAtMs: Date.now(), autoSavedAfterMs: 3 * 86_400_000 });
+    expect(row.textContent).toBe("Later workAuto");
+    const mark = screen.getByTestId("row-saved");
+    expect(mark.dataset.auto).toBe("true");
+    expect(mark.firstElementChild).toBe(screen.getByTestId("row-saved-icon"));
+    cleanup();
+    renderSnoozed({ name: "Later work", savedAtMs: Date.now(), autoSavedAfterMs: null });
+    expect(screen.getByTestId("row-saved").textContent).toBe("Saved");
+    expect(screen.getByTestId("row-saved").dataset.auto).toBeUndefined();
+    cleanup();
+    // Snoozed until an event, the event's label wins over Auto (the daemon drops the mark then anyway).
+    const evented = renderSnoozed({ name: "Later work", savedAtMs: Date.now(), autoSavedAfterMs: 3 * 86_400_000, snoozeEvent: { kind: "pull_request", target: "acme/web#812", condition: "checks_done", args: {}, title: "Fix login", pluginName: "", label: "#812 checks", waitingFor: "checks finish on #812", sinceMs: 1 } });
+    expect(evented.textContent).toBe("Later work#812 checks");
+    expect(screen.queryByTestId("row-saved")).toBeNull();
+  });
+
   it("an unnamed thread shows its id, muted", () => {
     renderSnoozed({ name: "", snoozedUntilMs: Date.now() + 3_600_000 + 1000 });
     expect(screen.getByTestId("thread-name").textContent).toBe("s-1");
@@ -1150,6 +1167,21 @@ describe("SidebarRow card (docs/notes/sidebar-thread-card.md)", () => {
     expect(ids(card)).toEqual(["tip-name", "tip-status", "tip-created-by", "tip-project", "tip-branch", "tip-model"]);
     cleanup();
     expect(within(openCard({ name: "Mine" })).queryByTestId("tip-created-by")).toBeNull();
+  });
+
+  it("an automatically saved thread's card says so in full, after the status; none for a thread the user saved", () => {
+    const card = openCard({ name: "Later work", state: "disconnected", savedAtMs: Date.now(), autoSavedAfterMs: 3 * 86_400_000 });
+    expect(text(card, "tip-auto-saved")).toBe("Saved automatically after 3 days without activity");
+    expect(ids(card).indexOf("tip-auto-saved")).toBe(1);
+    cleanup();
+    expect(within(openCard({ name: "Mine", savedAtMs: Date.now(), autoSavedAfterMs: null })).queryByTestId("tip-auto-saved")).toBeNull();
+    cleanup();
+    // A mark with no save (never published so) shows nothing.
+    expect(within(openCard({ name: "Gone", savedAtMs: null, autoSavedAfterMs: 86_400_000 })).queryByTestId("tip-auto-saved")).toBeNull();
+    cleanup();
+    // Snoozed until an event: the card says what it waits on, not that it was saved automatically.
+    const evented = openCard({ name: "Waits", state: "disconnected", savedAtMs: Date.now(), autoSavedAfterMs: 86_400_000, snoozeEvent: { kind: "pull_request", target: "acme/web#812", condition: "checks_done", args: {}, title: "Fix login", pluginName: "", label: "#812 checks", waitingFor: "checks finish on #812", sinceMs: 1 } });
+    expect(within(evented).queryByTestId("tip-auto-saved")).toBeNull();
   });
 });
 

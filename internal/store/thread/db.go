@@ -11,7 +11,7 @@ import (
 )
 
 // Persistence for the threads table (migrations 0003, 0006, 0008, 0009, 0011, 0014,
-// 0015, 0016, 0017, 0018, 0023, 0027, 0028, 0032, 0036, 0040, 0041, 0047, 0049 and 0058) and thread_pull_requests (0010, 0039, 0052); thread_usage and usage_retired
+// 0015, 0016, 0017, 0018, 0023, 0027, 0028, 0032, 0036, 0040, 0041, 0047, 0049 and 0058), thread_tidy (0066) and thread_pull_requests (0010, 0039, 0052); thread_usage and usage_retired
 // (0012) are in usage_db.go, which also deletes threads (retireThread). No process
 // survives a daemon restart. Status, its reason and StatusChangedAt are (0011): a disconnected
 // thread keeps the status it ended with.
@@ -109,7 +109,44 @@ func saveThread(ctx context.Context, db *sql.DB, s Thread) error {
 	if err != nil {
 		return fmt.Errorf("thread: save %s: %w", s.ID, err)
 	}
+	// Auto-tidy's state (AutoSavedAfter, ReturnedAt) lives in its own table, a row only
+	// while either is set (migration 0066).
+	if s.AutoSavedAfter > 0 || !s.ReturnedAt.IsZero() {
+		_, err = db.ExecContext(ctx, `INSERT INTO thread_tidy (thread_id, auto_saved_after_ms, returned_at) VALUES (?, ?, ?)
+			ON CONFLICT (thread_id) DO UPDATE SET auto_saved_after_ms = excluded.auto_saved_after_ms, returned_at = excluded.returned_at`,
+			s.ID, s.AutoSavedAfter.Milliseconds(), millis(s.ReturnedAt))
+	} else {
+		_, err = db.ExecContext(ctx, `DELETE FROM thread_tidy WHERE thread_id = ?`, s.ID)
+	}
+	if err != nil {
+		return fmt.Errorf("thread: save %s: auto-tidy state: %w", s.ID, err)
+	}
 	return nil
+}
+
+// tidyState is a thread_tidy row: Thread.AutoSavedAfter and Thread.ReturnedAt.
+type tidyState struct {
+	autoSavedAfter time.Duration
+	returnedAt     time.Time
+}
+
+// loadTidy reads auto-tidy's state per thread (thread_tidy) by thread id.
+func loadTidy(ctx context.Context, db *sql.DB) (map[string]tidyState, error) {
+	rows, err := db.QueryContext(ctx, `SELECT thread_id, auto_saved_after_ms, returned_at FROM thread_tidy`)
+	if err != nil {
+		return nil, fmt.Errorf("thread: load auto-tidy state: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+	out := map[string]tidyState{}
+	for rows.Next() {
+		var id string
+		var after, returned int64
+		if err := rows.Scan(&id, &after, &returned); err != nil {
+			return nil, fmt.Errorf("thread: load auto-tidy state: %w", err)
+		}
+		out[id] = tidyState{autoSavedAfter: time.Duration(after) * time.Millisecond, returnedAt: fromMillis(returned)}
+	}
+	return out, rows.Err()
 }
 
 func loadThreads(ctx context.Context, db *sql.DB) ([]Thread, error) {
@@ -192,12 +229,20 @@ func loadThreads(ctx context.Context, db *sql.DB) ([]Thread, error) {
 	if err != nil {
 		return nil, err
 	}
+	tidy, err := loadTidy(ctx, db)
+	if err != nil {
+		return nil, err
+	}
 	for i := range out {
 		id := out[i].ID
 		out[i].LinkedPullRequests = links[id]
 		out[i].Usage = usage[id]
 		out[i].Transcripts = transcripts[id]
 		out[i].AgentRuns = runs[id]
+		out[i].ReturnedAt = tidy[id].returnedAt
+		if !out[i].SavedAt.IsZero() {
+			out[i].AutoSavedAfter = tidy[id].autoSavedAfter // a mark outlives its save only if a write failed
+		}
 	}
 	return out, nil
 }
