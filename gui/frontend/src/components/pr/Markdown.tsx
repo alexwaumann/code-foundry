@@ -1,5 +1,6 @@
 import { memo, useMemo, type ReactNode } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
+import { WebLink } from "@/components/links/WebLink";
 import { Tip } from "@/components/ui/tooltip";
 import { REF_PROP, REF_TIGHT_PROP } from "@/lib/answerMarkdown";
 import { rehypePluginsFor, rehypePluginsInertFor, remarkPlugins, remarkTaskPlugins } from "@/lib/markdownPlugins";
@@ -7,14 +8,12 @@ import { CHIP_PROP, isRelativeHref, matchPath, type PathMatch } from "@/lib/path
 import { fitScrollbar } from "@/lib/scrollbarFit";
 import { taskItemOf, type TaskItem } from "@/lib/taskItems";
 import { cn } from "@/lib/utils";
-import { openUrl } from "@/stores/gh";
 import { resolveLink } from "./model";
 
 /**
- * A link: through openUrl (resolveLink: relative ones are github.com paths), or plain text
- * when it goes nowhere. With `open` (MarkdownExtras.openLink), a plain click asks it first
- * and opens the browser only when it declines; a cmd, ctrl or middle click always opens the
- * browser.
+ * A link: a WebLink (a click opens the browser, or `open` first; a right-click shows the
+ * app's link menu), resolved by resolveLink (relative ones are github.com paths), or plain
+ * text when it goes nowhere, with no menu.
  */
 function Link({ href, children, tip, open }: { href?: string | undefined; children?: ReactNode; tip?: string | undefined; open?: ((url: string) => boolean) | undefined }) {
   const url = resolveLink(href);
@@ -29,28 +28,9 @@ function Link({ href, children, tip, open }: { href?: string | undefined; childr
       </Tip>
     );
   return (
-    <Tip label={tip ?? (showsTarget(children, href, url) ? undefined : url)}>
-      <a
-        href={url}
-        onClick={(e) => {
-          // Never navigate the app's own webview: links open in the browser.
-          e.preventDefault();
-          if (open && isPlainClick(e) && open(url)) return;
-          void openUrl(url);
-        }}
-        onAuxClick={
-          open &&
-          ((e) => {
-            // A middle click is "somewhere else": the browser, as cmd+click.
-            if (e.button !== 1) return;
-            e.preventDefault();
-            void openUrl(url);
-          })
-        }
-      >
-        {children}
-      </a>
-    </Tip>
+    <WebLink url={url} tip={tip ?? (showsTarget(children, href, url) ? undefined : url)} open={open}>
+      {children}
+    </WebLink>
   );
 }
 
@@ -58,11 +38,6 @@ function Link({ href, children, tip, open }: { href?: string | undefined; childr
 function showsTarget(children: ReactNode, href: string | undefined, url: string): boolean {
   const text = Array.isArray(children) && children.length === 1 ? (children[0] as ReactNode) : children;
   return typeof text === "string" && (text === href || text === url);
-}
-
-/** A click with the main button and no cmd or ctrl (which mean "in the browser"). */
-function isPlainClick(e: Pick<MouseEvent, "button" | "metaKey" | "ctrlKey">): boolean {
-  return e.button === 0 && !e.metaKey && !e.ctrlKey;
 }
 
 const baseComponents: Components = {

@@ -9,11 +9,11 @@ import { inlineSpans, inlineText } from "@/api/plugin";
 import { Button } from "@/components/ui/button";
 import { CopyButton, CopyIcon } from "@/components/copy/CopyButton";
 import { DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { WebLink } from "@/components/links/WebLink";
 import { Tip } from "@/components/ui/tooltip";
 import { useNow } from "@/lib/clock";
 import { cn } from "@/lib/utils";
 import { usePending } from "@/stores/pluginSurfaces";
-import { openElementUrl } from "@/stores/pluginSurfaces";
 import { useRunAction } from "./actions";
 import { useFormCtx, useViewCtx } from "./context";
 import { useCopiedHere } from "./useCopiedHere";
@@ -38,20 +38,11 @@ function SpanView({ span }: { span: Span }) {
   const body = span.time ? <TimeText at={span.time.at} style={span.time.style} /> : span.duration ? <span className="tabular-nums">{formatFixedDuration(span.duration.ms)}</span> : span.text;
   const cls = cn(toneText[span.tone ?? ""], span.mono && "font-mono", span.strong && "font-semibold");
   if (span.url) {
-    const url = span.url;
+    // A click opens the browser (openUrl, as openElementUrl); a right-click shows the link menu.
     return (
-      <Tip label={span.hint ?? url}>
-        <a
-          href={url}
-          className={cn("text-link", cls)}
-          onClick={(e) => {
-            e.preventDefault();
-            openElementUrl(url);
-          }}
-        >
-          {body}
-        </a>
-      </Tip>
+      <WebLink url={span.url} tip={span.hint ?? span.url} className={cn("text-link", cls)}>
+        {body}
+      </WebLink>
     );
   }
   if (span.hint) {

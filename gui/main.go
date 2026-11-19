@@ -141,9 +141,15 @@ func main() {
 	// empty-page colour (#1e1e1e in dark mode) instead of BackgroundColour. So the
 	// window starts hidden and is shown here, with the webview's background cleared.
 	var shown sync.Once
+	// Nothing navigates the window away from the app (navguard.go): guarded once its page
+	// has loaded, at that page's origin. A web page goes to the browser instead.
+	setNavGuard(log, app.Browser.OpenURL)
 	window.OnWindowEvent(events.Mac.WebViewDidFinishNavigation, func(*application.WindowEvent) {
 		shown.Do(func() {
-			application.InvokeSync(func() { clearWebViewBackground(window.NativeWindow()) })
+			application.InvokeSync(func() {
+				clearWebViewBackground(window.NativeWindow())
+				guardNavigation(window.NativeWindow(), "main", log)
+			})
 			applyWindowFrame(window, app, p.WindowFrame(), log)
 			window.Show()
 			watchWindowFrame(window, app, p.WindowFrame(), log)
