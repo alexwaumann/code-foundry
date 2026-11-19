@@ -82,6 +82,7 @@ function plugin(o: Partial<PluginView> & { name: string }): PluginView {
     updateVersion: "",
     updateRegistry: "",
     heldUpdate: null,
+    wakes: [],
     ...o,
   };
 }

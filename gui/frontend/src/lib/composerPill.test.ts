@@ -75,6 +75,10 @@ describe("the segments' words", () => {
     [{ kind: "saved" as const }, "Saved for later", "Snoozed"],
     [{ kind: "woken" as const, at: now - 5 * 60_000 }, "Snooze ended 5m ago", "Snooze ended"],
     [{ kind: "woken" as const, at: null }, "Snooze ended", "Snooze ended"],
+    // Until an event (docs/notes/snooze-until-event.md): what it waits for, then what ended it.
+    [{ kind: "event" as const, eventKind: "pull_request" as const, waitingFor: "checks finish on #812" }, "Snoozed until checks finish on #812", "Snoozed"],
+    [{ kind: "woken" as const, at: now - 5 * 60_000, by: "#812 was merged" }, "#812 was merged · 5m ago", "Snooze ended"],
+    [{ kind: "woken" as const, at: null, by: "#812 was merged" }, "#812 was merged", "Snooze ended"],
   ])("%o", (s, full, short) => {
     expect(snoozeFull(s, now)).toBe(full);
     expect(snoozeShort(s)).toBe(short);

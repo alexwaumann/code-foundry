@@ -36,6 +36,8 @@ type Thread struct {
 	Subscriptions  []*v1.ThreadSubscription
 	// SubscribeWarnings are Subscribe's warnings.
 	SubscribeWarnings []string
+	// Events is SnoozeEvents' answer (nil: an empty one).
+	Events *v1.SnoozeEventsResponse
 	// SubscribeErr is Subscribe's error (after the call is recorded); SubscribeErrAfter
 	// its error for a request with after_ordinal only.
 	SubscribeErr, SubscribeErrAfter error
@@ -308,14 +310,33 @@ func (s *Thread) Snooze(_ context.Context, r *connect.Request[v1.SnoozeThreadReq
 		cur = proto.CloneOf(s.Current)
 	}
 	cur.Id = r.Msg.GetId()
-	cur.SnoozedUntil, cur.SavedAt = r.Msg.GetUntil(), nil
+	cur.SnoozedUntil, cur.SavedAt, cur.SnoozeEvent = r.Msg.GetUntil(), nil, nil
 	if r.Msg.GetSave() {
 		cur.SavedAt = timestamppb.New(time.UnixMilli(1))
+	}
+	if ev := r.Msg.GetEvent(); ev != nil {
+		cur.SavedAt = timestamppb.New(time.UnixMilli(1))
+		cur.SnoozeEvent = &v1.ThreadSnoozeEvent{Kind: "pull_request", Target: ev.GetPullRequest(), Condition: ev.GetCondition(),
+			WaitingFor: ev.GetCondition() + " on " + ev.GetPullRequest()}
+		if ev.GetPlugin() != "" {
+			cur.SnoozeEvent = &v1.ThreadSnoozeEvent{Kind: "plugin", Target: ev.GetPlugin(), Condition: "fired", Args: ev.GetArgs(), WaitingFor: ev.GetPlugin()}
+		}
 	}
 	if cur.SnoozedUntil != nil || cur.SavedAt != nil {
 		cur.ArchivedAt = nil
 	}
 	return connect.NewResponse(&v1.SnoozeThreadResponse{Thread: cur}), nil
+}
+
+// SnoozeEvents returns Events (default: none).
+func (s *Thread) SnoozeEvents(_ context.Context, r *connect.Request[v1.SnoozeEventsRequest]) (*connect.Response[v1.SnoozeEventsResponse], error) {
+	if err := s.do(r.Msg); err != nil {
+		return nil, err
+	}
+	if s.Events != nil {
+		return connect.NewResponse(proto.CloneOf(s.Events)), nil
+	}
+	return connect.NewResponse(&v1.SnoozeEventsResponse{}), nil
 }
 
 // Move echoes the request on Current (default: a DISCONNECTED thread without a project):

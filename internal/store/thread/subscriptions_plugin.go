@@ -114,17 +114,31 @@ func (m *Manager) resolvePluginTarget(ctx context.Context, subscriber, target st
 // name): every subscription to it whose args all have the same value in match is woken
 // with title and payload (JSON, "" for null), in subscription order. A one-shot one
 // that was woken goes. It returns how many subscribers were woken (one over its wake
-// limit is not).
+// limit is not). A snooze's subscription ends its thread's snooze instead, and counts.
 func (m *Manager) FirePlugin(plugin, display, source string, match map[string]string, title string, payload json.RawMessage) int {
-	target := plugin + "/" + source
 	m.mu.Lock()
-	defer m.mu.Unlock()
+	n, ends := m.firePluginLocked(plugin, display, source, match, title, payload)
+	live := m.endSnoozesLocked(ends)
+	m.mu.Unlock()
+	m.markSnoozesEnded(live)
+	return n
+}
+
+// firePluginLocked is FirePlugin under m.mu: it returns the snoozes the fire ended too.
+func (m *Manager) firePluginLocked(plugin, display, source string, match map[string]string, title string, payload json.RawMessage) (int, []snoozeEnd) {
+	target := plugin + "/" + source
 	s := m.subs
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	hit := s.pluginLocked(func(r *subRec) bool { return r.s.TargetID == target && argsCovered(r.s.Args, match) })
 	n := 0
+	var ends []snoozeEnd
 	for _, r := range hit {
+		if r.snooze != nil {
+			ends = append(ends, s.snoozeHitLocked(r, cmp.Or(display, plugin)+": "+oneLine(title, maxHeaderSummary)))
+			n++
+			continue
+		}
 		if m.fireLocked(r, func(sub Subscription, at time.Time) Message {
 			return pluginWake(sub, display, title, payload, at)
 		}) {
@@ -135,16 +149,25 @@ func (m *Manager) FirePlugin(plugin, display, source string, match map[string]st
 	if len(hit) > 0 {
 		m.log.Info("plugin wake fired", "plugin", plugin, "source", source, "matched", len(hit), "delivered", n)
 	}
-	return n
+	return n, ends
 }
 
 // PluginWakesGone ends plugin's subscriptions to sources (every source when sources is
 // nil): each subscriber gets one last wake, "<display>: <source> — source gone
 // (<reason>)" with a null payload, and the subscription is deleted. It returns how
-// many subscriptions went.
+// many subscriptions went. A snooze waiting on one ends, saying the event can no longer
+// happen.
 func (m *Manager) PluginWakesGone(plugin, display string, sources []string, reason string) int {
 	m.mu.Lock()
-	defer m.mu.Unlock()
+	n, ends := m.pluginWakesGoneLocked(plugin, display, sources, reason)
+	live := m.endSnoozesLocked(ends)
+	m.mu.Unlock()
+	m.markSnoozesEnded(live)
+	return n
+}
+
+// pluginWakesGoneLocked is PluginWakesGone under m.mu: it returns the snoozes it ended too.
+func (m *Manager) pluginWakesGoneLocked(plugin, display string, sources []string, reason string) (int, []snoozeEnd) {
 	s := m.subs
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -153,17 +176,24 @@ func (m *Manager) PluginWakesGone(plugin, display string, sources []string, reas
 		return p == plugin && (sources == nil || slices.Contains(sources, src))
 	})
 	if len(hit) == 0 {
-		return 0
+		return 0, nil
 	}
 	title := "source gone (" + reason + ")"
 	ids := make([]string, 0, len(hit))
+	var ends []snoozeEnd
 	for _, r := range hit {
-		m.fireLocked(r, func(sub Subscription, at time.Time) Message { return pluginWake(sub, display, title, nil, at) })
+		if r.snooze != nil {
+			_, src, _ := strings.Cut(r.s.TargetID, "/")
+			why := cmp.Or(display, plugin) + ": " + cmp.Or(r.snooze.title, src) + " can no longer fire (" + reason + ")"
+			ends = append(ends, snoozeEnd{thread: r.s.SubscriberID, sub: r.s.ID, why: why})
+		} else {
+			m.fireLocked(r, func(sub Subscription, at time.Time) Message { return pluginWake(sub, display, title, nil, at) })
+		}
 		ids = append(ids, r.s.ID)
 	}
 	s.removeLocked(ids)
 	m.log.Info("plugin wake subscriptions ended: the source is gone", "plugin", plugin, "reason", reason, "subscriptions", ids)
-	return len(ids)
+	return len(ids), ends
 }
 
 // PluginSubscriptions returns the live subscriptions to plugin's sources (every

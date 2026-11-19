@@ -169,6 +169,10 @@ type Options struct {
 	// the question failed. Subscribe bounds it and holds no lock. nil refuses wake
 	// subscriptions to pull requests.
 	LookupPullRequest func(ctx context.Context, target string) (PullRequestInfo, error)
+	// ThreadPullRequests are a thread's pull requests ("owner/name#123"), the one to show
+	// first (its branch's, then the ones Claude linked, newest first), for a snooze until a
+	// pull request event (snooze_event.go). nil: none.
+	ThreadPullRequests func(ctx context.Context, t Thread) []string
 	// WatchPullRequests is told the pull requests the subscriptions watch (sorted
 	// "owner/name#123") whenever that set changes, from New on, so the GitHub poll keeps
 	// them in scope. Called under the store's locks: it must not call back into it.
@@ -548,6 +552,10 @@ func New(ctx context.Context, opts Options) (*Manager, error) {
 		return nil, err
 	}
 	m.subs.changed = func(id string) { bus.Publish(opts.Bus, SubscriptionsChanged{SubscriberID: id}) }
+	// The events snoozed threads wait on (snooze_event.go).
+	if err := m.loadSnoozeEvents(ctx); err != nil {
+		return nil, err
+	}
 	m.subs.reportedAtStop = reported
 	m.mu.Lock()
 	m.rebuildLocked()

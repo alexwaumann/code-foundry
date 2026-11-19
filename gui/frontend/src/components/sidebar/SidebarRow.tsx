@@ -1,5 +1,7 @@
 import { memo, useContext, useEffect, useRef, useState, type ReactElement, type ReactNode, type SyntheticEvent } from "react";
 import { AlarmClock, ArrowRightLeft, BellRing, Bookmark, Bot, Check, ChevronDown, ChevronRight, CircleAlert, CircleCheck, CornerDownRight, GitBranch, House, Layers, OctagonX, Pin, SquareTerminal, type LucideIcon } from "lucide-react";
+import { SnoozeEventIcon } from "@/components/snooze/SnoozeEventIcon";
+import { dropdownMenuKit } from "@/components/thread/menuKit";
 import { useShallow } from "zustand/react/shallow";
 import { CLAUDE_ORANGE, ClaudeMark } from "@/components/icons/ClaudeMark";
 import { ProjectKindIcon } from "@/components/icons/ProjectKindIcon";
@@ -34,6 +36,7 @@ import { NotificationMark } from "./NotificationMark";
 import { TipLinkedPrs } from "./TipLinkedPrs";
 import { TipNotifications } from "./TipNotifications";
 import { useNameProvisional } from "@/shell/useThreadName";
+import type { ThreadSnoozeEventView } from "@/api/snoozeEvents";
 
 interface RowProps {
   row: Row;
@@ -194,7 +197,7 @@ function RowActions({ id, cursor, onShownChange }: { id: string; cursor: boolean
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" data-testid="row-snooze-menu" onClick={stop} onDoubleClick={stop}>
-            <SnoozePresetItems id={id} Item={DropdownMenuItem} Separator={DropdownMenuSeparator} />
+            <SnoozePresetItems id={id} Item={DropdownMenuItem} Separator={DropdownMenuSeparator} kit={dropdownMenuKit} />
           </DropdownMenuContent>
         </DropdownMenu>
       )}
@@ -478,6 +481,29 @@ function TipStatus({ id }: { id: string }) {
 }
 
 /**
+ * A snooze until an event in full (docs/notes/snooze-until-event.md): "Snoozed until checks finish
+ * on #812" while it waits, or what ended it ("#812 was merged") while the thread reads "snooze
+ * ended". Nothing otherwise.
+ */
+function TipSnoozeEvent({ id }: { id: string }) {
+  const tip = useThreadsStore(
+    useShallow((s) => {
+      const t = s.byId[id];
+      if (t?.snoozeEvent) return { kind: t.snoozeEvent.kind, text: `Snoozed until ${t.snoozeEvent.waitingFor}` };
+      if (t && t.snoozeEndedBy && statusLine(t).kind === "snoozeEnded") return { kind: null, text: t.snoozeEndedBy };
+      return null;
+    }),
+  );
+  if (!tip) return null;
+  return (
+    <div className="mb-[3px] flex items-start gap-2 leading-5" data-testid="tip-snooze-event">
+      {tip.kind ? <SnoozeEventIcon kind={tip.kind} className="mt-[3px] size-3.5 shrink-0 text-cf-text-muted" /> : <span className="size-3.5 shrink-0" aria-hidden />}
+      <span className="min-w-0 break-words">{tip.text}</span>
+    </div>
+  );
+}
+
+/**
  * "↳ Created by <name>" for a thread an agent created (the creator's current name); a
  * removed creator keeps the name it had then, muted and marked so. Nothing for the user's
  * threads.
@@ -529,6 +555,7 @@ function ThreadTipBody({ id, onMenuOpenChange }: { id: string; onMenuOpenChange:
         {name || id}
       </div>
       <TipStatus id={id} />
+      <TipSnoozeEvent id={id} />
       <TipWaiting id={id} />
       <TipCreatedBy id={id} />
       <TipMoving id={id} />
@@ -718,6 +745,25 @@ function ArchivedAge({ id }: { id: string }) {
   );
 }
 
+/** What a row's event mark needs of the thread's snooze event (a narrow, shallow-compared pick). */
+function eventMarkOf(e: ThreadSnoozeEventView | null | undefined): { kind: ThreadSnoozeEventView["kind"]; label: string } | null {
+  return e ? { kind: e.kind, label: e.label } : null;
+}
+
+/**
+ * A thread snoozed until an event (docs/notes/snooze-until-event.md): where a timed row shows the
+ * alarm and its countdown, a pull request or plug glyph and the event in a few words ("#812
+ * checks", "deploy"). The hover card says it in full.
+ */
+function EventMark({ kind, label }: { kind: ThreadSnoozeEventView["kind"]; label: string }) {
+  return (
+    <span className="ml-auto flex shrink-0 items-center gap-1 pl-1 text-caption-sm whitespace-nowrap text-cf-sidebar-muted-foreground" data-testid="row-snooze-event">
+      <SnoozeEventIcon kind={kind} className="size-3 shrink-0" />
+      <span className="tabular-nums">{label}</span>
+    </span>
+  );
+}
+
 /** A thread saved for later: a bookmark and "Saved", where a snoozed row counts down (it never wakes). */
 function SavedMark() {
   return (
@@ -736,7 +782,9 @@ function SavedMark() {
 function SnoozeLeft({ id }: { id: string }) {
   const until = useThreadsStore((s) => s.byId[id]?.snoozedUntilMs ?? null);
   const saved = useThreadsStore((s) => (s.byId[id]?.savedAtMs ?? null) !== null);
+  const event = useThreadsStore(useShallow((s) => eventMarkOf(s.byId[id]?.snoozeEvent)));
   const left = useNowSelect(30_000, (now) => (until === null ? "" : shortRemaining(until, now)));
+  if (event) return <EventMark kind={event.kind} label={event.label} />;
   if (saved) return <SavedMark />;
   if (until === null) return null;
   return (

@@ -234,6 +234,15 @@ type Thread struct {
 	// that clear SnoozedUntil clear it, and a timed Snooze replaces it. Snoozed reports
 	// either. Persisted.
 	SavedAt time.Time
+	// SnoozeEvent is what a thread snoozed until an event waits on (snooze_event.go): such
+	// a thread has SavedAt set (no wake time), and the event ends the snooze. Nil
+	// otherwise. Persisted in thread_snooze_events beside its subscription, not in the
+	// threads row. Never mutated: a new value replaces it.
+	SnoozeEvent *SnoozeEvent
+	// SnoozeEndedBy says in plain words why the last snooze until an event ended ("#812
+	// was merged"); "" when it ended otherwise. Meaningful while StatusReason is
+	// ReasonSnoozeEnded. Persisted in thread_snooze_events.
+	SnoozeEndedBy string
 	// TurnStartedAt is when the latest turn started: the first top-level message Claude
 	// read after the turn before it ended (lastTurn, turn.go). Zero before any. Published
 	// with the status while the thread runs and when its process ends. Persisted.
@@ -757,6 +766,12 @@ type Store interface {
 	// SaveForLater snoozes a thread with no wake time: everything Snooze does, but it
 	// sets SavedAt (kept when already set) and clears SnoozedUntil, and nothing wakes it.
 	SaveForLater(ctx context.Context, id string) (Thread, error)
+	// SnoozeUntilEvent snoozes a thread until an event (snooze_event.go): a save for later
+	// that a pull request's condition or a plugin's wake source ends, as a time ends a timed
+	// snooze. An event that cannot happen or already did is ErrFailedPrecondition.
+	SnoozeUntilEvent(ctx context.Context, id string, ev EventSnooze) (Thread, error)
+	// SnoozeEvents lists what thread id can be snoozed until now.
+	SnoozeEvents(ctx context.Context, id string) (SnoozeEvents, error)
 	// PutAwaySelf is Archive(true), Snooze or SaveForLater as the thread asks them of
 	// itself. Mid-turn it reports deferred and the end of the turn carries it out
 	// (putaway.go); otherwise it is the plain call, which outlives ctx.

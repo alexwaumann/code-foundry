@@ -166,6 +166,7 @@ var Pages = []Page{
 		{ID: "threads", Title: "Threads"},
 		{ID: "textgen", Title: "Text generation", Description: "Models for small jobs like naming a thread."},
 		{ID: "lifecycle", Title: "Lifecycle"},
+		{ID: "snooze", Title: "Events in “Until event”", Description: "What a snooze menu's Until event offers, when the thread can wait on it. The rest stay under More events."},
 		{ID: "files", Title: "Files", Description: "What Go to File, @ completion and text search find."},
 		{ID: "dictation", Title: "Dictation", Description: "Speak into any composer. Transcribed on this Mac with Whisper; audio never leaves it."},
 		{ID: "updates", Title: "Updates"},
@@ -224,6 +225,7 @@ const (
 	KeyDefaultEffort             = "threads.default_effort"
 	KeyDefaultWorktree           = "threads.default_worktree"
 	KeyDefaultSnooze             = "threads.default_snooze"
+	KeySnoozeEvents              = "threads.snooze_events"
 	KeyAutoName                  = "threads.auto_name"
 	KeyUtilityModel              = "models.utility"
 	KeyCacheTTL                  = "threads.cache_ttl_seconds"
@@ -433,7 +435,6 @@ var staticFields = []Field{
 		Default:     "true",
 		bind:        func(s *Settings) any { return &s.Threads.AutoName },
 	},
-	// General › Text generation.
 	{
 		Key: KeyUtilityModel, Group: GroupModels, Page: PageGeneral, Section: "textgen", Type: Enum, Title: "Utility model",
 		Description: "The model Code Foundry uses for its own small jobs. Always runs at low effort.",
@@ -453,6 +454,17 @@ var staticFields = []Field{
 		Default:     strconv.Itoa(defaultCloseGrace), Min: 1, Max: 120, Restart: true,
 		bind: func(s *Settings) any { return &s.Threads.CloseGraceSeconds },
 	},
+	{
+		// The GUI's Until event submenu (docs/notes/snooze-until-event.md): the pull request
+		// events and plugin wake sources it offers; the GUI draws the section as checkboxes.
+		Key: KeySnoozeEvents, Group: GroupThreads, Page: PageGeneral, Section: "snooze", Type: String, Title: "Events in Until event",
+		Description: "The events a snooze menu's Until event offers, separated by spaces: pull request events (" + strings.Join(SnoozePullRequestEvents, ", ") +
+			") and plugin wake sources as plugin:<plugin>/<source>. none for none.",
+		Default: DefaultSnoozeEvents, Placeholder: DefaultSnoozeEvents,
+		check: checkSnoozeEvents,
+		bind:  func(s *Settings) any { return &s.Threads.SnoozeEvents },
+	},
+	// General › Text generation.
 	// General › Dictation. The rest of the section is the dictation store's state
 	// (DictationService.Watch): the model, its download, this Mac.
 	// General › Files.
@@ -1097,4 +1109,29 @@ func checkBackdropChoice(o Options, values map[string]string) error {
 func checkRegistries(v string) error {
 	_, err := registry.ParseList(v)
 	return err
+}
+
+// SnoozePullRequestEvents are the pull request events threads.snooze_events takes, in the
+// Until event menu's order (thread.SnoozeConditions without the CLI's checks_passed and
+// checks_failed).
+var SnoozePullRequestEvents = []string{"checks_done", "review", "merged", "comment", "head_pushed", "closed", "review_requested"}
+
+// DefaultSnoozeEvents is threads.snooze_events' default: checks finish, reviewed, merged.
+const DefaultSnoozeEvents = "checks_done review merged"
+
+// snoozePluginEvent is a plugin wake source in threads.snooze_events.
+var snoozePluginEvent = regexp.MustCompile(`^plugin:[a-z0-9][a-z0-9-]{0,63}/[a-z0-9-]{1,64}$`)
+
+// checkSnoozeEvents checks threads.snooze_events: known pull request events and
+// plugin:<plugin>/<source> words, or none.
+func checkSnoozeEvents(v string) error {
+	if strings.TrimSpace(v) == "none" {
+		return nil
+	}
+	for _, w := range strings.Fields(v) {
+		if !slices.Contains(SnoozePullRequestEvents, w) && !snoozePluginEvent.MatchString(w) {
+			return fmt.Errorf("%q is not a pull request event (%s) or plugin:<plugin>/<source>", w, strings.Join(SnoozePullRequestEvents, ", "))
+		}
+	}
+	return nil
 }

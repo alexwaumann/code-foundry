@@ -52,7 +52,7 @@ func TestLayoutWayBack(t *testing.T) {
 	if err := Migrate(ctx, db, old); err != nil {
 		t.Fatalf("an old build after the way back: %v", err)
 	}
-	for _, table := range []string{"layout_spaces", "layout_threads", "layout_meta", "project_include_ignored", "notifications"} {
+	for _, table := range []string{"layout_spaces", "layout_threads", "layout_meta", "project_include_ignored", "notifications", "thread_snooze_events", "snooze_recent_events"} {
 		var n int
 		if err := db.QueryRowContext(ctx, `SELECT count(*) FROM sqlite_master WHERE type = 'table' AND name = ?`, table).Scan(&n); err != nil || n != 0 {
 			t.Errorf("%s: %d, %v; want it gone", table, n, err)

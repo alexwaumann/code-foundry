@@ -90,6 +90,26 @@ func TestThreadSnooze(t *testing.T) {
 			wantErr: command.ErrInvalidArgs, wantReqs: []proto.Message{}},
 		{name: "a past until fails without asking", args: map[string]string{"id": "s5", "until": "2001-01-01"}, current: busy,
 			wantErr: command.ErrInvalidArgs, wantReqs: []proto.Message{}},
+		// Until an event (docs/notes/snooze-until-event.md).
+		{name: "until a pull request event", args: map[string]string{"id": "s5", "until-pr": "#812", "on": "merged"}, current: busy,
+			wantMsg:  "snoozed thread drv (s5) until merged on #812",
+			wantReqs: []proto.Message{&v1.SnoozeThreadRequest{Id: "s5", Event: &v1.SnoozeEvent{PullRequest: "#812", Condition: "merged"}}}},
+		{name: "until checks finish by default", args: map[string]string{"id": "s5", "until-pr": "acme/web#812"}, current: idle,
+			wantReqs: []proto.Message{&v1.SnoozeThreadRequest{Id: "s5", Event: &v1.SnoozeEvent{PullRequest: "acme/web#812"}}}},
+		{name: "a thread snoozing itself until an event", ctx: command.Context{ActiveThreadID: "s5"}, args: map[string]string{"until-pr": "#812", "on": "checks_done"},
+			current: busy, wantReqs: []proto.Message{&v1.SnoozeThreadRequest{Id: "s5", ByThreadId: "s5", Event: &v1.SnoozeEvent{PullRequest: "#812", Condition: "checks_done"}}}},
+		{name: "until a plugin's wake source", args: map[string]string{"id": "s5", "until-plugin": "hello/tick", "arg": "every=1h\nn=2"}, current: idle,
+			wantReqs: []proto.Message{&v1.SnoozeThreadRequest{Id: "s5", Event: &v1.SnoozeEvent{Plugin: "hello/tick", Args: map[string]string{"every": "1h", "n": "2"}}}}},
+		{name: "an event and a time", args: map[string]string{"id": "s5", "until-pr": "#1", "until": "1h"}, current: idle,
+			wantErr: command.ErrInvalidArgs, wantReqs: []proto.Message{}},
+		{name: "an event and save", args: map[string]string{"id": "s5", "until-plugin": "a/b", "save": "true"}, current: idle,
+			wantErr: command.ErrInvalidArgs, wantReqs: []proto.Message{}},
+		{name: "two events", args: map[string]string{"id": "s5", "until-plugin": "a/b", "until-pr": "#1"}, current: idle,
+			wantErr: command.ErrInvalidArgs, wantReqs: []proto.Message{}},
+		{name: "on without a pull request", args: map[string]string{"id": "s5", "on": "merged", "until": "1h"}, current: idle,
+			wantErr: command.ErrInvalidArgs, wantReqs: []proto.Message{}},
+		{name: "arg without a plugin", args: map[string]string{"id": "s5", "arg": "a=b", "until-pr": "#1"}, current: idle,
+			wantErr: command.ErrInvalidArgs, wantReqs: []proto.Message{}},
 		{name: "missing a thread", args: map[string]string{"until": "1h"}, wantErr: command.ErrInvalidArgs},
 		{name: "an unknown thread fails in Run, not with a confirmation", args: map[string]string{"id": "s5", "until": "1h"},
 			backendErr: connect.NewError(connect.CodeNotFound, errors.New("nope")), wantCode: connect.CodeNotFound},
@@ -151,5 +171,37 @@ func TestThreadSnoozeNeverConfirms(t *testing.T) {
 	c, ok := reg.Get("thread.snooze")
 	if !ok || c.Confirm != "" || c.ConfirmIf != nil || c.DynamicConfirm != nil || c.Category != "Thread" {
 		t.Fatalf("thread.snooze = %+v", c)
+	}
+}
+
+// thread.snooze.events: each event with the thread.snooze flags that pick it, and the
+// daemon's answer as its JSON.
+func TestThreadSnoozeEvents(t *testing.T) {
+	reg, b, _ := newLifecycleRegistry(t)
+	res, err := reg.Invoke(context.Background(), command.Context{}, "thread.snooze.events", map[string]string{"id": "s5"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(res.Message, "nothing to snooze until") {
+		t.Errorf("empty = %q", res.Message)
+	}
+	b.Events = &v1.SnoozeEventsResponse{
+		PullRequests: []*v1.SnoozePullRequestEvents{{Target: "acme/web#812", Number: 812, Title: "Fix login", Conditions: []string{"checks_done", "merged"}}},
+		Plugins:      []*v1.SnoozePluginEvent{{Target: "hello/tick", Title: "Tick", PluginName: "Hello", Args: map[string]string{"every": "10s", "a": "b"}}},
+	}
+	res, err = reg.Invoke(context.Background(), command.Context{}, "thread.snooze.events", map[string]string{"id": "s5"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "#812 Fix login\n  --until-pr acme/web#812 --on checks_done\n  --until-pr acme/web#812 --on merged\n" +
+		"Tick (Hello): --until-plugin hello/tick --arg a=b --arg every=10s"
+	if res.Message != want {
+		t.Errorf("message =\n%s\nwant\n%s", res.Message, want)
+	}
+	if !proto.Equal(res.JSON.(proto.Message), b.Events) {
+		t.Errorf("json = %v", res.JSON)
+	}
+	if got := b.Requests(); !slices.EqualFunc(got, []proto.Message{&v1.SnoozeEventsRequest{Id: "s5"}, &v1.SnoozeEventsRequest{Id: "s5"}}, proto.Equal) {
+		t.Errorf("requests = %v", got)
 	}
 }

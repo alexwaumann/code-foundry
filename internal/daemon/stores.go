@@ -338,6 +338,9 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, threadEnv 
 		PullRequest:       pullRequestForWake(s.gh),
 		LookupPullRequest: lookupPullRequestForWake(s.gh),
 		WatchPullRequests: watchPullRequestsForWake(log.With("store", "gh"), s.gh),
+		// A snooze until a pull request event offers and resolves the thread's
+		// (docs/notes/snooze-until-event.md).
+		ThreadPullRequests: threadPullRequestTargets(s.project, s.gh),
 		// An archived thread's worktree-mode worktrees nobody else has go (cleanup_archived.go).
 		Archived: s.archived.archived,
 		// And a removed thread's, the same way (docs/notes/remove-cleans-worktrees.md).

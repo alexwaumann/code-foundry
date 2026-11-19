@@ -137,6 +137,7 @@ type Threads struct {
 	DefaultWorktree   string // WorktreeNew or WorktreeCurrent; read by the GUI's composer and by a thread move without a placement
 	AutoName          bool
 	DefaultSnooze     string // command.SnoozeDefaults; thread.snooze.default's preset, default "tomorrow"
+	SnoozeEvents      string // the Until event menu's events (KeySnoozeEvents); the GUI reads it
 	CacheTTLSeconds   int    // the API's prompt cache lifetime; default 3600
 	CloseGraceSeconds int
 }
