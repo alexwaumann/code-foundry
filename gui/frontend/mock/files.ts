@@ -476,7 +476,7 @@ export class MockFiles {
     }
     const rel = abs.slice(scope.length + 1);
     const single = TEMP_ROOTS.includes(scope);
-    return { url: `/preview/${grant}/${rel.split("/").map(encodeURIComponent).join("/")}`, scope: single ? abs : scope, singleFile: single };
+    return { url: `/preview/${grant}/${rel.split("/").map(encodeURIComponent).join("/")}`, scope: single ? abs : scope, singleFile: single, pageThread: "" };
   }
 
   /** GET /preview/<grant>/<path>: the file under the grant's scope (a directory serves its index.html), or undefined. */

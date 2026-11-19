@@ -231,6 +231,8 @@ export interface FilePreview {
   scope: string;
   /** The page may load only itself: its directory is home or otherwise too broad to hand it. */
   singleFile: boolean;
+  /** The thread whose pages directory holds the file, so the page is that thread's own; "" for any other file (and from an older daemon). */
+  pageThread: string;
 }
 
 /**
@@ -243,7 +245,7 @@ export async function previewFile(baseDir: string, path: string, conn: DaemonCon
   try {
     const r = await c.previewFile({ baseDir, path }, { signal });
     const { baseUrl } = await conn.resolveEndpoint();
-    return { url: new URL(r.url, baseUrl).toString(), scope: r.scope, singleFile: r.singleFile };
+    return { url: new URL(r.url, baseUrl).toString(), scope: r.scope, singleFile: r.singleFile, pageThread: r.pageThread };
   } catch (err) {
     throw orOutdatedDaemon(err);
   }

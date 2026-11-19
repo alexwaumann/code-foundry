@@ -223,7 +223,7 @@ func Run(ctx context.Context, opts Options) (retErr error) {
 	shots := shot.New()
 	// Terminals answer color queries from the theme; dark until the GUI publishes one.
 	st.terminal.SetColors(ctx, terminalColors(theme.DefaultFrame(theme.SchemeDark)))
-	filesystemAPI := api.NewFilesystem(st.home, st.project, grants).WithTemp(tempRoots).WithPagesOrigin(pagesOrigin(pagesPort)).
+	filesystemAPI := api.NewFilesystem(st.home, st.project, grants).WithTemp(tempRoots).WithPagesOrigin(pagesOrigin(pagesPort)).WithPagesRoot(p.Pages()).
 		WithIncludeIgnored(includeIgnored(st.settings)).WithRipgrep(st.ripgrep)
 	commands := command.NewRegistry()
 	facts := pluginFacts{thread: st.thread, project: st.project, gh: st.gh}

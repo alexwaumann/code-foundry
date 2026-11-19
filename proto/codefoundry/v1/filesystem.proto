@@ -559,4 +559,8 @@ message PreviewFileResponse {
   // config home, or is otherwise too broad to hand a page (so its relative links to other
   // files do not load).
   bool single_file = 3;
+  // The thread whose pages directory holds the file (<home>/pages/<thread id>/...): the
+  // page is that thread's own, so the GUI gives it the thread's bridge in a tab linked to
+  // it without reading the thread's log. Empty for any other file.
+  string page_thread = 4;
 }

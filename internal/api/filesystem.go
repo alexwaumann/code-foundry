@@ -36,6 +36,9 @@ type Filesystem struct {
 	// pagesOrigin is where the preview route is served (the daemon's pages listener);
 	// PreviewFile's URLs are on it. Empty: root-relative URLs.
 	pagesOrigin string
+	// pagesRoot is the directory the threads' pages directories are made under
+	// (WithPagesRoot); PreviewFile names the thread a file under it belongs to. Empty: none.
+	pagesRoot string
 	// includeAll reads the files.include_ignored setting's patterns (WithIncludeIgnored);
 	// nil: none.
 	includeAll func() []string
@@ -97,6 +100,34 @@ func (h *Filesystem) includes(p project.Project) []string {
 func (h *Filesystem) WithTemp(temps []string) *Filesystem {
 	h.temp = temps
 	return h
+}
+
+// WithPagesRoot tells PreviewFile where the threads' pages directories are (root/<thread
+// id>, paths.Paths.Pages), so it can say which thread a page belongs to.
+func (h *Filesystem) WithPagesRoot(root string) *Filesystem {
+	h.pagesRoot = root
+	if real, err := filepath.EvalSymlinks(root); err == nil {
+		h.pagesRoot = real
+	}
+	return h
+}
+
+// pageThread is the id of the thread whose pages directory holds the file at real (its
+// symlinks followed): the first directory under the pages root. "" for a file anywhere
+// else, and for one directly in the root (the welcome page), which is no thread's.
+func (h *Filesystem) pageThread(real string) string {
+	if h.pagesRoot == "" || real == "" {
+		return ""
+	}
+	rel, err := filepath.Rel(h.pagesRoot, real)
+	if err != nil || !filepath.IsLocal(rel) {
+		return ""
+	}
+	id, rest, ok := strings.Cut(filepath.ToSlash(rel), "/")
+	if !ok || rest == "" {
+		return ""
+	}
+	return id
 }
 
 // readRoots are the trees the file viewer reads.
@@ -394,7 +425,7 @@ func (h *Filesystem) PreviewFile(_ context.Context, req *connect.Request[v1.Prev
 		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("preview %s: %w", f.Path, err))
 	}
 	url := h.pagesOrigin + preview.URL(grant, filepath.ToSlash(rel))
-	return connect.NewResponse(&v1.PreviewFileResponse{Url: url, Scope: scope, SingleFile: single}), nil
+	return connect.NewResponse(&v1.PreviewFileResponse{Url: url, Scope: scope, SingleFile: single, PageThread: h.pageThread(f.RealPath)}), nil
 }
 
 // previewGuarded reports whether the file at p, or where its symlinks lead, is guarded;
