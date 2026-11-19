@@ -279,3 +279,31 @@ for (const scheme of ["dark", "light"] as const) {
     }
   });
 }
+
+/** SHOTS=<dir>: the rail with Needs you rows and no Active ones (one separator, above the bottom sections), and with Ember alone above them; dark and light. */
+for (const scheme of ["dark", "light"] as const) {
+  test(`sidebar rail separators screenshots (${scheme})`, async ({ page }, info) => {
+    const shots = process.env.SHOTS;
+    test.skip(!shots || info.project.name !== "webkit", "SHOTS=<dir> with WebKit only");
+    const at = (name: string) => `${shots ?? ""}/${name}${scheme === "light" ? "-light" : ""}.png`;
+    await resetMock();
+    for (const id of ["s-3", "s-4", "s-5", "s-6"]) await mockPost(`thread/archive?id=${id}`);
+    await page.emulateMedia({ colorScheme: scheme });
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await openApp(page);
+    await collapse(page);
+    await expect(page.getByTestId("rail-active")).toHaveCount(0);
+    await page.mouse.move(900, 700);
+    await still(page);
+    const clip = { x: 0, y: 0, width: 120, height: 800 };
+    await page.screenshot({ path: at("rail-no-active"), clip });
+
+    await mockPost("ember?enabled=true");
+    await mockPost("thread/archive?id=s-2");
+    await expect(page.getByTestId("rail-ember")).toBeVisible();
+    await expect(page.getByTestId("rail-needs")).toHaveCount(0);
+    await page.mouse.move(900, 700);
+    await still(page);
+    await page.screenshot({ path: at("rail-ember-only"), clip });
+  });
+}

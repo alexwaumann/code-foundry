@@ -310,3 +310,26 @@ for (const scheme of ["dark", "light"] as const) {
     });
   });
 }
+
+/** SHOTS=<dir>: the five section headers in one look (label left; scope, count, chevron right), one hovered, WebKit at 2x, dark and light. */
+for (const scheme of ["dark", "light"] as const) {
+  test.describe(`header screenshots (${scheme})`, () => {
+    test.use({ colorScheme: scheme, deviceScaleFactor: 2 });
+    test("the section headers", async ({ page }, info) => {
+      const shots = process.env.SHOTS;
+      test.skip(!shots || info.project.name !== "webkit", "SHOTS=<dir> with WebKit only");
+      await mockPost("thread/archive?id=s-3");
+      await mockPost("thread/snooze?id=s-6&until=2h");
+      await openApp(page);
+      const sidebar = await page.getByTestId("sidebar").boundingBox();
+      if (!sidebar) throw new Error("no sidebar");
+      const clip = { x: sidebar.x, y: sidebar.y, width: sidebar.width + 12, height: sidebar.height };
+      await page.mouse.move(640, 400);
+      await page.waitForTimeout(350);
+      await page.screenshot({ path: `${String(shots)}/headers-${scheme}.png`, clip });
+      await page.getByTestId("needs-label").hover({ force: true });
+      await page.waitForTimeout(350);
+      await page.screenshot({ path: `${String(shots)}/headers-hover-${scheme}.png`, clip: { ...clip, height: 220 } });
+    });
+  });
+}

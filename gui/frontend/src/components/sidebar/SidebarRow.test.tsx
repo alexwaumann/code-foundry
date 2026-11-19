@@ -763,10 +763,12 @@ describe("SidebarRow footer headers", () => {
     ["working", "Working", 2, false],
     ["snoozed", "Snoozed", 3, true],
     ["archived", "Archived", 5, true],
-  ] as const)("%s: label and count, a toggle button", (section, label, count, collapsed) => {
+  ] as const)("%s: label and count, a toggle button named by them", (section, label, count, collapsed) => {
     render(<SidebarRow row={{ key: `h:${section}`, kind: "header", section, label, count, collapsed }} selected={false} cursor={false} onActivate={() => undefined} />);
-    const button = screen.getByTestId(`${section}-header`);
-    expect(button.textContent).toBe(`${label} ${String(count)}`);
+    const button = screen.getByRole("button", { name: `${label} ${String(count)}` });
+    expect(button).toBe(screen.getByTestId(`${section}-header`));
+    expect(screen.getByTestId(`${section}-label`).textContent).toBe(label);
+    expect(screen.getByTestId(`${section}-count`).textContent).toBe(String(count));
     expect(button.getAttribute("aria-expanded")).toBe(collapsed ? "false" : "true");
   });
 

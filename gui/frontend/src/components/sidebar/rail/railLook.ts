@@ -23,6 +23,30 @@ export function railGroupHeight(n: number): number {
   return n <= 0 ? 0 : n * RAIL_TILE + (n - 1) * RAIL_GAP;
 }
 
+/**
+ * The rail's groups under the menu pane, top to bottom: Ember's flame, Needs you, Active, the
+ * Working / Snoozed / Archived icons, and the bottom (a pending update's tile, the footer's
+ * buttons, the daemon's dot), which is always there.
+ */
+export const RAIL_GROUPS = ["ember", "needs", "active", "sections", "bottom"] as const;
+export type RailGroupName = (typeof RAIL_GROUPS)[number];
+
+/**
+ * Which groups a separator goes before: only between two groups that both show, so never two in
+ * a row and none before the first group. A group with nothing to show is skipped, and the
+ * separator is the later group's (with no Needs you or Active rows, Ember's flame and the bottom
+ * sections meet at the bottom's separator, which stays where it always is).
+ */
+export function railSeparatorsBefore(present: Readonly<Record<RailGroupName, boolean>>): Record<RailGroupName, boolean> {
+  const before = { ember: false, needs: false, active: false, sections: false, bottom: false };
+  let above = false;
+  for (const g of RAIL_GROUPS) {
+    before[g] = present[g] && above;
+    above ||= present[g];
+  }
+  return before;
+}
+
 /** What a row's icon on the rail looks like: the glyph, its colour class, and what it stands for (for tests and screen readers' data). */
 export interface RailLook {
   icon: LucideIcon;

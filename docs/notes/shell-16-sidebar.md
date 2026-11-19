@@ -43,13 +43,21 @@ sidebar sits under the top bar, which holds the app name and back and forward.
   it is in no section, as today.
 - **Scope**: all spaces, or the current space. With either, a thread of the current space that asks
   is never under Active. The header shows while any thread in any space asks, so the scope button
-  stays reachable when this space has none (its count is then hidden). Most recent ask first.
+  stays reachable when this space has none (its count then says 0). Most recent ask first.
 - **The scope button** is one pill that names the scope in force ("All spaces" with a layers icon,
   "This space" with a square) and switches it with `settings.set sidebar.needs_scope`: a command,
-  global, so every window follows. It fits beside "Needs you N" at the 260px minimum width. Its
-  tooltip says what a click does (not on screen).
-- **Counts**: Needs you shows its count always (the inbox's number); Active only while collapsed.
-  Both collapse, remembered per window (localStorage), as the footers' are.
+  global, so every window follows. It sits on the header's right, just before the count, and fits
+  at the 260px minimum width (the label truncates first). Its tooltip says what a click does (not
+  on screen). A click on it switches the scope and never collapses the section.
+- **Headers**: Needs you's and Active's have the footers' look (`SectionHeaderBar` in
+  `SidebarRow.tsx`): the label on the rows' 8px inset, the count and the chevron on the right,
+  the chevron's box ending on the sidebar's edge, the whole bar the collapse target with its hover
+  fill. Since a button cannot hold the scope button, the collapse button is laid over the bar
+  (`absolute inset-0`, named "Needs you 2") and the scope button sits above it (`z-10`). Before,
+  the chevron led on the left and the count sat beside the label.
+- **Counts**: both always show, as the footers' do: Needs you's is the inbox's number (0 under
+  "This space" while only another space asks), Active's its rows. Both collapse, remembered per
+  window (localStorage), as the footers' are.
 - **Current space only** for Active, Working and Snoozed; Archived lists every space's. Each
   thread's space is `spaceOfThread` over the layout slice.
 - **A separate list component**, not a generalised `SidebarList`: the classic list goes when the

@@ -142,9 +142,9 @@ describe("the shell sidebar list", () => {
     expect(rowKeys()).toEqual(["h:needs", "s:s-2", "h:active", "d:d-1", "d:d-2", "s:s-5", "s:s-4", "s:s-3", "s:s-1"]);
     // s-6 was started by a thread: in no section, though it asks.
     expect(rowOf("s:s-6")).toBeNull();
-    expect(within(screen.getByTestId("needs-header")).getByTestId("needs-count").textContent).toBe("1");
-    // Active shows its count only while collapsed.
-    expect(within(screen.getByTestId("active-header")).queryByTestId("active-count")).toBeNull();
+    expect(screen.getByTestId("needs-count").textContent).toBe("1");
+    // Active shows its count whether open or not, as the footers do.
+    expect(screen.getByTestId("active-count").textContent).toBe("6");
   });
 
   it("a Needs you row: the project and the kind of ask, then the title; no controls", () => {
@@ -322,7 +322,7 @@ describe("the shell sidebar list", () => {
     expect(runs.at(-1)).toEqual({ name: "settings.set", args: { key: "sidebar.needs_scope", value: "all" } });
   });
 
-  it("collapsing Needs you keeps its count and hides its rows; Active shows its count once collapsed", () => {
+  it("collapsing Needs you or Active keeps its count and hides its rows", () => {
     render(<ShellSidebarList bodyHeight={800} />);
     fireEvent.click(screen.getByTestId("needs-header"));
     expect(rowOf("s:s-2")).toBeNull();
@@ -418,6 +418,56 @@ describe("the shell sidebar list", () => {
       await seedLayout({ ...two("sp-a"), rev: 4 });
     });
     expect(rowKeys()).toEqual(["h:needs", "h:active", "s:s-5", "s:s-4", "s:s-1"]);
+    // Its header stays for the scope button, and says 0.
+    expect(screen.getByTestId("needs-count").textContent).toBe("0");
+  });
+});
+
+/**
+ * Needs you's and Active's headers have the footers' look (SectionHeaderBar): the label, then on
+ * the right the scope button (Needs you's), the count and the chevron. The insets and edges are
+ * e2e's (sidebar.spec.ts).
+ */
+describe("the Needs you and Active headers", () => {
+  /** A header row's parts, left to right: the collapse button laid over it, then what it draws. */
+  const parts = (key: string) => [...rowOf(key).querySelectorAll("[data-testid], svg")].map((e) => e.getAttribute("data-testid") ?? (e.closest('[data-testid="needs-scope"]') ? null : e.getAttribute("class")?.match(/lucide-chevron-\w+/)?.[0])).filter((t) => t != null);
+
+  it("label, then the scope button, the count and the chevron on the right; Active without a scope button", () => {
+    render(<ShellSidebarList bodyHeight={800} />);
+    expect(parts("h:needs")).toEqual(["needs-header", "needs-label", "needs-scope", "needs-count", "lucide-chevron-down"]);
+    expect(parts("h:active")).toEqual(["active-header", "active-label", "active-count", "lucide-chevron-down"]);
+    expect(screen.getByTestId("needs-label").textContent).toBe("Needs you");
+    expect(screen.getByTestId("active-label").textContent).toBe("Active");
+  });
+
+  it("the collapse button is named by the label and count and says whether the section is open", () => {
+    render(<ShellSidebarList bodyHeight={800} />);
+    const needs = screen.getByRole("button", { name: "Needs you 1" });
+    expect(needs).toBe(screen.getByTestId("needs-header"));
+    expect(needs.getAttribute("aria-expanded")).toBe("true");
+    expect(screen.getByRole("button", { name: "Active 6" })).toBe(screen.getByTestId("active-header"));
+    fireEvent.click(needs);
+    expect(needs.getAttribute("aria-expanded")).toBe("false");
+    expect(parts("h:needs").at(-1)).toBe("lucide-chevron-right");
+  });
+
+  it("a click on the scope button switches the scope and never collapses Needs you; a click on the header does", async () => {
+    render(<ShellSidebarList bodyHeight={800} />);
+    fireEvent.click(screen.getByTestId("needs-scope"));
+    await settle();
+    expect(runs).toEqual([{ name: "settings.set", args: { key: "sidebar.needs_scope", value: "space" } }]);
+    expect(useShellSidebarStore.getState().needsCollapsed).toBe(false);
+    expect(rowOf("s:s-2")).toBeTruthy();
+    fireEvent.click(screen.getByTestId("needs-header"));
+    expect(useShellSidebarStore.getState().needsCollapsed).toBe(true);
+    expect(runs).toHaveLength(1);
+  });
+
+  it("a press on the scope button or the header keeps the focus where it is", () => {
+    render(<ShellSidebarList bodyHeight={800} />);
+    for (const id of ["needs-scope", "needs-header", "active-header"]) {
+      expect(fireEvent.mouseDown(screen.getByTestId(id))).toBe(false);
+    }
   });
 });
 

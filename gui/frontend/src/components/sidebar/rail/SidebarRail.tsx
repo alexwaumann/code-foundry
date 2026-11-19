@@ -23,7 +23,7 @@ import { useSidebarDashboard } from "../useLinkedPrs";
 import { useShellListRows } from "../shell/listRows";
 import { ThreadListbox } from "../shell/ThreadListbox";
 import { RailGroup, type RailScrollTo } from "./RailGroup";
-import { RAIL_NEEDS_MAX, RAIL_WIDTH, railTileClass } from "./railLook";
+import { RAIL_NEEDS_MAX, RAIL_WIDTH, railSeparatorsBefore, railTileClass, type RailGroupName } from "./railLook";
 import { RailArchived, RailSnoozed, RailWorking } from "./RailSections";
 
 /**
@@ -31,8 +31,10 @@ import { RailArchived, RailSnoozed, RailWorking } from "./RailSections";
  * (docs/notes/sidebar-rail.md). Top to bottom: New thread and search in a small pane, Ember's
  * flame, Needs you (at most four icons tall, then it scrolls), Active (the height left, scrolls),
  * then pinned to the bottom Working, Snoozed and Archived (each a card of its rows on hover), a
- * pending update's tile, and the footer's palette, usage and settings buttons and the daemon's dot. Each row's icon behaves as its expanded row does; no
- * section headers, no scope toggle (the rail lists by the scope in force), no resize handle.
+ * pending update's tile, and the footer's palette, usage and settings buttons and the daemon's dot.
+ * A hairline separates two groups only when both show (railSeparatorsBefore). Each row's icon
+ * behaves as its expanded row does; no section headers, no scope toggle (the rail lists by the
+ * scope in force), no resize handle.
  */
 export function SidebarRail() {
   useSidebarDashboard();
@@ -47,7 +49,7 @@ export function SidebarRail() {
   );
 }
 
-/** A 16px wide hairline in the divider colour between the rail's groups. */
+/** A 16px wide hairline in the divider colour between two of the rail's groups. */
 function RailSeparator() {
   return <div className="my-1.5 h-px w-4 shrink-0 bg-cf-divider" role="separator" data-testid="rail-separator" />;
 }
@@ -108,7 +110,7 @@ function RailSearch() {
   );
 }
 
-/** Ember's flame alone, while Ember's row would show: the row's click and menu; its name and line in the tooltip. A separator under it. */
+/** Ember's flame alone, while Ember's row would show: the row's click and menu; its name and line in the tooltip. Its separator is the list's (RailList). */
 function RailEmber() {
   const threadId = useShownEmberThreadId();
   if (!threadId) return null;
@@ -121,45 +123,42 @@ function RailEmberShown({ threadId }: { threadId: string }) {
   const selected = useEmberSelected(threadId);
   const cursor = useUiStore((s) => s.cursorKey === EMBER_ROW_KEY);
   return (
-    <>
-      <ContextMenu modal={false}>
-        <Tip
-          side="right"
-          label={
-            <span className="flex flex-col">
-              <span className="font-semibold">Ember</span>
-              <EmberLine threadId={threadId} />
-            </span>
-          }
-        >
-          <ContextMenuTrigger asChild>
-            <div
-              id={`row-${EMBER_ROW_KEY}`}
-              role="option"
-              aria-selected={selected}
-              aria-label="Ember"
-              data-testid="rail-ember"
-              data-cursor={cursor || undefined}
-              data-flame={flame}
-              className={cn(
-                railTileClass(selected, false),
-                "[--wails-draggable:no-drag]",
-                // The keyboard cursor while the rail's list has focus (its arrows reach this icon).
-                cursor && "[[data-testid=sidebar-rail-body]:has([data-testid=rail-list]:focus)_&]:ring-1 [[data-testid=sidebar-rail-body]:has([data-testid=rail-list]:focus)_&]:ring-cf-focus [[data-testid=sidebar-rail-body]:has([data-testid=rail-list]:focus)_&]:ring-inset",
-              )}
-              onClick={() => {
-                useUiStore.getState().setCursor(null);
-                openEmber(threadId);
-              }}
-            >
-              <Flame state={flame} size="nav" />
-            </div>
-          </ContextMenuTrigger>
-        </Tip>
-        <EmberRowMenu threadId={threadId} />
-      </ContextMenu>
-      <RailSeparator />
-    </>
+    <ContextMenu modal={false}>
+      <Tip
+        side="right"
+        label={
+          <span className="flex flex-col">
+            <span className="font-semibold">Ember</span>
+            <EmberLine threadId={threadId} />
+          </span>
+        }
+      >
+        <ContextMenuTrigger asChild>
+          <div
+            id={`row-${EMBER_ROW_KEY}`}
+            role="option"
+            aria-selected={selected}
+            aria-label="Ember"
+            data-testid="rail-ember"
+            data-cursor={cursor || undefined}
+            data-flame={flame}
+            className={cn(
+              railTileClass(selected, false),
+              "[--wails-draggable:no-drag]",
+              // The keyboard cursor while the rail's list has focus (its arrows reach this icon).
+              cursor && "[[data-testid=sidebar-rail-body]:has([data-testid=rail-list]:focus)_&]:ring-1 [[data-testid=sidebar-rail-body]:has([data-testid=rail-list]:focus)_&]:ring-cf-focus [[data-testid=sidebar-rail-body]:has([data-testid=rail-list]:focus)_&]:ring-inset",
+            )}
+            onClick={() => {
+              useUiStore.getState().setCursor(null);
+              openEmber(threadId);
+            }}
+          >
+            <Flame state={flame} size="nav" />
+          </div>
+        </ContextMenuTrigger>
+      </Tip>
+      <EmberRowMenu threadId={threadId} />
+    </ContextMenu>
   );
 }
 
@@ -178,11 +177,20 @@ function splitMain(main: readonly ShellRow[]): { needs: ShellRow[]; active: Shel
 /**
  * The rail's list and footer: Needs you and Active in the expanded list's listbox behaviour
  * (ThreadListbox: keys, cursor, click, context menu), each group scrolling on its own; then the
- * bottom of the rail.
+ * bottom of the rail. It places every separator under the menu pane, the one after Ember's flame
+ * too, since only it knows which groups show.
  */
 function RailList() {
   const { main, headers, footers } = useShellListRows({ expandAll: true });
   const { needs, active } = splitMain(main);
+  const ember = useShownEmberThreadId() !== "";
+  const separators = railSeparatorsBefore({
+    ember,
+    needs: needs.length > 0,
+    active: active.length > 0,
+    sections: headers.working !== null || headers.snoozed !== null || headers.archived !== null,
+    bottom: true,
+  });
   const keyRows = [...needs, ...active];
   const scrollNeeds = useRef<RailScrollTo>(null);
   const scrollActive = useRef<RailScrollTo>(null);
@@ -198,36 +206,41 @@ function RailList() {
           <>
             {needs.length > 0 && (
               <>
+                {separators.needs && <RailSeparator />}
                 <RailGroup rows={needs} selectedKey={selectedKey} cursorKey={cursorKey} onActivate={activate} scrollTo={scrollNeeds} maxIcons={RAIL_NEEDS_MAX} testId="rail-needs" />
-                <RailSeparator />
               </>
             )}
-            {active.length > 0 && <RailGroup rows={active} selectedKey={selectedKey} cursorKey={cursorKey} onActivate={activate} scrollTo={scrollActive} testId="rail-active" />}
+            {active.length > 0 && (
+              <>
+                {separators.active && <RailSeparator />}
+                <RailGroup rows={active} selectedKey={selectedKey} cursorKey={cursorKey} onActivate={activate} scrollTo={scrollActive} testId="rail-active" />
+              </>
+            )}
           </>
         )}
       </ThreadListbox>
-      <RailFooter headers={headers} footers={footers} />
+      <RailFooter headers={headers} footers={footers} separators={separators} />
     </>
   );
 }
 
 /**
- * Working, Snoozed and Archived (each while the expanded sidebar shows it) after a separator, then
- * a pending update's tile, the footer's buttons and the daemon's dot.
+ * Working, Snoozed and Archived (each while the expanded sidebar shows it), then a pending update's
+ * tile, the footer's buttons and the daemon's dot; a separator before either where the list says.
  */
-function RailFooter({ headers, footers }: { headers: Readonly<Record<FooterSection, HeaderRow | null>>; footers: Readonly<Record<FooterSection, Row[]>> }) {
+function RailFooter({ headers, footers, separators }: { headers: Readonly<Record<FooterSection, HeaderRow | null>>; footers: Readonly<Record<FooterSection, Row[]>>; separators: Readonly<Record<RailGroupName, boolean>> }) {
   const { working, snoozed, archived } = headers;
   return (
     <div className="flex w-full shrink-0 flex-col items-center pb-2" data-testid="rail-footer">
       {(working || snoozed || archived) && (
         <>
-          <RailSeparator />
+          {separators.sections && <RailSeparator />}
           {working && <RailWorking header={working} rows={footers.working} />}
           {snoozed && <RailSnoozed header={snoozed} rows={footers.snoozed} />}
           {archived && <RailArchived header={archived} rows={footers.archived} />}
         </>
       )}
-      <RailSeparator />
+      {separators.bottom && <RailSeparator />}
       <UpdateTile />
       <PaletteButton className={RAIL_BUTTON} tooltipSide="right" />
       <UsageButton className={RAIL_BUTTON} tooltipSide="right" />
