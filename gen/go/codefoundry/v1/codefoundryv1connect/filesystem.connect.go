@@ -192,19 +192,20 @@ type FilesystemServiceClient interface {
 	// its folder is locked, or the folder or volume takes no writes. ResourceExhausted: the
 	// disk is full. PermissionDenied: macOS's privacy protection refused the write.
 	WriteFile(context.Context, *connect.Request[v1.WriteFileRequest]) (*connect.Response[v1.WriteFileResponse], error)
-	// PreviewFile grants the File tab's HTML preview a URL on the daemon's loopback
+	// PreviewFile grants the File tab's HTML preview a URL on the daemon's pages
 	// listener that serves the file, and everything else under its scope, without the
 	// bearer token: the scope is the registered checkout holding the file, else its
 	// directory. A sandboxed frame loads the page from there so its scripts run and its
 	// relative links, stylesheets, scripts and images resolve. The grant is an
 	// unguessable id in the URL, scoped to that directory tree and never reaching above
 	// it, outside the home directory and the temp folders or into a protected folder
-	// (symlinks resolved); it lasts until the daemon stops. A scope is never home itself, a
-	// temp folder, the config home or an ancestor of it, or a credentials folder: a file
-	// whose directory is one of those gets a grant for the file alone (single_file). path is
-	// as for ReadFile: InvalidArgument when ReadFile refuses it, when it is not a regular
-	// file, or in a protected folder (the config home outside its checkouts, ~/.ssh,
-	// ~/Library and other credential folders).
+	// (symlinks resolved). Its id is derived from the scope and a secret the daemon keeps,
+	// so the same scope gets the same id, and its page the same origin, after a restart. A
+	// scope is never home itself, a temp folder, the config home or an ancestor of it, or a
+	// credentials folder: a file whose directory is one of those gets a grant for the file
+	// alone (single_file). path is as for ReadFile: InvalidArgument when ReadFile refuses
+	// it, when it is not a regular file, or in a protected folder (the config home outside
+	// its checkouts, ~/.ssh, ~/Library and other credential folders).
 	PreviewFile(context.Context, *connect.Request[v1.PreviewFileRequest]) (*connect.Response[v1.PreviewFileResponse], error)
 	// StreamFile grants the File tab's player a URL on the daemon's API listener that
 	// streams one video or audio file (ReadFileResponse.media) without the bearer token, as
@@ -476,19 +477,20 @@ type FilesystemServiceHandler interface {
 	// its folder is locked, or the folder or volume takes no writes. ResourceExhausted: the
 	// disk is full. PermissionDenied: macOS's privacy protection refused the write.
 	WriteFile(context.Context, *connect.Request[v1.WriteFileRequest]) (*connect.Response[v1.WriteFileResponse], error)
-	// PreviewFile grants the File tab's HTML preview a URL on the daemon's loopback
+	// PreviewFile grants the File tab's HTML preview a URL on the daemon's pages
 	// listener that serves the file, and everything else under its scope, without the
 	// bearer token: the scope is the registered checkout holding the file, else its
 	// directory. A sandboxed frame loads the page from there so its scripts run and its
 	// relative links, stylesheets, scripts and images resolve. The grant is an
 	// unguessable id in the URL, scoped to that directory tree and never reaching above
 	// it, outside the home directory and the temp folders or into a protected folder
-	// (symlinks resolved); it lasts until the daemon stops. A scope is never home itself, a
-	// temp folder, the config home or an ancestor of it, or a credentials folder: a file
-	// whose directory is one of those gets a grant for the file alone (single_file). path is
-	// as for ReadFile: InvalidArgument when ReadFile refuses it, when it is not a regular
-	// file, or in a protected folder (the config home outside its checkouts, ~/.ssh,
-	// ~/Library and other credential folders).
+	// (symlinks resolved). Its id is derived from the scope and a secret the daemon keeps,
+	// so the same scope gets the same id, and its page the same origin, after a restart. A
+	// scope is never home itself, a temp folder, the config home or an ancestor of it, or a
+	// credentials folder: a file whose directory is one of those gets a grant for the file
+	// alone (single_file). path is as for ReadFile: InvalidArgument when ReadFile refuses
+	// it, when it is not a regular file, or in a protected folder (the config home outside
+	// its checkouts, ~/.ssh, ~/Library and other credential folders).
 	PreviewFile(context.Context, *connect.Request[v1.PreviewFileRequest]) (*connect.Response[v1.PreviewFileResponse], error)
 	// StreamFile grants the File tab's player a URL on the daemon's API listener that
 	// streams one video or audio file (ReadFileResponse.media) without the bearer token, as

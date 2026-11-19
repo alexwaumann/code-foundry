@@ -32,6 +32,7 @@ func TestFloor(t *testing.T) {
 		{"loose subfolder", f, h("Downloads"), false, true},
 		{"config home", f, cfg, true, false},
 		{"token", f, h(".code-foundry/daemon.token"), true, false},
+		{"pages key", f, h(".code-foundry/pages.key"), true, false},
 		{"logs", f, h(".code-foundry/logs"), true, false},
 		{"config home worktree", f, h(".code-foundry/worktrees/app/wt"), false, true},
 		{"config home worktrees folder", f, h(".code-foundry/worktrees"), false, true},

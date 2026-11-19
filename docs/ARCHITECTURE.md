@@ -1507,12 +1507,14 @@ tab's preview) run in sandboxed frames that never touch the API
 (`docs/notes/bridge-1-daemon.md`).
 
 * **The pages listener** (`internal/daemon/pages.go`): a third loopback listener, its port
-  kept in `pages.port` and tried again on the next start. It serves only what a page loads
+  kept in `pages.port` and tried again on the next start, and a page grant's id derived from a
+  secret kept in `pages.key`, so a page keeps its origin across restarts. It serves only what a page loads
   without a credential: each grant's files on the grant's own host,
   `http://<grant>.localhost:<pages port>/` (`internal/preview`: a grant from
   `FilesystemService.PreviewFile`, bound to one directory tree or one file, is the URL's
   credential; `/` is its directory, so a build's root-absolute `/assets/…` loads its own files,
-  `docs/notes/page-preview-serving.md`), the same at `/preview/<grant>/` on a loopback name,
+  `docs/notes/page-preview-serving.md`; only for a client that asks, `PreviewFileRequest.grant_host`),
+  the same at `/preview/<grant>/` on a loopback name (what an older GUI is given),
   and `/cf/`. Nothing behind the token is served there, and the API listener's CORS refuses
   every origin on the pages port, so a page holding a leaked token still cannot call the API.
   The app's App Transport Security lets the webview load plain HTTP from `*.localhost` (the

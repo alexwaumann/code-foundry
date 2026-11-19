@@ -1,6 +1,8 @@
 package daemon
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -24,10 +26,35 @@ import (
 // script and the page library) on both. It serves nothing else, and the API listener none of
 // it. The split gives pages origins of their own, on the pages port, which CORS on the API
 // listener refuses (allowedOrigin), so a page holding a leaked token still cannot call the
-// API. The port is kept in pages.port and tried again on the next start; a grant, and with it
-// a page's origin, lasts until the daemon stops. Its localStorage does not survive the app's: WebKit
-// keeps a cross-site frame's storage in memory for the session, so cf.storage is kept by
-// the daemon instead (docs/notes/bridge-fix-storage.md).
+// API. The port is kept in pages.port and tried again on the next start, and a page grant's
+// id is derived from a secret kept in pages.key (pagesKey), so a page's origin, and the
+// storage WebKit keeps for it, survive a daemon restart. Its localStorage does not survive the
+// app's: WebKit keeps a cross-site frame's storage in memory for the session, so cf.storage is
+// kept by the daemon instead (docs/notes/bridge-fix-storage.md).
+
+// pagesKey reads the secret page grants' ids are derived from (preview.Grants.WithKey), kept
+// in file like the daemon token (0600, in the config home, which no grant may read), or makes
+// and writes a new one when there is none or it is not 32 hex-encoded bytes. A new key gives
+// every page a new origin once; a key that cannot be written is still used for this run.
+func pagesKey(log *slog.Logger, file string) ([]byte, error) {
+	raw, err := os.ReadFile(file)
+	if err == nil {
+		if key, derr := hex.DecodeString(strings.TrimSpace(string(raw))); derr == nil && len(key) == 32 {
+			return key, nil
+		}
+		log.Warn("replacing a malformed pages key; pages get new origins", "path", file)
+	} else if !errors.Is(err, os.ErrNotExist) {
+		log.Warn("read pages key; pages get new origins", "path", file, "err", err)
+	}
+	key := make([]byte, 32)
+	if _, err := rand.Read(key); err != nil {
+		return nil, fmt.Errorf("generate pages key: %w", err)
+	}
+	if err := writeFileAtomic(file, []byte(hex.EncodeToString(key)+"\n"), 0o600); err != nil {
+		log.Warn("write pages key; pages get new origins at the next start", "path", file, "err", err)
+	}
+	return key, nil
+}
 
 // listenPages binds the pages listener on loopback: the port in file when it is still
 // free, else a new one. A missing, unreadable or taken port is not an error.

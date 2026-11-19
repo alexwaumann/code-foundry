@@ -110,6 +110,11 @@ func (p Paths) Port() string { return filepath.Join(p.home, "daemon.port") }
 // a page's origin, and its storage, survive restarts.
 func (p Paths) PagesPort() string { return filepath.Join(p.home, "pages.port") }
 
+// PagesKey is the file holding the secret a page grant's id is derived from (hex, 0600):
+// with the kept pages port, it gives a page the same origin, and so the same storage, after
+// the daemon restarts (preview.Grants.WithKey). Kept across restarts like pages.port.
+func (p Paths) PagesKey() string { return filepath.Join(p.home, "pages.key") }
+
 // Lock is the single-instance lock file.
 func (p Paths) Lock() string { return filepath.Join(p.home, "daemon.lock") }
 

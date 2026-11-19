@@ -306,6 +306,8 @@ func TestRequireBearerAndCORS(t *testing.T) {
 		{"pages port as localhost in dev", true, http.MethodOptions, preflight("http://localhost:9300"), http.StatusUnauthorized, ""},
 		{"pages port as ::1 in dev", true, http.MethodOptions, preflight("http://[::1]:9300"), http.StatusUnauthorized, ""},
 		{"pages port over https in dev", true, http.MethodOptions, preflight("https://127.0.0.1:9300"), http.StatusUnauthorized, ""},
+		{"a grant's own origin in dev", true, http.MethodOptions, preflight("http://0123456789abcdef0123456789abcdef.localhost:9300"), http.StatusUnauthorized, ""},
+		{"a grant's name on a listed port in dev", true, http.MethodOptions, preflight("http://0123456789abcdef0123456789abcdef.localhost:9245"), http.StatusUnauthorized, ""},
 		// An opaque-origin page and the web, never.
 		{"null origin preflight", true, http.MethodOptions, preflight("null"), http.StatusUnauthorized, ""},
 		{"null origin with token", true, http.MethodPost, withToken("null"), http.StatusTeapot, ""},

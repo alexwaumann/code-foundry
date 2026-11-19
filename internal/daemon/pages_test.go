@@ -1,6 +1,8 @@
 package daemon
 
 import (
+	"bytes"
+	"encoding/hex"
 	"log/slog"
 	"net"
 	"os"
@@ -61,6 +63,55 @@ func TestListenPages(t *testing.T) {
 			}
 			if got := addr.Port == want; got != tc.wantSame {
 				t.Errorf("port %d, last %d: same = %v, want %v", addr.Port, want, got, tc.wantSame)
+			}
+		})
+	}
+}
+
+// The pages key is read back as written, made (0600) when missing or malformed, and the same
+// across two starts on one home.
+func TestPagesKey(t *testing.T) {
+	const kept = "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f"
+	tests := []struct {
+		name string
+		// content is pages.key's; "" leaves it missing.
+		content  string
+		wantKept bool
+	}{
+		{"no file", "", false},
+		{"a kept key", kept + "\n", true},
+		{"not hex", "not a key\n", false},
+		{"too short", "0001\n", false},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			file := filepath.Join(t.TempDir(), "pages.key")
+			if tc.content != "" {
+				if err := os.WriteFile(file, []byte(tc.content), 0o600); err != nil {
+					t.Fatal(err)
+				}
+			}
+			log := slog.New(slog.DiscardHandler)
+			key, err := pagesKey(log, file)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := hex.EncodeToString(key) == kept; got != tc.wantKept {
+				t.Errorf("key %x: kept = %v, want %v", key, got, tc.wantKept)
+			}
+			if len(key) != 32 {
+				t.Errorf("key is %d bytes, want 32", len(key))
+			}
+			fi, err := os.Stat(file)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if fi.Mode().Perm() != 0o600 {
+				t.Errorf("mode %v, want 0600", fi.Mode().Perm())
+			}
+			again, err := pagesKey(log, file)
+			if err != nil || !bytes.Equal(again, key) {
+				t.Errorf("next start: %x, %v; want %x", again, err, key)
 			}
 		})
 	}

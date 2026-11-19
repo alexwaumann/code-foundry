@@ -143,19 +143,20 @@ service FilesystemService {
   // disk is full. PermissionDenied: macOS's privacy protection refused the write.
   rpc WriteFile(WriteFileRequest) returns (WriteFileResponse) {}
 
-  // PreviewFile grants the File tab's HTML preview a URL on the daemon's loopback
+  // PreviewFile grants the File tab's HTML preview a URL on the daemon's pages
   // listener that serves the file, and everything else under its scope, without the
   // bearer token: the scope is the registered checkout holding the file, else its
   // directory. A sandboxed frame loads the page from there so its scripts run and its
   // relative links, stylesheets, scripts and images resolve. The grant is an
   // unguessable id in the URL, scoped to that directory tree and never reaching above
   // it, outside the home directory and the temp folders or into a protected folder
-  // (symlinks resolved); it lasts until the daemon stops. A scope is never home itself, a
-  // temp folder, the config home or an ancestor of it, or a credentials folder: a file
-  // whose directory is one of those gets a grant for the file alone (single_file). path is
-  // as for ReadFile: InvalidArgument when ReadFile refuses it, when it is not a regular
-  // file, or in a protected folder (the config home outside its checkouts, ~/.ssh,
-  // ~/Library and other credential folders).
+  // (symlinks resolved). Its id is derived from the scope and a secret the daemon keeps,
+  // so the same scope gets the same id, and its page the same origin, after a restart. A
+  // scope is never home itself, a temp folder, the config home or an ancestor of it, or a
+  // credentials folder: a file whose directory is one of those gets a grant for the file
+  // alone (single_file). path is as for ReadFile: InvalidArgument when ReadFile refuses
+  // it, when it is not a regular file, or in a protected folder (the config home outside
+  // its checkouts, ~/.ssh, ~/Library and other credential folders).
   rpc PreviewFile(PreviewFileRequest) returns (PreviewFileResponse) {}
 
   // StreamFile grants the File tab's player a URL on the daemon's API listener that
@@ -528,6 +529,12 @@ message PreviewFileRequest {
   string base_dir = 1;
   // Absolute, "~/"-prefixed, or relative to base_dir.
   string path = 2;
+  // The client can load a page on its grant's own origin,
+  // http://<grant>.localhost:<pages port> (the app's App Transport Security allows
+  // *.localhost since docs/notes/page-preview-serving.md), so the URL is there. Unset (a
+  // client from before it, which an update can leave running beside a newer daemon): the
+  // URL is on the pages listener's loopback origin, http://127.0.0.1:<pages port>/preview/<grant>/.
+  bool grant_host = 3;
 }
 
 message StreamFileRequest {
@@ -551,8 +558,11 @@ message StreamFileResponse {
 }
 
 message PreviewFileResponse {
-  // Root-relative URL of the file on the daemon's loopback listener
-  // ("/preview/<grant>/docs/index.html"); the GUI joins it to the daemon's base URL.
+  // URL of the file on the daemon's pages listener: on the grant's own origin
+  // ("http://<grant>.localhost:<pages port>/docs/index.html") when grant_host was asked,
+  // else under the preview route ("http://127.0.0.1:<pages port>/preview/<grant>/docs/index.html").
+  // A server with no pages listener answers root-relative ("/preview/<grant>/docs/index.html");
+  // the GUI joins it to the daemon's base URL.
   string url = 1;
   // Absolute directory the grant serves: the checkout holding the file, else its
   // directory; the file itself when single_file.

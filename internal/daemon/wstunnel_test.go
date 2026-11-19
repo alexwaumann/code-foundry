@@ -132,6 +132,8 @@ func tunnelOrigins(r *tunnelRig) []tunnelCase {
 		{"null", "null", false},
 		{"pages origin", "http://127.0.0.1:" + pages, false},
 		{"pages origin by name", "http://localhost:" + pages, false},
+		{"a grant's own origin", "http://0123456789abcdef0123456789abcdef.localhost:" + pages, false},
+		{"a grant's name on the dev port", "http://0123456789abcdef0123456789abcdef.localhost:9245", false},
 		{"api origin", "http://127.0.0.1:" + api, false},
 		{"other loopback port", "http://127.0.0.1:9246", false},
 		{"https dev port", "https://127.0.0.1:9245", false},

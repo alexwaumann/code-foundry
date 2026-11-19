@@ -226,7 +226,12 @@ export async function statFile(baseDir: string, path: string, conn: DaemonConnec
 
 /** Where the HTML preview loads a file from (FilesystemService.PreviewFile). */
 export interface FilePreview {
-  /** Absolute URL on the daemon's loopback listener; no bearer token needed (the grant is in the path). */
+  /**
+   * Absolute URL on the daemon's pages listener; no bearer token needed (the grant is in it):
+   * on the grant's own origin (`http://<grant>.localhost:<port>/…`), or under
+   * `http://127.0.0.1:<port>/preview/<grant>/` from a daemon from before grant hosts. The frame
+   * goes by the URL's own origin either way.
+   */
   url: string;
   /** Absolute directory the page may load files from: its checkout, else its directory; the file itself when singleFile. */
   scope: string;
@@ -244,13 +249,16 @@ export interface FilePreview {
 
 /**
  * Grants the HTML preview a URL for `path` (as for readFile) and joins it to the daemon's
- * base URL. A missing file is NotFound; a directory, a path outside home or a file in a
+ * base URL. It asks for the URL on the grant's own origin (`grantHost`): this app's App
+ * Transport Security allows `*.localhost` (gui/build/darwin/Info.*.plist), and a daemon from
+ * before grant hosts ignores the field and answers on the preview route, which loads as well
+ * (docs/notes/page-preview-serving.md). A missing file is NotFound; a directory, a path outside home or a file in a
  * protected folder (Code Foundry's own data, ~/.ssh, ~/Library) is InvalidArgument. A daemon older than the RPC fails with OutdatedDaemonError.
  */
 export async function previewFile(baseDir: string, path: string, conn: DaemonConnection = daemon, signal?: AbortSignal): Promise<FilePreview> {
   const c = await conn.client(FilesystemService);
   try {
-    const r = await c.previewFile({ baseDir, path }, { signal });
+    const r = await c.previewFile({ baseDir, path, grantHost: true }, { signal });
     const { baseUrl } = await conn.resolveEndpoint();
     return { url: new URL(r.url, baseUrl).toString(), scope: r.scope, singleFile: r.singleFile, pageThread: r.pageThread, page: toPageAccessView(r.page) };
   } catch (err) {

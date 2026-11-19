@@ -7,6 +7,8 @@
 // GET /preview/<grant>/<path> on the loopback listener, mounted outside the bearer check.
 // A grant reads only its tree, never above it, outside the home directory and the temp
 // folders or inside a guarded folder (symlinks resolved), and lasts until the daemon stops.
+// A page's grant is minted again with the same id after a restart (WithKey), so its origin,
+// and the storage WebKit keeps for it, outlive the daemon; a media grant's id is new each run.
 // A grant in a temp folder reads only its own tree, and what is in a temp folder only such a
 // grant reads: anyone can plant a link there, or swap a file for one mid-read (open.go).
 //
@@ -14,14 +16,16 @@
 // (docs/notes/bridge-1-daemon.md), and the GUI loads a grant on its own origin there,
 // http://<grant>.localhost:<pages port>, where / is the grant's directory (host.go). Its CSP
 // sandbox keeps scripts and forms on and allows same-origin, so a page in a frame (whose
-// sandbox allows it too) has that origin and its storage while the grant lasts. That origin
+// sandbox allows it too) has that origin and its storage, across reloads and daemon restarts. That origin
 // is never the API's: the API listens on another port and its CORS refuses every origin on
 // the pages port, so a page cannot call it even holding a token.
 package preview
 
 import (
 	"bytes"
+	"crypto/hmac"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -49,6 +53,8 @@ var ErrGuarded = errors.New("preview: path is guarded")
 // per tree or file: asking again returns the same id. Every grant clears the Floor.
 type Grants struct {
 	floor Floor
+	// key derives a page grant's id from what it serves (WithKey); nil: every id is random.
+	key   []byte
 	mu    sync.Mutex
 	byKey map[entry]string
 	byID  map[string]entry
@@ -64,6 +70,17 @@ type entry struct {
 // NewGrants returns an empty grant table whose grants clear floor.
 func NewGrants(floor Floor) *Grants {
 	return &Grants{floor: floor, byKey: map[entry]string{}, byID: map[string]entry{}}
+}
+
+// WithKey makes a page grant's id (Grant, GrantFile) the HMAC of what it serves under key, a
+// secret the daemon keeps in its config home, rather than random: the same tree or file gets
+// the same id after a restart, so a page keeps its origin (GrantOrigin), and with it the
+// localStorage, IndexedDB and cookies WebKit keeps for that origin
+// (docs/notes/page-preview-serving.md). Without the key the id is as unguessable as a random
+// one. A media grant's id stays random. Call it before the first grant.
+func (g *Grants) WithKey(key []byte) *Grants {
+	g.key = bytes.Clone(key)
+	return g
 }
 
 // Allows reports whether dir may be a grant's whole tree (Floor.ScopeOK).
@@ -100,12 +117,31 @@ func (g *Grants) mint(e entry) (string, error) {
 		return id, nil
 	}
 	b := make([]byte, 16)
-	if _, err := rand.Read(b); err != nil {
+	if g.key != nil && !e.media {
+		b = derive(g.key, e)
+	} else if _, err := rand.Read(b); err != nil {
 		return "", fmt.Errorf("preview: mint grant: %w", err)
 	}
 	id := hex.EncodeToString(b)
+	if other, ok := g.byID[id]; ok && other != e {
+		// Two entries with one HMAC: not expected in practice; refuse rather than serve one's files as the other's.
+		return "", fmt.Errorf("preview: mint grant: id collision")
+	}
 	g.byKey[e], g.byID[id] = id, e
 	return id, nil
+}
+
+// derive is a page grant's id under key: the first 128 bits of HMAC-SHA256 over what it
+// serves, a tree ("dir") or one file ("file"), with a version so a later scheme gets new ids.
+// Paths hold no NUL, so the fields cannot run together.
+func derive(key []byte, e entry) []byte {
+	m := hmac.New(sha256.New, key)
+	kind := "dir"
+	if e.file != "" {
+		kind = "file"
+	}
+	_, _ = io.WriteString(m, "code-foundry page grant v1\x00"+kind+"\x00"+e.dir+"\x00"+e.file)
+	return m.Sum(nil)[:16]
 }
 
 func (g *Grants) lookup(id string) (entry, bool) {
