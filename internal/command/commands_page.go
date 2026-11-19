@@ -118,9 +118,10 @@ func RegisterPage(r *Registry, b PageBackend) error {
 			return b.SetConsent(ctx, path, allowed)
 		})
 		return func(ctx context.Context, uctx Context, a Args) (Result, error) {
-			if uctx.Origin == OriginPage {
+			// A page, or a caller that did not say who it is (an older GUI's page).
+			if uctx.Untrusted() {
 				return Result{}, connect.NewError(connect.CodePermissionDenied,
-					errors.New("a page cannot answer for pages: only the user can, in the app or with the CLI"))
+					errors.New("only the user answers for pages, in the app or with the CLI: a page, or a caller that does not say it is one of those, cannot"))
 			}
 			return inner(ctx, uctx, a)
 		}

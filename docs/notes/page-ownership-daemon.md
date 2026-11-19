@@ -28,7 +28,8 @@ it.
    read as no owner (`Options.ThreadExists`).
 3. **Owned pages are allowed automatically**, with the owner's bridge.
 4. **Any other page is asked about once.** The answer (allowed / refused) is kept per file,
-   keyed by its absolute path with symlinks resolved, and never asked again when the content
+   keyed by its absolute path with symlinks resolved and spelled as on disk (case and
+   Unicode form, `page-path-identity.md`), and never asked again when the content
    changes. The user changes it with `page.allow` / `page.disallow`. The answer is kept even
    while a thread owns the page, and counts once none does.
 5. **Floor.** Ownership, answers and storage exist only for a regular `.html`/`.htm` file
@@ -121,13 +122,14 @@ one place.
 | verb | args | does |
 |---|---|---|
 | `page.get` | `path` (positional) | read-only: the page's owner and answer |
-| `page.allow` | `path` | the user allows the page (kept per resolved path) |
+| `page.allow` | `path` | the user allows the page (kept per file, under its on-disk path) |
 | `page.disallow` | `path` | the user does not allow it ("stop allowing" after allowing) |
 
 All three: category `Pages`, `NoPalette` (they need a path the palette cannot give; the
 GUI's question and its controls invoke them), `NoKeybinding`, `NoIndex` (the user's
 answers, not an agent's work; the guide was also at its budget), page class `PageState`.
-`page.allow` and `page.disallow` refuse a call from a page (`Origin = PAGE`) with
+`page.allow` and `page.disallow` refuse a call from a page (`Origin = PAGE`), and one that
+names neither origin nor view (`OriginUnknown`, an older GUI's page; `Context.Untrusted`), with
 `PermissionDenied`: the answer is the user's about that page's script. Errors: the
 `PageService` codes for the path. JSON (`PageView`):
 

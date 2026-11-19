@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"testing"
 
 	"connectrpc.com/connect"
@@ -18,6 +19,7 @@ import (
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
 	"github.com/alexwaumann/code-foundry/internal/fsx"
+	"github.com/alexwaumann/code-foundry/internal/fsx/fsxtest"
 	"github.com/alexwaumann/code-foundry/internal/paths"
 	"github.com/alexwaumann/code-foundry/internal/preview"
 	"github.com/alexwaumann/code-foundry/internal/store/project"
@@ -211,6 +213,7 @@ func TestPreviewReadError(t *testing.T) {
 		{"refused in ~/Library: guarded, System Settings would not help", "~/Library/Safari/page.html", refused, connect.CodeInvalidArgument, "protected folder"},
 		{"refused in Documents: the privacy message", "~/Documents/page.html", refused, connect.CodePermissionDenied, "not permitted"},
 		{"any other failure in ~/Library", "~/Library/Safari/page.html", errors.New("boom"), connect.CodeInternal, "boom"},
+		{"a path longer than the system takes", "~/x.html", fmt.Errorf("fsx: read x: %w", syscall.ENAMETOOLONG), connect.CodeInvalidArgument, "too long"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -260,14 +263,18 @@ func TestFilesystemPreviewFilePageThread(t *testing.T) {
 		srv := httptest.NewServer(h.Route().Handler)
 		t.Cleanup(srv.Close)
 		c := codefoundryv1connect.NewFilesystemServiceClient(srv.Client(), srv.URL)
-		for _, tc := range []struct{ path, want string }{
+		cases := []struct{ path, want string }{
 			{"cf-pages/s-1/tracker.html", "s-1"},
 			{"cf-pages/s-1/sub/deep.html", "s-1"},
 			{"cf-pages/welcome.html", ""},
 			{"loose/s-1/tracker.html", ""},
 			{"loose/link.html", "s-1"},
 			{"cf-pages/s-1/away.html", ""},
-		} {
+		}
+		if fsxtest.Insensitive(t, root) { // the same folder, spelled otherwise
+			cases = append(cases, struct{ path, want string }{"CF-PAGES/s-1/Tracker.html", "s-1"})
+		}
+		for _, tc := range cases {
 			res, err := c.PreviewFile(context.Background(), connect.NewRequest(&v1.PreviewFileRequest{Path: filepath.Join(root, tc.path)}))
 			if err != nil {
 				t.Fatalf("%s: %v", tc.path, err)

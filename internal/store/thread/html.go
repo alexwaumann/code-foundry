@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/alexwaumann/code-foundry/internal/fsx"
+	"github.com/alexwaumann/code-foundry/internal/paths"
 )
 
 // Inline HTML pages (docs/notes/inline-html.md): `code-foundry view.inline <path>` puts
@@ -31,9 +32,13 @@ type HTMLPage struct {
 }
 
 // htmlPage checks path for ShowHTML and returns the item's payload: an absolute path to
-// a regular .html or .htm file under home (symlinks followed), stored relative to cwd
-// when it is inside it.
-func htmlPage(home, cwd, path, title string) (*HTMLPage, error) {
+// a regular .html or .htm file under home or the pages root (paths.Pages, where the
+// threads' $CODE_FOUNDRY_PAGES are, outside home with a side-by-side CODE_FOUNDRY_HOME),
+// symlinks followed, as the page store takes it (internal/store/page). It is stored
+// relative to cwd when inside it, except when cwd is home itself (a thread of no
+// project): there "~/…" says more than a bare relative path. Each refusal says what to do
+// instead.
+func htmlPage(home, pages, cwd, path, title string) (*HTMLPage, error) {
 	if path == "" || !filepath.IsAbs(path) {
 		return nil, fmt.Errorf("%w: path %q is not an absolute path", ErrInvalidArgument, path)
 	}
@@ -41,10 +46,17 @@ func htmlPage(home, cwd, path, title string) (*HTMLPage, error) {
 	switch strings.ToLower(filepath.Ext(path)) {
 	case ".html", ".htm":
 	default:
-		return nil, fmt.Errorf("%w: %s is not an .html or .htm file", ErrInvalidArgument, path)
+		return nil, fmt.Errorf("%w: %s is not an .html or .htm file: view.inline shows pages; "+
+			"view.open.file shows any other file in a tab", ErrInvalidArgument, path)
 	}
-	if !fsx.Within(home, path) {
-		return nil, fmt.Errorf("%w: %s is outside your home directory", ErrInvalidArgument, path)
+	outside := func(how string) error {
+		return fmt.Errorf("%w: %s %s your home directory, and a page shown inline must be under it: write it to your "+
+			"pages directory ($%s) or elsewhere under home, or show it without the bridge in a tab with view.open.file",
+			ErrInvalidArgument, path, how, paths.EnvPages)
+	}
+	roots := append(spellings(home), spellings(pages)...)
+	if !withinAny(roots, path) {
+		return nil, outside("is outside")
 	}
 	real, err := filepath.EvalSymlinks(path)
 	if errors.Is(err, fs.ErrNotExist) {
@@ -53,23 +65,46 @@ func htmlPage(home, cwd, path, title string) (*HTMLPage, error) {
 	if err != nil {
 		return nil, fmt.Errorf("%w: %s: %w", ErrInvalidArgument, path, err)
 	}
-	if realHome, err := filepath.EvalSymlinks(home); err == nil && !fsx.Within(realHome, real) && !fsx.Within(home, real) {
-		return nil, fmt.Errorf("%w: %s links outside your home directory", ErrInvalidArgument, path)
+	if !withinAny(roots, real) {
+		return nil, outside("links outside")
 	}
 	fi, err := os.Stat(real)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %s: %w", ErrInvalidArgument, path, err)
 	}
 	if !fi.Mode().IsRegular() {
-		return nil, fmt.Errorf("%w: %s is not a file", ErrInvalidArgument, path)
+		return nil, fmt.Errorf("%w: %s is a directory, not a file: show a page in it by its own path", ErrInvalidArgument, path)
 	}
 	p := &HTMLPage{Path: path, Title: strings.TrimSpace(title), BaseDir: cwd}
-	if cwd != "" && fsx.Within(cwd, path) && path != cwd {
+	if cwd != "" && fsx.Within(cwd, path) && path != cwd && filepath.Clean(cwd) != filepath.Clean(home) {
 		if rel, err := filepath.Rel(cwd, path); err == nil {
 			p.Path = filepath.ToSlash(rel)
 		}
 	}
 	return p, nil
+}
+
+// spellings are p cleaned and with its symlinks resolved, without repeats; none for "".
+func spellings(p string) []string {
+	if p == "" {
+		return nil
+	}
+	p = filepath.Clean(p)
+	out := []string{p}
+	if real, err := filepath.EvalSymlinks(p); err == nil && real != p {
+		out = append(out, real)
+	}
+	return out
+}
+
+// withinAny reports whether p is under one of roots (fsx.Within, which ignores case).
+func withinAny(roots []string, p string) bool {
+	for _, r := range roots {
+		if fsx.Within(r, p) {
+			return true
+		}
+	}
+	return false
 }
 
 // pageNotFound is ErrNotFound with its own message: "thread not found: no file at …"
@@ -116,7 +151,7 @@ func (m *Manager) ShowHTML(ctx context.Context, id, path, title string, o ShowHT
 		if cwd == "" {
 			cwd = m.opts.Home
 		}
-		page, err := htmlPage(m.opts.Home, cwd, path, title)
+		page, err := htmlPage(m.opts.Home, m.opts.PagesRoot, cwd, path, title)
 		if err != nil {
 			return Item{}, err
 		}
@@ -148,20 +183,47 @@ func (m *Manager) ShowHTML(ctx context.Context, id, path, title string, o ShowHT
 // shownHTML is the newest html item showing the page at abs since the last message the
 // user sent (a queued one, not read yet, does not count), or anywhere with anywhere: its
 // card is still the one in view, so showing the page again would only stack a second
-// copy under it.
+// copy under it. An item shows the page when its path is abs or the same file under
+// another spelling (a symlink to it, a symlinked folder, another letter case): the page
+// store keys them as one page too.
 func (t *threadLog) shownHTML(abs string, anywhere bool) (Item, bool) {
+	var page os.FileInfo
+	for _, it := range t.htmlItems(anywhere) {
+		p := htmlItemPath(it.HTML)
+		if p == abs {
+			return it, true
+		}
+		if page == nil {
+			fi, err := os.Stat(abs)
+			if err != nil {
+				continue // no file to be the same as: only abs itself is
+			}
+			page = fi
+		}
+		if fi, err := os.Stat(p); err == nil && os.SameFile(fi, page) {
+			return it, true
+		}
+	}
+	return Item{}, false
+}
+
+// htmlItems are the html items since the last message the user sent (shownHTML), or all
+// of them with anywhere, newest first: looked at outside the lock, since telling a file's
+// other spellings stats it.
+func (t *threadLog) htmlItems(anywhere bool) []Item {
 	t.mu.Lock()
 	defer t.mu.Unlock()
+	var out []Item
 	for i := len(t.items) - 1; i >= 0; i-- {
 		it := t.items[i]
 		switch {
 		case it.Kind == KindUserMessage && !it.Queued && !anywhere:
-			return Item{}, false
-		case it.Kind == KindHTML && it.HTML != nil && htmlItemPath(it.HTML) == abs:
-			return cloneItem(it), true
+			return out
+		case it.Kind == KindHTML && it.HTML != nil:
+			out = append(out, cloneItem(it))
 		}
 	}
-	return Item{}, false
+	return out
 }
 
 // htmlItemPath is the absolute path an html item shows.
