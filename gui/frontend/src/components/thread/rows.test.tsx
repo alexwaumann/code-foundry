@@ -267,7 +267,7 @@ describe("a finished turn's gutter (turn-gutter)", () => {
     expect(g).toHaveLength(2);
     expect(g[1]?.className).toContain("text-caption");
     const kids = [...(g[1]?.querySelector(".in")?.children ?? [])];
-    expect(kids.map((k) => k.getAttribute("data-testid") ?? k.className)).toEqual(["thread-copy-reply", "info"]);
+    expect(kids.map((k) => k.getAttribute("data-testid") ?? k.className)).toEqual(["thread-copy-reply", "thread-fork-here", "info"]);
     expect(kids[0]?.querySelector("svg")).not.toBeNull();
     expect(info(g[1])).toMatch(/^1 step·\$0\.04·Opus 4\.8·\d\d:02/);
   });
@@ -410,7 +410,7 @@ describe("a message sent mid-turn (a steer)", () => {
     expect(header?.textContent).toBe("Interrupted after 2.1s");
     expect(header?.querySelector(".t-red")?.textContent).toBe("Interrupted after 2.1s");
     expect(header?.querySelector("button.fold")).not.toBeNull();
-    expect(gutters(c)[0]?.querySelector("button")).toBeNull();
+    expect(gutters(c)[0]?.querySelector('[data-testid="thread-copy-reply"]')).toBeNull();
     expect(info(gutters(c)[0])).toMatch(/^2 steps·<\$0\.01·/);
     expect(c.querySelector('[data-testid="thread-steer"]')).not.toBeNull();
   });
@@ -436,7 +436,7 @@ describe("a finished turn with nothing to fold", () => {
     const header = c.querySelector('[data-testid="thread-turn-header"]');
     expect(header?.textContent).toContain("Interrupted after 2.1s");
     expect(header?.querySelector("button")).toBeNull();
-    expect(gutters(c)[0]?.querySelector("button")).toBeNull();
+    expect(gutters(c)[0]?.querySelector('[data-testid="thread-copy-reply"]')).toBeNull();
   });
 
   it("a failed turn keeps its wording in red", () => {
@@ -723,7 +723,7 @@ describe("Claude Code's API-error text", () => {
     expect(row?.textContent).toBe("Invalid API key · Fix external API key");
     expect(row?.className).toMatch(/border-cf-error/);
     expect(c.querySelector('[data-testid="thread-text"]')).toBeNull();
-    expect(gutters(c)[0]?.querySelector("button")).toBeNull();
+    expect(gutters(c)[0]?.querySelector('[data-testid="thread-copy-reply"]')).toBeNull();
   });
 
   it("its turn's header says Failed, without the result's success subtype", () => {

@@ -56,6 +56,8 @@ import { LineageNote } from "./LineageNote";
 import { QueuedTag } from "./QueuedTag";
 import { SetupRow } from "./SetupRow";
 import { AgentOpen } from "./AgentOpen";
+import { ForkFromHereButton } from "./ForkFromHere";
+import { useForkFromTurn } from "./forkFromTurn";
 import { HtmlRow } from "./InlineHtml";
 import { ThemeCardRow } from "./ThemeCard";
 import { ToolPathChip } from "./PathChip";
@@ -1009,11 +1011,12 @@ const HeaderRow = memo(function HeaderRow({ row }: { row: Extract<TimelineRow, {
 
 /**
  * A finished turn's gutter, under its last row (docs/notes/turn-gutter.md): Copy (the
- * turn's reply, as Ember's reply copies), then in the caption style its steps, cost, model
- * and the time it ended. The row is always laid out at a fixed height; only its contents
- * show and hide, so nothing moves. They show at rest on the thread's latest turn, on an
- * older one while the pointer is over the turn or one of its controls has the keyboard
- * (turnActivity.ts), and while Copy shows its check.
+ * turn's reply, as Ember's reply copies), Fork from here (ForkFromHere.tsx), then in the
+ * caption style its steps, cost, model and the time it ended. The row is always laid out at a
+ * fixed height; only its contents show and hide, so nothing moves. They show at rest on the
+ * thread's latest turn, on an older one while the pointer is over the turn or one of its
+ * controls has the keyboard (turnActivity.ts), while Copy shows its check, and while a fork
+ * from it runs.
  */
 const GutterRow = memo(function GutterRow({ row }: { row: Extract<TimelineRow, { type: "gutter" }> }) {
   const { threadId } = useThreadCtx();
@@ -1021,7 +1024,8 @@ const GutterRow = memo(function GutterRow({ row }: { row: Extract<TimelineRow, {
   const active = useTurnActive(row.turn);
   const models = useModelChoices();
   const { copied, copy } = useCopied();
-  const shown = row.latest || active || copied;
+  const fork = useForkFromTurn(threadId, row.id);
+  const shown = row.latest || active || copied || fork.held;
   const end = it?.kind === "turnEnd" ? it : undefined;
   const info: string[] = [];
   if (row.steps > 0) info.push(stepsLabel(row.steps));
@@ -1054,7 +1058,7 @@ const GutterRow = memo(function GutterRow({ row }: { row: Extract<TimelineRow, {
             </button>
           </Tip>
         )}
-        {/* Fork from here goes here, right after Copy (a later change). */}
+        <ForkFromHereButton threadId={threadId} held={fork.held} onFork={fork.fork} />
         {info.length > 0 && (
           <span className="info">
             <Parts parts={info} />

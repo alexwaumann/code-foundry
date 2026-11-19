@@ -16,8 +16,8 @@ This replaces parts of the earlier fold notes: thread-fold-3-header.md's header 
   The live header ("Working · 3 steps · 1m 12s") is unchanged.
 * **Gutter** (`GutterRow`, row type `gutter`, key `f:<turn key>`): the turn's last row. Copy
   (icon only, tooltip "Copy reply"; copies the reply's texts joined by blank lines, API
-  error text left out, the same check and "Copied" as before), then a slot for "Fork from
-  here" (a later change), then in `text-caption`: steps, cost, model and the time the
+  error text left out, the same check and "Copied" as before), then "Fork from here"
+  (fork-from-here-button.md), then in `text-caption`: steps, cost, model and the time the
   turn_end arrived (`sentTime`, the bubbles' clock format). Steps, cost and model follow the
   rules the header had (nothing shown when the daemon could not tell).
 * **Folded**: the header, the reply, notes, steers, pages, theme cards and the gutter. The
