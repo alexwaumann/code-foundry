@@ -896,7 +896,7 @@ describe("bridge host: a page no thread owns", () => {
   });
 
   it("refused: a ready that says why, and every call refused with it", async () => {
-    const { h, posts, asked } = host(null, { kind: "refused", error: { code: "unavailable", message: NOT_ALLOWED_MSG } });
+    const { h, posts, asked, errors } = host(null, { kind: "refused", error: { code: "unavailable", message: NOT_ALLOWED_MSG } });
     h.receive(hello);
     h.receive(run("r", "thread.list"));
     h.receive({ cf: 1, type: "cf:store", id: "w", key: "k", value: "1" });
@@ -909,6 +909,8 @@ describe("bridge host: a page no thread owns", () => {
     expect(invokeCommand).not.toHaveBeenCalled();
     expect(fileStore.sets).toEqual([]);
     expect(asked.n).toBe(0);
+    // The user's own answer, which the footer shows: not the page's error to report.
+    expect(errors).toEqual([]);
   });
 
   it("ask: holds the ready (cf:asking), tells the frame, and holds the page's calls until the user allows it", async () => {

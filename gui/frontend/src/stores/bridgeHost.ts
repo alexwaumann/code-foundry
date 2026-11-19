@@ -166,14 +166,15 @@ function onStorageChain<T>(key: string, call: () => Promise<T>): Promise<T> {
 export type PageBridge = { kind: "allowed"; path: string } | { kind: "ask" } | { kind: "refused"; error: BridgeError };
 
 /** Whom a host acts for now. */
-type Mode = { kind: "thread"; id: string } | { kind: "page"; path: string } | { kind: "ask" } | { kind: "none"; error: BridgeError };
+/** `quiet`: its refusals are the user's own answer (or no page at all), which the footer shows: not reported to the error strip. */
+type Mode = { kind: "thread"; id: string } | { kind: "page"; path: string } | { kind: "ask" } | { kind: "none"; error: BridgeError; quiet: boolean };
 
 function modeOf(threadId: string | null, page: PageBridge | undefined): Mode {
   if (threadId !== null) return { kind: "thread", id: threadId };
-  if (!page) return { kind: "none", error: NO_THREAD };
+  if (!page) return { kind: "none", error: NO_THREAD, quiet: false };
   if (page.kind === "allowed") return { kind: "page", path: page.path };
   if (page.kind === "ask") return { kind: "ask" };
-  return { kind: "none", error: page.error };
+  return { kind: "none", error: page.error, quiet: true };
 }
 
 function sameMode(a: Mode, b: Mode): boolean {
@@ -205,6 +206,9 @@ function pageErrorOf(err: unknown): BridgeError {
 
 /** The daemon's refusal of a verb whose thread arg defaults to the caller's thread, which a page alone has not got. */
 const NO_ACTIVE_THREAD = "(default: the active thread; there is none)";
+
+/** No code: the refusals the error strip does not show. */
+const QUIET: ReadonlySet<BridgeErrorCode> = new Set();
 
 /** How many calls a document may make while its ready is held; past them each is refused. */
 const HELD_MAX = 64;
@@ -320,6 +324,8 @@ export function createBridgeHost(frame: BridgeFrame): BridgeHost {
     if (mode.kind === "ask") return NOT_ALLOWED;
     return null;
   };
+  /** The codes of a no-bridge refusal the strip reports: none for a page the user refused or no page. */
+  const noBridgeReported = (codes: ReadonlySet<BridgeErrorCode> = REPORTED_CODES): ReadonlySet<BridgeErrorCode> => (mode.kind === "none" && mode.quiet ? QUIET : codes);
 
   /** The thread the page's calls run in: its own, or "" for a page alone. */
   const contextThread = (): string => (mode.kind === "thread" ? mode.id : "");
@@ -459,7 +465,7 @@ export function createBridgeHost(frame: BridgeFrame): BridgeHost {
   const run = async (forDoc: number, id: CallId, verb: string, args: Record<string, string>, present: boolean) => {
     const none = noBridge();
     if (none) {
-      fail(forDoc, id, verb, none);
+      fail(forDoc, id, verb, none, null, noBridgeReported());
       return;
     }
     const tid = contextThread();
@@ -522,7 +528,7 @@ export function createBridgeHost(frame: BridgeFrame): BridgeHost {
     const call = fetchCall(m.url);
     const none = noBridge();
     if (none) {
-      fail(forDoc, m.id, call, none, null, FETCH_REPORTED);
+      fail(forDoc, m.id, call, none, null, noBridgeReported(FETCH_REPORTED));
       return;
     }
     const refused = refusal(m.id);
@@ -559,7 +565,7 @@ export function createBridgeHost(frame: BridgeFrame): BridgeHost {
     const call = `cf.on("${source}")`;
     const none = noBridge();
     if (none) {
-      fail(forDoc, id, call, none);
+      fail(forDoc, id, call, none, null, noBridgeReported());
       return;
     }
     if (!isBridgeSource(source)) {

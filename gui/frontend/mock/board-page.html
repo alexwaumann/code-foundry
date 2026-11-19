@@ -1,0 +1,81 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Team board</title>
+<!-- A page no thread owns (a script wrote it): it asks before using Code Foundry (docs/notes/page-ownership-gui.md). -->
+<script src="/cf/bridge.js"></script>
+<style>
+:root { color-scheme: light dark; }
+body { margin: 0; padding: 22px 24px; font: 13px/1.45 system-ui, sans-serif; background: #f7f8fb; color: #1d2433; }
+@media (prefers-color-scheme: dark) { body { background: #0d1326; color: #e6e9f5; } .card, .rows { background: #171f38 !important; border-color: #232c4a !important; } .muted, i { color: #8e97b8 !important; } .wait { background: #1c2542 !important; } .rows div { border-color: #232c4a !important; } }
+h1 { margin: 0 0 4px; font-size: 20px; line-height: 26px; font-weight: 600; }
+p { margin: 0 0 16px; }
+.muted, i { color: #667085; font-style: normal; }
+.cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.card { background: #fff; border: 1px solid #e3e6ee; border-radius: 10px; padding: 12px; }
+.card .v { font-size: 20px; line-height: 26px; font-weight: 600; margin-top: 2px; min-height: 26px; }
+.rows { margin-top: 12px; background: #fff; border: 1px solid #e3e6ee; border-radius: 10px; overflow: hidden; }
+.rows div { display: flex; justify-content: space-between; gap: 12px; padding: 9px 12px; border-top: 1px solid #e3e6ee; }
+.rows div:first-child { border-top: 0; }
+.wait { display: inline-block; width: 56px; height: 18px; border-radius: 4px; background: #e9ecf3; vertical-align: middle; }
+</style>
+</head>
+<body>
+<h1>Team board</h1>
+<p class="muted" id="sub">Open work across the team's threads.</p>
+<div class="cards">
+  <div class="card"><div class="muted">Threads</div><div class="v" id="threads"><span class="wait"></span></div></div>
+  <div class="card"><div class="muted">Waiting on you</div><div class="v" id="waiting"><span class="wait"></span></div></div>
+  <div class="card"><div class="muted">Visits</div><div class="v" id="visits"><span class="wait"></span></div></div>
+</div>
+<div class="rows" id="rows"><div><span class="wait"></span><i></i></div><div><span class="wait"></span><i></i></div><div><span class="wait"></span><i></i></div></div>
+<script>
+const $ = (id) => document.getElementById(id);
+cf.ready.then(
+  () => {
+    document.body.dataset.ready = "1";
+    document.body.dataset.thread = cf.thread ? cf.thread.id : "none";
+    // Kept by Code Foundry per page file once the user allowed it (cf.storage).
+    try {
+      const s = cf.storage("board");
+      const visits = (s.get("visits") || 0) + 1;
+      void s.set("visits", visits);
+      $("visits").textContent = String(visits);
+    } catch (e) {
+      $("visits").textContent = "–";
+      $("sub").textContent = e.message;
+      document.body.dataset.error = e.message;
+    }
+    cf.on(
+      "thread-list",
+      (list) => {
+        $("threads").textContent = String(list.length);
+        $("waiting").textContent = String(list.filter((t) => t.status === "attention").length);
+        $("rows").innerHTML = "";
+        for (const t of list.slice(0, 3)) {
+          const row = document.createElement("div");
+          const name = document.createElement("span");
+          name.textContent = t.name;
+          const st = document.createElement("i");
+          st.textContent = t.status;
+          row.append(name, st);
+          $("rows").append(row);
+        }
+        document.body.dataset.rows = String(list.length);
+      },
+      (e) => {
+        $("threads").textContent = "–";
+        $("waiting").textContent = "–";
+        document.body.dataset.error = e.message;
+      },
+    );
+  },
+  (e) => {
+    document.body.dataset.ready = "no";
+    $("sub").textContent = e.message;
+  },
+);
+</script>
+</body>
+</html>
