@@ -155,7 +155,9 @@ function FooterHeaderBox({ section, children }: { section: FooterSection; childr
   const dropping = useShellDragStore((s) => target !== null && s.section === target);
   return (
     <div
-      className={cn("shrink-0 rounded-md border border-transparent", dropping && "border-cf-focus bg-cf-focus/15")}
+      // An inset ring, not a border: a border takes a pixel on each side, and the header would no
+      // longer start where the rows start (e2e/sidebar.spec.ts "Working section").
+      className={cn("shrink-0 rounded-md", dropping && "bg-cf-focus/15 ring-1 ring-cf-focus ring-inset")}
       style={{ height: HEADER_HEIGHT }}
       data-drop-section={target ?? undefined}
       data-drop-target={dropping || undefined}
