@@ -21,7 +21,7 @@ const { mergePullRequest, usePrPanelStore } = await import("@/stores/prPanel");
 const { useUiStore } = await import("@/stores/ui");
 const { applyLayoutOp } = await import("@/api/layout");
 const { layoutSettled } = await import("@/test/fakeLayout");
-const { applyGhEvent } = await import("@/stores/gh");
+const { applyGhEvent, pullRequestDetailResource, pullRequestKey } = await import("@/stores/gh");
 const { UPDATING_AFTER_MS } = await import("./PullRequestSurface");
 const { useThreadsStore } = await import("@/stores/threads");
 const { PREPARING_TOAST_DELAY_MS, focusGrace } = await import("@/stores/prThreads");
@@ -844,7 +844,7 @@ describe("threads about a pull request", () => {
 });
 
 describe("the header's status and the Overview's cards", () => {
-  it("#139 (your review requested): headline, the row, and Review ▾ as the primary button", async () => {
+  it("#139 (your review requested): headline, the row, and Review as the primary button", async () => {
     renderPrPanel();
     await openPr(139);
     expect(byTestId("pr-ready-headline").textContent).toBe("Waiting on your review");
@@ -950,11 +950,11 @@ describe("the header's status and the Overview's cards", () => {
       expect(within(footer).getAllByRole("button").map((b) => b.dataset.testid)).toEqual(["pr-review-button", "pr-merge-button", "pr-merge-button-menu-button"]);
       expect(screen.queryAllByTestId("pr-ready-row").length > 0).toBe(tab === "pr-tab-overview");
     }
-    // Review ▾ opens its composer under the header, from any tab.
+    // Review opens the review dialog, from any tab (#142 is the viewer's own: on Comment).
     fireEvent.click(byTestId("pr-tab-activity"));
-    press(byTestId("pr-review-button"));
-    await pick(byTestId("pr-review-comment"));
-    expect(byTestId("pr-review-composer").dataset.verdict).toBe("comment");
+    fireEvent.click(byTestId("pr-review-button"));
+    await settle();
+    expect(byTestId("pr-review-dialog").dataset.verdict).toBe("comment");
   });
 
   for (const { number, words, tone } of [
@@ -1728,62 +1728,48 @@ describe("busy feedback", () => {
   });
 });
 
-describe("Review ▾", () => {
+describe("Review and its dialog", () => {
   const reviews = () => invocationsOf("pr.review").map((i) => i.args);
-  const reviewInput = () => input("pr-review-input");
+  const reviewInput = () => input("pr-review-dialog-input");
 
-  async function chooseVerdict(verdict: "approve" | "request-changes" | "comment"): Promise<void> {
-    // The Review button, or the chip once the viewer has reviewed.
-    press(queryTestId("pr-review-button") ?? byTestId("pr-your-review"));
-    expect(byTestId("pr-review-menu")).toBeTruthy();
-    await pick(byTestId(`pr-review-${verdict}`));
-    expect(queryTestId("pr-review-menu")).toBeNull();
-    expect(byTestId("pr-review-composer").dataset.verdict).toBe(verdict);
+  /** Opens the dialog from the Review button (or the chip once the viewer has reviewed); picks a verdict when given. */
+  async function openReview(verdict?: "approve" | "request-changes" | "comment"): Promise<void> {
+    fireEvent.click(queryTestId("pr-review-button") ?? byTestId("pr-your-review"));
+    await settle();
+    expect(byTestId("pr-review-dialog")).toBeTruthy();
+    if (verdict) fireEvent.click(byTestId(`pr-review-dialog-${verdict}`));
   }
 
-  it("on #139: the menu, Approve with cmd+Enter runs pr.review; the header says You approved and Comments has the review", async () => {
+  it("on #139: Review opens the dialog on Approve, cmd+Enter runs pr.review; the header says You approved and Comments has the review", async () => {
     renderPrPanel();
     await openPr(139);
     expect(byTestId("pr-author").textContent).toBe("teammate-kim");
     expect(byTestId("pr-review-button").textContent).toBe("Review");
     expect(screen.getAllByTestId("pr-reviewer").find((r) => r.dataset.login === "alexwaumann")?.dataset.status).toBe("requested");
 
-    press(byTestId("pr-review-button"));
-    const menu = byTestId("pr-review-menu");
-    expect(menu.textContent).toContain("Review #139");
-    expect(byTestId("pr-review-approve").textContent).toContain("Submit an approving review, with an optional note.");
-    expect(byTestId("pr-review-request-changes").textContent).toContain("Block merging until your points are addressed.");
-    expect(byTestId("pr-review-comment").textContent).toContain("General feedback without a verdict.");
-    for (const v of ["approve", "request-changes", "comment"]) expect(byTestId(`pr-review-${v}`).hasAttribute("data-disabled")).toBe(false);
-
-    await pick(byTestId("pr-review-approve"));
-    expect(byTestId("pr-review-composer").dataset.verdict).toBe("approve");
-    expect(byTestId("pr-review-label").textContent).toBe("Approve #139");
-    await vi.waitFor(() => {
-      expect(document.activeElement).toBe(reviewInput());
-    });
-    expect(reviewInput().placeholder).toBe("Say why, or leave it empty…");
-    expect(byTestId("pr-review-hint").textContent).toBe("⌘⏎ submit · esc cancel");
-    // An approval needs no text.
-    expect((byTestId("pr-review-submit") as HTMLButtonElement).disabled).toBe(false);
-    expect(byTestId("pr-review-submit").textContent).toBe("Approve");
-    // Enter is a newline; only cmd+Enter submits.
-    fireEvent.change(reviewInput(), { target: { value: "Read it through." } });
-    fireEvent.keyDown(reviewInput(), { key: "Enter" });
-    expect(reviews()).toEqual([]);
+    await openReview();
+    expect(byTestId("pr-review-dialog").dataset.verdict).toBe("approve");
+    expect(byTestId("pr-review-dialog-title").textContent).toBe("Review #139");
+    expect(queryTestId("pr-review-dialog-own")).toBeNull();
+    // No inline composer any more: the review is the dialog's.
+    expect(queryTestId("pr-review-composer")).toBeNull();
+    const release = world.hold("pr.review");
     fireEvent.change(reviewInput(), { target: { value: "Read it through.\nShip it." } });
     fireEvent.keyDown(reviewInput(), { key: "Enter", metaKey: true });
+    await settle();
+    // The dialog shut at once; the button is busy in the verdict's words until the detail shows the review.
+    expect(queryTestId("pr-review-dialog")).toBeNull();
+    expect(byTestId("pr-review-button").textContent).toBe("Approving…");
+    expect(byTestId("pr-review-button").getAttribute("aria-busy")).toBe("true");
+    release();
     await settle(3);
     await vi.waitFor(() => {
-      expect(queryTestId("pr-review-composer")).toBeNull();
+      expect(byTestId("pr-your-review").textContent).toBe("You approved");
     });
     expect(reviews()).toEqual([{ "repo-slug": SLUG, number: "139", verdict: "approve", body: "Read it through.\nShip it." }]);
     // The chip and the review in Comments show it: no success toast.
     expect(toastCount("Approved #139")).toBe(0);
-
-    // The refreshed detail: the chip in place of Review, the reviewer entry, the review in Comments.
     const chip = byTestId("pr-your-review");
-    expect(chip.textContent).toBe("You approved");
     expect(chip.dataset.review).toBe("approved");
     expect(queryTestId("pr-review-button")).toBeNull();
     expect(screen.getAllByTestId("pr-reviewer").find((r) => r.dataset.login === "alexwaumann")?.dataset.status).toBe("approved");
@@ -1791,133 +1777,65 @@ describe("Review ▾", () => {
     expect(mine).toHaveLength(1);
     expect(within(mine[0] as HTMLElement).getByTestId("pr-review-verdict").textContent).toBe("approved");
 
-    // The chip still opens the menu: GitHub takes another review.
-    press(chip);
-    expect(byTestId("pr-review-menu")).toBeTruthy();
-    fireEvent.keyDown(byTestId("pr-review-menu"), { key: "Escape" });
-    expect(queryTestId("pr-review-menu")).toBeNull();
-  });
-
-  it("the composer: Request changes waits for text, verdicts switch keeping it, Escape cancels, one composer at a time", async () => {
-    renderPrPanel();
-    await openPr(139);
-    await chooseVerdict("request-changes");
-    expect(byTestId("pr-review-label").textContent).toBe("Request changes on #139");
-    const submit = () => byTestId("pr-review-submit") as HTMLButtonElement;
-    expect(submit().disabled).toBe(true);
-    expect(submit().textContent).toBe("Request changes");
-    expect(byTestId("pr-review-hint").textContent).toBe("Say what should change");
-    // Blank (spaces only) cannot be submitted, by key or button.
-    fireEvent.change(reviewInput(), { target: { value: "   " } });
-    fireEvent.keyDown(reviewInput(), { key: "Enter", metaKey: true });
-    expect(byTestId("pr-review-composer")).toBeTruthy();
-    expect(submit().disabled).toBe(true);
-    fireEvent.change(reviewInput(), { target: { value: "Rename the flag." } });
-    expect(byTestId("pr-review-hint").textContent).toBe("⌘⏎ submit · esc cancel");
-    expect(submit().disabled).toBe(false);
-
-    // Another verdict: same text, new label and button.
-    await chooseVerdict("comment");
-    expect(byTestId("pr-review-label").textContent).toBe("Comment on #139");
-    expect(submit().textContent).toBe("Comment");
-    expect(reviewInput().value).toBe("Rename the flag.");
-    await vi.waitFor(() => {
-      expect(document.activeElement).toBe(reviewInput());
-    });
-    fireEvent.change(reviewInput(), { target: { value: "" } });
-    expect(byTestId("pr-review-hint").textContent).toBe("Write a comment");
-
-    // Escape cancels; nothing was sent.
+    // The chip opens the dialog again, on the previous verdict, empty: GitHub takes another review.
+    await openReview();
+    expect(byTestId("pr-review-dialog").dataset.verdict).toBe("approve");
+    expect(reviewInput().value).toBe("");
     fireEvent.keyDown(reviewInput(), { key: "Escape" });
-    expect(queryTestId("pr-review-composer")).toBeNull();
-    expect(prTabs()).toEqual(["#139"]);
-    expect(reviews()).toEqual([]);
-
-    // Ask and Review share the slot: opening one closes the other.
-    openMenu();
-    await pick(byTestId("pr-menu-ask"));
-    expect(byTestId("pr-ask")).toBeTruthy();
-    await chooseVerdict("approve");
-    expect(queryTestId("pr-ask")).toBeNull();
-    fireEvent.click(byTestId("pr-review-cancel"));
-    expect(queryTestId("pr-review-composer")).toBeNull();
-    await chooseVerdict("comment");
-    openMenu();
-    await pick(byTestId("pr-menu-ask"));
-    expect(byTestId("pr-ask")).toBeTruthy();
-    expect(queryTestId("pr-review-composer")).toBeNull();
+    expect(queryTestId("pr-review-dialog")).toBeNull();
   });
 
-  it("a review GitHub did not confirm is toasted and keeps the text; the same answer again is toasted again; while it runs the field is read-only", async () => {
+  it("a review GitHub did not confirm is toasted, the button comes back, and the text is there on the next open; other text posts", async () => {
     renderPrPanel();
     await openPr(139);
-    await chooseVerdict("request-changes");
+    await openReview("request-changes");
     fireEvent.change(reviewInput(), { target: { value: "The retry loop never backs off." } });
     world.failNext.add("pr.review");
     const release = world.hold("pr.review");
-    fireEvent.click(byTestId("pr-review-submit"));
+    fireEvent.click(byTestId("pr-review-dialog-confirm"));
     await settle();
-    expect(byTestId("pr-review-submit").getAttribute("aria-busy")).toBe("true");
-    expect(reviewInput().readOnly).toBe(true);
-    expect(byTestId("pr-review-hint").textContent).toBe("Submitting…");
-    expect((byTestId("pr-review-cancel") as HTMLButtonElement).disabled).toBe(true);
-    expect(byTestId("pr-review-button").getAttribute("aria-busy")).toBe("true");
+    expect(byTestId("pr-review-button").textContent).toBe("Requesting changes…");
     release();
     await expectToast("Review Pull Request failed");
     await expectToast(/GitHub did not confirm the review/);
     await vi.waitFor(() => {
-      expect(byTestId("pr-review-submit").hasAttribute("aria-busy")).toBe(false);
+      expect(byTestId("pr-review-button").textContent).toBe("Review");
     });
-    expect(reviewInput().readOnly).toBe(false);
-    expect(reviewInput().value).toBe("The retry loop never backs off.");
-    expect(byTestId("pr-review-button").textContent).toBe("Review");
+    expect(byTestId("pr-review-button").hasAttribute("aria-busy")).toBe(false);
 
-    // The daemon answers the same text the same way (Go-tested): toasted again, the composer stays.
-    fireEvent.keyDown(reviewInput(), { key: "Enter", metaKey: true });
-    await vi.waitFor(() => {
-      expect(toastCount("Review Pull Request failed")).toBe(2);
-    });
-    expect(byTestId("pr-review-composer")).toBeTruthy();
-    expect(byTestId("pr-review-button").textContent).toBe("Review");
-    // Other text posts.
+    await openReview();
+    expect(byTestId("pr-review-dialog").dataset.verdict).toBe("request-changes");
+    expect(reviewInput().value).toBe("The retry loop never backs off.");
     fireEvent.change(reviewInput(), { target: { value: "The retry loop never backs off; add a jittered delay." } });
     fireEvent.keyDown(reviewInput(), { key: "Enter", metaKey: true });
     await settle(3);
     await vi.waitFor(() => {
-      expect(queryTestId("pr-review-composer")).toBeNull();
+      expect(byTestId("pr-your-review").textContent).toBe("You requested changes");
     });
-    expect(byTestId("pr-your-review").textContent).toBe("You requested changes");
     expect(byTestId("pr-your-review").dataset.review).toBe("changes_requested");
     expect(screen.getAllByTestId("pr-comment").filter((c) => c.textContent.includes("jittered delay"))).toHaveLength(1);
-    expect(reviews().map((a) => a.body)).toEqual(["The retry loop never backs off.", "The retry loop never backs off.", "The retry loop never backs off; add a jittered delay."]);
+    expect(reviews().map((a) => a.body)).toEqual(["The retry loop never backs off.", "The retry loop never backs off; add a jittered delay."]);
   });
 
-  it("#145 (the viewer's own): Approve and Request changes are disabled with the reason; Comment posts a review; #140 and #138 have no Review", async () => {
+  it("#145 (the viewer's own): the dialog opens on Comment with Approve and Request changes off and the reason; Comment posts a review; #140 and #138 have no Review", async () => {
     renderPrPanel();
     await openPr(145);
     expect(byTestId("pr-author").textContent).toBe("alexwaumann");
-    press(byTestId("pr-review-button"));
-    expect(byTestId("pr-review-approve").getAttribute("data-disabled")).toBe("");
-    expect(byTestId("pr-review-request-changes").getAttribute("data-disabled")).toBe("");
-    expect(byTestId("pr-review-comment").hasAttribute("data-disabled")).toBe(false);
-    expect(await hoverTip(byTestId("pr-review-approve-reason"))).toBe("You cannot approve your own pull request.");
-    expect(await hoverTip(byTestId("pr-review-request-changes-reason"))).toBe("Not on your own pull request.");
-    // A disabled item opens nothing.
-    await pick(byTestId("pr-review-approve"));
-    expect(queryTestId("pr-review-composer")).toBeNull();
-    await pick(byTestId("pr-review-comment"));
-    expect(byTestId("pr-review-composer").dataset.verdict).toBe("comment");
+    await openReview();
+    expect(byTestId("pr-review-dialog").dataset.verdict).toBe("comment");
+    expect(byTestId("pr-review-dialog-approve").hasAttribute("disabled")).toBe(true);
+    expect(byTestId("pr-review-dialog-request-changes").hasAttribute("disabled")).toBe(true);
+    expect(byTestId("pr-review-dialog-own").textContent).toBe("You can’t approve or request changes on your own pull request.");
     fireEvent.change(reviewInput(), { target: { value: "Rebased on main." } });
     fireEvent.keyDown(reviewInput(), { key: "Enter", metaKey: true });
     await settle(3);
     await vi.waitFor(() => {
-      expect(queryTestId("pr-review-composer")).toBeNull();
+      expect(byTestId("pr-your-review").textContent).toBe("You commented");
     });
-    expect(byTestId("pr-your-review").textContent).toBe("You commented");
     expect(screen.getAllByTestId("pr-comment").filter((c) => c.textContent.includes("Rebased on main."))).toHaveLength(1);
     expect(reviews()).toEqual([{ "repo-slug": SLUG, number: "145", verdict: "comment", body: "Rebased on main." }]);
 
-    // GitHub's refusal from the palette or CLI (the menu never sends it) comes back as its message.
+    // GitHub's refusal from the palette or CLI (the dialog never sends it) comes back as its message.
     await act(async () => {
       await runCommandForResult("pr.review", { "repo-slug": SLUG, number: "145", verdict: "approve" });
     });
@@ -1936,7 +1854,7 @@ describe("Review ▾", () => {
     expect(queryTestId("pr-review-button")).toBeNull();
   });
 
-  it("read access with the viewer's review requested: Review ▾ (primary) and its verdicts, no merge controls", async () => {
+  it("read access with the viewer's review requested: Review (primary) and every verdict, no merge controls", async () => {
     world.update(140, (d) => ({ ...d, reviewers: [...d.reviewers, { login: "alexwaumann", isTeam: false, isBot: false, avatarUrl: "", state: "", submittedAtMs: null, requested: true, stale: false }] }));
     renderPrPanel();
     await openPr(140);
@@ -1944,41 +1862,30 @@ describe("Review ▾", () => {
     expect(byTestId("pr-review-button").dataset.primary).toBe("true");
     expect(queryTestId("pr-merge-button")).toBeNull();
     expect(queryTestId("pr-auto-merge-button")).toBeNull();
-    press(byTestId("pr-review-button"));
+    await openReview();
     // Not the author: GitHub takes every verdict from a read-access reviewer.
-    for (const v of ["approve", "request-changes", "comment"]) expect(byTestId(`pr-review-${v}`).hasAttribute("data-disabled")).toBe(false);
-    await pick(byTestId("pr-review-approve"));
+    for (const v of ["approve", "request-changes", "comment"]) expect(byTestId(`pr-review-dialog-${v}`).hasAttribute("disabled")).toBe(false);
     fireEvent.keyDown(reviewInput(), { key: "Enter", metaKey: true });
     await settle(3);
     expect(reviews()).toEqual([{ "repo-slug": SLUG, number: "140", verdict: "approve" }]);
   });
 
-  it("the composer closes when the pull request stops taking reviews (merged meanwhile)", async () => {
+  it("the dialog shuts when the pull request stops taking reviews (merged meanwhile)", async () => {
     renderPrPanel();
     await openPr(142);
-    await chooseVerdict("comment");
+    await openReview("comment");
     fireEvent.change(reviewInput(), { target: { value: "Looks done." } });
-    fireEvent.click(byTestId("pr-merge-button"));
-    await settle();
-    fireEvent.click(byTestId("pr-merge-dialog-confirm"));
+    // Merged elsewhere: the next read shows it.
+    world.update(142, (d) => ({ ...d, pullRequest: { ...d.pullRequest, state: "merged" } }));
+    act(() => {
+      pullRequestDetailResource.invalidate(pullRequestKey(SLUG, 142));
+    });
     await settle(3);
     await vi.waitFor(() => {
       expect(byTestId("pr-header").dataset.state).toBe("merged");
     });
     expect(queryTestId("pr-review-button")).toBeNull();
-    expect(queryTestId("pr-review-composer")).toBeNull();
+    expect(queryTestId("pr-review-dialog")).toBeNull();
     expect(reviews()).toEqual([]);
   });
 });
-
-/** A hover tooltip's text: Radix opens it on pointer move after the provider's delay. */
-async function hoverTip(el: HTMLElement): Promise<string | null> {
-  fireEvent.pointerMove(el, { pointerType: "mouse" });
-  let text: string | null = null;
-  await vi.waitFor(() => {
-    text = screen.queryByRole("tooltip")?.textContent ?? null;
-    expect(text).not.toBeNull();
-  });
-  fireEvent.pointerLeave(el, { pointerType: "mouse" });
-  return text;
-}

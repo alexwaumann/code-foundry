@@ -6,7 +6,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tip } from "@/components/ui/tooltip";
 import { useNow } from "@/lib/clock";
 import { cn } from "@/lib/utils";
-import { pullRequestDetailResource, pullRequestKey, useViewerLogin } from "@/stores/gh";
+import { pullRequestDetailResource, pullRequestKey } from "@/stores/gh";
 import { useCurrentTarget } from "@/shell/host";
 import { pullRequestDiffResource, warmPullRequestDiff } from "@/stores/prDiff";
 import { innerTabOf, refreshPullRequest, setInnerTab, usePrPanelStore, type PrInnerTab } from "@/stores/prPanel";
@@ -18,12 +18,10 @@ import { DiffButton } from "./DiffButton";
 import { PrHeader } from "./PrHeader";
 import { PrMenu } from "./PrMenu";
 import { OrderToggle, PrOverview } from "./PrOverview";
-import { PrReviewComposer } from "./PrReviewComposer";
 import { PrTimeline } from "./PrTimeline";
 import { HeaderStatus, SeededHeaderStatus, SeededReadinessCards } from "./ReadinessBox";
 import { useReadiness, useSeedReadiness } from "./useReadiness";
 import { detailFresh, statusTone } from "./readiness";
-import { reviewVisible, type Verdict } from "./review";
 import { seedDetail } from "./seed";
 import { useSeedRow } from "./useSeedRow";
 
@@ -155,9 +153,9 @@ function StaleStrip({ prRef, fetchedAtMs, lastError }: { prRef: PrRef; fetchedAt
 }
 
 /** The header of a pull request whose detail is here: its readiness on its own clock gives the wash, the words and the buttons. */
-function DetailHeader({ d, prRef, panelKey, menu, onReview }: { d: PullRequestDetailView; prRef: PrRef; panelKey: string; menu: ReactNode; onReview: (v: Verdict) => void }) {
+function DetailHeader({ d, prRef, panelKey, menu }: { d: PullRequestDetailView; prRef: PrRef; panelKey: string; menu: ReactNode }) {
   const r = useReadiness(d);
-  return <PrHeader d={d} prRef={prRef} menu={menu} tone={statusTone(r.headline.tone)} status={<HeaderStatus r={r} d={d} prRef={prRef} panelKey={panelKey} onReview={onReview} />} />;
+  return <PrHeader d={d} prRef={prRef} menu={menu} tone={statusTone(r.headline.tone)} status={<HeaderStatus r={r} d={d} prRef={prRef} panelKey={panelKey} />} />;
 }
 
 /** The header while the detail is on its way (seed.ts): no wash until an open pull request's verdict is known. */
@@ -277,25 +275,21 @@ export function PullRequestSurface({ tabId, slug, number }: { tabId: string; slu
   const d = pullRequestDetailResource.store((s) => s.entries[key]?.data ?? null);
   const error = pullRequestDetailResource.store((s) => s.entries[key]?.error ?? null);
   const inner = usePrPanelStore((s) => innerTabOf(s.byTab[tabKey]));
-  const viewer = useViewerLogin();
   const [shortRef, short] = useShortPane();
   const seedRow = useSeedRow(key, d === null);
   const seed = useMemo(() => (seedRow ? seedDetail(seedRow) : null), [seedRow]);
   useDiffWarm(key, d);
-  // The composer under the header: Ask a question, or a review with its verdict (one at a time).
-  const [composer, setComposer] = useState<"ask" | Verdict | null>(null);
-  // Bumped each time Ask or a verdict is chosen: the composer (re)takes focus.
+  // The composer under the header: Ask a question (a review is the review dialog, ReviewDialog).
+  const [composer, setComposer] = useState<"ask" | null>(null);
+  // Bumped each time Ask is chosen: the composer (re)takes focus.
   const [composerFocus, setComposerFocus] = useState(0);
-  const openComposer = (which: "ask" | Verdict) => {
+  const openComposer = (which: "ask") => {
     setComposer(which);
     setComposerFocus((n) => n + 1);
   };
   const closeComposer = () => {
     setComposer(null);
   };
-  // The pull request stopped taking reviews here (merged, closed, write access and the request gone):
-  // Review ▾ is gone, and so is its composer (adjusted during render, not in an effect).
-  if (composer !== null && composer !== "ask" && d && !reviewVisible(d, viewer)) setComposer(null);
 
   const shown = d ?? seed;
   if (!shown || (!d && isNotFoundMessage(error))) {
@@ -331,7 +325,6 @@ export function PullRequestSurface({ tabId, slug, number }: { tabId: string; slu
           d={d}
           prRef={prRef}
           panelKey={panelKey}
-          onReview={openComposer}
           menu={
             <PrMenu
               prRef={prRef}
@@ -347,13 +340,11 @@ export function PullRequestSurface({ tabId, slug, number }: { tabId: string; slu
       )}
       {d?.fetchFailed && <StaleStrip prRef={prRef} fetchedAtMs={d.fetchedAtMs} lastError={d.lastError} />}
       {error && <Banner testId={d ? "pr-refresh-error" : "pr-seed-error"} className="my-3">{d ? "Could not refresh" : "Could not load the rest of this pull request"}: {error}</Banner>}
-      {/* The composers under the header, below the ⋯ menu and Review ▾ that open them:
-          nothing above a menu's button moves when its item opens something (a menu still
-          fading out would slide under the pointer, and WebKit's synthetic mouse move would
-          hand focus to one of its items). One review composer across verdicts: switching
-          keeps the text. */}
+      {/* The Ask composer under the header, below the ⋯ menu that opens it: nothing above a
+          menu's button moves when its item opens something (a menu still fading out would
+          slide under the pointer, and WebKit's synthetic mouse move would hand focus to one
+          of its items). */}
       {composer === "ask" && <PrAskComposer key="ask" prRef={prRef} focusRequest={composerFocus} onClose={closeComposer} />}
-      {composer !== null && composer !== "ask" && <PrReviewComposer key="review" prRef={prRef} verdict={composer} focusRequest={composerFocus} onClose={closeComposer} />}
       <InnerTabBar d={d} prRef={prRef} target={panelKey} tabKey={tabKey} inner={inner} />
       {!d ? (
         <>

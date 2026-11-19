@@ -2,85 +2,74 @@ import type { PullRequestDetailView, PullRequestReviewerView } from "@/api/gh";
 import type { Tone } from "./model";
 
 /**
- * The header's Review menu and its composer (ReviewButton, PrReviewComposer): what each
- * verdict says and requires, who may give it, and the viewer's own latest review.
- * pr.review's verdict arg names them; GitHub's events are APPROVE, REQUEST_CHANGES and
- * COMMENT (docs/notes/pr-review-submit-2-gui.md).
+ * The header's Review button and its dialog (ReviewButton, ReviewDialog): what each verdict
+ * says and requires, who may give it, and the viewer's own latest review. pr.review's
+ * verdict arg names them; GitHub's events are APPROVE, REQUEST_CHANGES and COMMENT
+ * (docs/notes/pr-review-submit-2-gui.md, docs/notes/pr-review-dialog.md).
  */
 export type Verdict = "approve" | "request-changes" | "comment";
 
-export const VERDICTS: readonly Verdict[] = ["approve", "request-changes", "comment"];
+/** The dialog's segmented control, left to right. */
+export const VERDICTS: readonly Verdict[] = ["comment", "approve", "request-changes"];
 
 export interface VerdictSpec {
-  /** The menu item's title, and the submit button's label. */
+  /** The segment's label. */
   title: string;
-  /** The menu item's one-line hint. */
-  hint: string;
-  /** The composer's label, e.g. "Approve #139". */
-  label: (n: number) => string;
+  /** The dialog's confirm button. */
+  confirm: string;
+  /** The Review button's words while this verdict is submitted. */
+  busy: string;
   tone: Tone;
-  /** GitHub (and the daemon) refuse a blank body: the submit button waits for text. */
+  /** GitHub (and the daemon) refuse a blank body: the confirm waits for text. */
   bodyRequired: boolean;
-  /** The composer's hint while a required body is blank. */
+  /** The dialog's hint while a required body is blank. */
   emptyHint: string;
   placeholder: string;
-  /** Why it is disabled on the viewer's own pull request ("" when it is not). */
-  ownReason: string;
 }
 
 export const VERDICT_SPECS: Record<Verdict, VerdictSpec> = {
   approve: {
     title: "Approve",
-    hint: "Submit an approving review, with an optional note.",
-    label: (n) => `Approve #${String(n)}`,
+    confirm: "Approve",
+    busy: "Approving…",
     tone: "success",
     bodyRequired: false,
     emptyHint: "",
-    placeholder: "Say why, or leave it empty…",
-    ownReason: "You cannot approve your own pull request.",
+    placeholder: "Optional comment",
   },
   "request-changes": {
     title: "Request changes",
-    hint: "Block merging until your points are addressed.",
-    label: (n) => `Request changes on #${String(n)}`,
+    confirm: "Request changes",
+    busy: "Requesting changes…",
     tone: "failure",
     bodyRequired: true,
     emptyHint: "Say what should change",
-    placeholder: "What has to change before this merges…",
-    ownReason: "Not on your own pull request.",
+    placeholder: "What needs to change before this merges?",
   },
   comment: {
     title: "Comment",
-    hint: "General feedback without a verdict.",
-    label: (n) => `Comment on #${String(n)}`,
+    confirm: "Submit comment",
+    busy: "Commenting…",
     tone: "neutral",
     bodyRequired: true,
     emptyHint: "Write a comment",
-    placeholder: "Leave general feedback…",
-    ownReason: "",
+    placeholder: "Leave a comment",
   },
 };
 
-/** The composer's keys hint while it can submit: narrow enough for a 280px panel. */
+/** The dialog's keys hint while it can submit. */
 export const REVIEW_KEYS_HINT = "⌘⏎ submit · esc cancel";
-/** The composer's hint while its pr.review runs. */
-export const REVIEW_SENDING_HINT = "Submitting…";
-/** The composer's hint while a review of the same pull request is submitted from another surface. */
-export const REVIEW_ELSEWHERE_HINT = "Already submitting a review for this pull request";
 
-/** Whether the composer may submit this text (an approval needs none). */
+/** The dialog's line under the verdicts on the viewer's own pull request. */
+export const OWN_PULL_REQUEST_NOTE = "You can’t approve or request changes on your own pull request.";
+
+/** Whether the dialog may submit this text (an approval needs none). */
 export function canSubmit(verdict: Verdict, text: string): boolean {
   return !VERDICT_SPECS[verdict].bodyRequired || text.trim() !== "";
 }
 
-/**
- * The composer's footer hint: its own submit running, another surface's (elsewhere: the
- * same pull request's review is in flight and this one cannot submit), what it waits
- * for, else the keys.
- */
-export function composerHint(verdict: Verdict, text: string, sending: boolean, elsewhere = false): string {
-  if (sending) return REVIEW_SENDING_HINT;
-  if (elsewhere) return REVIEW_ELSEWHERE_HINT;
+/** The dialog's footer hint: what a blank required body waits for, else the keys. */
+export function reviewHint(verdict: Verdict, text: string): string {
   return canSubmit(verdict, text) ? REVIEW_KEYS_HINT : VERDICT_SPECS[verdict].emptyHint;
 }
 
@@ -89,12 +78,19 @@ export function sameLogin(a: string, b: string): boolean {
   return a !== "" && b !== "" && a.toLowerCase() === b.toLowerCase();
 }
 
-/** The verdicts GitHub refuses here, with the reason: approving or requesting changes on your own pull request. */
-export function disabledVerdicts(author: string, viewer: string): Partial<Record<Verdict, string>> {
-  if (!sameLogin(author, viewer)) return {};
-  const out: Partial<Record<Verdict, string>> = {};
-  for (const v of VERDICTS) if (VERDICT_SPECS[v].ownReason) out[v] = VERDICT_SPECS[v].ownReason;
-  return out;
+/** The verdicts GitHub refuses here: approving or requesting changes on your own pull request. An unknown viewer ("") is refused nothing. */
+export function disabledVerdicts(author: string, viewer: string): readonly Verdict[] {
+  return sameLogin(author, viewer) ? ["approve", "request-changes"] : [];
+}
+
+/**
+ * The verdict the dialog opens on: the one left in an unsent draft, else the viewer's
+ * previous review (reopening from the chip), else Comment on their own pull request and
+ * Approve on anyone else's; never one GitHub would refuse here.
+ */
+export function initialVerdict(draft: Verdict | null, mine: YourReview | null, disabled: readonly Verdict[]): Verdict {
+  for (const v of [draft, mine && YOUR_REVIEW_VERDICT[mine]]) if (v && !disabled.includes(v)) return v;
+  return disabled.includes("approve") ? "comment" : "approve";
 }
 
 /**
@@ -108,7 +104,12 @@ export function reviewVisible(
   viewer: string,
 ): boolean {
   if (d.pullRequest.state !== "open") return false;
-  return d.viewerCanUpdate || d.reviewers.some((r) => r.requested && !r.isTeam && sameLogin(r.login, viewer));
+  return d.viewerCanUpdate || reviewRequested(d.reviewers, viewer);
+}
+
+/** Whether the viewer's own review is requested (again, too): Review is then the primary button. */
+export function reviewRequested(reviewers: readonly Pick<PullRequestReviewerView, "login" | "isTeam" | "requested">[], viewer: string): boolean {
+  return reviewers.some((r) => r.requested && !r.isTeam && sameLogin(r.login, viewer));
 }
 
 export type YourReview = "approved" | "changes_requested" | "commented";
@@ -117,6 +118,9 @@ export interface YourReviewSpec {
   label: string;
   tone: Tone;
 }
+
+/** The verdict a review of that state gave. */
+export const YOUR_REVIEW_VERDICT: Record<YourReview, Verdict> = { approved: "approve", changes_requested: "request-changes", commented: "comment" };
 
 export const YOUR_REVIEW_SPECS: Record<YourReview, YourReviewSpec> = {
   approved: { label: "You approved", tone: "success" },

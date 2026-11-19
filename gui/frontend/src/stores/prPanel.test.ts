@@ -190,14 +190,15 @@ describe("submitReview", () => {
     const busy = () => usePrPanelStore.getState().reviewing[key] ?? false;
 
     const first = submitReview(ref, "approve", "  LGTM \n");
-    expect(busy()).toBe(true);
+    // Busy with the verdict: the Review button says "Approving…".
+    expect(busy()).toBe("approve");
     await vi.waitFor(() => {
       expect(getPullRequestDetail).toHaveBeenCalledTimes(2);
     });
     await expect(submitReview(ref, "approve", "again")).resolves.toBe(false);
     expect(invokeCommand).toHaveBeenCalledTimes(1);
     expect(invokeCommand).toHaveBeenCalledWith("pr.review", expect.anything(), { "repo-slug": SLUG, number: "5", verdict: "approve", body: "LGTM" });
-    expect(busy()).toBe(true);
+    expect(busy()).toBe("approve");
     reread.resolve(view("after"));
     await expect(first).resolves.toBe(true);
     expect(busy()).toBe(false);
@@ -207,7 +208,7 @@ describe("submitReview", () => {
     release();
   });
 
-  it("an empty approval sends no body; a refusal is toasted with GitHub's message, re-reads, and frees the composer without waiting for that read", async () => {
+  it("an empty approval sends no body; a refusal is toasted with GitHub's message, re-reads, and frees the button without waiting for that read", async () => {
     const ref = { slug: SLUG, number: 6 };
     const key = pullRequestKey(SLUG, 6);
     getPullRequestDetail.mockResolvedValueOnce(view("d"));

@@ -59,8 +59,8 @@ interface PrPanelState {
   confirmed: Readonly<Record<string, boolean>>;
   /** pullRequestKey → the method of the pr.merge in flight (until the detail shows it merged). */
   merging: Readonly<Record<string, MergeMethodView>>;
-  /** pullRequestKey → a pr.review in flight (until the detail shows it). */
-  reviewing: Readonly<Record<string, boolean>>;
+  /** pullRequestKey → the verdict of the pr.review in flight (until the detail shows it): the Review button's busy words. */
+  reviewing: Readonly<Record<string, Verdict>>;
   /** pullRequestKey → the pr.ready, pr.draft or pr.auto-merge in flight (until the detail shows it). */
   changing: Readonly<Record<string, PrChange>>;
   /** pullRequestKey → a pr.revert in flight (from its confirmation on). */
@@ -353,33 +353,38 @@ export async function mergePullRequest(ref: PrRef, method: MergeMethodView, dele
   }
 }
 
+/** The verdict of the review being submitted on ref (null: none): the Review button's busy words. */
+export function useReviewingVerdict(ref: PrRef): Verdict | null {
+  return usePrPanelStore((s) => s.reviewing[pullRequestKey(ref.slug, ref.number)] ?? null);
+}
+
 /** The method of the merge running on ref (null: none): the busy button's words, the box's "Merging…". */
 export function useMergingMethod(ref: PrRef): MergeMethodView | null {
   return usePrPanelStore((s) => s.merging[pullRequestKey(ref.slug, ref.number)] ?? null);
 }
 
 /**
- * The Review composer: pr.review with the verdict and the (trimmed) body. The daemon's
- * message is toasted under the command's title ("Approved #N"); a refusal is the generic "Review Pull Request
- * failed" toast with GitHub's message. Either way the detail is read again (the daemon
- * also announces it); on success this waits for that read, so the header's chip and the
- * new review in Comments are there when the composer closes, and a failure returns at
- * once. Returns whether it was
- * submitted; a second call while one runs sends nothing.
+ * The review dialog's submit: pr.review with the verdict and the (trimmed) body. The
+ * daemon's message is toasted under the command's title ("Approved #N"); a refusal is the
+ * generic "Review Pull Request failed" toast with GitHub's message. Either way the detail
+ * is read again (the daemon also announces it); on success this waits for that read, so
+ * the Review button stays busy until the header's chip and the new review in Comments are
+ * there, and a failure returns at once. Returns whether it was submitted; a second call
+ * while one runs sends nothing.
  */
 export async function submitReview(ref: PrRef, verdict: Verdict, body: string): Promise<boolean> {
   const key = pullRequestKey(ref.slug, ref.number);
   if (usePrPanelStore.getState().reviewing[key]) return false;
-  usePrPanelStore.setState((s) => ({ reviewing: { ...s.reviewing, [key]: true } }));
+  usePrPanelStore.setState((s) => ({ reviewing: { ...s.reviewing, [key]: verdict } }));
   let ok = false;
   try {
-    // The composer closes onto the review in Comments and the header's chip: no success toast.
+    // The button turns into the header's chip and the review shows in Comments: no success toast.
     ok = await runCommand("pr.review", reviewArgs(ref, verdict, body), undefined, { inView: true });
     return ok;
   } finally {
     pullRequestDetailResource.invalidate(key);
-    // A failure frees the composer at once (its text stays for a retry); only a posted
-    // review waits for the detail that shows it.
+    // A failure frees the button at once (the dialog's draft keeps the text for a retry);
+    // only a posted review waits for the detail that shows it.
     if (ok) await settled(pullRequestDetailResource, (k) => k === key);
     usePrPanelStore.setState((s) => {
       const { [key]: _done, ...rest } = s.reviewing;

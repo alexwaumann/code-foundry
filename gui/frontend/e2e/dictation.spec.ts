@@ -58,8 +58,8 @@ test.describe("settings section", () => {
 test.describe("composer", () => {
   // Listening… in the placeholder, Send while listening (flush, then send), Loading model…, the
   // engine's failure, the microphone-denied line and a session held elsewhere: unit-tested in
-  // src/components/thread/ThreadComposerDictation.test.tsx; the PR review composer's mic in
-  // src/components/pr/PrReviewComposer.test.tsx.
+  // src/components/thread/ThreadComposerDictation.test.tsx; the PR review dialog's mic in
+  // src/components/pr/ReviewDialog.test.tsx.
   // No mic while off or without a model, its place before attach, and none once turned off: unit-tested in
   // src/components/thread/ThreadComposerDictation.test.tsx.
 

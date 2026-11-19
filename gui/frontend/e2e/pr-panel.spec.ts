@@ -401,12 +401,12 @@ test("at 280px nothing overflows: header, cards, inner tab bar, logins, popups; 
   await page.getByTestId("pr-timeline-order").click();
   await expect(page.getByTestId("pr-timeline")).toHaveAttribute("data-order", "oldest");
 
-  // The popups and the Review composer reached through one: the next test.
+  // The popups and the review dialog reached through one: the next test.
   // The side panel's strip scrolling its active tab into view is gone: a pane's strip fits its tabs,
   // going icon-only when tight (src/components/shell/PaneTabStrip.test.tsx, "tight, tabs go icon-only").
 });
 
-test("at 280px the surface's popups stay inside its pane: the ⋯ menu, the reviewer picker, the Review menu and its composer", async ({ page }) => {
+test("at 280px the surface's popups stay inside its pane: the ⋯ menu and the reviewer picker; the review dialog fits the window", async ({ page }) => {
   await openPrBesidePage(page, 145, 280);
   await page.getByTestId("pr-menu-button").click();
   await expect(page.getByTestId("pr-menu")).toBeVisible();
@@ -420,14 +420,10 @@ test("at 280px the surface's popups stay inside its pane: the ⋯ menu, the revi
   await expect(page.getByTestId("pr-reviewer-picker")).toHaveCount(0);
   await expect(page.getByTestId("pr-review-button")).toHaveAccessibleName("Review");
   await page.getByTestId("pr-review-button").click();
-  await expect(page.getByTestId("pr-review-menu")).toBeVisible();
-  expect(inside(await boxOf(page, "pr-review-menu"), await boxOf(page, PANE))).toBe(true);
-  await page.getByTestId("pr-review-comment").click();
-  expect(await overflowX(page, "pr-review-composer")).toBeLessThanOrEqual(0);
-  expect(inside(await boxOf(page, "pr-review-submit"), await boxOf(page, PANE))).toBe(true);
-  await expect(page.getByTestId("pr-review-input")).toBeFocused();
+  await expect(page.getByTestId("pr-review-dialog")).toBeVisible();
+  expect(await overflowX(page, "pr-review-dialog")).toBeLessThanOrEqual(0);
   await page.keyboard.press("Escape");
-  await expect(page.getByTestId("pr-review-composer")).toHaveCount(0);
+  await expect(page.getByTestId("pr-review-dialog")).toHaveCount(0);
 });
 
 test("long conversations and timelines are virtualized in the panel's scroll", async ({ page }) => {
@@ -666,39 +662,38 @@ for (const scheme of ["dark", "light"] as const) {
   });
 }
 
-// ---- Review ▾ (pr.review; docs/notes/pr-review-submit-2-gui.md) ----------------------
+// ---- Review and its dialog (pr.review; docs/notes/pr-review-dialog.md) ------------------
 
-// The Review menu, the composer's label, hint and keys, pr.review's args, the toast, the chip, the
-// reviewer entry and the review in Comments: src/components/pr/PullRequestSurface.test.tsx ("Review ▾").
-test("Review on #139 sits left of Auto-merge in the header; its menu stays inside the panel", async ({ page }) => {
-  await shotViewport(page);
+// The dialog's contents per viewer, the verdicts, the busy words, pr.review's args, a failed submit
+// keeping the text, the chip and the review in Comments: src/components/pr/ReviewDialog.test.tsx,
+// ReviewButton.test.tsx and PullRequestSurface.test.tsx ("Review and its dialog"). Here: what
+// needs a browser, the focus on open, the chord, and focus coming back.
+test("Review on #139 sits left of Auto-merge; its dialog opens with the comment box focused, cmd+Enter submits and focus comes back", async ({ page }) => {
   await openPrBesidePage(page, 139);
-  await expect(page.getByTestId("pr-review-button")).toHaveText("Review");
+  const review = page.getByTestId("pr-review-button");
+  await expect(review).toHaveText("Review");
   expect((await boxOf(page, "pr-review-button")).x).toBeLessThan((await boxOf(page, "pr-auto-merge-button")).x);
-  await page.getByTestId("pr-review-button").click();
-  await expect(page.getByTestId("pr-review-menu")).toBeVisible();
-  expect(inside(await boxOf(page, "pr-review-menu"), await boxOf(page, PANE))).toBe(true);
-  await settledAnimations(page, "pr-review-menu");
-  await shot(page, "review-menu");
-  if (!shots) return;
-
-  // The composer and the approved header, for the PR body.
-  await page.getByTestId("pr-review-approve").click();
-  await page.getByTestId("pr-review-input").pressSequentially("Read it through.");
-  await shot(page, "review-approve");
+  await review.click();
+  const dialog = page.getByTestId("pr-review-dialog");
+  await expect(dialog).toBeVisible();
+  await expect(page.getByTestId("pr-review-dialog-input")).toBeFocused();
+  // Enter is a newline; only cmd+Enter submits.
+  await page.keyboard.type("Read it through.");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("Ship it.");
+  await expect(dialog).toBeVisible();
   await page.keyboard.press("Meta+Enter");
+  await expect(dialog).toHaveCount(0);
   await expect(page.getByTestId("pr-your-review")).toHaveText("You approved");
-  await page.mouse.move(0, 0);
-  await shot(page, "review-approved");
+  expect((await invocations()).filter((i) => i.name === "pr.review").map((i) => i.args)).toEqual([{ "repo-slug": SLUG, number: "139", verdict: "approve", body: "Read it through.\nShip it." }]);
+  // Focus is back on the button (now the chip), so the pane's keys keep working.
+  await expect(page.getByTestId("pr-your-review")).toBeFocused();
+  // Escape cancels.
+  await page.getByTestId("pr-your-review").click();
+  await expect(page.getByTestId("pr-review-dialog-input")).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
 });
-
-// "Review composer: Request changes waits for text, verdicts switch keeping it, Escape cancels, one
-// composer at a time", "a review GitHub did not confirm is toasted and keeps the text; the same text gets
-// that answer again; while it runs the field is read-only", "#145 (the viewer's own): Approve and Request
-// changes are disabled with the reason; Comment posts a review; #140 and #138 have no Review" and "the
-// review composer closes when the pull request stops taking reviews (merged meanwhile)": src/components/pr/PullRequestSurface.test.tsx
-// ("Review ▾"). The same text getting the same answer for 2 minutes is the daemon's
-// (internal/store/gh/pr_review_test.go).
 
 /** A screenshot of the pull request's pane only (SHOTS), once popovers have faded in. */
 async function paneShot(page: Page, name: string): Promise<void> {
@@ -745,5 +740,48 @@ for (const scheme of ["dark", "light"] as const) {
     await page.getByTestId("pr-menu-button").click();
     await expect(page.getByTestId("pr-menu-reopen")).toBeVisible();
     await paneShot(page, `after-menu-closed-${scheme}`);
+  });
+}
+
+/** SHOTS=<dir>: the review dialog as a requested reviewer and as the author, the busy button, the chip, and the Diff tab's Review; dark and light. */
+for (const scheme of ["dark", "light"] as const) {
+  test(`review dialog (screenshots, ${scheme})`, async ({ page }) => {
+    test.skip(!shots, "SHOTS=<dir> only: the screenshots are all it adds");
+    await page.emulateMedia({ colorScheme: scheme });
+    await shotViewport(page);
+    // The Diff tab's Review, before the review is posted; then the dialog from there.
+    await openPrBesidePage(page, 139);
+    await page.evaluate(`__cfModule("/src/stores/prDiffPanel.ts").then((m) => m.openPullRequestDiff({ slug: "${SLUG}", number: 139 }))`);
+    await expect(page.getByTestId("pr-diff-review-slot").getByTestId("pr-review-button")).toBeVisible();
+    await page.mouse.move(5, 5);
+    await shot(page, `review-diff-tab-${scheme}`);
+    await page.getByTestId("pr-diff-review-slot").getByTestId("pr-review-button").click();
+    await expect(page.getByTestId("pr-review-dialog")).toBeVisible();
+    await shot(page, `review-diff-tab-dialog-${scheme}`);
+    await page.keyboard.press("Escape");
+
+    await openPrBesidePage(page, 139);
+    await page.getByTestId("pr-review-button").click();
+    await page.getByTestId("pr-review-dialog-input").pressSequentially("Read it through. Ship it.");
+    await shot(page, `review-dialog-reviewer-${scheme}`);
+    await page.getByTestId("pr-review-dialog-request-changes").click();
+    await page.getByTestId("pr-review-dialog-input").fill("");
+    await shot(page, `review-dialog-request-changes-${scheme}`);
+    await page.getByTestId("pr-review-dialog-approve").click();
+    await page.getByTestId("pr-review-dialog-input").fill("Read it through. Ship it.");
+    await mockPost("gh/pr-delay?ms=3000");
+    await page.keyboard.press("Meta+Enter");
+    await expect(page.getByTestId("pr-review-button")).toHaveText("Approving…");
+    await page.mouse.move(5, 5);
+    await shot(page, `review-busy-${scheme}`);
+    await expect(page.getByTestId("pr-your-review")).toHaveText("You approved", { timeout: 10_000 });
+    await mockPost("gh/pr-delay?ms=0");
+    await page.mouse.move(5, 5);
+    await shot(page, `review-chip-${scheme}`);
+
+    await openPrBesidePage(page, 145);
+    await page.getByTestId("pr-review-button").click();
+    await expect(page.getByTestId("pr-review-dialog-own")).toBeVisible();
+    await shot(page, `review-dialog-author-${scheme}`);
   });
 }
