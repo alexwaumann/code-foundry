@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { useMemo, type ReactNode } from "react";
 import type { PullRequestDetailView } from "@/api/gh";
+import { WorkingCircle } from "@/components/status/StatusCircle";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tip } from "@/components/ui/tooltip";
@@ -45,14 +46,15 @@ import { useTaskRouting } from "./useTaskRouting";
 import { toneText } from "./tones";
 
 /**
- * A card's icon. Running checks take the app's "something is running" mark, the dashed circle
- * the sidebar's Working rows and thread tabs show (statusRegistry), still, in the card's tone;
- * a single running check inside the card keeps its own dot (checkIcons.ts).
+ * A card's icon. Running checks take the app's "something is running" mark, the working circle
+ * the sidebar's Working rows show (statusRegistry), turning, in the card's tone; "No checks"
+ * keeps a still dashed circle. A single running check inside the card keeps its own dot
+ * (checkIcons.ts).
  */
 const icons: Record<ReadyIcon, LucideIcon> = {
   draft: GitPullRequestDraft,
   failure: CircleX,
-  running: statusRegistry.working.icon ?? CircleDashed,
+  running: statusRegistry.working.icon ?? WorkingCircle,
   success: CircleCheck,
   clock: Clock,
   eye: Eye,

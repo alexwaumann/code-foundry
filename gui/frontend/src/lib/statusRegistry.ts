@@ -6,14 +6,14 @@
  *
  * Attention, error and done kinds show no time on the row (the hover card has it).
  * Working and waiting show the time since the status changed, in the word's tone. Idle
- * (place) shows no icon or word, only the time since the last activity, muted.
+ * (place) shows no icon or word, only the time since the last activity, muted. Working,
+ * setting up and waiting show the turning dashed circle (components/status/StatusCircle).
  */
 import {
   Ban,
   BellRing,
   CircleAlert,
   CircleCheck,
-  CircleDashed,
   CircleQuestionMark,
   ClipboardCheck,
   ShieldQuestionMark,
@@ -22,6 +22,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import type { ThreadView } from "@/api/threads";
+import { WaitingCircle, WorkingCircle } from "@/components/status/StatusCircle";
 import { DAY, MINUTE, type DurationUnits } from "./duration";
 import type { StatusLine, StatusLineKind } from "./statusLine";
 import { statusNote } from "./thread";
@@ -81,11 +82,11 @@ export const statusRegistry: Readonly<Record<StatusLineKind, StatusEntry>> = {
   crashed: { icon: TriangleAlert, word: "Crashed", tone: "error", timeMode: "none" },
   transcriptDeleted: { icon: CircleAlert, word: "Error", tone: "error", timeMode: "none" },
   finished: { icon: CircleCheck, word: "Done", tone: "success", timeMode: "none" },
-  working: { icon: CircleDashed, word: "Working", tone: "info", timeMode: "status" },
-  settingUp: { icon: CircleDashed, word: "Setting up", tone: "info", timeMode: "status" },
+  working: { icon: WorkingCircle, word: "Working", tone: "info", timeMode: "status" },
+  settingUp: { icon: WorkingCircle, word: "Setting up", tone: "info", timeMode: "status" },
   setupFailed: { icon: CircleAlert, word: "Setup failed", tone: "error", timeMode: "none" },
   setupCancelled: { icon: Ban, word: "Cancelled", tone: "muted", timeMode: "none" },
-  waiting: { icon: CircleDashed, word: "Waiting", tone: "muted", timeMode: "status" },
+  waiting: { icon: WaitingCircle, word: "Waiting", tone: "muted", timeMode: "status" },
   place: { icon: null, word: "", tone: "muted", timeMode: "activity" },
 };
 

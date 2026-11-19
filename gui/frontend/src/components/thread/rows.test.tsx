@@ -162,7 +162,7 @@ describe("the latest turn", () => {
     errors: [],
   };
 
-  it("is open while it runs, under a live header: spinner, Working, its steps and the time since its message", () => {
+  it("is open while it runs, under a live header: the working circle, Working, its steps and the time since its message", () => {
     vi.useFakeTimers({ toFake: ["Date", "setInterval", "clearInterval"] });
     vi.setSystemTime(1 + 72_000);
     const c = show(turn, { working: true });
@@ -174,7 +174,8 @@ describe("the latest turn", () => {
     const working = header?.querySelector('[data-testid="thread-working"]');
     expect(working?.textContent).toBe("Working·1 step·1m 12s");
     expect(working?.querySelector(".shimmer")?.textContent).toBe("Working");
-    expect(working?.querySelector("svg.animate-spin")).not.toBeNull();
+    expect(working?.querySelector('svg[data-status-circle="working"]')?.getAttribute("class")).toContain("animate-status-working");
+    expect(working?.querySelector("svg.animate-spin")).toBeNull();
     // Always open: nothing to click, and no copy while the answer may still grow.
     expect(header?.querySelector("button")).toBeNull();
     expect(c.querySelector('[aria-label="Copy answer"]')).toBeNull();

@@ -29,6 +29,7 @@ import {
 import type { AgentRunView } from "@/api/agents";
 import type { ThreadItemView, ToolCallView, WakeView } from "@/api/thread";
 import { CopyIcon } from "@/components/copy/CopyButton";
+import { StatusCircle } from "@/components/status/StatusCircle";
 import { Tip } from "@/components/ui/tooltip";
 import { agentElapsedMs, agentName, parseAgentNote } from "@/lib/agents";
 import { useNow, useNowSelect } from "@/lib/clock";
@@ -923,7 +924,7 @@ export function TurnHead({
       {live ? (
         <span className="line text-caption" data-testid="thread-working">
           <span className="ico">
-            <LoaderCircle className="t-sky animate-spin" aria-hidden />
+            <StatusCircle tone="working" aria-hidden />
           </span>
           {parts.map((p, i) => (
             <span key={i} className="contents">

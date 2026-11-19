@@ -3,7 +3,6 @@ import {
   BellRing,
   CircleAlert,
   CircleCheck,
-  CircleDashed,
   CircleQuestionMark,
   ClipboardCheck,
   ShieldQuestionMark,
@@ -12,6 +11,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import type { ThreadStateView, ThreadStatusView } from "@/api/threads";
+import { WaitingCircle, WorkingCircle } from "@/components/status/StatusCircle";
 import { statusLine, type StatusLineKind } from "./statusLine";
 import { formatDuration } from "./duration";
 import { rowToneClasses, statusBadge, statusDetail, statusRegistry, statusTimeAt, statusTimeUnits, type RowTone, type TimeMode } from "./statusRegistry";
@@ -39,8 +39,9 @@ describe("statusRegistry", () => {
     ["crashed", TriangleAlert, "Crashed", "error", "none"],
     ["transcriptDeleted", CircleAlert, "Error", "error", "none"],
     ["finished", CircleCheck, "Done", "success", "none"],
-    ["working", CircleDashed, "Working", "info", "status"],
-    ["waiting", CircleDashed, "Waiting", "muted", "status"],
+    ["working", WorkingCircle, "Working", "info", "status"],
+    ["settingUp", WorkingCircle, "Setting up", "info", "status"],
+    ["waiting", WaitingCircle, "Waiting", "muted", "status"],
     ["place", null, "", "muted", "activity"],
   ])("%s", (kind, icon, word, tone, timeMode) => {
     // Only a woken snooze shows its word on an Active row (StatusEntry.rowWord).
