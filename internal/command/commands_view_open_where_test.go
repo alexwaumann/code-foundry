@@ -53,13 +53,19 @@ func fileTab(id, thread string) *core.Tab {
 }
 
 // An item verb from a thread whose own tab is open in no space: the tab goes to the focused
-// pane of the thread's space (as the user's Open ▸ does), and the message says so instead of
+// pane of the thread's space (as the user's Open ▸ does), or by smart placement to a pane holding
+// tabs of its kind, and the message says so instead of
 // "beside the thread". Before any window has loaded the layout, the first load takes it into
 // the thread's remembered set: the message says that, and the import does it.
 func TestViewOpenForAThreadWhoseTabIsNotOpen(t *testing.T) {
 	inOther := oneSpace(threadTab("t-o", other))
 	inOther.Spaces = append(inOther.Spaces, &core.Space{ID: "sp-two", Name: "Two"})
 	inOther.Threads = map[string]*core.ThreadState{self: {Space: "sp-two"}}
+	withFiles := oneSpace(threadTab("t-o", other))
+	files := &core.Node{T: core.NodePane, ID: "p-two", Active: "t-b", Tabs: []*core.Tab{
+		{ID: "t-b", Kind: "file", Thread: other, Key: "file:/wt/b.go", Params: map[string]string{"path": "/wt/b.go"}}}}
+	withFiles.Spaces[0].Root = &core.Node{T: core.NodeSplit, ID: "s-1", Dir: core.Row, Sizes: []float64{0.5, 0.5},
+		Kids: []*core.Node{withFiles.Spaces[0].Root, files}}
 	tests := []struct {
 		name     string
 		st       *core.State
@@ -71,6 +77,11 @@ func TestViewOpenForAThreadWhoseTabIsNotOpen(t *testing.T) {
 			name: "the user on another thread's tab", st: oneSpace(threadTab("t-o", other)), imported: true,
 			want: "thread " + self + "'s tab is not open, so tab t-n1 opened in pane p-main, the focused pane of its space, behind the tab shown there; windows=1",
 			json: command.PanelResult{Windows: 1, Thread: self, TabThread: self, Tab: "t-n1", Pane: "p-main", Space: "sp-main", Rule: "focused", ThreadNotOpen: true, Behind: true},
+		},
+		{
+			name: "smart placement: it joins the open files", st: withFiles, imported: true,
+			want: "thread " + self + "'s tab is not open, so tab t-n1 opened in pane p-two, with the open tabs of its kind; windows=1",
+			json: command.PanelResult{Windows: 1, Thread: self, TabThread: self, Tab: "t-n1", Pane: "p-two", Space: "sp-main", Rule: "kind-any", ThreadNotOpen: true},
 		},
 		{
 			name: "the thread lives in a space the user is not in", st: inOther, imported: true,

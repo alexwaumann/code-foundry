@@ -1,0 +1,91 @@
+{
+  "doc": "Smart placement: a terminal never joins another thread's terminals by kind (rule kind-any skips terminals), so rule 3 takes the right neighbour.",
+  "state": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Space A",
+        "root": {
+          "t": "split",
+          "id": "s-r",
+          "dir": "row",
+          "kids": [
+            {
+              "t": "pane",
+              "id": "p-a",
+              "tabs": [{"id":"t-a","kind":"thread","thread":"th-a"}],
+              "active": "t-a"
+            },
+            {
+              "t": "pane",
+              "id": "p-r",
+              "tabs": [{"id":"t-g","kind":"file","params":{"path":"/r/g"},"thread":"th-b"}],
+              "active": "t-g"
+            },
+            {
+              "t": "pane",
+              "id": "p-t",
+              "tabs": [
+                {"id":"t-2","kind":"terminal","params":{"terminal":"term-2"},"thread":"th-b"}
+              ],
+              "active": "t-2"
+            }
+          ],
+          "sizes": [0.4,0.3,0.3]
+        },
+        "focus": "p-a"
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "op": {
+    "op": "open_surface",
+    "tab": {"kind":"terminal","params":{"terminal":"term-3"},"thread":"th-a"}
+  },
+  "want": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Space A",
+        "root": {
+          "t": "split",
+          "id": "s-r",
+          "dir": "row",
+          "kids": [
+            {
+              "t": "pane",
+              "id": "p-a",
+              "tabs": [{"id":"t-a","kind":"thread","thread":"th-a"}],
+              "active": "t-a"
+            },
+            {
+              "t": "pane",
+              "id": "p-r",
+              "tabs": [
+                {"id":"t-g","kind":"file","thread":"th-b","params":{"path":"/r/g"}},
+                {"id":"t-n1","kind":"terminal","thread":"th-a","params":{"terminal":"term-3"}}
+              ],
+              "active": "t-n1"
+            },
+            {
+              "t": "pane",
+              "id": "p-t",
+              "tabs": [
+                {"id":"t-2","kind":"terminal","thread":"th-b","params":{"terminal":"term-2"}}
+              ],
+              "active": "t-2"
+            }
+          ],
+          "sizes": [0.4,0.3,0.3]
+        },
+        "focus": "p-a"
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "result": {"space":"sp-a","pane":"p-r","tab":"t-n1","rule":"3"}
+}

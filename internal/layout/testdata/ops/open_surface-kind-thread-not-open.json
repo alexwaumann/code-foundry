@@ -1,0 +1,72 @@
+{
+  "doc": "Smart placement, rule kind-any: a file of a thread whose tab is not open joins the pane of files, ranked from the focused pane, instead of the focused pane.",
+  "state": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Space A",
+        "root": {
+          "t": "split",
+          "id": "s-r",
+          "dir": "row",
+          "kids": [
+            {
+              "t": "pane",
+              "id": "p-a",
+              "tabs": [{"id":"t-a","kind":"thread","thread":"th-a"}],
+              "active": "t-a"
+            },
+            {
+              "t": "pane",
+              "id": "p-b",
+              "tabs": [{"id":"t-g","kind":"file","params":{"path":"/r/g"},"thread":"th-b"}],
+              "active": "t-g"
+            }
+          ],
+          "sizes": [0.6,0.4]
+        },
+        "focus": "p-a"
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "op": {"op":"open_surface","tab":{"kind":"file","params":{"path":"/r/z"},"thread":"th-c"}},
+  "want": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Space A",
+        "root": {
+          "t": "split",
+          "id": "s-r",
+          "dir": "row",
+          "kids": [
+            {
+              "t": "pane",
+              "id": "p-a",
+              "tabs": [{"id":"t-a","kind":"thread","thread":"th-a"}],
+              "active": "t-a"
+            },
+            {
+              "t": "pane",
+              "id": "p-b",
+              "tabs": [
+                {"id":"t-g","kind":"file","thread":"th-b","params":{"path":"/r/g"}},
+                {"id":"t-n1","kind":"file","thread":"th-c","params":{"path":"/r/z"}}
+              ],
+              "active": "t-n1"
+            }
+          ],
+          "sizes": [0.6,0.4]
+        },
+        "focus": "p-a"
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "result": {"space":"sp-a","pane":"p-b","tab":"t-n1","rule":"kind-any"}
+}

@@ -1,0 +1,120 @@
+{
+  "doc": "Smart placement: a collapsed pane is no candidate for the kind rules, so the pull request falls back to rule 2, beside this thread's diff.",
+  "state": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Space A",
+        "root": {
+          "t": "split",
+          "id": "s-r",
+          "dir": "row",
+          "kids": [
+            {
+              "t": "pane",
+              "id": "p-a",
+              "tabs": [{"id":"t-a","kind":"thread","thread":"th-a"}],
+              "active": "t-a"
+            },
+            {
+              "t": "pane",
+              "id": "p-x",
+              "tabs": [
+                {
+                  "id": "t-d",
+                  "kind": "diff",
+                  "thread": "th-a",
+                  "params": {"project":"pj","worktree":"w-th-a"}
+                }
+              ],
+              "active": "t-d"
+            },
+            {
+              "t": "pane",
+              "id": "p-c",
+              "tabs": [
+                {
+                  "id": "t-p",
+                  "kind": "pullrequest",
+                  "params": {"slug":"o/r","number":"3"},
+                  "thread": "th-b"
+                }
+              ],
+              "active": "t-p",
+              "collapsed": true
+            }
+          ],
+          "sizes": [0.4,0.3,0.3]
+        },
+        "focus": "p-a"
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "op": {
+    "op": "open_surface",
+    "tab": {"kind":"pullrequest","params":{"slug":"o/r","number":"4"},"thread":"th-a"}
+  },
+  "want": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Space A",
+        "root": {
+          "t": "split",
+          "id": "s-r",
+          "dir": "row",
+          "kids": [
+            {
+              "t": "pane",
+              "id": "p-a",
+              "tabs": [{"id":"t-a","kind":"thread","thread":"th-a"}],
+              "active": "t-a"
+            },
+            {
+              "t": "pane",
+              "id": "p-x",
+              "tabs": [
+                {
+                  "id": "t-d",
+                  "kind": "diff",
+                  "thread": "th-a",
+                  "params": {"project":"pj","worktree":"w-th-a"}
+                },
+                {
+                  "id": "t-n1",
+                  "kind": "pullrequest",
+                  "thread": "th-a",
+                  "params": {"number":"4","slug":"o/r"}
+                }
+              ],
+              "active": "t-n1"
+            },
+            {
+              "t": "pane",
+              "id": "p-c",
+              "tabs": [
+                {
+                  "id": "t-p",
+                  "kind": "pullrequest",
+                  "thread": "th-b",
+                  "params": {"number":"3","slug":"o/r"}
+                }
+              ],
+              "active": "t-p",
+              "collapsed": true
+            }
+          ],
+          "sizes": [0.4,0.3,0.3]
+        },
+        "focus": "p-a"
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "result": {"space":"sp-a","pane":"p-x","tab":"t-n1","rule":"2"}
+}

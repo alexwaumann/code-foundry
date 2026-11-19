@@ -1,5 +1,5 @@
 {
-  "doc": "Rule 4 with several panes: the nearest by centre distance, here the second in layout order.",
+  "doc": "Rule 4 with several panes: the nearest by centre distance, here the second in layout order. Smart placement off: with it on, a pane holding a tab of the same kind comes first (placement-by-kind cases).",
   "state": {
     "v": 1,
     "spaces": [
@@ -55,6 +55,7 @@
     "default_space": "sp-a"
   },
   "op": {"op":"open_surface","tab":{"kind":"file","thread":"th-a","params":{"path":"/r/new"}}},
+  "options": {"no_smart_placement": true},
   "want": {
     "v": 1,
     "spaces": [

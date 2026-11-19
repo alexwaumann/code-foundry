@@ -64,7 +64,8 @@ type PanelResult struct {
 	// is one per path), "" for none.
 	//
 	// ThreadNotOpen: Thread's own tab is open in no space, so the tab went to its space's
-	// focused pane (Rule "focused"), not beside it: Behind when it waits behind the tab shown
+	// focused pane (Rule "focused") or, by smart placement, to a pane holding tabs of its kind
+	// (Rule "kind" or "kind-any"), not beside it: Behind when it waits behind the tab shown
 	// there, OtherSpace when that space is not the one the user is in. JoinsSet: no window has
 	// loaded the layout yet, and the first load takes the tab into the thread's remembered set
 	// (it shows when the thread is opened).

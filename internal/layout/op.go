@@ -30,8 +30,10 @@ type Result struct {
 	Closed []*Tab `json:"closed,omitempty"`
 	// Rule says how placement chose where a tab went (place.go): "1" to "6", "pane" (the
 	// caller's pane), "focused" (the focused pane), "near" (smart placement: the
-	// pane holding a thread nearest the focused one), "compose" (it replaced a composer tab),
-	// "edge" (a new pane on the edge the caller gave).
+	// pane holding a thread nearest the focused one), "kind" (smart placement: a pane holding
+	// a tab of its kind for its thread), "kind-any" (smart placement: a pane holding a tab of
+	// its kind), "compose" (it replaced a composer tab), "edge" (a new pane on the edge the
+	// caller gave).
 	Rule string `json:"rule,omitempty"`
 	// Kept lists linked tabs taken out of the layout into their thread's remembered set
 	// (thread.go). Their terminals keep running.
@@ -65,7 +67,8 @@ type Options struct {
 	// NoSmartSwap turns smart swap off (the setting layout.smart_swap, on by default).
 	NoSmartSwap bool `json:"no_smart_swap,omitempty"`
 	// NoSmartPlacement turns smart placement off (the setting layout.smart_placement, on by
-	// default): a thread's own tab then opens in the focused pane (place.go threadHost).
+	// default): a thread's own tab then opens in the focused pane (place.go threadHost), and
+	// another surface is placed without regard to its kind (place.go kindHost).
 	NoSmartPlacement bool `json:"no_smart_placement,omitempty"`
 	// KeepFocus puts the user's focus back as it was after the op (keep_focus.go): a call
 	// from inside a thread, which never moves the user's focus.

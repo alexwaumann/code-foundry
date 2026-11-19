@@ -1470,7 +1470,10 @@ type ApplyLayoutResponse struct {
 	// (an unlinked terminal) or closes what they show (a thread).
 	Closed []*LayoutTab `protobuf:"bytes,6,rep,name=closed,proto3" json:"closed,omitempty"`
 	// How placement chose where a tab went: "1" to "6" (the spec's rules), "pane" (the
-	// caller's pane), "focused" (the focused pane), "compose" (it replaced a composer).
+	// caller's pane), "focused" (the focused pane), "near" (smart placement: the pane holding
+	// a thread nearest the focused one), "kind" and "kind-any" (smart placement: a pane holding
+	// a tab of its kind, for its thread or for any), "compose" (it replaced a composer),
+	// "edge" (a new pane on the edge the caller gave).
 	Rule string `protobuf:"bytes,7,opt,name=rule,proto3" json:"rule,omitempty"`
 	// Linked tabs taken into their thread's remembered set; their terminals keep running.
 	Kept []*LayoutTab `protobuf:"bytes,8,rep,name=kept,proto3" json:"kept,omitempty"`

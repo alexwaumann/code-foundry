@@ -262,11 +262,11 @@ func TestViewOpenIdentity(t *testing.T) {
 				t.Errorf("second call: message = %q, want it to say the tab is open", last.Message)
 			}
 			if tt.tabs == 2 {
-				// Rule 2 for the second, unless it is the same pane anyway: beside the first.
+				// Smart placement's rule kind for the second: beside the first, of its kind and thread.
 				_, p1, _ := f.state().FindTab(tabs[0].ID)
 				_, p2, _ := f.state().FindTab(tabs[1].ID)
-				if p1 != p2 || out.Rule != "2" {
-					t.Errorf("second tab in pane %s by rule %s, want the first's (%s) by rule 2", p2.ID, out.Rule, p1.ID)
+				if p1 != p2 || out.Rule != "kind" {
+					t.Errorf("second tab in pane %s by rule %s, want the first's (%s) by rule kind", p2.ID, out.Rule, p1.ID)
 				}
 			}
 			if got := f.focus(); got != "sp-main/p-main/t-a" {
