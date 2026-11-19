@@ -13,7 +13,12 @@ import { useStripRunIds } from "@/stores/agents";
 import { useThreadsStore } from "@/stores/threads";
 import { stopWaiting, useWaitListCurrent, useWaitListShown, useWaitShells, useWakes } from "@/stores/waitList";
 
-type SnoozeKey = { kind: "snoozed"; until: number } | { kind: "saved" } | { kind: "woken"; at: number } | { kind: "none" };
+type SnoozeKey =
+  | { kind: "snoozed"; until: number }
+  | { kind: "saved" }
+  | { kind: "event"; eventKind: "pull_request" | "plugin"; waitingFor: string }
+  | { kind: "woken"; at: number; by: string }
+  | { kind: "none" };
 
 /**
  * The thread's snooze as the pill shows it: snoozed until a time, saved for later, woken
@@ -24,14 +29,16 @@ export function usePillSnooze(threadId: string): PillSnooze | null {
     useShallow((s): SnoozeKey => {
       const t = s.byId[threadId];
       if (!t) return { kind: "none" };
+      // An event's snooze is a save with an event that ends it (docs/notes/snooze-until-event.md).
+      if (t.snoozeEvent) return { kind: "event", eventKind: t.snoozeEvent.kind, waitingFor: t.snoozeEvent.waitingFor };
       if (t.savedAtMs !== null) return { kind: "saved" };
       if (isSnoozed(t) && t.snoozedUntilMs !== null) return { kind: "snoozed", until: t.snoozedUntilMs };
       const l = statusLine(t);
-      return l.kind === "snoozeEnded" ? { kind: "woken", at: l.at ?? 0 } : { kind: "none" };
+      return l.kind === "snoozeEnded" ? { kind: "woken", at: l.at ?? 0, by: t.snoozeEndedBy ?? "" } : { kind: "none" };
     }),
   );
   if (k.kind === "none") return null;
-  if (k.kind === "woken") return { kind: "woken", at: k.at === 0 ? null : k.at };
+  if (k.kind === "woken") return { kind: "woken", at: k.at === 0 ? null : k.at, ...(k.by ? { by: k.by } : {}) };
   return k;
 }
 

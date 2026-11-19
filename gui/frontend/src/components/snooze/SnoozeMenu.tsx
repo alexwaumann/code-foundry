@@ -7,6 +7,8 @@ import { saveThreadsForLater, snoozeThreads } from "@/stores/bulkThreadActions";
 import { useDefaultSnooze } from "@/stores/snoozeDefault";
 import { useCommandChord } from "@/stores/commands";
 import { formatChord } from "@/keys/chord";
+import type { MenuKit } from "@/components/thread/menuKit";
+import { UntilEventMenu } from "./UntilEventMenu";
 
 /** A menu item as the snooze items need it: a context menu's or a dropdown's. */
 type MenuItem = ComponentType<{ onSelect: () => void; children?: ReactNode; "data-testid"?: string; "data-preset"?: string }>;
@@ -21,17 +23,37 @@ type MenuItem = ComponentType<{ onSelect: () => void; children?: ReactNode; "dat
  * (`inView`, the default); the thread header's menu passes false: the snooze closes the
  * thread's tab and the sidebar may be hidden, so it toasts (docs/notes/toast-success-rule.md).
  * `ids`: the sidebar's selection (its bulk menu): every item is one thread.snooze --ids for all
- * of them, and Save for later is left out once one of them is saved.
+ * of them, and Save for later is left out once one of them is saved. Given `kit`, a single
+ * thread's menu ends with Until event (UntilEventMenu, docs/notes/snooze-until-event.md); the
+ * bulk menu stays with times, since each thread waits on its own pull requests.
  * The default snooze's item (Settings, threads.default_snooze) says "default" after its label,
  * with Snooze to Default's chord in a single thread's menu (the chord acts on the thread in view,
  * not on a selection; docs/notes/put-away-chords.md).
  */
-export function SnoozePresetItems({ id, ids, Item, Separator, onPreset, inView = true }: { id: string; ids?: readonly string[]; Item: MenuItem; Separator: ComponentType; onPreset?: () => void; inView?: boolean }) {
+export function SnoozePresetItems({
+  id,
+  ids,
+  Item,
+  Separator,
+  kit,
+  onPreset,
+  inView = true,
+}: {
+  id: string;
+  ids?: readonly string[];
+  Item: MenuItem;
+  Separator: ComponentType;
+  /** The menu's parts for a submenu: given, a single thread's menu offers Until event (UntilEventMenu). The bulk menu leaves it out. */
+  kit?: MenuKit;
+  onPreset?: () => void;
+  inView?: boolean;
+}) {
   // Mounted when the menu opens: the times are as of then.
   const [now] = useState(() => Date.now());
   const list = ids ?? [id];
   const many = list.length > 1;
-  const saved = useThreadsStore((s) => list.some((t) => (s.byId[t]?.savedAtMs ?? null) !== null));
+  // A thread snoozed until an event is saved too (no wake time), but not "saved for later".
+  const saved = useThreadsStore((s) => list.some((t) => (s.byId[t]?.savedAtMs ?? null) !== null && !s.byId[t]?.snoozeEvent));
   const byDefault = useDefaultSnooze();
   const chord = useCommandChord("thread.snooze.default");
   const mark = <DefaultMark chord={many ? "" : chord} />;
@@ -79,6 +101,7 @@ export function SnoozePresetItems({ id, ids, Item, Separator, onPreset, inView =
           </span>
         </Item>
       )}
+      {kit && !many && <UntilEventMenu id={id} kit={kit} inView={inView} {...(onPreset ? { onPreset } : {})} />}
     </>
   );
 }

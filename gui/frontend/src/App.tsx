@@ -8,6 +8,7 @@ import { RemoveWorktreeDialog } from "@/components/projects/RemoveWorktreeDialog
 import { PublishDialog } from "@/components/publish/PublishDialog";
 import { SaveWorkspaceDialog } from "@/components/thread/SaveWorkspaceDialog";
 import { SnoozeDialog } from "@/components/snooze/SnoozeDialog";
+import { SnoozeEventPicker } from "@/components/snooze/SnoozeEventPicker";
 import { ConfirmDialog } from "@/components/confirm/ConfirmDialog";
 import { ReviewDialog } from "@/components/pr/ReviewDialog";
 import { ConsentDialog } from "@/components/plugin/ConsentDialog";
@@ -132,6 +133,7 @@ export function App() {
         <PublishDialog />
         <NewWorkspaceDialog />
         <SnoozeDialog />
+        <SnoozeEventPicker />
         <SaveWorkspaceDialog />
         <ActionDialog />
         <ActionRunDialog />

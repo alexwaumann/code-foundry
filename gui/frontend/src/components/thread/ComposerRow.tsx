@@ -1,5 +1,6 @@
 import { useLayoutEffect, useRef, useState, type ReactNode, type Ref, type RefObject } from "react";
 import { AlarmClock, ArrowDown, ChevronRight, ChevronUp } from "lucide-react";
+import { SnoozeEventIcon } from "@/components/snooze/SnoozeEventIcon";
 import { StatusCircle } from "@/components/status/StatusCircle";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -90,7 +91,7 @@ function SnoozeBody({ form, snooze, now, open, measure }: { form: number; snooze
   return (
     <>
       <Icon measure={measure}>
-        <AlarmClock className={cn(ICON, woken ? WARNING : MUTED)} aria-hidden />
+        {snooze.kind === "event" ? <SnoozeEventIcon kind={snooze.eventKind} className={cn(ICON, MUTED)} /> : <AlarmClock className={cn(ICON, woken ? WARNING : MUTED)} aria-hidden />}
       </Icon>
       <span className={cn(woken && WARNING)} data-testid={measure ? undefined : "snooze-sentence"}>
         {form === 0 ? snoozeFull(snooze, now) : snoozeShort(snooze)}

@@ -85,22 +85,37 @@ export function pillStep(w: PillWidths, available: number): PillStep {
   return PILL_STEPS;
 }
 
-/** The snooze segment's state: until a time, saved for later (no alarm), or woken at a time (null: unknown). */
-export type PillSnooze = { kind: "snoozed"; until: number } | { kind: "saved" } | { kind: "woken"; at: number | null };
+/**
+ * The snooze segment's state: until a time, saved for later (no alarm), until an event
+ * (docs/notes/snooze-until-event.md; `waitingFor` ends "Snoozed until …"), or woken at a time
+ * (null: unknown), with what ended it when an event did (`by`, "#812 was merged").
+ */
+export type PillSnooze =
+  | { kind: "snoozed"; until: number }
+  | { kind: "saved" }
+  | { kind: "event"; eventKind: "pull_request" | "plugin"; waitingFor: string }
+  | { kind: "woken"; at: number | null; by?: string };
 
 /** "Snooze ended 5m ago", or "Snooze ended" when the time is not known. */
 function endedText(at: number | null, now: number): string {
   return at === null ? "Snooze ended" : `Snooze ended ${formatAge(at, now, { days: true, hours: true, minutes: true })}`;
 }
 
-/** The segment's full words ("Snoozed until Mon 9:00 AM", "Saved for later", "Snooze ended 5m ago"); its menu's first line too. */
+/**
+ * The segment's full words ("Snoozed until Mon 9:00 AM", "Saved for later", "Snoozed until
+ * checks finish on #812", "Snooze ended 5m ago", "#812 was merged · 5m ago"); its menu's first
+ * line too.
+ */
 export function snoozeFull(s: PillSnooze, now: number): string {
   switch (s.kind) {
     case "snoozed":
       return `Snoozed until ${snoozeTimeShort(s.until, now)}`;
     case "saved":
       return "Saved for later";
+    case "event":
+      return `Snoozed until ${s.waitingFor}`;
     case "woken":
+      if (s.by) return s.at === null ? s.by : `${s.by} · ${formatAge(s.at, now, { days: true, hours: true, minutes: true })}`;
       return endedText(s.at, now);
   }
 }

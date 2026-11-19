@@ -720,6 +720,19 @@ describe("SidebarRow snoozed", () => {
     expect(screen.queryByTestId("row-snooze-left")).toBeNull();
   });
 
+  it.each<[string, ThreadView["snoozeEvent"], string, string]>([
+    ["a pull request event", { kind: "pull_request", target: "acme/web#812", condition: "checks_done", args: {}, title: "Fix login", pluginName: "", label: "#812 checks", waitingFor: "checks finish on #812", sinceMs: 1 }, "#812 checks", "lucide-git-pull-request"],
+    ["a plugin event", { kind: "plugin", target: "doc-preview/deploy", condition: "fired", args: {}, title: "Preview deployed", pluginName: "Doc Preview", label: "deploy", waitingFor: "Preview deployed (Doc Preview)", sinceMs: 1 }, "deploy", "lucide-plug"],
+  ])("until an event (%s): its glyph and a short label where the countdown goes, not Saved", (_name, snoozeEvent, label, glyph) => {
+    const row = renderSnoozed({ name: "Later work", savedAtMs: Date.now(), snoozeEvent });
+    expect(row.textContent).toBe(`Later work${label}`);
+    const mark = screen.getByTestId("row-snooze-event");
+    expect(mark.className.split(" ")).toEqual(expect.arrayContaining(["text-caption-sm", "text-cf-sidebar-muted-foreground", "gap-1"]));
+    expect(screen.getByTestId("snooze-event-icon").getAttribute("class")).toContain(glyph);
+    expect(screen.queryByTestId("row-saved")).toBeNull();
+    expect(screen.queryByTestId("row-snooze-left")).toBeNull();
+  });
+
   it("an unnamed thread shows its id, muted", () => {
     renderSnoozed({ name: "", snoozedUntilMs: Date.now() + 3_600_000 + 1000 });
     expect(screen.getByTestId("thread-name").textContent).toBe("s-1");
@@ -1280,5 +1293,41 @@ describe("a thread's setup", () => {
     expect(screen.getByTestId("row-status-word").textContent).toBe("Cancelled");
     expect(screen.getByTestId("row-status").className).toContain("text-cf-sidebar-muted-foreground");
     expect(screen.queryByTestId("row-branch")).toBeNull();
+  });
+});
+
+describe("SidebarRow card: a snooze until an event (docs/notes/snooze-until-event.md)", () => {
+  function openCard(o: Partial<ThreadView>, section: "snoozed" | "idle" = "idle"): HTMLElement {
+    vi.useFakeTimers();
+    try {
+      useThreadsStore.setState({ byId: { "s-1": thread({ state: "disconnected", status: "idle", statusReason: "at prompt", ...o }) }, order: ["s-1"] });
+      render(
+        <TooltipProvider>
+          <SidebarRow row={{ key: "s:s-1", kind: "thread", section, threadId: "s-1" }} selected={false} cursor={false} onActivate={() => undefined} />
+        </TooltipProvider>,
+      );
+      fireEvent.pointerMove(screen.getByRole("option"), { pointerType: "mouse" });
+      act(() => {
+        vi.advanceTimersByTime(600);
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+    return screen.getAllByTestId("thread-tooltip")[0] as HTMLElement;
+  }
+
+  it("says in full what the snoozed row waits for", () => {
+    const card = openCard(
+      { savedAtMs: Date.now(), snoozeEvent: { kind: "pull_request", target: "acme/web#812", condition: "checks_done", args: {}, title: "Fix login", pluginName: "", label: "#812 checks", waitingFor: "checks finish on #812", sinceMs: 1 } },
+      "snoozed",
+    );
+    expect(within(card).getByTestId("tip-snooze-event").textContent).toBe("Snoozed until checks finish on #812");
+  });
+
+  it("says what ended the snooze while the thread reads snooze ended, and nothing once cleared", () => {
+    const card = openCard({ status: "attention", statusReason: "snooze ended", statusChangedAtMs: Date.now() - 60_000, snoozeEndedBy: "Checks failed on #812 (2 of 14)" });
+    expect(within(card).getByTestId("tip-snooze-event").textContent).toBe("Checks failed on #812 (2 of 14)");
+    cleanup();
+    expect(within(openCard({ snoozeEndedBy: "Checks failed on #812 (2 of 14)" })).queryByTestId("tip-snooze-event")).toBeNull();
   });
 });

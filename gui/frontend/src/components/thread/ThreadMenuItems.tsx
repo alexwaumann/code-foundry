@@ -189,6 +189,7 @@ export function ThreadMenuItems({ id, kit, afterArchive }: { id: string; kit: Me
               id={id}
               Item={kit.Item}
               Separator={kit.Separator}
+              kit={kit}
               inView={kit.rowInView}
               onPreset={() => {
                 markInPlace(kit, id);

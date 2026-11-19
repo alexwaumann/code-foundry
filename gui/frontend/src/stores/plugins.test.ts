@@ -33,6 +33,7 @@ function plugin(name: string, surfaces: string[] = []): PluginView {
     updateVersion: "",
     updateRegistry: "",
     heldUpdate: null,
+    wakes: [],
   };
 }
 

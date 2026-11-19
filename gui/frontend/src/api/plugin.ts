@@ -736,6 +736,8 @@ export interface PluginView {
   updateRegistry: string;
   /** A newer version its source lists that needs a newer Code Foundry: no update (updateAvailable stays false). */
   heldUpdate: HostNeedView | null;
+  /** Its wake sources (manifest wakes): name and title. A snooze can wait on one (docs/notes/snooze-until-event.md). */
+  wakes: { name: string; title: string }[];
 }
 
 /** A plugin version this Code Foundry is too old for (PluginHostNeed): versions without a leading v. */
@@ -798,6 +800,7 @@ export function toPluginView(p: Plugin): PluginView {
     updateVersion: p.updateVersion,
     updateRegistry: p.updateRegistry,
     heldUpdate: toHostNeed(p.heldUpdate),
+    wakes: p.wakes.map((w) => ({ name: w.name, title: w.title })),
   };
 }
 

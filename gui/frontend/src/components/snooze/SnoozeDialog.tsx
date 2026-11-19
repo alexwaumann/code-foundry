@@ -118,7 +118,8 @@ function SnoozeBody({ threadId, ids }: { threadId: string; ids: readonly string[
   const [day, setDay] = useState<Day>(() => addDays(dayOf(Date.now()), 1));
   const [time, setTime] = useState(DEFAULT_TIME);
   const many = ids.length > 1;
-  const saved = useThreadsStore((s) => (many ? ids : [threadId]).some((id) => (s.byId[id]?.savedAtMs ?? null) !== null));
+  // A thread snoozed until an event has savedAtMs too, but is not saved for later.
+  const saved = useThreadsStore((s) => (many ? ids : [threadId]).some((id) => (s.byId[id]?.savedAtMs ?? null) !== null && !s.byId[id]?.snoozeEvent));
   const parsed = parseTimeValue(time);
   const untilMs = parsed ? wallTime(day, parsed.hour, parsed.minute) : null;
   const ready = untilMs !== null && untilMs > now;

@@ -19,6 +19,7 @@ import {
 import { ThreadService } from "@/gen/codefoundry/v1/thread_pb";
 import { daemon, type DaemonConnection } from "./endpoint";
 import { orOutdatedDaemon } from "./errors";
+import { toSnoozeEventView, type ThreadSnoozeEventView } from "./snoozeEvents";
 import { ms } from "./timestamp";
 
 /**
@@ -196,6 +197,14 @@ export interface ThreadView {
   snoozedUntilMs: number | null;
   /** When it was saved for later (epoch ms), null when not: a snooze with no wake time, so snoozedUntilMs stays null. lib/snooze isSnoozed covers both. */
   savedAtMs: number | null;
+  /**
+   * What a thread snoozed until an event waits on (docs/notes/snooze-until-event.md); null
+   * otherwise. Such a thread has savedAtMs set too (no wake time): read this before "saved".
+   * Optional so test fixtures may leave it out.
+   */
+  snoozeEvent?: ThreadSnoozeEventView | null;
+  /** Why the last snooze until an event ended ("#812 was merged"); "" otherwise. Meaningful while the status reason is "snooze ended". */
+  snoozeEndedBy?: string;
   /**
    * An effort change (thread.set-effort) not applied yet: `effort` is the
    * new level; Claude restarts with it once the running turn ends.
@@ -568,6 +577,8 @@ export function toThreadView(s: Thread): ThreadView {
     archivedAtMs: ms(s.archivedAt),
     snoozedUntilMs: ms(s.snoozedUntil),
     savedAtMs: ms(s.savedAt),
+    snoozeEvent: toSnoozeEventView(s.snoozeEvent),
+    snoozeEndedBy: s.snoozeEndedBy,
     effortPending: s.effortPending,
     linkedPullRequests: s.linkedPullRequests.map((l) => ({
       slug: l.slug,

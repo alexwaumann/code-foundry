@@ -1,4 +1,5 @@
 import { SnoozePresetItems } from "@/components/snooze/SnoozeMenu";
+import { dropdownMenuKit } from "@/components/thread/menuKit";
 import { DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { snoozeFull, type PillSnooze } from "@/lib/composerPill";
 import { clearSnoozeEnded, snoozeThread } from "@/stores/threadActions";
@@ -38,7 +39,7 @@ export function PillSnoozeMenu({ threadId, snooze, now }: { threadId: string; sn
         </DropdownMenuItem>
       )}
       <DropdownMenuSeparator />
-      <SnoozePresetItems id={threadId} Item={DropdownMenuItem} Separator={DropdownMenuSeparator} inView={!woken} />
+      <SnoozePresetItems id={threadId} Item={DropdownMenuItem} Separator={DropdownMenuSeparator} kit={dropdownMenuKit} inView={!woken} />
     </>
   );
 }
