@@ -81,3 +81,7 @@ there before the GUI connected) is seen unless `seen=0`; `post`, `seed` and `git
 
 - `make drive DAEMON=dev` with `DRIVE_HOME` under the session scratchpad fails: the daemon's socket
   path passes macOS's 103 bytes. Leave `DRIVE_HOME` unset (a short `/tmp` dir).
+- The arrival tilt (`docs/notes/arrival-tilt.md`) rotates the bell's glyph, badge left still, and
+  plays under reduced motion too, so a browser test measuring the glyph polls until it has no
+  running animations (`still` in `notification-seen.spec.ts`); waiting on `finished` rejects
+  when the tilt is cancelled.

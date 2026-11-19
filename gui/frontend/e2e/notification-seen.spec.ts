@@ -16,6 +16,12 @@ test.beforeEach(async () => {
 const enc = encodeURIComponent;
 const post = (q: string) => mockPost(`notifications/post?${q}`);
 
+/** Waits out the bell glyph's arrival tilt (docs/notes/arrival-tilt.md), which moves its box. */
+async function still(page: Page): Promise<void> {
+  const icon = page.getByTestId("notification-bell-icon");
+  await expect.poll(() => icon.evaluate((el) => el.getAnimations().length)).toBe(0);
+}
+
 async function calls(): Promise<string[]> {
   const res = await fetch(`${mockUrl}/__mock/notifications`);
   return ((await res.json()) as { calls: string[] }).calls;
@@ -28,6 +34,7 @@ test("the badge sits on the bell's top-right corner, and opening the list takes 
   const badge = page.getByTestId("notification-bell-count");
   await expect(bell).toHaveAttribute("data-unseen", "true");
   const box = async () => {
+    await still(page);
     const [b, i, c, bar] = await Promise.all([bell.boundingBox(), bell.locator("svg").boundingBox(), badge.boundingBox(), page.getByTestId("top-bar").boundingBox()]);
     if (!b || !i || !c || !bar) throw new Error("no boxes");
     return { b, i, c, bar };
@@ -95,6 +102,7 @@ test("screenshots: the bell nothing, unseen, unseen time-sensitive, seen, seen t
   for (const [name, make] of states) {
     await resetMock();
     await make();
+    await still(page);
     await page.mouse.move(640, 700);
     for (const scheme of ["dark", "light"] as const) {
       await page.emulateMedia({ colorScheme: scheme });
