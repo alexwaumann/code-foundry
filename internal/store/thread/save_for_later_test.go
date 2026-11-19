@@ -9,10 +9,10 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/termlabel"
 )
 
-// saved is a disconnected thread saved for later.
+// saved is a stopped thread saved for later (saving leaves a running process running).
 func (e *env) saved() Thread {
 	e.t.Helper()
-	s := e.connected(CreateOptions{Name: "saved"})
+	s := e.stopped("saved")
 	got, err := e.m.SaveForLater(e.ctx(), s.ID)
 	if err != nil {
 		e.t.Fatal(err)
@@ -20,26 +20,29 @@ func (e *env) saved() Thread {
 	return got
 }
 
+// Saving for later only hides the thread, as a snooze does: its process, its shells and its
+// pin stay; an archived thread is unarchived, a timed snooze replaced.
 func TestSaveForLater(t *testing.T) {
 	tests := []struct {
-		name       string
-		setup      func(e *env) Thread
-		wantReason string // DisconnectReason after the save
+		name      string
+		setup     func(e *env) Thread
+		wantState State
+		pinned    bool
 	}{
-		{name: "a connected thread is closed", wantReason: ReasonClosed, setup: func(e *env) Thread {
+		{name: "a connected thread runs on", wantState: StateConnected, setup: func(e *env) Thread {
 			return e.connected(CreateOptions{Name: "live"})
 		}},
-		{name: "a pinned thread is unpinned", wantReason: ReasonClosed, setup: func(e *env) Thread {
+		{name: "a pinned thread stays pinned", wantState: StateConnected, pinned: true, setup: func(e *env) Thread {
 			s := e.connected(CreateOptions{Name: "pinned"})
 			if _, err := e.m.Pin(e.ctx(), s.ID, true); err != nil {
 				e.t.Fatal(err)
 			}
 			return s
 		}},
-		{name: "an archived thread is unarchived", wantReason: ReasonClosed, setup: func(e *env) Thread {
+		{name: "an archived thread is unarchived", wantState: StateDisconnected, setup: func(e *env) Thread {
 			return e.archived()
 		}},
-		{name: "a timed snooze is replaced", wantReason: ReasonClosed, setup: func(e *env) Thread {
+		{name: "a timed snooze is replaced", wantState: StateDisconnected, setup: func(e *env) Thread {
 			return e.snoozed()
 		}},
 	}
@@ -56,20 +59,20 @@ func TestSaveForLater(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if got.State != StateDisconnected || got.DisconnectReason != tt.wantReason || got.Pinned || !got.ArchivedAt.IsZero() {
-				t.Errorf("saved = state %s reason %q pinned %v archived %v; want disconnected %q, unpinned, not archived",
-					got.State, got.DisconnectReason, got.Pinned, got.ArchivedAt, tt.wantReason)
+			if got.State != tt.wantState || got.Pinned != tt.pinned || !got.ArchivedAt.IsZero() {
+				t.Errorf("saved = state %s pinned %v archived %v; want %s, pinned %v, not archived",
+					got.State, got.Pinned, got.ArchivedAt, tt.wantState, tt.pinned)
 			}
 			if got.SavedAt.IsZero() || !got.SnoozedUntil.IsZero() || !got.Snoozed() {
 				t.Errorf("saved = SavedAt %v SnoozedUntil %v; want SavedAt set and no wake time", got.SavedAt, got.SnoozedUntil)
 			}
-			if _, err := e.terms.Get(e.ctx(), shell.ID); !errors.Is(err, terminal.ErrNotFound) {
-				t.Errorf("the thread's shell after saving: %v, want gone", err)
+			if term, err := e.terms.Get(e.ctx(), shell.ID); err != nil || term.State != terminal.StateRunning {
+				t.Errorf("the thread's shell after saving: %+v, %v; want it running", term, err)
 			}
 
 			e.restart()
-			if after, err := e.m.Get(e.ctx(), s.ID); err != nil || after.SavedAt.UnixMilli() != got.SavedAt.UnixMilli() || !after.SnoozedUntil.IsZero() {
-				t.Errorf("after restart = SavedAt %v SnoozedUntil %v, %v; want %v, no wake time", after.SavedAt, after.SnoozedUntil, err, got.SavedAt)
+			if after, err := e.m.Get(e.ctx(), s.ID); err != nil || after.SavedAt.UnixMilli() != got.SavedAt.UnixMilli() || !after.SnoozedUntil.IsZero() || after.Pinned != tt.pinned {
+				t.Errorf("after restart = SavedAt %v SnoozedUntil %v pinned %v, %v; want %v, no wake time", after.SavedAt, after.SnoozedUntil, after.Pinned, err, got.SavedAt)
 			}
 		})
 	}

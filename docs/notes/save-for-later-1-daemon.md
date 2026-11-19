@@ -1,5 +1,8 @@
 # Save for later, PR 1 of 2: daemon, command, API
 
+Update 2026-11-19 (`snooze-without-teardown.md`): saving, like a snooze, no longer closes the
+thread, removes its shells or unpins it, and never asks for confirmation.
+
 A snooze with no wake time. The user approved the design from rendered options (option A):
 the Snooze submenu gains "Save for later", and a saved thread stays in the Snoozed section.
 PR 2 (`save-for-later-2-gui.md`) is the GUI. Builds on `snooze-threads-1-daemon.md`.

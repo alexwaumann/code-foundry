@@ -2,7 +2,7 @@ package thread
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"time"
 )
 
@@ -20,22 +20,16 @@ const SnoozeCheckInterval = 30 * time.Second
 func (s Thread) Snoozed() bool { return !s.SnoozedUntil.IsZero() || !s.SavedAt.IsZero() }
 
 // Snooze snoozes a thread until a time, or unsnoozes it (until zero)
-// (docs/notes/snooze-threads-1-daemon.md).
+// (docs/notes/snooze-threads-1-daemon.md, docs/notes/snooze-without-teardown.md).
 //
-// Snoozing closes the thread like Close (a no-op when it is disconnected), kills and
-// removes its shells like Remove, then, under m.mu, unpins and unarchives it and sets
+// A snooze only hides the thread until later: its process, a turn it is in, its shells
+// and background shells, its pin and its subscriptions are left as they are. Under m.mu it
+// unarchives the thread, clears a "snooze ended" left by an earlier wake and sets
 // SnoozedUntil (replacing an earlier snooze, or a save for later). until must be after
-// Options.Now. As with Archive, a turn the close cut off leaves the thread idle
-// ReasonSnoozed instead of error ReasonInterrupted, and a start that wins the race
-// between the close and that last step makes Snooze fail rather than snooze a live
-// thread. Unsnoozing only clears SnoozedUntil and SavedAt: the thread stays disconnected
-// and gets no attention.
+// Options.Now. The idle stop stops a snoozed thread's process as any other's. Unsnoozing
+// only clears SnoozedUntil and SavedAt: the thread is left as it is and gets no
+// attention.
 func (m *Manager) Snooze(ctx context.Context, id string, until time.Time) (Thread, error) {
-	return m.snooze(ctx, id, until, nil)
-}
-
-// snooze is Snooze; closing as in archive.
-func (m *Manager) snooze(ctx context.Context, id string, until time.Time, closing *runner) (Thread, error) {
 	if until.IsZero() {
 		m.mu.Lock()
 		defer m.mu.Unlock()
@@ -57,7 +51,7 @@ func (m *Manager) snooze(ctx context.Context, id string, until time.Time, closin
 	if err != nil {
 		return Thread{}, err
 	}
-	s, err := m.putAway(ctx, id, closing, func(s *Thread) {
+	s, err := m.putAway(ctx, id, func(s *Thread) {
 		s.SnoozedUntil, s.SavedAt = until, time.Time{}
 	})
 	if err != nil {
@@ -73,12 +67,7 @@ func (m *Manager) snooze(ctx context.Context, id string, until time.Time, closin
 // and clears SnoozedUntil, so wakeSnoozed never sees it. It lasts until a call that
 // unsnoozes.
 func (m *Manager) SaveForLater(ctx context.Context, id string) (Thread, error) {
-	return m.saveForLater(ctx, id, nil)
-}
-
-// saveForLater is SaveForLater; closing as in archive.
-func (m *Manager) saveForLater(ctx context.Context, id string, closing *runner) (Thread, error) {
-	s, err := m.putAway(ctx, id, closing, func(s *Thread) {
+	s, err := m.putAway(ctx, id, func(s *Thread) {
 		s.SnoozedUntil = time.Time{}
 		if s.SavedAt.IsZero() {
 			s.SavedAt = m.opts.Now().Round(0).Truncate(time.Millisecond)
@@ -91,10 +80,12 @@ func (m *Manager) saveForLater(ctx context.Context, id string, closing *runner) 
 	return s, nil
 }
 
-// putAway is the part of a snooze both forms share: it closes the thread, removes its
-// shells, then under m.mu applies set, unpins and unarchives it and clears a "snooze
-// ended" status. A turn the close cut off reads idle ReasonSnoozed (markPuttingAway).
-func (m *Manager) putAway(ctx context.Context, id string, closing *runner, set func(*Thread)) (_ Thread, err error) {
+// putAway is the part of a snooze both forms share: under m.mu it drops an archive the
+// thread asked of itself for its turn's end (the later put-away wins), applies set,
+// unarchives the thread, clears a "snooze ended" left by an earlier wake and commits; on a
+// running thread that attention is its process's, cleared there after the commit. Nothing is closed, removed or unpinned
+// (docs/notes/snooze-without-teardown.md).
+func (m *Manager) putAway(ctx context.Context, id string, set func(*Thread)) (Thread, error) {
 	if err := m.refuseResident(id, "snoozed"); err != nil {
 		return Thread{}, err
 	}
@@ -105,36 +96,30 @@ func (m *Manager) putAway(ctx context.Context, id string, closing *runner, set f
 	if err := m.refuseSettingUp(id, "snoozed"); err != nil {
 		return Thread{}, err
 	}
-	wasInterrupted, err := m.interrupted(id)
-	if err != nil {
-		return Thread{}, err
-	}
-	m.markPuttingAway(id, wasInterrupted, ReasonSnoozed)
-	defer func() { m.endPuttingAway(id, err != nil) }() // after m.mu's unlock below
-	if err := m.closeAway(ctx, id, closing); err != nil {
-		return Thread{}, err
-	}
-	if err := m.removeShells(ctx, id, ShellsSnoozed); err != nil {
-		return Thread{}, err
-	}
 	m.mu.Lock()
-	defer m.mu.Unlock()
 	rec, err := m.record(id)
 	if err != nil {
+		m.mu.Unlock()
 		return Thread{}, err
 	}
-	if rec.run != nil || rec.s.State != StateDisconnected {
-		return Thread{}, fmt.Errorf("%w: thread %s was started while being snoozed", ErrFailedPrecondition, id)
-	}
-	if !wasInterrupted {
-		putAwayStatus(&rec.s, ReasonSnoozed, m.opts.Now()) // the close cut off a turn: not a failure
-	}
+	m.dropPutAwayLocked(rec, "the thread was snoozed") // an archive of itself it asked for
 	set(&rec.s)
-	rec.s.Pinned = false
-	clearSnoozeEnded(&rec.s, m.opts.Now()) // a re-snooze: the last wake is old news
+	live := rec.run != nil
+	if !live {
+		clearSnoozeEnded(&rec.s, m.opts.Now()) // a re-snooze: the last wake is old news
+	}
 	m.unarchiveLocked(rec)
 	m.commitLocked(rec, true)
-	return rec.s, nil
+	s := rec.s
+	m.mu.Unlock()
+	if !live {
+		return s, nil
+	}
+	// The running process holds a wake's attention (streamStatus.snoozeEnded): it goes there.
+	if err := m.setSnoozeEnded(ctx, id, false); err != nil {
+		return Thread{}, err
+	}
+	return m.Get(ctx, id)
 }
 
 // unsnoozeLocked clears rec's SnoozedUntil and SavedAt and reports whether either was
@@ -163,29 +148,94 @@ func clearSnoozeEnded(s *Thread, now time.Time) bool {
 // prompt, persisted and published, as a re-snooze or an archive does: the user saw the
 // wake and wants nothing more from it (thread.snooze.clear). cleared is false, and
 // nothing changes, when the thread is not woken.
-func (m *Manager) ClearSnoozeEnded(_ context.Context, id string) (_ Thread, cleared bool, _ error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	rec, err := m.record(id)
+func (m *Manager) ClearSnoozeEnded(ctx context.Context, id string) (_ Thread, cleared bool, _ error) {
+	before, err := m.Get(ctx, id)
 	if err != nil {
 		return Thread{}, false, err
 	}
-	if !clearSnoozeEnded(&rec.s, m.opts.Now()) {
-		return rec.s, false, nil
+	if before.Status != StatusNeedsAttention || before.StatusReason != ReasonSnoozeEnded {
+		return before, false, nil
 	}
-	m.commitLocked(rec, true)
+	if err := m.setSnoozeEnded(ctx, id, false); err != nil {
+		return Thread{}, false, err
+	}
+	s, err := m.Get(ctx, id)
+	if err != nil {
+		return Thread{}, false, err
+	}
 	m.log.Info("cleared snooze ended", "thread", id)
-	return rec.s, true, nil
+	return s, true, nil
+}
+
+// setSnoozeEnded sets (mark) or clears thread id's "snooze ended" attention: on its runner
+// while it runs (streamStatus.snoozeEnded, so the status the runner publishes keeps it),
+// else on its row. A runner marks it only at its prompt: a thread that works when its
+// snooze ends keeps its own status. A stopped thread is marked only while disconnected.
+func (m *Manager) setSnoozeEnded(ctx context.Context, id string, mark bool) error {
+	for {
+		live, closing, reserved, _, err := m.lifecycle(id)
+		switch {
+		case err != nil:
+			return err
+		case live != nil:
+			_, err := live.exchange(ctx, threadCmd{snoozeEnded: &mark})
+			if errors.Is(err, errProcessGone) {
+				continue
+			}
+			return err
+		case closing != nil:
+			if err := waitDone(ctx, closing); err != nil {
+				return err
+			}
+			continue
+		case reserved != nil:
+			select {
+			case <-reserved:
+			case <-ctx.Done():
+				return ctx.Err()
+			}
+			continue
+		}
+		now := m.opts.Now()
+		_, ok, err := m.updateStopped(id, func(s *Thread) {
+			if !mark {
+				clearSnoozeEnded(s, now)
+			} else if s.State == StateDisconnected {
+				s.Status, s.StatusReason, s.StatusChangedAt = StatusNeedsAttention, ReasonSnoozeEnded, now
+			}
+		})
+		if err != nil || ok {
+			return err
+		}
+		// started meanwhile
+	}
+}
+
+// onSnoozeEnded is setSnoozeEnded on the runner's goroutine: published at once, as a
+// wake's status should not wait for the debounce.
+func (r *runner) onSnoozeEnded(mark bool) {
+	d := r.st.sd
+	switch {
+	case !mark && !d.snoozeEnded:
+		return
+	case mark && (r.closing || r.puttingAway || !d.AtPrompt()):
+		return // it works, or is on its way out: its own status says so
+	}
+	d.snoozeEnded = mark
+	if r.debounce != nil {
+		r.debounce.Stop()
+		r.debounce = nil
+	}
+	r.publishStatus()
 }
 
 // wakeSnoozed wakes every thread whose SnoozedUntil is not after Options.Now: it
-// clears SnoozedUntil and, for a disconnected thread, sets StatusNeedsAttention
-// ReasonSnoozeEnded stamped with the
-// wake time, persisted and published; a thread that works (another thread's message
-// started it, the snooze held: holds.go) is only cleared, its status its own. The
-// status is stamped even when it already
-// reads "snooze ended" (a re-snoozed thread that was never reconnected), so the GUI's
-// "ended … ago" counts from this wake.
+// clears SnoozedUntil, persisted and published, and then marks it NeedsAttention
+// ReasonSnoozeEnded stamped with the wake time (setSnoozeEnded): on its row when it is
+// stopped, on its runner when its process runs and Claude is at its prompt. A thread that
+// works when its snooze ends (a snooze no longer stops anything) keeps its own status. The
+// status is stamped even when it already reads "snooze ended" (a re-snoozed thread that
+// was never reconnected), so the GUI's "ended … ago" counts from this wake.
 //
 // It compares wall-clock times on purpose: SnoozedUntil carries no monotonic reading
 // (Snooze strips it, the database and the API have none), and Go's monotonic clock
@@ -194,8 +244,8 @@ func (m *Manager) ClearSnoozeEnded(_ context.Context, id string) (_ Thread, clea
 // then wakeSnoozedLoop every Options.SnoozeCheckInterval.
 func (m *Manager) wakeSnoozed() {
 	now := m.opts.Now().Round(0)
+	var woke []string
 	m.mu.Lock()
-	defer m.mu.Unlock()
 	for id, rec := range m.recs {
 		if rec.s.SnoozedUntil.IsZero() || rec.s.SnoozedUntil.After(now) {
 			continue
@@ -204,9 +254,17 @@ func (m *Manager) wakeSnoozed() {
 		rec.s.SnoozedUntil = time.Time{}
 		if rec.run == nil && rec.s.State == StateDisconnected {
 			rec.s.Status, rec.s.StatusReason, rec.s.StatusChangedAt = StatusNeedsAttention, ReasonSnoozeEnded, now
+		} else {
+			woke = append(woke, id)
 		}
 		m.commitLocked(rec, true)
 		m.log.Info("snooze ended", "thread", id, "until", until, "late", now.Sub(until).Round(time.Second))
+	}
+	m.mu.Unlock()
+	for _, id := range woke {
+		if err := m.setSnoozeEnded(m.ctx, id, true); err != nil && m.ctx.Err() == nil {
+			m.log.Warn("mark snooze ended", "thread", id, "err", err)
+		}
 	}
 }
 

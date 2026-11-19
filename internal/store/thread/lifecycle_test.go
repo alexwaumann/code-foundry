@@ -691,22 +691,37 @@ func TestIdleStopHoldsForTheWake(t *testing.T) {
 	}
 }
 
-// Archived and snoozed threads are stopped already: the check passes them by.
+// An archived thread is stopped already: the check passes it by. A snoozed or saved
+// thread's process runs on (docs/notes/snooze-without-teardown.md): the idle stop stops it
+// at its prompt cache expiry as any other's, and it stays snoozed.
 func TestIdleStopSkipsStopped(t *testing.T) {
 	e, clock := idleEnv(t, "text-table", nil)
 	a := e.connected(CreateOptions{Name: "archived"})
 	z := e.connected(CreateOptions{Name: "snoozed"})
+	v := e.connected(CreateOptions{Name: "saved"})
 	if _, err := e.m.Archive(e.ctx(), a.ID, true); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := e.m.Snooze(e.ctx(), z.ID, clock.Now().Add(time.Hour)); err != nil {
+	if _, err := e.m.Snooze(e.ctx(), z.ID, clock.Now().Add(100*time.Hour)); err != nil {
 		t.Fatal(err)
+	}
+	if _, err := e.m.SaveForLater(e.ctx(), v.ID); err != nil {
+		t.Fatal(err)
+	}
+	for _, id := range []string{z.ID, v.ID} {
+		if got := e.snapshot(id); got.State != StateConnected {
+			t.Fatalf("%s stopped by the snooze: %+v", id, got)
+		}
 	}
 	clock.advance(48 * time.Hour)
 	e.m.stopIdle()
-	for _, id := range []string{a.ID, z.ID} {
-		if got := e.snapshot(id); got.DisconnectReason != ReasonClosed {
-			t.Errorf("%s: %+v", id, got)
+	if got := e.snapshot(a.ID); got.DisconnectReason != ReasonClosed {
+		t.Errorf("archived: %+v", got)
+	}
+	for _, id := range []string{z.ID, v.ID} {
+		got := e.waitFor(id, "the idle stop", func(s Thread) bool { return s.State == StateDisconnected })
+		if got.DisconnectReason != ReasonIdle || !got.Snoozed() {
+			t.Errorf("%s after the idle stop: reason %q snoozed %v; want %q, still snoozed", id, got.DisconnectReason, got.Snoozed(), ReasonIdle)
 		}
 	}
 }

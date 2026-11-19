@@ -14,8 +14,8 @@ type MenuItem = ComponentType<{ onSelect: () => void; children?: ReactNode; "dat
 /**
  * The snooze presets (lib/snooze.ts snoozePresets, computed when the menu opens), each with
  * its resolved time on the right, then "Pick a date and time" (the custom dialog) and
- * "Save for later" (no wake time; left out of a thread already saved). A preset invokes thread.snooze with the absolute time (snoozeThread); the daemon asks
- * for confirmation only mid-turn. The Snooze submenu of a thread's menu
+ * "Save for later" (no wake time; left out of a thread already saved). A preset invokes thread.snooze with the absolute time (snoozeThread), which never
+ * asks for confirmation. The Snooze submenu of a thread's menu
  * (components/thread/ThreadMenuItems.tsx) and the row's Snooze button. The row shows the
  * snooze (it leaves for Snoozed), so no success toast from the row's button and menu
  * (`inView`, the default); the thread header's menu passes false: the snooze closes the

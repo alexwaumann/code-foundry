@@ -21,6 +21,8 @@ import (
 //   - NeedsAttention "budget reached" from the budget stop (budget.go, budgetStop)
 //     until the next message, a turn Claude starts after the stopped one, or, once
 //     the stopped turn ended, until seen.
+//   - NeedsAttention "snooze ended" when its snooze ran out at its prompt (snooze.go),
+//     until the next message or turn, or the user clears it.
 //   - NeedsAttention "wake limit" once the thread's wake subscriptions reached their
 //     rate limit (subscriptions_fire.go), while Claude does not work, until the next
 //     message or until seen.
@@ -46,6 +48,11 @@ type streamStatus struct {
 	budget, budgetEnded bool
 	// wakeLimit: wakes to the thread are being dropped (subscriptions_fire.go).
 	wakeLimit bool
+	// snoozeEnded: the thread's snooze ran out while its process ran at its prompt
+	// (snooze.go wakeSnoozed): NeedsAttention ReasonSnoozeEnded, as a stopped thread's
+	// row reads, until a message, a new turn, the user's clear or another snooze. Seeing
+	// the thread does not clear it, as it does not on a stopped thread.
+	snoozeEnded bool
 	// held: the user marked the thread unread (unread.go): "finished" again, and the
 	// viewer already there does not see it. A new viewer, the thread gaining the focus,
 	// a message or a new turn end the hold.
@@ -71,6 +78,8 @@ func (d *streamStatus) Status() (Status, string) {
 		return StatusBusy, "working"
 	case d.wakeLimit:
 		return StatusNeedsAttention, ReasonWakeLimit
+	case d.snoozeEnded:
+		return StatusNeedsAttention, ReasonSnoozeEnded
 	case d.unseen && d.turnError != "":
 		return StatusNeedsAttention, "error: " + d.turnError
 	case d.unseen:
@@ -109,7 +118,7 @@ func (d *streamStatus) markUnread() { d.unseen, d.turnError, d.held = true, "", 
 // stop (they have seen it); a wake does not, so a wake queued behind the handshake
 // cannot clear a limit raised while it waited (TestWakeLimit).
 func (d *streamStatus) sent(byUser bool) {
-	d.busy, d.held = true, false
+	d.busy, d.held, d.snoozeEnded = true, false, false
 	d.budget, d.budgetEnded = false, false
 	if byUser {
 		d.wakeLimit = false
@@ -119,7 +128,7 @@ func (d *streamStatus) sent(byUser bool) {
 // turnStarted: Claude works (again); a budget stop whose turn ended gives way to a turn
 // Claude starts on its own (a background task's notification).
 func (d *streamStatus) turnStarted() {
-	d.busy, d.held = true, false
+	d.busy, d.held, d.snoozeEnded = true, false, false
 	if d.budgetEnded {
 		d.budget, d.budgetEnded = false, false
 	}

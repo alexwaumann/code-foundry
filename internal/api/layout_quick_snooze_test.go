@@ -9,10 +9,9 @@ import (
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 )
 
-// The quick terminal across a snooze through the service: snooze_thread's quick_ran is the
-// line the window shows (QuickTerminal.ran), the thread waking with its tab open (set_snoozed,
-// after an open that restores nothing while it is snoozed) names it in fresh_quick_thread_id,
-// and set_quick's forget_ran drops the line.
+// The quick terminal across a snooze through the service (docs/notes/snooze-without-teardown.md):
+// snooze_thread leaves it as it is (open, no "Run again" line: its shell runs on), and the
+// thread waking (set_snoozed) puts its tab back with it, asking for no fresh shell.
 func TestLayoutQuickTerminalAcrossASnooze(t *testing.T) {
 	_, cl, _ := layoutServer(t)
 	ctx := context.Background()
@@ -40,21 +39,14 @@ func TestLayoutQuickTerminalAcrossASnooze(t *testing.T) {
 	must(&v1.LayoutOp{Op: &v1.LayoutOp_OpenThread{OpenThread: &v1.OpenThreadOp{ThreadId: "s-1", Focus: true}}})
 	must(&v1.LayoutOp{Op: &v1.LayoutOp_SetQuick{SetQuick: &v1.SetQuickOp{ThreadId: "s-1", Open: true}}})
 	must(&v1.LayoutOp{Op: &v1.LayoutOp_SnoozeThread{SnoozeThread: &v1.SnoozeThreadOp{ThreadId: "s-1", QuickRan: "make dev"}}})
-	if q := quick(); q.GetOpen() || q.GetRan() != "make dev" {
-		t.Fatalf("after the snooze: %v", q)
-	}
-	if res := must(&v1.LayoutOp{Op: &v1.LayoutOp_OpenThread{OpenThread: &v1.OpenThreadOp{ThreadId: "s-1", Focus: true}}}); res.GetFreshQuickThreadId() != "" {
-		t.Errorf("open_thread while snoozed = %v, want no fresh_quick_thread_id", res)
+	if q := quick(); !q.GetOpen() || q.GetRan() != "" {
+		t.Fatalf("after the snooze: %v, want it open with no Run again line", q)
 	}
 	res := must(&v1.LayoutOp{Op: &v1.LayoutOp_SetSnoozed{SetSnoozed: &v1.SetSnoozedOp{ThreadId: "s-1"}}})
-	if res.GetFreshQuickThreadId() != "s-1" {
-		t.Errorf("set_snoozed = %v, want fresh_quick_thread_id s-1", res)
+	if res.GetFreshQuickThreadId() != "" || res.GetTabId() == "" {
+		t.Errorf("set_snoozed = %v, want the thread's tab back and no fresh_quick_thread_id", res)
 	}
-	if q := quick(); !q.GetOpen() || q.GetRan() != "make dev" {
-		t.Errorf("after opening: %v", q)
-	}
-	must(&v1.LayoutOp{Op: &v1.LayoutOp_SetQuick{SetQuick: &v1.SetQuickOp{ThreadId: "s-1", Open: true, ForgetRan: true}}})
 	if q := quick(); !q.GetOpen() || q.GetRan() != "" {
-		t.Errorf("after forget_ran: %v", q)
+		t.Errorf("after the wake: %v", q)
 	}
 }

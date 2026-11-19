@@ -38,13 +38,13 @@ test("Snoozed section: stacked between Working and Archived; quiet rows at the l
 
 // The Snooze submenu's presets and times, a preset's thread.snooze, Unsnooze, and the Snoozed section's order
 // and countdown: unit-tested in src/components/thread/ThreadMenuItems.test.tsx, src/lib/snooze.test.ts,
-// src/stores/threadActions.test.ts, src/lib/tree.test.ts and src/components/sidebar/SidebarRow.test.tsx (the
-// daemon asks only mid-turn: internal/command/commands_thread_snooze_test.go).
+// src/stores/threadActions.test.ts, src/lib/tree.test.ts and src/components/sidebar/SidebarRow.test.tsx (it
+// never asks: internal/command/commands_thread_snooze_test.go, mock/world.test.ts).
 
 // Snoozing a working thread from the title menu: the presets and their times
-// (src/components/thread/ThreadMenuItems.test.tsx, src/lib/snooze.test.ts), the daemon asking only
-// mid-turn (internal/command/commands_thread_snooze_test.go) and the retry confirmed
-// (src/stores/commands.test.ts, src/components/confirm/ConfirmDialog.test.tsx), its panels dropped and
+// (src/components/thread/ThreadMenuItems.test.tsx, src/lib/snooze.test.ts), no question and Claude
+// working on, its pin kept, its tabs closed and back on an unsnooze (docs/notes/snooze-without-teardown.md:
+// internal/store/thread snooze_test.go, internal/daemon layout_test.go, mock/world.test.ts), and
 // the window landing home, whoever snoozed it (src/stores/archiveCleanup.test.ts), the pill's snooze
 // segment, "Snoozed until …" and Dismiss snooze (src/components/thread/ComposerRow.test.tsx), the title menu's Unsnooze
 // (ThreadMenuItems.test.tsx), back in the main list's waiting band (src/components/sidebar/Sidebar.test.tsx).

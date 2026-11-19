@@ -44,29 +44,29 @@ func (c *testClock) opts(interval ...time.Duration) func(*Options) {
 	}
 }
 
+// A snooze only hides the thread (docs/notes/snooze-without-teardown.md): its process, its
+// shells and its pin stay as they are; an archived thread is unarchived.
 func TestSnooze(t *testing.T) {
 	tests := []struct {
-		name string
-		// setup returns the thread to snooze.
-		setup      func(e *env) Thread
-		wantReason string // DisconnectReason after the snooze
+		name      string
+		setup     func(e *env) Thread
+		wantState State
+		pinned    bool
 	}{
-		{name: "a connected thread is closed", wantReason: ReasonClosed, setup: func(e *env) Thread {
+		{name: "a connected thread runs on", wantState: StateConnected, setup: func(e *env) Thread {
 			return e.connected(CreateOptions{Name: "live"})
 		}},
-		{name: "a pinned connected thread is closed and unpinned", wantReason: ReasonClosed, setup: func(e *env) Thread {
+		{name: "a pinned connected thread runs on and stays pinned", wantState: StateConnected, pinned: true, setup: func(e *env) Thread {
 			s := e.connected(CreateOptions{Name: "pinned"})
 			if _, err := e.m.Pin(e.ctx(), s.ID, true); err != nil {
 				e.t.Fatal(err)
 			}
 			return s
 		}},
-		{name: "a disconnected thread is not closed again", wantReason: ReasonExited, setup: func(e *env) Thread {
-			s := e.connected(CreateOptions{Name: "gone"})
-			e.exit(s.ID, 0)
-			return e.waitFor(s.ID, "exited", func(s Thread) bool { return s.State == StateDisconnected })
+		{name: "a stopped thread stays stopped", wantState: StateDisconnected, setup: func(e *env) Thread {
+			return e.stopped("gone")
 		}},
-		{name: "an archived thread is unarchived", wantReason: ReasonClosed, setup: func(e *env) Thread {
+		{name: "an archived thread is unarchived", wantState: StateDisconnected, setup: func(e *env) Thread {
 			return e.archived()
 		}},
 	}
@@ -78,9 +78,9 @@ func TestSnooze(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			other, err := e.terms.Create(e.ctx(), terminal.Spec{Argv: []string{"zsh"}, Cwd: e.wt, Labels: termlabel.Shell("", "r1", e.wt)})
-			if err != nil {
-				t.Fatal(err)
+			var pid int
+			if tt.wantState == StateConnected {
+				pid = e.pid(s.ID)
 			}
 
 			until := time.Now().Add(time.Hour)
@@ -88,9 +88,12 @@ func TestSnooze(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if got.State != StateDisconnected || got.DisconnectReason != tt.wantReason || got.Pinned || !got.ArchivedAt.IsZero() {
-				t.Errorf("snoozed = state %s reason %q pinned %v archived %v; want disconnected %q, unpinned, not archived",
-					got.State, got.DisconnectReason, got.Pinned, got.ArchivedAt, tt.wantReason)
+			if got.State != tt.wantState || got.Pinned != tt.pinned || !got.ArchivedAt.IsZero() {
+				t.Errorf("snoozed = state %s pinned %v archived %v; want %s, pinned %v, not archived",
+					got.State, got.Pinned, got.ArchivedAt, tt.wantState, tt.pinned)
+			}
+			if pid != 0 && e.pid(s.ID) != pid {
+				t.Error("the snooze replaced the thread's process")
 			}
 			if got.SnoozedUntil.UnixMilli() != until.UnixMilli() {
 				t.Errorf("SnoozedUntil = %v, want %v", got.SnoozedUntil, until)
@@ -101,11 +104,8 @@ func TestSnooze(t *testing.T) {
 			if snap, _ := e.m.Snapshot().Thread(s.ID); !snap.SnoozedUntil.Equal(got.SnoozedUntil) {
 				t.Errorf("snapshot SnoozedUntil = %v, want %v", snap.SnoozedUntil, got.SnoozedUntil)
 			}
-			if _, err := e.terms.Get(e.ctx(), mine.ID); !errors.Is(err, terminal.ErrNotFound) {
-				t.Errorf("the thread's shell after snooze: %v, want gone", err)
-			}
-			if _, err := e.terms.Get(e.ctx(), other.ID); err != nil {
-				t.Errorf("the worktree's shell after snooze: %v, want kept", err)
+			if term, err := e.terms.Get(e.ctx(), mine.ID); err != nil || term.State != terminal.StateRunning {
+				t.Errorf("the thread's shell after snooze: %+v, %v; want it running", term, err)
 			}
 
 			// Snoozing again replaces the time, earlier or later.
@@ -117,10 +117,77 @@ func TestSnooze(t *testing.T) {
 
 			// Persisted.
 			e.restart()
-			if got, err := e.m.Get(e.ctx(), s.ID); err != nil || got.SnoozedUntil.UnixMilli() != sooner.UnixMilli() || got.Pinned {
-				t.Errorf("after restart = SnoozedUntil %v pinned %v, %v; want %v, unpinned", got.SnoozedUntil, got.Pinned, err, sooner)
+			if got, err := e.m.Get(e.ctx(), s.ID); err != nil || got.SnoozedUntil.UnixMilli() != sooner.UnixMilli() || got.Pinned != tt.pinned {
+				t.Errorf("after restart = SnoozedUntil %v pinned %v, %v; want %v, pinned %v", got.SnoozedUntil, got.Pinned, err, sooner, tt.pinned)
 			}
 		})
+	}
+}
+
+// Undoing a snooze (the user's thread.snooze --clear right after it, the Undo toast's call)
+// leaves the thread as it was before the snooze: the same process, mid-turn or at its
+// prompt, the same status and pending request, its pin, its shell running. A snooze in
+// either form, a running thread at its prompt, mid-turn and a stopped one.
+func TestSnoozeUndo(t *testing.T) {
+	snooze := func(e *env, id string) (Thread, error) { return e.m.Snooze(e.ctx(), id, time.Now().Add(time.Hour)) }
+	save := func(e *env, id string) (Thread, error) { return e.m.SaveForLater(e.ctx(), id) }
+	for _, form := range []struct {
+		name string
+		do   func(e *env, id string) (Thread, error)
+	}{{"snooze", snooze}, {"save", save}} {
+		for _, tc := range []struct {
+			name  string
+			setup func(t *testing.T) (*env, Thread)
+		}{
+			{"at its prompt", func(t *testing.T) (*env, Thread) { return idleSetup.start(t) }},
+			{"mid-turn, asking", func(t *testing.T) (*env, Thread) { return permissionSetup.start(t) }},
+			{"working", func(t *testing.T) (*env, Thread) { return busySetup.start(t) }},
+			{"stopped", func(t *testing.T) (*env, Thread) {
+				e, s := idleSetup.start(t)
+				if err := e.m.Close(e.ctx(), s.ID); err != nil {
+					t.Fatal(err)
+				}
+				return e, e.waitFor(s.ID, "stopped", func(s Thread) bool { return s.State == StateDisconnected })
+			}},
+		} {
+			t.Run(form.name+"/"+tc.name, func(t *testing.T) {
+				e, s := tc.setup(t)
+				if _, err := e.m.Pin(e.ctx(), s.ID, true); err != nil {
+					t.Fatal(err)
+				}
+				shell, err := e.terms.Create(e.ctx(), terminal.Spec{Argv: []string{"zsh"}, Cwd: e.wt, Labels: termlabel.Shell(s.ID, "r1", e.wt)})
+				if err != nil {
+					t.Fatal(err)
+				}
+				before, _ := e.m.Get(e.ctx(), s.ID)
+				pid := 0
+				if before.State == StateConnected {
+					pid = e.pid(s.ID)
+				}
+				if _, err := form.do(e, s.ID); err != nil {
+					t.Fatal(err)
+				}
+				after, err := e.m.Snooze(e.ctx(), s.ID, time.Time{})
+				if err != nil {
+					t.Fatal(err)
+				}
+				if after.Snoozed() || !after.Pinned || after.State != before.State || after.Status != before.Status ||
+					after.StatusReason != before.StatusReason || after.PendingRequestID != before.PendingRequestID {
+					t.Errorf("after the undo %s %s %q pinned %v snoozed %v request %q; want as before: %s %s %q pinned, request %q",
+						after.State, after.Status, after.StatusReason, after.Pinned, after.Snoozed(), after.PendingRequestID,
+						before.State, before.Status, before.StatusReason, before.PendingRequestID)
+				}
+				if pid != 0 && e.pid(s.ID) != pid {
+					t.Error("the round trip replaced the thread's process")
+				}
+				if term, err := e.terms.Get(e.ctx(), shell.ID); err != nil || term.State != terminal.StateRunning {
+					t.Errorf("the thread's shell: %+v, %v; want it running", term, err)
+				}
+				if after.StatusReason == ReasonSnoozeEnded {
+					t.Error("the undo asked for attention")
+				}
+			})
+		}
 	}
 }
 
@@ -147,10 +214,11 @@ func TestSnoozeUnknown(t *testing.T) {
 	}
 }
 
-// snoozed returns a disconnected thread snoozed for an hour.
+// snoozed returns a stopped thread snoozed for an hour (a snooze leaves a running process
+// running: snoozedLive).
 func (e *env) snoozed() Thread {
 	e.t.Helper()
-	s := e.connected(CreateOptions{Name: "snoozed"})
+	s := e.stopped("snoozed")
 	got, err := e.m.Snooze(e.ctx(), s.ID, e.m.opts.Now().Add(time.Hour))
 	if err != nil || got.SnoozedUntil.IsZero() {
 		e.t.Fatalf("Snooze = %+v, %v", got, err)
@@ -353,6 +421,68 @@ func TestSnoozeWakesAtStartup(t *testing.T) {
 		!got.StatusChangedAt.Equal(woke) || got.State != StateDisconnected {
 		t.Errorf("after the startup check = %+v, %v; want disconnected, woken at %v", got, err, woke)
 	}
+}
+
+// snoozedLive returns a thread at its prompt, its process running, snoozed for an hour.
+func (e *env) snoozedLive() Thread {
+	e.t.Helper()
+	s := e.connected(CreateOptions{Name: "live"})
+	got, err := e.m.Snooze(e.ctx(), s.ID, e.m.opts.Now().Add(time.Hour))
+	if err != nil || got.SnoozedUntil.IsZero() || got.State != StateConnected {
+		e.t.Fatalf("Snooze = %+v, %v", got, err)
+	}
+	return got
+}
+
+// A snooze that ends while the thread's process runs at its prompt (a snooze stops
+// nothing, and the idle stop has not come yet) wakes it as a stopped one wakes: needs
+// attention "snooze ended", stamped with the wake, on the running process, which keeps it
+// (its own status does not take it back). Clear turns it idle at its prompt; a message
+// ends it as it starts a turn.
+func TestSnoozeWakesALiveThread(t *testing.T) {
+	clk := newTestClock()
+	e := newEnv(t, clk.opts())
+	s := e.snoozedLive()
+	pid := e.pid(s.ID)
+	woke := clk.advance(time.Hour + time.Second)
+	got := e.waitFor(s.ID, "the wake", func(s Thread) bool { return s.StatusReason == ReasonSnoozeEnded })
+	if got.State != StateConnected || got.Snoozed() || got.Status != StatusNeedsAttention || !got.StatusChangedAt.Equal(woke) {
+		t.Errorf("woken = %s %s %q at %v snoozed %v; want connected, needs attention at %v, unsnoozed",
+			got.State, got.Status, got.StatusReason, got.StatusChangedAt, got.Snoozed(), woke)
+	}
+	time.Sleep(100 * time.Millisecond) // the runner's ticks and debounce come and go
+	if got, _ := e.m.Get(e.ctx(), s.ID); got.StatusReason != ReasonSnoozeEnded || e.pid(s.ID) != pid {
+		t.Errorf("later = %s %q; want %q kept on the same process", got.Status, got.StatusReason, ReasonSnoozeEnded)
+	}
+
+	cleared, ok, err := e.m.ClearSnoozeEnded(e.ctx(), s.ID)
+	if err != nil || !ok || cleared.Status != StatusIdle || cleared.StatusReason != "at prompt" || cleared.State != StateConnected {
+		t.Errorf("ClearSnoozeEnded = %s %s %q, %v, %v; want connected, idle at its prompt", cleared.State, cleared.Status, cleared.StatusReason, ok, err)
+	}
+
+	// Snoozed and woken again: a message ends the wake's attention.
+	if _, err := e.m.Snooze(e.ctx(), s.ID, clk.Now().Add(time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	clk.advance(2 * time.Minute)
+	e.waitFor(s.ID, "the second wake", func(s Thread) bool { return s.StatusReason == ReasonSnoozeEnded })
+	// A re-snooze clears it, on the running process too.
+	if again, err := e.m.Snooze(e.ctx(), s.ID, clk.Now().Add(time.Hour)); err != nil || again.StatusReason == ReasonSnoozeEnded {
+		t.Errorf("re-snoozed = %s %q, %v; want the wake's attention gone", again.Status, again.StatusReason, err)
+	}
+	time.Sleep(50 * time.Millisecond)
+	if got, _ := e.m.Get(e.ctx(), s.ID); got.StatusReason == ReasonSnoozeEnded {
+		t.Errorf("re-snoozed, later = %s %q", got.Status, got.StatusReason)
+	}
+	if _, err := e.m.Snooze(e.ctx(), s.ID, clk.Now().Add(time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	clk.advance(2 * time.Minute)
+	e.waitFor(s.ID, "the third wake", func(s Thread) bool { return s.StatusReason == ReasonSnoozeEnded })
+	if _, err := e.m.Send(e.ctx(), s.ID, Message{Text: "again"}); err != nil {
+		t.Fatal(err)
+	}
+	e.waitFor(s.ID, "the message's turn", func(s Thread) bool { return s.StatusReason != ReasonSnoozeEnded })
 }
 
 // wokenThread is a snoozed thread whose snooze ended: disconnected, needs attention

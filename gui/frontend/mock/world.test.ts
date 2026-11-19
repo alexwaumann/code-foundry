@@ -2,7 +2,8 @@
 import { describe, expect, it, vi } from "vitest";
 import { ActionRunMode, ActionRunState } from "../src/gen/codefoundry/v1/action_pb";
 import type { UiContext } from "../src/gen/codefoundry/v1/command_pb";
-import { PermissionMode, ThreadStatus } from "../src/gen/codefoundry/v1/thread_lifecycle_pb";
+import { TerminalState } from "../src/gen/codefoundry/v1/terminal_pb";
+import { PermissionMode, ThreadState, ThreadStatus } from "../src/gen/codefoundry/v1/thread_lifecycle_pb";
 import { panes } from "./layout";
 import { World } from "./world";
 
@@ -33,18 +34,64 @@ describe("the mock world", () => {
     expect(w.workspaces.get(b.id)?.name).toBe("b");
   });
 
-  it.each(["archive", "snooze", "save"] as const)("%s stops the thread's background action runs", (how) => {
+  it.each([
+    ["archive", ActionRunState.EXITED],
+    ["snooze", ActionRunState.RUNNING],
+    ["save", ActionRunState.RUNNING],
+  ] as const)("%s leaves the thread's background action runs %s (only archive stops them)", (how, want) => {
     const w = new World();
     const r = w.actions.run({ action: "a-debug0000000", threadId: "s-1", mode: ActionRunMode.BACKGROUND });
     expect(w.actions.getRun(r.id ?? "").state).toBe(ActionRunState.RUNNING);
     if (how === "archive") w.archiveThread("s-1", true);
     else if (how === "snooze") w.snoozeThread("s-1", new Date(Date.now() + 3_600_000));
     else w.saveThread("s-1");
-    expect(w.actions.getRun(r.id ?? "").state).toBe(ActionRunState.EXITED);
+    expect(w.actions.getRun(r.id ?? "").state).toBe(want);
+  });
+
+  // docs/notes/snooze-without-teardown.md: a snooze only hides the thread, so it never asks.
+  it.each([
+    ["until a time", { until: new Date(Date.now() + 3_600_000).toISOString() }],
+    ["for later", { save: "true" }],
+  ] as const)("thread.snooze %s on a working pinned thread asks nothing and leaves Claude, its shell and its pin", async (_how, args) => {
+    const w = new World();
+    const c = { activeThreadId: "s-1", activeView: "thread" };
+    await run(w, "thread.pin", c, { pinned: "true" });
+    const shell = w.ensureQuick("s-1");
+    const before = w.threads.get("s-1");
+    expect(before).toMatchObject({ state: ThreadState.CONNECTED, status: ThreadStatus.BUSY, pinned: true });
+    await run(w, "thread.snooze", c, args); // not confirmed: a question would throw
+    expect(w.threads.get("s-1")).toMatchObject({ state: ThreadState.CONNECTED, status: ThreadStatus.BUSY, pinned: true });
+    expect(w.terms.get(shell.id)?.state).toBe(TerminalState.RUNNING);
+    // Undone at once (the Undo toast's call): back as it was.
+    await run(w, "thread.snooze", c, { clear: "true" });
+    expect(w.threads.get("s-1")).toMatchObject({ state: ThreadState.CONNECTED, status: ThreadStatus.BUSY, pinned: true, snoozedUntil: null, savedAt: null });
+  });
+
+  it("thread.snooze --ids with working and asking threads among them asks nothing", async () => {
+    const w = new World();
+    await run(w, "thread.snooze", { activeThreadId: "s-1" }, { ids: "s-1,s-2,s-3", until: new Date(Date.now() + 3_600_000).toISOString() });
+    for (const id of ["s-1", "s-2", "s-3"]) expect(w.threads.get(id)?.snoozedUntil).not.toBeNull();
+    expect(w.threads.get("s-1")).toMatchObject({ status: ThreadStatus.BUSY, state: ThreadState.CONNECTED });
+  });
+
+  it("a wake marks a thread at its prompt \"snooze ended\" as a stopped one, and leaves a working one working", () => {
+    const w = new World();
+    const wake = (id: string) => {
+      w.snoozeThread(id, new Date(Date.now() + 3_600_000));
+      w.wakeThread(id);
+    };
+    wake("s-1"); // working
+    expect(w.threads.get("s-1")).toMatchObject({ status: ThreadStatus.BUSY, snoozedUntil: null });
+    w.setThreadStatus("s-1", ThreadStatus.IDLE, "at prompt");
+    wake("s-1");
+    expect(w.threads.get("s-1")).toMatchObject({ state: ThreadState.CONNECTED, status: ThreadStatus.NEEDS_ATTENTION, statusReason: "snooze ended", snoozedUntil: null });
+    wake("s-3"); // stopped
+    expect(w.threads.get("s-3")).toMatchObject({ status: ThreadStatus.NEEDS_ATTENTION, statusReason: "snooze ended" });
   });
 
   it("thread.snooze.clear: a woken thread is idle at its prompt; a re-snooze or archive clears a wake too; elsewhere it says so", async () => {
     const w = new World();
+    w.setThreadStatus("s-1", ThreadStatus.IDLE, "at prompt");
     const woken = () => {
       w.snoozeThread("s-1", new Date(Date.now() + 3_600_000));
       w.wakeThread("s-1");
@@ -173,6 +220,28 @@ describe("the mock's layout glue (internal/daemon/layout.go): what keeps a previ
     const { w, tab } = await previewOf(id);
     await act(w);
     expect(tab()?.preview).toBeUndefined();
+  });
+
+  it("a snooze closes the thread's tab; undoing it puts the tab back", async () => {
+    const w = new World();
+    await w.invoke("thread.open", ctx({}), { id: "s-1", focus: "true" }, false);
+    const where = () => {
+      for (const sp of w.layout.state().spaces)
+        for (const p of panes(sp.root)) {
+          const i = (p.tabs ?? []).findIndex((t) => t.kind === "thread" && t.thread === "s-1");
+          if (i >= 0) return `${p.id}:${String(i)}`;
+        }
+      return "";
+    };
+    expect(where()).not.toBe("");
+    await run(w, "thread.snooze", { activeThreadId: "s-1", activeView: "thread" }, { until: new Date(Date.now() + 3_600_000).toISOString() });
+    expect(where()).toBe("");
+    expect(w.layout.state().threads?.["s-1"]?.snoozed).toBe(true);
+    await run(w, "thread.snooze", { activeThreadId: "s-1", activeView: "thread" }, { clear: "true" });
+    // Its pane went with it (its only tab): the mock opens it again as a thread's tab opens (Go
+    // rebuilds the pane where it sat: internal/layout testdata set_snoozed-wake-*).
+    expect(where()).not.toBe("");
+    expect(w.layout.state().threads?.["s-1"]?.snoozed).toBeUndefined();
   });
 
   it("a wake clears the layout's snoozed mark, so the next --preview of it opens a kept tab", async () => {

@@ -13,7 +13,8 @@ import (
 
 // thread.snooze.default (cmd+shift+s) is thread.snooze given the default preset: the setting
 // threads.default_snooze reaches it as its to arg's default (Overrides.ArgDefaults), and it
-// asks what thread.snooze asks.
+// asks what thread.snooze asks: nothing, a snooze cuts nothing off
+// (docs/notes/snooze-without-teardown.md).
 func TestThreadSnoozeDefault(t *testing.T) {
 	a := idle("s-aaaa11112222", "one")
 	busy := &v1.Thread{Id: "s-cccc55556666", Name: "three", State: v1.ThreadState_THREAD_STATE_CONNECTED, Status: v1.ThreadStatus_THREAD_STATUS_BUSY}
@@ -40,11 +41,9 @@ func TestThreadSnoozeDefault(t *testing.T) {
 			wantUntil: func(u time.Time) bool { return u.Equal(tomorrow) }},
 		{name: "to given wins over the setting", ctx: inView("s-aaaa11112222"), setting: "save", args: map[string]string{"to": "1h"},
 			wantUntil: func(u time.Time) bool { return time.Until(u) <= time.Hour && time.Until(u) > 59*time.Minute }},
-		{name: "a busy thread asks as thread.snooze does", ctx: inView("s-cccc55556666"),
-			wantAsk: "Snooze thread three? Claude is still working; snoozing ends the turn."},
-		{name: "a busy thread asks to save it", ctx: inView("s-cccc55556666"), setting: "save",
-			wantAsk: "Save thread three for later? Claude is still working; saving ends the turn."},
-		{name: "confirmed, it goes", ctx: inView("s-cccc55556666"), setting: "save", confirmed: true, wantSave: true},
+		{name: "a busy thread snoozes without asking, as thread.snooze does", ctx: inView("s-cccc55556666"),
+			wantUntil: func(u time.Time) bool { return u.Equal(tomorrow) }},
+		{name: "a busy thread saves without asking", ctx: inView("s-cccc55556666"), setting: "save", wantSave: true},
 		{name: "from the CLI with an id", args: map[string]string{"id": "11112222"}, wantUntil: func(u time.Time) bool { return u.Equal(tomorrow) }},
 		{name: "a to it does not know", ctx: inView("s-aaaa11112222"), args: map[string]string{"to": "soon"}, wantErr: command.ErrInvalidArgs},
 		{name: "no thread in a window", ctx: command.Context{ActiveView: "pullrequests"}, wantErr: command.ErrUnavailable},

@@ -97,10 +97,10 @@ const (
 	ThreadState_THREAD_STATE_STARTING ThreadState = 1
 	// Claude is running.
 	ThreadState_THREAD_STATE_CONNECTED ThreadState = 2
-	// A stop is under way (idle, archive, snooze, remove); waiting for the process to
+	// A stop is under way (idle, archive, remove); waiting for the process to
 	// exit. A message sent meanwhile starts a new process once it has.
 	ThreadState_THREAD_STATE_CLOSING ThreadState = 3
-	// No process: stopped by the daemon (idle, archive, snooze), exited by Claude, crashed,
+	// No process: stopped by the daemon (idle, archive), exited by Claude, crashed,
 	// or not started since the daemon started. The next message starts it.
 	ThreadState_THREAD_STATE_DISCONNECTED ThreadState = 4
 )
@@ -1024,7 +1024,7 @@ type Thread struct {
 	// Exit code of the last process, valid when DISCONNECTED after a process ran.
 	ExitCode int32 `protobuf:"varint,14,opt,name=exit_code,json=exitCode,proto3" json:"exit_code,omitempty"`
 	// Why the thread is DISCONNECTED: "idle" (stopped at its prompt cache expiry),
-	// "closed" (archive, snooze, remove), "exited", "crashed", "daemon stopped", "daemon
+	// "closed" (archive, remove), "exited", "crashed", "daemon stopped", "daemon
 	// restarted", "spawn failed" (Claude did not start or never answered its handshake),
 	// or empty. Internal detail for clients; the next message starts the thread whatever it
 	// says.
@@ -1033,9 +1033,9 @@ type Thread struct {
 	// Forked from this thread id, if any.
 	ParentId string `protobuf:"bytes,17,opt,name=parent_id,json=parentId,proto3" json:"parent_id,omitempty"`
 	// Short explanation of status from the detector, e.g. "finished", "at prompt",
-	// "permission: Do you want to proceed?", "snooze ended" (NEEDS_ATTENTION on a
-	// disconnected thread whose snooze ran out; cleared like "finished" on a disconnected
-	// thread, by the next start, and to IDLE "at prompt" by Archive and Snooze), "budget reached" (NEEDS_ATTENTION: the thread's cost
+	// "permission: Do you want to proceed?", "snooze ended" (NEEDS_ATTENTION on a thread
+	// whose snooze ran out while it was stopped or at its prompt; cleared by the next start
+	// or message, and to IDLE "at prompt" by Archive, Snooze and ClearSnoozeEnded), "budget reached" (NEEDS_ATTENTION: the thread's cost
 	// reached budget_usd mid-turn and the daemon interrupted Claude; cleared by the next
 	// message, or once seen like "finished"), "wake limit" (NEEDS_ATTENTION: the thread's
 	// wake subscriptions woke it 60 times within an hour and further wakes are dropped;
@@ -1049,7 +1049,8 @@ type Thread struct {
 	// e.g. "waiting on 2 child threads and 1 subagent", "waiting on 1 shell". A waiting
 	// row loads as NEEDS_ATTENTION "finished" after a daemon restart. Persisted with status: a DISCONNECTED thread keeps the status and reason it had when its process
 	// ended (a busy one becomes ERROR "interrupted", or "crashed" when its process died on
-	// its own, or IDLE "archived" or "snoozed" when an archive or a snooze stopped it), across daemon restarts. Empty when
+	// its own, or IDLE "archived" when an archive stopped it; IDLE "snoozed" on rows from
+	// before a snooze left the process running), across daemon restarts. Empty when
 	// unknown.
 	StatusReason string `protobuf:"bytes,18,opt,name=status_reason,json=statusReason,proto3" json:"status_reason,omitempty"`
 	// Permission mode passed to claude; re-passed on every spawn.
@@ -1142,11 +1143,13 @@ type Thread struct {
 	// lists it apart. Pin (pinned) and Send clear it. Persisted.
 	ArchivedAt *timestamppb.Timestamp `protobuf:"bytes,37,opt,name=archived_at,json=archivedAt,proto3" json:"archived_at,omitempty"`
 	// When a snoozed thread wakes (ThreadService.Snooze); unset when it is not snoozed.
-	// A snoozed thread is disconnected, unpinned, not archived and has no shells; the GUI
-	// lists it apart. The daemon checks the wall clock (every 30 s and at startup, so a
+	// A snoozed thread is not archived; its process, its shells and its pin are left as they
+	// were (docs/notes/snooze-without-teardown.md), and the idle stop stops it as any other.
+	// The GUI lists it apart. The daemon checks the wall clock (every 30 s and at startup, so a
 	// snooze that ended while the Mac slept or the daemon was stopped wakes as soon as it
 	// can): waking clears this field and sets status NEEDS_ATTENTION with status_reason
-	// "snooze ended". Pin (pinned), Send and Archive (archived) clear it.
+	// "snooze ended", unless Claude is working then. Pin (pinned), the user's Send and
+	// Archive (archived) clear it.
 	// Persisted.
 	SnoozedUntil *timestamppb.Timestamp `protobuf:"bytes,38,opt,name=snoozed_until,json=snoozedUntil,proto3" json:"snoozed_until,omitempty"`
 	// Subagent runs still running: all of them (nested ones too), and those the thread
@@ -1162,7 +1165,7 @@ type Thread struct {
 	BackgroundShellsRunning int32 `protobuf:"varint,41,opt,name=background_shells_running,json=backgroundShellsRunning,proto3" json:"background_shells_running,omitempty"`
 	// A background shell or agent run ended while Claude was at its prompt, and the turn
 	// Claude starts by itself to report it has not ended yet (a few seconds at most).
-	// Stopping Claude now loses that report: archive, snooze and restarts confirm it like
+	// Stopping Claude now loses that report: archive and restarts confirm it like
 	// running background work. Not persisted. See docs/notes/thread-lifecycle.md.
 	BackgroundWakePending bool `protobuf:"varint,42,opt,name=background_wake_pending,json=backgroundWakePending,proto3" json:"background_wake_pending,omitempty"`
 	// The thread whose agent created this one (thread.new run from that thread's Claude:
@@ -1298,8 +1301,8 @@ type Thread struct {
 	PendingMove *ThreadMove `protobuf:"bytes,75,opt,name=pending_move,json=pendingMove,proto3" json:"pending_move,omitempty"`
 	// When the thread was saved for later (ThreadService.Snooze with save): a snooze with
 	// no wake time, so snoozed_until stays unset and the daemon never wakes it. Unset when
-	// it is not saved. Otherwise like a snoozed thread: disconnected, unpinned, not
-	// archived, no shells, listed apart with the snoozed ones. A timed snooze replaces it;
+	// it is not saved. Otherwise like a snoozed thread: not archived, its process, shells
+	// and pin left as they were, listed apart with the snoozed ones. A timed snooze replaces it;
 	// Snooze with neither until nor save, Pin (pinned), Send and Archive (archived)
 	// clear it. Persisted. See docs/notes/save-for-later-1-daemon.md.
 	SavedAt *timestamppb.Timestamp `protobuf:"bytes,76,opt,name=saved_at,json=savedAt,proto3" json:"saved_at,omitempty"`
@@ -6777,8 +6780,8 @@ type SnoozeThreadRequest struct {
 	// Save the thread for later: a snooze with no wake time (Thread.saved_at). Not with
 	// until (INVALID_ARGUMENT).
 	Save bool `protobuf:"varint,3,opt,name=save,proto3" json:"save,omitempty"`
-	// The thread that asks for it, as ArchiveThreadRequest.by_thread_id. Unsnoozing is
-	// never deferred. A thread may unsnooze, or snooze an archived thread (which
+	// The thread that asks for it, as ArchiveThreadRequest.by_thread_id. A snooze is never
+	// deferred: it cuts nothing off. A thread may unsnooze, or snooze an archived thread (which
 	// unarchives it), only when it created that thread (FAILED_PRECONDITION otherwise).
 	ByThreadId    string `protobuf:"bytes,4,opt,name=by_thread_id,json=byThreadId,proto3" json:"by_thread_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
@@ -6846,8 +6849,8 @@ func (x *SnoozeThreadRequest) GetByThreadId() string {
 type SnoozeThreadResponse struct {
 	state  protoimpl.MessageState `protogen:"open.v1"`
 	Thread *Thread                `protobuf:"bytes,1,opt,name=thread,proto3" json:"thread,omitempty"`
-	// The thread asked this of itself mid-turn: it is snoozed when the turn ends, so
-	// thread is as it is now.
+	// Always false since a snooze stops nothing (docs/notes/snooze-without-teardown.md);
+	// it was true when a thread snoozing itself mid-turn waited for the turn's end.
 	Deferred      bool `protobuf:"varint,2,opt,name=deferred,proto3" json:"deferred,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache

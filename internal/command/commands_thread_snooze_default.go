@@ -8,7 +8,8 @@ import (
 // away to the user's default snooze, one of the snooze menu's presets or save for later (the
 // setting threads.default_snooze, which the daemon passes as the default of its to arg,
 // Overrides.ArgDefaults). It is thread.snooze given that preset: the same refusals, the same
-// confirmation (whatever thread.snooze asks), the same result. A separate verb, so a bare
+// confirmation (whatever thread.snooze asks: nowadays nothing,
+// docs/notes/snooze-without-teardown.md), the same result. A separate verb, so a bare
 // `thread snooze` still says to give until, save or clear.
 
 // SnoozeSave is the default snooze that saves the thread for later (no wake time).

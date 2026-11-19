@@ -7,7 +7,8 @@ import (
 
 // A thread's own tab and its linked set (docs/notes/shell-model.md, "Linked surfaces"):
 // opening a thread, closing it with its linked tabs remembered, restoring them, moving it to
-// another space, archiving and snoozing it. Decisions are in docs/notes/shell-2-placement.md.
+// another space, archiving and snoozing it. Decisions are in docs/notes/shell-2-placement.md
+// and docs/notes/snooze-without-teardown.md.
 
 func init() {
 	register("open_thread", func() Op { return &OpenThread{} })
@@ -56,7 +57,8 @@ func init() {
 // when Preview asks again, and is kept otherwise.
 //
 // Snoozed says the thread is snoozed, as Archived says it is archived; the layout remembers
-// it (ThreadState.Snoozed) until set_snoozed wakes it.
+// it (ThreadState.Snoozed) until set_snoozed wakes it. Opening the tab forgets where a
+// snooze closed it (ThreadState.SnoozedTab): the wake finds it open.
 //
 // Child says another thread created the thread and that creator still exists (the sidebar
 // rule; its lead manages it). Only a preview reads it: a child's preview shows only its
@@ -189,6 +191,9 @@ func (o *OpenThread) apply(t *tx) (Result, error) {
 		return Result{}, err
 	}
 	tb.Preview = preview
+	if ts := t.st.Threads[o.Thread]; ts != nil {
+		ts.SnoozedTab = nil // open now: the snooze's place is old news
+	}
 	res := Result{Space: sp.ID, Tab: tb.ID, Rule: rule, Kept: kept}
 	if closed != nil {
 		res.Closed = []*Tab{closed}
@@ -295,8 +300,9 @@ func (t *tx) restore(sp *Space, thread string, w, h float64, res *Result) error 
 				tb.Params["ran"] = rec.Fresh.Ran
 			}
 		}
-		// A tab that was in another space (a snooze took it from there) goes back there when
-		// its pane, or a neighbour to rebuild it beside, is still there.
+		// A tab that was in another space (a snooze took it from there, in a layout saved
+		// before snoozes left terminals running) goes back there when its pane, or a
+		// neighbour to rebuild it beside, is still there.
 		home := sp
 		if rec.Space != "" && rec.Space != sp.ID {
 			if other := t.st.Space(rec.Space); other != nil {
@@ -519,39 +525,6 @@ func (t *tx) putAway(sp *Space, thread, threadPane string, w, h float64) []*Tab 
 	return linked
 }
 
-// putAwayElsewhere takes thread's terminal tabs in space sp, which is not the thread's, into
-// its remembered set, each with the space and pane it was in (RememberedTab.Space), so it
-// goes back there when the thread opens. It returns the tabs it took.
-func (t *tx) putAwayElsewhere(sp *Space, thread string) []*Tab {
-	var took []*Tab
-	wasFocused := false
-	for _, p := range Panes(sp.Root) {
-		for _, tb := range slices.Clone(p.Tabs) {
-			if tb.Kind != "terminal" || tb.Thread != thread {
-				continue
-			}
-			_, p, _ := t.st.FindTab(tb.ID)
-			rec := RememberedTab{Tab: tb, Space: sp.ID, Pane: p.ID, Index: p.TabIndex(tb.ID), Active: p.Active == tb.ID}
-			if len(p.Tabs) == 1 {
-				rec.Beside, rec.Collapsed = BesideInfo(sp.Root, p.ID), p.Collapsed
-			}
-			ts := threadState(t.st, thread)
-			if ts.Remembered == nil {
-				ts.Remembered = &Remembered{}
-			}
-			ts.Remembered.Tabs = append(ts.Remembered.Tabs, rec)
-			wasFocused = wasFocused || focusedTab(sp) == tb.ID
-			detach(sp, p, tb.ID)
-			forget(sp, tb.ID)
-			took = append(took, tb)
-		}
-	}
-	if wasFocused {
-		refocus(sp)
-	}
-	return took
-}
-
 // CloseThread closes a thread's tab and the linked tabs in its space, remembering which were
 // open and where; opening the thread again restores them. Terminals closed this way keep
 // running (Result.Kept). The focus returns as close_tab's. Record puts the thread's tab in its
@@ -734,7 +707,7 @@ func (o *ArchiveThread) apply(t *tx) (Result, error) {
 }
 
 // runningTerminals lists the terminal tabs of a remembered set that are still running (not
-// already ended by a snooze).
+// already ended by a snooze, in a layout saved before snoozes left terminals running).
 func runningTerminals(r *Remembered) []*Tab {
 	if r == nil {
 		return nil
@@ -748,23 +721,16 @@ func runningTerminals(r *Remembered) []*Tab {
 	return out
 }
 
-// SnoozeThread closes a thread like close_thread (its tab when open, and its linked tabs in
-// its space, remembered), then ends its terminals while keeping the set: each remembered
-// terminal is marked to come back as a fresh shell under the same name, with the command it
-// was running (Ran, by terminal id, from the caller) for its "Run again" line. Its terminal
-// tabs open in other spaces join the set too, each with the space it was in, so it comes
-// back there (a terminal cannot end under an open tab). Its quick terminal, when open, is
-// marked the same way (Quick.Fresh, with QuickRan for its line): drawn closed now, it opens
-// again with a fresh shell when the thread's tab opens. Result.Kept lists the tabs it took,
-// Result.Ended the terminals the caller ends (the quick terminal is not a tab: the thread's
-// shells end with the snooze). The layout then knows the thread is snoozed
-// (ThreadState.Snoozed): its tab opens with none of that until set_snoozed wakes it.
+// SnoozeThread closes a thread as close_thread does: its tab when open, and its linked tabs
+// in its space, remembered (Result.Kept); their terminals and its quick terminal keep
+// running. It is not recorded for reopen_closed. Where its tab was is remembered
+// (ThreadState.SnoozedTab), so the snooze ending puts it back there (set_snoozed). The
+// layout then knows the thread is snoozed (ThreadState.Snoozed): its tab, opened before
+// then, shows only its conversation (docs/notes/snooze-without-teardown.md).
 type SnoozeThread struct {
-	Thread   string            `json:"thread"`
-	Ran      map[string]string `json:"ran,omitempty"`
-	QuickRan string            `json:"quick_ran,omitempty"`
-	W        float64           `json:"w,omitempty"`
-	H        float64           `json:"h,omitempty"`
+	Thread string  `json:"thread"`
+	W      float64 `json:"w,omitempty"`
+	H      float64 `json:"h,omitempty"`
 }
 
 // OpName implements Op.
@@ -776,28 +742,31 @@ func (o *SnoozeThread) apply(t *tx) (Result, error) {
 	}
 	w, h := viewport(o.W, o.H)
 	var res Result
-	sp := t.st.Space(t.st.SpaceOf(o.Thread))
+	var away *SnoozedTab
 	if id := threadTabID(t.st, o.Thread); id != "" {
-		res = t.closeThread(o.Thread, id, w, h, false)
-	} else if sp != nil {
+		sp, p, tb := t.st.FindTab(id)
+		active := p.Active == id
+		kept := t.putAway(sp, o.Thread, p.ID, w, h)
+		_, p, _ = t.st.FindTab(id)
+		// Its place once its linked tabs are out, as close_thread records it for reopening.
+		away = &SnoozedTab{Space: sp.ID, Pane: p.ID, Index: p.TabIndex(id), Active: active}
+		if len(p.Tabs) == 1 {
+			away.Beside = BesideInfo(sp.Root, p.ID)
+		}
+		wasFocused := focusedTab(sp) == id
+		detach(sp, p, id)
+		forget(sp, id)
+		if wasFocused {
+			refocus(sp)
+		}
+		res = Result{Space: sp.ID, Pane: p.ID, Tab: id, Closed: []*Tab{tb}, Kept: kept}
+	} else if sp := t.st.Space(t.st.SpaceOf(o.Thread)); sp != nil {
 		res = Result{Space: sp.ID, Kept: t.putAway(sp, o.Thread, "", w, h)}
 	}
-	for _, other := range t.st.Spaces {
-		if other != sp {
-			res.Kept = append(res.Kept, t.putAwayElsewhere(other, o.Thread)...)
-		}
+	ts := threadState(t.st, o.Thread)
+	ts.Snoozed = true
+	if away != nil {
+		ts.SnoozedTab = away
 	}
-	if ts := t.st.Threads[o.Thread]; ts != nil && ts.Remembered != nil {
-		res.Ended = runningTerminals(ts.Remembered)
-		for i, rt := range ts.Remembered.Tabs {
-			if rt.Tab.Kind == "terminal" && rt.Fresh == nil {
-				ts.Remembered.Tabs[i].Fresh = &Fresh{Name: rt.Tab.Name, Ran: o.Ran[rt.Tab.Params["terminal"]]}
-			}
-		}
-	}
-	if ts := t.st.Threads[o.Thread]; ts != nil && ts.Quick != nil && ts.Quick.Open {
-		ts.Quick.Open, ts.Quick.Fresh, ts.Quick.Ran = false, true, o.QuickRan
-	}
-	threadState(t.st, o.Thread).Snoozed = true
 	return res, nil
 }

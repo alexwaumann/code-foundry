@@ -1,5 +1,5 @@
 {
-  "doc": "Snoozing a closed thread ends the terminals its set kept running and marks them to come back fresh.",
+  "doc": "Snoozing a thread whose tab is closed leaves its set as it is, its terminals running on, and only marks it snoozed: there is no tab to put back at the wake.",
   "state": {
     "v": 1,
     "spaces": [
@@ -50,8 +50,7 @@
             {
               "tab": {"id":"t-x","kind":"terminal","thread":"th-a","params":{"terminal":"term-x"}},
               "pane": "p-a",
-              "index": 1,
-              "fresh": {}
+              "index": 1
             }
           ]
         },
@@ -59,5 +58,5 @@
       }
     }
   },
-  "result": {"space":"sp-a","ended":["t-x"]}
+  "result": {"space":"sp-a"}
 }

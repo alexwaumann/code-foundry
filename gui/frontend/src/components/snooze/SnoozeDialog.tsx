@@ -107,8 +107,8 @@ function Calendar({ now, selected, onSelect }: { now: number; selected: Day; onS
  * The dialog's body for one thread: the calendar (tomorrow selected), a time (9:00 AM),
  * the chosen day spelled out, Save for later (how the palette reaches it; a thread already
  * saved says so instead), Cancel and Snooze. Snooze is disabled while the chosen time
- * is not in the future; it invokes thread.snooze with the absolute time (the daemon
- * confirms only mid-turn).
+ * is not in the future; it invokes thread.snooze with the absolute time (never a
+ * confirmation).
  *
  * With `ids` (several threads from the sidebar's selection) each is snoozed or saved by one
  * thread.snooze --ids; Save for later is left out once one of them is saved already.

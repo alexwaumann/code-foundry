@@ -1,0 +1,68 @@
+{
+  "doc": "The wake of a thread whose tab a snooze closed with its pane rebuilds the pane beside its old neighbour at its old share, the focus left where it is.",
+  "state": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Space A",
+        "root": {
+          "t": "pane",
+          "id": "p-o",
+          "tabs": [{"id":"t-o","kind":"thread","thread":"th-o"}],
+          "active": "t-o"
+        },
+        "focus": "p-o"
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a",
+    "threads": {
+      "th-a": {
+        "space": "sp-a",
+        "snoozed": true,
+        "snoozed_tab": {
+          "space": "sp-a",
+          "pane": "p-a",
+          "index": 0,
+          "active": true,
+          "beside": {"neighbours":["p-o"],"edge":"right","frac":0.3}
+        }
+      }
+    }
+  },
+  "op": {"op":"set_snoozed","thread":"th-a"},
+  "want": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Space A",
+        "root": {
+          "t": "split",
+          "id": "s-n1",
+          "dir": "row",
+          "kids": [
+            {
+              "t": "pane",
+              "id": "p-o",
+              "tabs": [{"id":"t-o","kind":"thread","thread":"th-o"}],
+              "active": "t-o"
+            },
+            {
+              "t": "pane",
+              "id": "p-a",
+              "tabs": [{"id":"t-n1","kind":"thread","thread":"th-a"}],
+              "active": "t-n1"
+            }
+          ],
+          "sizes": [0.7,0.3]
+        },
+        "focus": "p-o"
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "result": {"space":"sp-a","pane":"p-a","tab":"t-n1"}
+}

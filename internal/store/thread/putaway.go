@@ -9,24 +9,27 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/claudestream"
 )
 
-// Putting a thread away: what archive and snooze share (docs/notes/self-put-away.md).
+// Putting a thread away: archive and, since a snooze closes nothing, the bookkeeping a
+// snooze shares with it (docs/notes/self-put-away.md, docs/notes/snooze-without-teardown.md).
 //
-// Both close the thread, and a close that cuts off a turn must not read as a failure:
-// record.away names what closes it, so the close's end (detach) publishes the cut-off
-// turn idle "archived" or "snoozed", not error "interrupted".
+// An archive closes the thread, and a close that cuts off a turn must not read as a
+// failure: record.away names what closes it, so the close's end (detach) publishes the
+// cut-off turn idle "archived", not error "interrupted".
 //
-// A thread can also ask this of itself, from its own Bash tool. Doing it at once cannot
+// A thread can also ask this of itself, from its own Bash tool. Archiving at once cannot
 // work: the close makes Claude kill that Bash call, which ends the very request the
 // close runs in (status 499 about 30 ms after the close began, the process gone some
-// 300 ms later), so the put-away fails and the thread reads Interrupted. So mid-turn the
-// request only leaves a pending put-away (record.putAway) and returns. The turn ends
+// 300 ms later), so the archive fails and the thread reads Interrupted. So mid-turn the
+// request only leaves a pending archive (record.putAway) and returns. The turn ends
 // normally, the thread gets to write its last message, and the end of the turn does the
-// rest, with nothing about that turn asking for the user's attention.
+// rest, with nothing about that turn asking for the user's attention. A snooze or a save
+// for later of itself happens at once: it cuts nothing off.
 //
 // A pending put-away is in memory only: a daemon restart loses the turn it waits for.
 
 // ReasonSnoozed is the StatusReason, with StatusIdle, of a thread whose turn (or pending
-// request) a snooze cut off: stopped on purpose, not interrupted (Snooze, SaveForLater).
+// request) a snooze cut off, when a snooze still closed the thread: stopped on purpose,
+// not interrupted. Rows saved before docs/notes/snooze-without-teardown.md may carry it.
 const ReasonSnoozed = "snoozed"
 
 // PutAwayKind is how a thread is put away.
@@ -55,15 +58,21 @@ type PutAway struct {
 	Until time.Time // PutAwaySnooze's wake time
 }
 
-// PutAwaySelf is Archive, Snooze or SaveForLater as thread id asks them of itself. Mid-turn
-// it only records p and reports deferred: the end of the turn carries it out, unless a
-// message, an interrupt, an unarchive or an unsnooze came first, the turn failed, or the
-// process ended. A second call replaces the first. Not mid-turn it is the plain call,
-// run on the store's context: the caller may be a shell of the thread, which the close
-// ends, and the request with it. What the plain call refuses is refused here at once.
+// PutAwaySelf is Archive, Snooze or SaveForLater as thread id asks them of itself. A
+// snooze or a save is the plain call at once: it closes nothing, so it cuts nothing off.
+// An archive mid-turn only records p and reports deferred: the end of the turn carries it
+// out, unless a message, an interrupt, an unarchive or an unsnooze came first, the turn
+// failed, or the process ended. A second call replaces the first. Not mid-turn it is the
+// plain call, run on the store's context: the caller may be a shell of the thread, which
+// the close ends, and the request with it. What the plain call refuses is refused here at
+// once.
 func (m *Manager) PutAwaySelf(ctx context.Context, id string, p PutAway) (_ Thread, deferred bool, _ error) {
 	if err := m.refusePutAway(id, &p); err != nil {
 		return Thread{}, false, err
+	}
+	if p.Kind != PutAwayArchive {
+		s, err := m.applyPutAway(ctx, id, p, nil)
+		return s, false, err
 	}
 	live, _, _, _, err := m.lifecycle(id)
 	if err != nil {
@@ -106,18 +115,19 @@ func (m *Manager) refusePutAway(id string, p *PutAway) error {
 	return nil
 }
 
-// applyPutAway runs p. closing: as in archive; nil closes whatever process the thread has.
+// applyPutAway runs p. closing (an archive's): as in archive; nil closes whatever process
+// the thread has.
 func (m *Manager) applyPutAway(ctx context.Context, id string, p PutAway, closing *runner) (Thread, error) {
 	switch p.Kind {
 	case PutAwaySnooze:
-		return m.snooze(ctx, id, p.Until, closing)
+		return m.Snooze(ctx, id, p.Until)
 	case PutAwaySave:
-		return m.saveForLater(ctx, id, closing)
+		return m.SaveForLater(ctx, id)
 	}
 	return m.archive(ctx, id, true, closing)
 }
 
-// closeAway closes thread id for a put-away: Close, or with closing (the process a turn's
+// closeAway closes thread id for an archive: Close, or with closing (the process a turn's
 // end began closing) only the wait for it. Whatever process the thread has after that was
 // started by a message sent since, which wins: closing it would cut off the user's turn,
 // so the put-away fails, before it touches the thread's shells.
@@ -142,7 +152,7 @@ func (m *Manager) closeAway(ctx context.Context, id string, closing *runner) err
 	return nil
 }
 
-// onPutAway takes a thread's put-away of itself on the runner goroutine, where whether a
+// onPutAway takes a thread's archive of itself on the runner goroutine, where whether a
 // turn is running is exact (the published status lags by the debounce), and reports
 // whether it waits for the turn's end.
 func (r *runner) onPutAway(p PutAway) bool {
@@ -161,7 +171,7 @@ func (r *runner) onPutAway(p PutAway) bool {
 
 // putAwayAtTurnEnd carries out a pending put-away when Claude's turn ended at its prompt.
 // A turn the user (or the budget stop) interrupted drops it, as does one that failed: its
-// status says what happened. So does a snooze whose time passed meanwhile. A result with
+// status says what happened. A result with
 // a turn queued behind it is not the end: the last one decides.
 //
 // The close begins here, before anything is published: acknowledged first, the turn
@@ -181,9 +191,6 @@ func (r *runner) putAwayAtTurnEnd(e *claudestream.Result) {
 		return
 	case e.IsError:
 		r.log().info("thread put-away dropped: the turn failed", "what", p.Kind.String())
-		return
-	case p.Kind == PutAwaySnooze && !p.Until.After(r.m.opts.Now()):
-		r.log().info("thread put-away dropped: the snooze time passed during the turn", "until", p.Until)
 		return
 	}
 	if p.Kind == PutAwayArchive {
@@ -242,14 +249,14 @@ func (m *Manager) dropPutAwayLocked(rec *record, why string) {
 	rec.putAway = nil
 }
 
-// awayClose is record.away: an archive or a snooze is closing the thread.
+// awayClose is record.away: an archive is closing the thread.
 type awayClose struct {
 	reason string // the idle status reason of a turn it cuts off
 	cut    bool   // detach published one
 }
 
-// markPuttingAway notes that an archive or a snooze (reason: ReasonArchived,
-// ReasonSnoozed) is about to close thread id, unless it was interrupted before: the
+// markPuttingAway notes that an archive (reason: ReasonArchived) is about to close thread
+// id, unless it was interrupted before: the
 // close's end (detach) then publishes the turn it cuts off as idle reason rather than
 // error "interrupted", which a board showed for the seconds the shells and strays took
 // to stop. endPuttingAway clears it.

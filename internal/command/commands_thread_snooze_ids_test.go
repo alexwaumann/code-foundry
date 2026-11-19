@@ -12,8 +12,8 @@ import (
 )
 
 // thread.snooze given ids (the sidebar's bulk Snooze ▸ and its Snoozed header as a drop
-// target): every thread gets the same request, past one that fails, and one confirmation
-// names the count and the busy ones.
+// target): every thread gets the same request, past one that fails, and nothing asks, busy
+// threads among them or not: a snooze cuts nothing off (docs/notes/snooze-without-teardown.md).
 func TestThreadSnoozeIDs(t *testing.T) {
 	a, b := idle("s-aaaa11112222", "one"), idle("s-bbbb33334444", "two")
 	busy := &v1.Thread{Id: "s-cccc55556666", Name: "three", State: v1.ThreadState_THREAD_STATE_CONNECTED, Status: v1.ThreadStatus_THREAD_STATUS_BUSY}
@@ -39,14 +39,12 @@ func TestThreadSnoozeIDs(t *testing.T) {
 			wantMsg: "snoozed 2 threads until " + farText + ": s-aaaa11112222, s-bbbb33334444", wantIDs: []string{"s-aaaa11112222", "s-bbbb33334444"}, wantUntil: true},
 		{name: "clear unsnoozes each without asking", args: map[string]string{"ids": "11112222,55556666", "clear": "true"},
 			wantMsg: "unsnoozed 2 threads: s-aaaa11112222, s-cccc55556666", wantIDs: []string{"s-aaaa11112222", "s-cccc55556666"}},
-		{name: "one busy thread among them asks once", args: map[string]string{"ids": "11112222,55556666,33334444", "until": "1h"},
-			wantAsk: "Snooze 3 threads? 1 of them is busy: three (Claude is still working). Snoozing ends its turn or stops its background work."},
-		{name: "two busy threads ask once", args: map[string]string{"ids": "11112222,55556666,77778888", "save": "true"},
-			wantAsk: "Save 3 threads for later? 2 of them are busy: three (Claude is still working), four (Claude is waiting on your answer). Saving ends their turns and stops their background work."},
-		{name: "confirmed, they all go", args: map[string]string{"ids": "55556666,77778888", "save": "true"}, confirmed: true,
+		{name: "a busy thread among them does not ask", args: map[string]string{"ids": "11112222,55556666,33334444", "until": "2099-01-02T15:04:00Z"},
+			wantMsg:   "snoozed 3 threads until " + farText + ": s-aaaa11112222, s-cccc55556666, s-bbbb33334444",
+			wantIDs:   []string{"s-aaaa11112222", "s-cccc55556666", "s-bbbb33334444"},
+			wantUntil: true},
+		{name: "busy and asking threads save without asking", args: map[string]string{"ids": "55556666,77778888", "save": "true"},
 			wantMsg: "saved 2 threads for later: s-cccc55556666, s-dddd77778888", wantIDs: []string{"s-cccc55556666", "s-dddd77778888"}, wantSave: true},
-		{name: "one busy thread in ids asks as alone", args: map[string]string{"ids": "55556666", "save": "true"},
-			wantAsk: "Save thread three for later? Claude is still working; saving ends the turn."},
 		// In a thread id defaults to the caller's own thread; ids replaces it.
 		{name: "ids ignore the context thread", ctx: command.Context{ActiveThreadID: "s-cccc55556666", ActiveView: "thread"},
 			args: map[string]string{"ids": "11112222", "save": "true"}, wantIDs: []string{"s-aaaa11112222"}, wantSave: true,

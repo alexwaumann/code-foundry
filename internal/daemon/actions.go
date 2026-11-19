@@ -26,11 +26,9 @@ type actionRuns interface {
 //
 //   - a project is unregistered (project.ProjectRemoved): its actions are forgotten (the
 //     database cascades) and its runs killed and forgotten;
-//   - a thread is removed (thread.Removed), archived (thread.Updated with archived) or
-//     snoozed (the first thread.Updated with a snooze in either form): its background runs
-//     are killed, as its action terminals are by the thread store. Only the snooze itself
-//     kills: a snoozed thread a message from another thread started works on, snoozed, and
-//     may start runs that must live (docs/notes/snooze-holds-archive-refuses.md);
+//   - a thread is removed (thread.Removed) or archived (thread.Updated with archived): its
+//     background runs are killed, as its action terminals are by the thread store. A
+//     snooze kills nothing: it only hides the thread (docs/notes/snooze-without-teardown.md);
 //   - a worktree's directory is removed (project.WorktreeRemoved, directory gone): the
 //     background runs in it are killed.
 //
@@ -50,7 +48,6 @@ func startActionCleanupWith(ctx context.Context, log *slog.Logger, runs actionRu
 	wg.Go(func() {
 		defer projectEvents.Close()
 		defer threadListEvents.Close()
-		snoozed := map[string]bool{} // threads seen snoozed since; a run they start is kept
 		kill := func(why string, match func(action.Run) bool) {
 			if n := runs.KillRuns(match); n > 0 {
 				log.Info("killed background action runs", "why", why, "count", n)
@@ -72,21 +69,10 @@ func startActionCleanupWith(ctx context.Context, log *slog.Logger, runs actionRu
 			case ev := <-threadListEvents.C():
 				switch e := ev.(type) {
 				case thread.Removed:
-					delete(snoozed, e.ID)
 					kill("thread removed", func(r action.Run) bool { return r.ThreadID == e.ID })
 				case thread.Updated:
-					id := e.Thread.ID
-					was := snoozed[id]
-					if e.Thread.Snoozed() {
-						snoozed[id] = true
-					} else {
-						delete(snoozed, id)
-					}
-					switch {
-					case !e.Thread.ArchivedAt.IsZero():
+					if id := e.Thread.ID; !e.Thread.ArchivedAt.IsZero() {
 						kill("thread archived", func(r action.Run) bool { return r.ThreadID == id })
-					case e.Thread.Snoozed() && !was:
-						kill("thread snoozed", func(r action.Run) bool { return r.ThreadID == id })
 					}
 				}
 			}

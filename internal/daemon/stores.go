@@ -343,9 +343,9 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, threadEnv 
 		// An open thread view counts as the user seeing the thread only while a GUI
 		// window is visible and key (docs/notes/alerts-foreground.md).
 		Attended: func() bool { return pres.Current().Attended },
-		// Before a thread's shells go, the layout closes its tabs; a snooze keeps its
-		// terminal tabs to come back as fresh shells (layout.go).
-		ShellsGoing: layoutShellsGoing(log.With("store", "layout"), s.layout, s.terminal),
+		// Before an archived or removed thread's shells go, the layout closes its tabs
+		// (layout.go; a snooze closes them on the thread's update, its shells running on).
+		ShellsGoing: layoutShellsGoing(log.With("store", "layout"), s.layout),
 	}); err != nil {
 		return nil, err
 	}

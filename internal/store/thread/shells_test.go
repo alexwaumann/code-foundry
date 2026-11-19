@@ -92,9 +92,10 @@ func TestRemoveFailsWhileAShellWillNotDie(t *testing.T) {
 	}
 }
 
-// Options.ShellsGoing hears of an archive, a snooze, a save for later and a removal before
-// the thread's shells go: a shell is still running when it is called (the layout glue
-// reads what runs in it then; docs/notes/shell-6-lifecycle.md), and gone after.
+// Options.ShellsGoing hears of an archive and a removal before the thread's shells go: a
+// shell is still running when it is called (docs/notes/shell-6-lifecycle.md), and gone
+// after. A snooze and a save for later remove nothing and call nothing: the shell runs on
+// (docs/notes/snooze-without-teardown.md).
 func TestShellsGoingBeforeTheShellsGo(t *testing.T) {
 	type call struct {
 		why     ShellsGo
@@ -109,8 +110,8 @@ func TestShellsGoingBeforeTheShellsGo(t *testing.T) {
 		{"snooze", func(e *env, id string) error {
 			_, err := e.m.Snooze(e.ctx(), id, e.m.opts.Now().Add(time.Hour))
 			return err
-		}, ShellsSnoozed},
-		{"save for later", func(e *env, id string) error { _, err := e.m.SaveForLater(e.ctx(), id); return err }, ShellsSnoozed},
+		}, 0},
+		{"save for later", func(e *env, id string) error { _, err := e.m.SaveForLater(e.ctx(), id); return err }, 0},
 		{"remove", func(e *env, id string) error { return e.m.Remove(e.ctx(), id) }, ShellsRemoved},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -131,6 +132,15 @@ func TestShellsGoingBeforeTheShellsGo(t *testing.T) {
 			shell = term.ID
 			if err := tc.act(e, s.ID); err != nil {
 				t.Fatal(err)
+			}
+			if tc.want == 0 {
+				if len(calls) != 0 {
+					t.Errorf("calls %+v, want none", calls)
+				}
+				if got, err := e.terms.Get(e.ctx(), shell); err != nil || got.State != terminal.StateRunning {
+					t.Errorf("the shell %+v, %v; want it running", got, err)
+				}
+				return
 			}
 			if len(calls) != 1 || calls[0] != (call{tc.want, true}) {
 				t.Errorf("calls %+v, want one %v with the shell running", calls, tc.want)

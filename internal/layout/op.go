@@ -39,17 +39,19 @@ type Result struct {
 	// (thread.go). Their terminals keep running.
 	Kept []*Tab `json:"kept,omitempty"`
 	// Ended lists terminal tabs whose terminals the caller ends although the op did not close
-	// them now: remembered terminals of a thread being snoozed or archived.
+	// them now: remembered terminals of a thread being archived.
 	Ended []*Tab `json:"ended,omitempty"`
 	// Back and Placed list the remembered tabs a thread brought back when it opened: back in
 	// their old panes, or placed fresh beside it. Fresh lists the terminal tabs among them that
-	// come back as fresh shells (after a snooze): the caller starts one for each and sets its
-	// terminal param.
+	// come back as fresh shells (a terminal's tab reopened, or one a snooze ended in a layout
+	// saved before snoozes left terminals running): the caller starts one for each and sets
+	// its terminal param.
 	Back   []string `json:"back,omitempty"`
 	Placed []string `json:"placed,omitempty"`
 	Fresh  []string `json:"fresh,omitempty"`
 	// FreshQuick is the thread whose quick terminal came back open when its tab opened, after
-	// a snooze ended it (Quick.Fresh): the caller starts a fresh quick shell for it.
+	// a snooze ended it in a layout saved before snoozes left terminals running
+	// (Quick.Fresh): the caller starts a fresh quick shell for it.
 	FreshQuick string `json:"fresh_quick,omitempty"`
 	// Swapped lists the panes smart swap switched (swap.go).
 	Swapped []string `json:"swapped,omitempty"`
@@ -271,6 +273,9 @@ func usedIDs(st *State) map[string]bool {
 		})
 	}
 	for _, ts := range st.Threads {
+		if ts != nil && ts.SnoozedTab != nil {
+			used[ts.SnoozedTab.Pane] = true
+		}
 		if ts == nil || ts.Remembered == nil {
 			continue
 		}

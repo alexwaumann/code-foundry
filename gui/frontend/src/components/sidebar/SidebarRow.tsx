@@ -768,7 +768,8 @@ function SnoozedWork({ id }: { id: string }) {
 /**
  * An archived or snoozed thread's single line: the name, quiet (regular and muted; the id
  * while unnamed) and, on the right, how long ago it was archived or how long until it wakes. No status line,
- * badges or pin (such a thread is unpinned): the whole section is such threads. A snoozed thread
+ * badges or pin (an archived thread is unpinned; a snoozed one keeps its pin for when it wakes,
+ * docs/notes/snooze-without-teardown.md, but is not among the pinned meanwhile): the whole section is such threads. A snoozed thread
  * that works says so before its countdown (SnoozedWork). All of it is
  * dimmed (QUIET) but the rename field, which is being typed in.
  */

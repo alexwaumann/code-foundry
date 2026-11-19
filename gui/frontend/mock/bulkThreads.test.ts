@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 import type { UiContext } from "../src/gen/codefoundry/v1/command_pb";
-import { ThreadStatus } from "../src/gen/codefoundry/v1/thread_lifecycle_pb";
+import { ThreadState, ThreadStatus } from "../src/gen/codefoundry/v1/thread_lifecycle_pb";
 import { World } from "./world";
 
 /**
@@ -28,11 +28,12 @@ describe("the mock's commands given ids", () => {
     expect(await run(w, "thread.archive", { ids: "s-3,s-4", archived: "false" })).toBe("unarchived 2 threads: s-3, s-4");
   });
 
-  it("thread.snooze saves or snoozes each, asks once for busy ones, and clear unsnoozes each without asking", async () => {
+  it("thread.snooze saves or snoozes each, never asks (busy ones work on), and clear unsnoozes each", async () => {
     const w = new World();
     expect(await run(w, "thread.snooze", { ids: "s-3,s-4", save: "true" })).toBe("saved 2 threads for later: s-3, s-4");
     expect(w.threads.get("s-4")?.savedAt).not.toBeNull();
-    await expect(run(w, "thread.snooze", { ids: "s-1,s-3", save: "true" })).rejects.toThrow(/^Save 2 threads for later\? 1 of them is busy: Refactor sidebar tree \(Claude is still working\)\. Saving ends its turn/);
+    expect(await run(w, "thread.snooze", { ids: "s-1,s-3", save: "true" })).toBe("saved 2 threads for later: s-1, s-3");
+    expect(w.threads.get("s-1")).toMatchObject({ status: ThreadStatus.BUSY, state: ThreadState.CONNECTED });
     expect(await run(w, "thread.snooze", { ids: "s-3,s-4", clear: "true" })).toBe("unsnoozed 2 threads: s-3, s-4");
     expect(w.threads.get("s-4")?.savedAt).toBeNull();
     const until = new Date(Date.now() + 3_600_000).toISOString();

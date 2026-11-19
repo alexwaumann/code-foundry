@@ -186,14 +186,30 @@ type ThreadState struct {
 	// restores nothing; its remembered set and quick terminal come back when it wakes
 	// (preview.go).
 	Snoozed bool `json:"snoozed,omitempty"`
+	// SnoozedTab is where its tab was when a snooze closed it (snooze_thread): the snooze
+	// ending puts it back there (set_snoozed). Nil: its tab was not open.
+	SnoozedTab *SnoozedTab `json:"snoozed_tab,omitempty"`
+}
+
+// SnoozedTab is the place of a thread's tab a snooze closed: its space, its pane and its
+// index in the pane's strip, whether it was the pane's active tab, and, when it was its
+// pane's only tab, where that pane sat.
+type SnoozedTab struct {
+	Space  string  `json:"space"`
+	Pane   string  `json:"pane"`
+	Index  int     `json:"index"`
+	Active bool    `json:"active,omitempty"`
+	Beside *Beside `json:"beside,omitempty"`
 }
 
 // Quick is the thread's quick terminal slot.
 type Quick struct {
 	Open   bool    `json:"open"`
 	Height float64 `json:"height,omitempty"`
-	// Fresh: a snooze ended it while it was open (Open is then false). It comes back open, as
-	// a fresh shell the caller starts (Result.FreshQuick), when the thread's tab opens.
+	// Fresh: a snooze ended it while it was open (Open is then false), when a snooze still
+	// ended a thread's shells (a layout saved before docs/notes/snooze-without-teardown.md).
+	// It comes back open, as a fresh shell the caller starts (Result.FreshQuick), when the
+	// thread's tab opens.
 	Fresh bool `json:"fresh,omitempty"`
 	// Ran is the command its shell was running when a snooze ended it, for its "Run again"
 	// line, until that runs or is dismissed (SetQuick.ForgetRan).
@@ -209,8 +225,9 @@ type Remembered struct {
 // RememberedTab is one remembered linked tab and where it was.
 type RememberedTab struct {
 	Tab *Tab `json:"tab"`
-	// Space is the space it was in when that is not its thread's (a snooze takes the thread's
-	// terminal tabs from every space): it goes back there. Empty: the thread's space.
+	// Space is the space it was in when that is not its thread's (a snooze took the thread's
+	// terminal tabs from every space, before docs/notes/snooze-without-teardown.md): it goes
+	// back there. Empty: the thread's space.
 	Space    string  `json:"space,omitempty"`
 	Pane     string  `json:"pane"`
 	Index    int     `json:"index"`
@@ -231,7 +248,8 @@ type Beside struct {
 	Frac       float64  `json:"frac"`
 }
 
-// Fresh is a terminal that comes back as a fresh shell (after a snooze).
+// Fresh is a terminal that comes back as a fresh shell: one a snooze ended, in a layout saved
+// before docs/notes/snooze-without-teardown.md (a snooze now leaves terminals running).
 type Fresh struct {
 	Name string `json:"name,omitempty"`
 	Ran  string `json:"ran,omitempty"`
@@ -439,6 +457,15 @@ func (ts *ThreadState) clone() *ThreadState {
 		return nil
 	}
 	c := &ThreadState{Space: ts.Space, Last: maps.Clone(ts.Last), Snoozed: ts.Snoozed}
+	if ts.SnoozedTab != nil {
+		a := *ts.SnoozedTab
+		if a.Beside != nil {
+			b := *a.Beside
+			b.Neighbours = slices.Clone(b.Neighbours)
+			a.Beside = &b
+		}
+		c.SnoozedTab = &a
+	}
 	if ts.Info != nil {
 		v := *ts.Info
 		c.Info = &v

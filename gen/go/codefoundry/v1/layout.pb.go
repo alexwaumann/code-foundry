@@ -2937,14 +2937,15 @@ func (x *ArchiveThreadOp) GetThreadId() string {
 	return ""
 }
 
-// SnoozeThreadOp closes a thread's tab and linked tabs as CloseThreadOp does, and marks its
-// remembered terminals to come back as fresh shells.
+// SnoozeThreadOp closes a thread's tab and linked tabs as CloseThreadOp does (their
+// terminals keep running) and remembers where its tab was, to put it back when the snooze
+// ends (docs/notes/snooze-without-teardown.md).
 type SnoozeThreadOp struct {
 	state    protoimpl.MessageState `protogen:"open.v1"`
 	ThreadId string                 `protobuf:"bytes,1,opt,name=thread_id,json=threadId,proto3" json:"thread_id,omitempty"`
-	// The command each of its terminals ran last, by terminal id, shown with "Run again".
+	// Ignored: a snooze no longer ends terminals, so nothing comes back with "Run again".
 	Ran map[string]string `protobuf:"bytes,2,rep,name=ran,proto3" json:"ran,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	// The command its quick terminal ran last, for the same line when it comes back.
+	// Ignored, as ran.
 	QuickRan      string `protobuf:"bytes,3,opt,name=quick_ran,json=quickRan,proto3" json:"quick_ran,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache

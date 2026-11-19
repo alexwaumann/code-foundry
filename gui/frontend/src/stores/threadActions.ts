@@ -112,10 +112,10 @@ export function archiveThread(id: string, archived: boolean, source: CommandSour
 
 /**
  * thread.snooze until an absolute time (epoch ms, sent as RFC 3339; the caller computes
- * presets such as "tomorrow 9 AM" itself), or null to unsnooze. Snoozing stops Claude,
- * removes the thread's shells and unpins and unarchives it; the daemon asks for
- * confirmation (runCommand opens the dialog) only while Claude is working or waiting on an
- * answer, and refuses a time that is not in the future. Unsnoozing never asks.
+ * presets such as "tomorrow 9 AM" itself), or null to unsnooze. Snoozing only hides the
+ * thread: it is unarchived and its tabs close, while Claude, its terminals and its pin stay
+ * as they are, so nothing ever asks for confirmation (docs/notes/snooze-without-teardown.md);
+ * the daemon refuses a time that is not in the future. Unsnoozing puts its tabs back.
  */
 export function snoozeThread(id: string, untilMs: number | null, source: CommandSource = {}): Promise<boolean> {
   const args: Record<string, string> = untilMs === null ? { clear: "true" } : { until: new Date(untilMs).toISOString() };
@@ -141,7 +141,7 @@ export function markThreadUnread(id: string, source: CommandSource = {}): Promis
 
 /**
  * thread.snooze with save: a snooze with no wake time. Everything else is as snoozeThread
- * (the daemon's confirmation mid-turn; snoozeThread(id, null) ends it).
+ * (no confirmation; snoozeThread(id, null) ends it).
  */
 export function saveThreadForLater(id: string, source: CommandSource = {}): Promise<boolean> {
   return runCommand(THREAD_COMMANDS.snooze, { save: "true" }, threadContext(id), source);

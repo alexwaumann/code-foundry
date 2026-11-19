@@ -1,11 +1,11 @@
 package daemon
 
 import (
+	"slices"
 	"testing"
 	"time"
 
 	core "github.com/alexwaumann/code-foundry/internal/layout"
-	"github.com/alexwaumann/code-foundry/internal/store/terminal"
 	"github.com/alexwaumann/code-foundry/internal/store/thread"
 )
 
@@ -79,47 +79,41 @@ func TestLayoutGlueKeepsAPreview(t *testing.T) {
 }
 
 // A snoozed thread's tab opens with its conversation only; when the thread wakes with its tab
-// open, its set comes back beside it with fresh shells under its terminals.
+// open, its set comes back beside it over the terminals that ran on meanwhile, and the place
+// the snooze remembered for its tab is forgotten (it is open).
 func TestLayoutGlueWakeRestoresTheSet(t *testing.T) {
 	e := newGlueEnv(t, []thread.Thread{th("th-a")}, nil)
 	x, y := openWithSet(e)
-	e.goings(e.ctx, "th-a", thread.ShellsSnoozed)
-	for _, id := range []string{x, y} {
-		if err := terminal.KillAndRemove(e.ctx, e.terms, id); err != nil {
-			t.Fatal(err)
-		}
-	}
 	e.publish(thread.Updated{Thread: snoozedTh("th-a")})
+	e.eventually("the thread's tabs close", func() bool { return !threadOpen(e.state(), "th-a") })
 	settle()
 	c := e.apply(&core.OpenThread{Thread: "th-a", Snoozed: true, Preview: true, Focus: true})
 	if n := len(c.Result.Back) + len(c.Result.Placed); n != 0 || c.Result.Rule == "" {
 		t.Fatalf("opened while snoozed: %+v, want only its tab", c.Result)
 	}
-	if ts := e.state().Threads["th-a"]; ts == nil || ts.Remembered == nil || len(ts.Remembered.Tabs) != 3 {
-		t.Fatalf("the set did not stay put away: %+v", ts)
+	if ts := e.state().Threads["th-a"]; ts == nil || ts.Remembered == nil || len(ts.Remembered.Tabs) != 3 || ts.SnoozedTab != nil {
+		t.Fatalf("the set did not stay put away, or the snooze's place stayed: %+v", ts)
 	}
 
 	e.publish(thread.Updated{Thread: th("th-a")})
-	e.eventually("the set back with fresh shells", func() bool {
+	e.eventually("the set back over its terminals", func() bool {
 		st := e.state()
 		if ts := st.Threads["th-a"]; ts != nil && ts.Remembered != nil {
 			return false
 		}
-		n := 0
+		var got []string
 		for _, p := range core.Panes(st.Space(st.CurrentSpace).Root) {
 			for _, tb := range p.Tabs {
-				if tb.Kind != "terminal" {
-					continue
+				if tb.Kind == "terminal" {
+					got = append(got, tb.Params[core.TerminalParam])
 				}
-				id := tb.Params[core.TerminalParam]
-				if id == x || id == y || !e.running(id) {
-					return false
-				}
-				n++
 			}
 		}
-		return n == 2
+		return len(got) == 2 && slices.Contains(got, x) && slices.Contains(got, y)
 	})
+	if !e.running(x) || !e.running(y) {
+		t.Error("a terminal ended")
+	}
 	if id, preview := previewTab(e, "th-a"); id == "" || preview {
 		t.Errorf("tab %q preview %v after the wake, want it open and kept", id, preview)
 	}

@@ -5,7 +5,6 @@ import (
 	"time"
 
 	core "github.com/alexwaumann/code-foundry/internal/layout"
-	"github.com/alexwaumann/code-foundry/internal/store/terminal"
 	"github.com/alexwaumann/code-foundry/internal/store/thread"
 )
 
@@ -113,15 +112,12 @@ func TestLayoutGlueCatchesUpAfterDroppedEvents(t *testing.T) {
 	})
 	main := e.state().CurrentSpace
 	other := e.apply(&core.NewSpace{Name: "Other"}).Result.Space
-	// th-a snoozed with a terminal, so opening it makes the glue start a fresh shell, which
-	// holds the glue in Shell while the rest happens.
+	// th-a snoozed with a terminal by an older build, so opening it makes the glue start a
+	// fresh shell, which holds the glue in Shell while the rest happens.
 	e.apply(&core.OpenThread{Thread: "th-a", Focus: true})
 	x := e.shell("th-a")
 	e.termTab("th-a", x)
-	e.goings(e.ctx, "th-a", thread.ShellsSnoozed)
-	if err := terminal.KillAndRemove(e.ctx, e.terms, x); err != nil {
-		t.Fatal(err)
-	}
+	e.olderSnooze("th-a")
 	var free, tabs []string
 	for range 4 {
 		id := e.shell("")

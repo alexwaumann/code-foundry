@@ -54,8 +54,8 @@ type Thread struct {
 	// FailIDs are the thread ids Remove and Archive fail for, with these errors (the
 	// call is recorded first).
 	FailIDs map[string]error
-	// Deferred makes Archive and Snooze answer deferred, the thread as it is, for a thread
-	// asking it of itself (by_thread_id is its id).
+	// Deferred makes Archive answer deferred, the thread as it is, for a thread asking it
+	// of itself (by_thread_id is its id). A snooze is never deferred.
 	Deferred bool
 	// Cascade is List's answer to a filter with archive_cascade_of, by that id (none
 	// when absent): the hidden threads archiving it takes along.
@@ -295,8 +295,8 @@ func (s *Thread) Archive(_ context.Context, r *connect.Request[v1.ArchiveThreadR
 }
 
 // Snooze returns Current (default: a CONNECTED thread) with the requested id:
-// snoozing disconnects, unpins and unarchives it and sets snoozed_until to the request's
-// until, or saved_at with save; neither clears both.
+// snoozing unarchives it and sets snoozed_until to the request's until, or saved_at with
+// save, its state and pin left as they are; neither clears both.
 func (s *Thread) Snooze(_ context.Context, r *connect.Request[v1.SnoozeThreadRequest]) (*connect.Response[v1.SnoozeThreadResponse], error) {
 	if err := s.do(r.Msg); err != nil {
 		return nil, err
@@ -306,15 +306,12 @@ func (s *Thread) Snooze(_ context.Context, r *connect.Request[v1.SnoozeThreadReq
 		cur = proto.CloneOf(s.Current)
 	}
 	cur.Id = r.Msg.GetId()
-	if s.Deferred && r.Msg.GetByThreadId() == cur.Id && (r.Msg.GetUntil() != nil || r.Msg.GetSave()) {
-		return connect.NewResponse(&v1.SnoozeThreadResponse{Thread: cur, Deferred: true}), nil
-	}
 	cur.SnoozedUntil, cur.SavedAt = r.Msg.GetUntil(), nil
 	if r.Msg.GetSave() {
 		cur.SavedAt = timestamppb.New(time.UnixMilli(1))
 	}
 	if cur.SnoozedUntil != nil || cur.SavedAt != nil {
-		cur.State, cur.Pinned, cur.ArchivedAt = v1.ThreadState_THREAD_STATE_DISCONNECTED, false, nil
+		cur.ArchivedAt = nil
 	}
 	return connect.NewResponse(&v1.SnoozeThreadResponse{Thread: cur}), nil
 }

@@ -243,9 +243,11 @@ Services (v1):
   `docs/notes/removed-thread-signal.md`), RunIn, Move,
   Pin (the user's pin, persisted; `docs/notes/workspaces-4-sidebar.md`), Archive (close,
   remove the thread's shells, unpin, stamp `archived_at`; pin and send
-  unarchive; `docs/notes/archive-threads-1-daemon.md`), Snooze (close, remove the
-  thread's shells, unpin, unarchive, set `snoozed_until`; the store wakes it on the wall
-  clock into NEEDS_ATTENTION "snooze ended"; `docs/notes/snooze-threads-1-daemon.md`;
+  unarchive; `docs/notes/archive-threads-1-daemon.md`), Snooze (unarchive and set
+  `snoozed_until`, nothing else: the process, a turn, the shells and the pin are left as
+  they are, `docs/notes/snooze-without-teardown.md`; the store wakes it on the wall
+  clock into NEEDS_ATTENTION "snooze ended", on the runner when it runs at its prompt;
+  `docs/notes/snooze-threads-1-daemon.md`;
   both are the user's to undo: another thread's message or a wake leaves a snooze held
   while the thread works, and a thread may message, unarchive, pin or unsnooze only a
   thread it created, by the creator chain (`holds.go`,
@@ -638,8 +640,8 @@ PTY (creack/pty) ──reader goroutine──► tee ──► libghostty-vt (fe
 ## 6. Thread store
 
 Owns the Claude processes. It uses the terminal store only to reap a thread's shells;
-before it removes them for an archive, a snooze or a removal it calls `Options.ShellsGoing`
-with the reason, so the layout glue can record what each ran while they still exist (§14).
+before it removes them for an archive or a removal it calls `Options.ShellsGoing` with the
+reason, so the layout glue closes the thread's tabs first (§14). A snooze removes nothing.
 
 * Spawns `claude -p` over stream-json in a worktree with the chosen
   model/effort/permission-mode flags through `internal/claudestream` and sends the first
@@ -1586,16 +1588,16 @@ what depends on the drawn frame (rails, full screen, tab fitting, drag targets, 
   old pane, else places them fresh beside it. Moving a thread takes its linked tabs;
   removing a space closes each of its threads as `close_thread` does, so their linked tabs
   join their sets and their terminals keep running; archiving closes them everywhere and
-  ends its terminals; snoozing closes them, ends its terminals and remembers them as fresh
-  shells with the command each ran (a terminal tab in another space with that space, to go
-  back there). An archived thread lives in no space: `open_thread` with `archived` opens it
+  ends its terminals; snoozing closes the thread as `close_thread` does, its terminals
+  running on, and remembers where its tab was (`ThreadState.SnoozedTab`), so the snooze
+  ending puts the tab back there with its set (`docs/notes/snooze-without-teardown.md`). An archived thread lives in no space: `open_thread` with `archived` opens it
   in the current space, and with a pane and an index or an edge it opens at a drop's place
   in one op. **Preview tabs** (`preview.go`): `open_thread` with `preview` opens an archived or
   snoozed thread's tab as its space's one preview, which the next preview replaces (in its
   slot when it is in the same pane) and is never recorded for reopening; a move, a surface of
   its thread opened or `keep_tab` keeps it. A snoozed thread (`ThreadState.Snoozed`, set by
   `snooze_thread`) opens without its set; `set_snoozed` off brings the set back beside an open
-  tab (`docs/notes/preview-tabs-1-daemon.md`). **Smart swap**
+  tab, or puts back the tab the snooze closed (`docs/notes/preview-tabs-1-daemon.md`). **Smart swap**
   (`swap.go`, setting `layout.smart_swap`): when a thread tab gains the focus, every pane
   whose active tab is another thread's linked surface of a kind this thread also has open in
   that pane switches to it. **Smart placement** (`place.go` `threadHost`, setting
@@ -1628,13 +1630,13 @@ what depends on the drawn frame (rails, full screen, tab fitting, drag targets, 
 * **The glue** (`internal/daemon/layout.go`), so the store never imports the thread or
   terminal stores: a new thread joins its creator's space or the current one (a plugin's
   stays in the default space); an unarchived one joins the current space unless its tab is
-  open (opened while archived, it lives there); archive, snooze and
-  removal reach the layout through the thread store's `ShellsGoing` hook, before the shells
-  go, so a snooze can record each terminal's foreground or last command; a commit's closed
+  open (opened while archived, it lives there); archive and removal reach the layout
+  through the thread store's `ShellsGoing` hook, before the shells go; a thread newly
+  snoozed (its `Updated`) gets `snooze_thread`; a commit's closed
   terminal tabs end their terminals (shells and action runs, never a plugin's), while tabs
   closed with their thread keep running; a removed terminal closes its tab; a reset
-  terminal's tab follows the shell that `replaces` it; a restore after a snooze (an open, or
-  the thread waking with its tab open) starts a fresh shell for each restored terminal tab; a
+  terminal's tab follows the shell that `replaces` it; a restore of terminals an older
+  build's snooze ended starts a fresh shell for each restored terminal tab; a
   thread unarchived, woken, renamed or pinned keeps its preview tab, and the layout is told when
   a thread wakes, or is snoozed without its mark (`set_snoozed`, also at start); a sweep at start and every minute drops what
   the layout holds of terminals that are gone (no terminal survives a daemon restart); and

@@ -410,12 +410,13 @@ func (f *Fake) Pin(_ context.Context, id string, pinned bool) (thread.Thread, er
 	})
 }
 
-// PutAwaySelf records "PutAwaySelf <id> <kind>". A busy thread is deferred, unchanged (the
-// fake has no turn to end); otherwise it is the plain call, recorded as such too.
+// PutAwaySelf records "PutAwaySelf <id> <kind>". A busy thread's archive is deferred,
+// unchanged (the fake has no turn to end); otherwise, and for a snooze or a save always,
+// it is the plain call, recorded as such too.
 func (f *Fake) PutAwaySelf(ctx context.Context, id string, p thread.PutAway) (thread.Thread, bool, error) {
 	deferred := false
 	s, err := f.mutate("PutAwaySelf "+id+" "+p.Kind.String(), id, func(s *thread.Thread) error {
-		deferred = s.Status == thread.StatusBusy
+		deferred = s.Status == thread.StatusBusy && p.Kind == thread.PutAwayArchive
 		return nil
 	})
 	if err != nil || deferred {
@@ -456,9 +457,9 @@ func (f *Fake) Archive(_ context.Context, id string, archived bool) (thread.Thre
 }
 
 // Snooze records "Snooze <id> <until RFC3339 ms>" ("Snooze <id> -" to unsnooze).
-// Snoozing requires until after Now (ErrInvalidArgument), disconnects a live thread
-// (reason "closed"), unpins and unarchives it and sets SnoozedUntil, clearing SavedAt;
-// unsnoozing clears SnoozedUntil and SavedAt only. No shells are involved and nothing wakes: tests Put the woken
+// Snoozing requires until after Now (ErrInvalidArgument), unarchives the thread and sets
+// SnoozedUntil, clearing SavedAt: a live thread stays live, a pin stays
+// (docs/notes/snooze-without-teardown.md); unsnoozing clears SnoozedUntil and SavedAt only. No shells are involved and nothing wakes: tests Put the woken
 // state.
 func (f *Fake) Snooze(_ context.Context, id string, until time.Time) (thread.Thread, error) {
 	call := "Snooze " + id + " -"
@@ -476,10 +477,7 @@ func (f *Fake) Snooze(_ context.Context, id string, until time.Time) (thread.Thr
 		if err := f.refuseResident(id, "snoozed"); err != nil {
 			return err
 		}
-		if s.State != thread.StateDisconnected {
-			s.State, s.DisconnectReason = thread.StateDisconnected, thread.ReasonClosed
-		}
-		s.Pinned, s.ArchivedAt, s.SnoozedUntil, s.SavedAt = false, time.Time{}, until, time.Time{}
+		s.ArchivedAt, s.SnoozedUntil, s.SavedAt = time.Time{}, until, time.Time{}
 		return nil
 	})
 }
@@ -511,18 +509,15 @@ func (f *Fake) MarkUnread(_ context.Context, id string) (thread.Thread, error) {
 	})
 }
 
-// SaveForLater records "SaveForLater <id>". Like a snooze it disconnects a live thread
-// (reason "closed"), unpins and unarchives it; it clears SnoozedUntil and sets SavedAt to
-// Now unless already set.
+// SaveForLater records "SaveForLater <id>". Like a snooze it unarchives the thread and
+// leaves its process and pin alone; it clears SnoozedUntil and sets SavedAt to Now unless
+// already set.
 func (f *Fake) SaveForLater(_ context.Context, id string) (thread.Thread, error) {
 	return f.mutate("SaveForLater "+id, id, func(s *thread.Thread) error {
 		if err := f.refuseResident(id, "snoozed"); err != nil {
 			return err
 		}
-		if s.State != thread.StateDisconnected {
-			s.State, s.DisconnectReason = thread.StateDisconnected, thread.ReasonClosed
-		}
-		s.Pinned, s.ArchivedAt, s.SnoozedUntil = false, time.Time{}, time.Time{}
+		s.ArchivedAt, s.SnoozedUntil = time.Time{}, time.Time{}
 		if s.SavedAt.IsZero() {
 			s.SavedAt = f.Now()
 		}

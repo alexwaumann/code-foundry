@@ -187,7 +187,8 @@ export interface ThreadView {
   archivedAtMs: number | null;
   /**
    * When a snoozed thread wakes (thread.snooze), epoch ms; null when it is not snoozed. A
-   * snoozed thread is stopped, unpinned, not archived and has no shells. The daemon
+   * snoozed thread is not archived; its process, shells and pin are left as they were
+   * (docs/notes/snooze-without-teardown.md), and it lists under Snoozed whatever its pin. The daemon
    * wakes it: this becomes null and the thread needs attention with status reason
    * "snooze ended" (statusChangedAtMs = the wake). Pinning, archiving or sending
    * unsnoozes it. docs/notes/snooze-threads-1-daemon.md.

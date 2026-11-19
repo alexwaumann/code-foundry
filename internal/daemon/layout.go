@@ -1,7 +1,6 @@
 package daemon
 
 import (
-	"cmp"
 	"context"
 	"errors"
 	"log/slog"
@@ -25,14 +24,16 @@ import (
 //   - A new thread joins its creator's space, else the current space. (A user's thread sent
 //     from a composer tab takes the composer's place: thread.new --compose applies that.)
 //     An unarchived thread joins the current space.
-//   - Preview tabs (docs/notes/preview-tabs-1-daemon.md): a thread unarchived, woken (a
-//     message wakes it too), renamed or pinned keeps its preview tab (keep_tab). The layout
-//     is told when a thread is snoozed or woke (set_snoozed; snooze_thread marks it too), so a
-//     snoozed thread's tab opens without its set, which comes back when it wakes with its tab
-//     open (the commit's Fresh and FreshQuick start their shells as any restore's do).
-//   - A thread being archived, snoozed or removed (thread.Options.ShellsGoing, called before
-//     its shells go): archive_thread or snooze_thread. A snooze first reads what runs in each
-//     of its terminals, for the "Run again" line of the fresh shell that replaces it.
+//   - Preview tabs (docs/notes/preview-tabs-1-daemon.md): a thread unarchived, woken (the
+//     user's message wakes it too), renamed or pinned keeps its preview tab (keep_tab).
+//   - A thread snoozed (in either form; docs/notes/snooze-without-teardown.md): snooze_thread
+//     closes its tab and linked tabs as closing its tab does, their terminals running on,
+//     and marks it snoozed, so a tab opened while it is snoozed opens without its set. When
+//     it wakes (set_snoozed) its tab goes back where the snooze closed it, with its set (the
+//     commit's Fresh and FreshQuick start shells as any restore's do: a layout saved before
+//     this may still hold terminals a snooze ended).
+//   - A thread being archived or removed (thread.Options.ShellsGoing, called before its
+//     shells go): archive_thread.
 //   - A removed thread: archive_thread, which drops whatever the layout still has of it.
 //   - A terminal removed (a shell is removed as soon as it exits): its tab closes and a thread
 //     forgets it (drop_terminal). A thread's quick terminal removed: the quick terminal is
@@ -41,10 +42,11 @@ import (
 //   - A commit that closed terminal tabs by themselves (Result.Closed) or ended a thread's
 //     terminals (Result.Ended): those terminals end. Tabs closed with their thread
 //     (Result.Kept) keep theirs running. A commit that restored fresh shells (Result.Fresh,
-//     after a snooze, or a terminal's tab reopened from the reopen history): a new shell for
+//     a terminal's tab reopened from the reopen history, or one an older build's snooze
+//     ended): a new shell for
 //     each, in its thread's checkout or, for a free terminal, the home directory, and the tab
-//     follows it. A commit that opened a
-//     quick terminal a snooze ended (Result.FreshQuick): a new quick shell for its thread.
+//     follows it. A commit that opened a quick terminal an older build's snooze ended
+//     (Result.FreshQuick): a new quick shell for its thread.
 //
 // The glue's own ops carry no client id. A sweep at start and every layoutSweepEvery drops
 // what the layout holds of terminals that are gone (after a restart every terminal is), for
@@ -243,6 +245,11 @@ func (g *layoutGlue) threadEvent(ev thread.Event) {
 		}
 		if seen && was.keeps(now) {
 			g.keepPreview(t.ID)
+		}
+		if ts := g.state().Threads[t.ID]; seen && !was.snoozed && now.snoozed && (ts == nil || !ts.Snoozed) {
+			// Snoozed just now: its tabs close as a close of its tab closes them, their
+			// terminals running on (docs/notes/snooze-without-teardown.md).
+			g.apply(&core.SnoozeThread{Thread: t.ID})
 		}
 		if ts := g.state().Threads[t.ID]; now.snoozed != (ts != nil && ts.Snoozed) {
 			g.syncThreadSnoozed(t.ID)
@@ -705,64 +712,11 @@ func (g *layoutGlue) sweep() {
 	}
 }
 
-// layoutShellsGoing is the thread store's ShellsGoing: before a thread's shells go, the
-// layout closes its tabs. An archive or a removal forgets the thread (archive_thread); a
-// snooze keeps its set, its terminals (its quick terminal too, when open) to come back as
-// fresh shells, each with the command it was running (the foreground job, else the last
-// one) for its "Run again" line. An action run's tab does not come back (a fresh shell would
-// not be the action): it is dropped, as an archive drops it. It runs before the shells go, so
-// that command can still be read.
-func layoutShellsGoing(log *slog.Logger, l layoutstore.Store, terms terminal.Store) func(context.Context, string, thread.ShellsGo) {
-	return func(ctx context.Context, id string, why thread.ShellsGo) {
-		ctx = context.WithoutCancel(ctx)
-		if why != thread.ShellsSnoozed {
-			applyLayout(ctx, log, l, &core.ArchiveThread{Thread: id})
-			return
-		}
-		ran := map[string]string{}
-		for _, term := range threadTerminals(l.Snapshot().State, id) {
-			t, err := terms.Get(ctx, term)
-			if err != nil {
-				continue
-			}
-			if termlabel.IsAction(t.Labels) {
-				applyLayout(ctx, log, l, &core.DropTerminal{Terminal: term})
-				continue
-			}
-			if cmd := cmp.Or(t.Foreground, t.LastCommand); cmd != "" {
-				ran[term] = cmd
-			}
-		}
-		quickRan := ""
-		for _, t := range terms.List(ctx) {
-			if termlabel.IsQuick(t.Labels) && t.Labels[termlabel.Thread] == id && t.State != terminal.StateExited {
-				quickRan = cmp.Or(t.Foreground, t.LastCommand)
-				break
-			}
-		}
-		applyLayout(ctx, log, l, &core.SnoozeThread{Thread: id, Ran: ran, QuickRan: quickRan})
+// layoutShellsGoing is the thread store's ShellsGoing: before an archived or removed
+// thread's shells go, the layout closes its tabs and forgets it (archive_thread). A snooze
+// removes no shells: the glue closes its tabs on the thread's update (threadEvent).
+func layoutShellsGoing(log *slog.Logger, l layoutstore.Store) func(context.Context, string, thread.ShellsGo) {
+	return func(ctx context.Context, id string, _ thread.ShellsGo) {
+		applyLayout(context.WithoutCancel(ctx), log, l, &core.ArchiveThread{Thread: id})
 	}
-}
-
-// threadTerminals lists the terminals of thread's terminal tabs: open ones and remembered
-// ones still running.
-func threadTerminals(st *core.State, thread string) []string {
-	var out []string
-	for _, sp := range st.Spaces {
-		for _, p := range core.Panes(sp.Root) {
-			for _, tb := range p.Tabs {
-				if tb.Kind == "terminal" && tb.Thread == thread {
-					out = append(out, tb.Params[core.TerminalParam])
-				}
-			}
-		}
-	}
-	if ts := st.Threads[thread]; ts != nil && ts.Remembered != nil {
-		for _, rt := range ts.Remembered.Tabs {
-			if rt.Tab.Kind == "terminal" && rt.Fresh == nil {
-				out = append(out, rt.Tab.Params[core.TerminalParam])
-			}
-		}
-	}
-	return out
 }
