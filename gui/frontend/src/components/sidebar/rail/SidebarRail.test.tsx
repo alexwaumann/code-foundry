@@ -137,7 +137,6 @@ const list = () => screen.getByTestId("rail-list");
 const keysIn = (testId: string) => [...screen.getByTestId(testId).querySelectorAll("[data-row-key]")].map((e) => e.getAttribute("data-row-key"));
 const icon = (key: string) => rail().querySelector<HTMLElement>(`[data-row-key="${CSS.escape(key)}"]`) as HTMLElement;
 const glyph = (key: string) => within(icon(key)).getByTestId("rail-row-icon");
-const separators = () => [...rail().querySelectorAll('[data-testid="rail-separator"]')];
 
 describe("the sidebar's toggle", () => {
   it("switches between the expanded list and the rail; nothing hides the sidebar any more", () => {
