@@ -85,6 +85,16 @@ export function forkThread(id: string, source: CommandSource = {}): Promise<bool
   return runCommand(THREAD_COMMANDS.fork, {}, threadContext(id), source);
 }
 
+/**
+ * thread.fork with `at`: a fork whose conversation ends with one finished turn (its turn end's
+ * item id; a turn gutter's Fork from here). The daemon decides whether that turn can be forked
+ * from and refuses with why (a /clear or a compaction after it); runCommand toasts the refusal.
+ * Like a whole-thread fork, the daemon selects the new thread.
+ */
+export function forkThreadAt(id: string, at: string, source: CommandSource = {}): Promise<boolean> {
+  return runCommand(THREAD_COMMANDS.fork, { at }, threadContext(id), source);
+}
+
 /** thread.pin with an explicit value (the menu knows the current pin). */
 export function pinThread(id: string, pinned: boolean, source: CommandSource = {}): Promise<boolean> {
   return runCommand(THREAD_COMMANDS.pin, { pinned: String(pinned) }, threadContext(id), source);
