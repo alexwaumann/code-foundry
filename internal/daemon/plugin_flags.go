@@ -154,7 +154,7 @@ func cmpOr(a, b string) string {
 }
 
 // seen withdraws thread id's until-seen flags: the user sees it. The thread store calls
-// it with its lock held (SetSeenHook); the notification store never waits on the thread
+// it with its lock held (AddSeenHook); the notification store never waits on the thread
 // store.
 func (f pluginFlags) seen(log *slog.Logger) func(id string) {
 	return func(id string) {
@@ -202,13 +202,15 @@ const flagArchiveSweep = time.Minute
 
 // seenHooks is where the thread store reports the user seeing a thread. *thread.Manager
 // implements it.
-type seenHooks interface{ SetSeenHook(func(threadID string)) }
+type seenHooks interface {
+	AddSeenHook(func(threadID string)) (remove func())
+}
 
 // startFlagNotifications hooks flags into the thread store: its seen moments withdraw
 // until-seen flags, and an archived thread's flags are withdrawn (on its Updated event,
 // at start and every minute). The returned func stops it.
 func startFlagNotifications(ctx context.Context, log *slog.Logger, threads seenHooks, flags pluginFlags, b *bus.Bus) func() {
-	threads.SetSeenHook(flags.seen(log))
+	unhook := threads.AddSeenHook(flags.seen(log))
 	ctx, cancel := context.WithCancel(ctx)
 	events := bus.Subscribe[thread.Event](b, 256)
 	sweep := func(only string) {
@@ -238,7 +240,7 @@ func startFlagNotifications(ctx context.Context, log *slog.Logger, threads seenH
 		}
 	})
 	return func() {
-		threads.SetSeenHook(nil)
+		unhook()
 		cancel()
 		wg.Wait()
 	}

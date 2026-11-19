@@ -221,10 +221,13 @@ someone reviews it, without polling `gh`.
 ```
 code-foundry thread subscribe --pr acme/web#87 --until checks_done --repeat
 # subscribed sub-4b2c9e1d7a30: s-… wakes when pr acme/web#87 finishes its checks (repeat)
+# s-… is now waiting and may be out of the user's sight; if they need to look at something meanwhile, run code-foundry thread look "<what to look at>" (…)
 code-foundry thread subscribe --pr acme/web#87 --until review --repeat
 ```
 
-End your turn. The wake comes with the GitHub poll: about a minute with the app open, up
+End your turn. While you wait, your row sits under Working; `thread look "<what>"` puts one
+amber request on your row and in the bell (a second replaces it) without changing your status,
+and does nothing when your thread is on the user's screen. The wake comes with the GitHub poll: about a minute with the app open, up
 to 15 without it. `--until` also takes checks_failed, checks_passed, comment,
 review_requested, head_pushed, merged, closed and changed. Each wake is a message:
 

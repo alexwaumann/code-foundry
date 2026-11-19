@@ -180,7 +180,7 @@ func TestAttendedUntilSeenFlags(t *testing.T) {
 			s := e.stopped("flagged")
 			var mu sync.Mutex
 			flags := 0
-			e.m.SetSeenHook(func(id string) {
+			e.m.AddSeenHook(func(id string) {
 				mu.Lock()
 				defer mu.Unlock()
 				if id == s.ID {

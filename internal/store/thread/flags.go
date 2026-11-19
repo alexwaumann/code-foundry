@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"maps"
+	"slices"
 	"time"
 )
 
@@ -12,7 +14,7 @@ import (
 // flag never changes a thread's status, section or attention. What the store keeps for
 // them:
 //
-//   - the moment the user sees a thread (SetSeenHook): a viewer opening while presence is
+//   - the moment the user sees a thread (AddSeenHook): a viewer opening while presence is
 //     attended, or presence rising with the thread open (attended.go), the acknowledge
 //     points of a finished turn. The daemon dismisses the thread's until-seen flag
 //     notifications then.
@@ -22,12 +24,23 @@ import (
 //     DropLegacyFlag deletes one once the daemon has converted it, at start. Nothing else
 //     reads or writes that table any more; it stays so no migration is needed.
 
-// SetSeenHook sets the function told each time the user sees a thread (seenLocked). It
-// is called with the store's lock held: it must not call back into the thread store.
-func (m *Manager) SetSeenHook(f func(threadID string)) {
+// AddSeenHook adds a function told each time the user sees a thread (seenLocked) and
+// returns the func that removes it. Hooks are called with the store's lock held: they
+// must not call back into the thread store.
+func (m *Manager) AddSeenHook(f func(threadID string)) (remove func()) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	m.seenHook = f
+	if m.seenHooks == nil {
+		m.seenHooks = map[uint64]func(string){}
+	}
+	m.seenHookID++
+	id := m.seenHookID
+	m.seenHooks[id] = f
+	return func() {
+		m.mu.Lock()
+		defer m.mu.Unlock()
+		delete(m.seenHooks, id)
+	}
 }
 
 // Seen reports whether the user sees thread id now: it has a viewer (WatchItems) and
@@ -38,10 +51,11 @@ func (m *Manager) Seen(id string) bool {
 	return m.viewers[id] > 0 && m.attended()
 }
 
-// seenHookLocked tells the seen hook that the user sees rec. m.mu held.
+// seenHookLocked tells the seen hooks, in the order they were added, that the user sees
+// rec. m.mu held.
 func (m *Manager) seenHookLocked(rec *record) {
-	if m.seenHook != nil {
-		m.seenHook(rec.s.ID)
+	for _, id := range slices.Sorted(maps.Keys(m.seenHooks)) {
+		m.seenHooks[id](rec.s.ID)
 	}
 }
 

@@ -34,6 +34,9 @@ import (
 //   - The user's own: thread.prompts (their prompt history), thread.regenerate-name (agents
 //     use thread rename), thread.restart, thread.stop-waiting (agents unsubscribe),
 //     thread.snooze.clear (the user's own attention on a woken thread).
+//   - thread.look: a waiting thread is told of it by the line thread.subscribe prints when it
+//     adds a subscription, the moment it matters (docs/notes/waiting-thread-look.md); listing
+//     it put the guide over its budget.
 var noIndex = []string{
 	"action.last", "composer.draft.clear", "composer.draft.discard", "composer.draft.label", "composer.draft.open",
 	"composer.draft.start", "composer.history", "composer.new", "file.export",
@@ -41,7 +44,7 @@ var noIndex = []string{
 	"notification.snooze", "notification.withdraw",
 	"pane.focus", "pane.focus.down", "pane.focus.left", "pane.focus.right", "pane.focus.up", "pane.fullscreen", "pane.move.down",
 	"pane.move.left", "pane.move.right", "pane.move.up", "pane.split", "space.move", "tab.auto-name", "tab.next", "tab.previous", "tab.rename", "tab.reopen",
-	"terminal.cycle", "terminal.quick",
+	"terminal.cycle", "terminal.quick", "thread.look",
 	"thread.move.open", "thread.needs.next", "thread.new-like", "thread.placement.check", "thread.prompts",
 	"thread.regenerate-name", "thread.restart", "thread.shell.stop", "thread.snooze.clear", "thread.snooze.default", "thread.stop-waiting", "thread.unread", "thread.workspace",
 	"view.panel.diff", "view.panel.file", "view.panel.gallery", "view.panel.mcp", "view.panel.page", "view.panel.pr",

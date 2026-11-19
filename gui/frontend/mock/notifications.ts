@@ -111,6 +111,8 @@ export class MockNotifications {
       send: (threadId: string, text: string) => void;
       /** Runs a registry verb as notification.act does: with the caller's view and nothing else of its context. */
       invoke?: (name: string, args: Record<string, string>, ctx: UiContext) => string | Promise<InvokeOut>;
+      /** Whether a thread's own tab is open in the space the window shows (thread.look skips it); false when unknown. */
+      onScreen?: (threadId: string) => boolean;
     },
   ) {
     setInterval(() => {
@@ -344,6 +346,35 @@ export class MockNotifications {
           const level = (a.level ?? "info") as Level;
           const n = this.post({ title: a.title ?? "", body: a.body, level, key: a.key, threadId: a.thread, timeSensitive: a["time-sensitive"] === "true" });
           return `posted notification ${n.id}: ${n.title}`;
+        },
+      },
+      {
+        // thread.look (internal/command/commands_thread_look.go): one warning, time-sensitive request per thread,
+        // key look:<thread>, skipped while the thread is on screen in the window's space.
+        cmd: {
+          ...cmd("thread.look", "Ask the User to Look", "Ask the user to look at this thread while it waits, without changing its status.", [
+            { name: "title", type: ArgType.STRING, required: false, description: "What to look at" },
+            { name: "body", type: ArgType.STRING, required: false, description: "More detail" },
+            { name: "id", type: ArgType.STRING, required: true, description: "The thread asking (default: the thread this runs in)" },
+            { name: "withdraw", type: ArgType.BOOL, required: false, description: "Take the request back" },
+          ]),
+          category: "Thread",
+        },
+        when: always,
+        run: (c: UiContext | undefined, a) => {
+          record("thread.look", a);
+          const thread = a.id || c?.activeThreadId || "";
+          if (!thread) throw new CommandError("invalid", "id: give the thread asking");
+          const key = `look:${thread}`;
+          if (a.withdraw === "true") {
+            if (!this.notes.some((n) => n.source === "command" && n.key === key && n.state === "active")) return `thread ${thread} was not asking the user to look`;
+            this.withdraw(key);
+            return `withdrew thread ${thread}'s request to look`;
+          }
+          if (!a.title) throw new CommandError("invalid", "title: say what the user should look at");
+          if (this.deps.onScreen?.(thread)) return `not needed: thread ${thread} is on screen in the space the user's window shows; nothing was posted`;
+          const n = this.post({ key, level: "warning", timeSensitive: true, title: a.title, body: a.body ?? "", threadId: thread });
+          return `asked the user to look: the bell and this thread's row show it until they open the thread (${n.id})`;
         },
       },
       {

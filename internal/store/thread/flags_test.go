@@ -13,7 +13,7 @@ func TestSeenHookAndSeen(t *testing.T) {
 	e := newEnv(t)
 	s := e.stopped("watched")
 	var seen []string
-	e.m.SetSeenHook(func(id string) { seen = append(seen, id) })
+	e.m.AddSeenHook(func(id string) { seen = append(seen, id) })
 	if e.m.Seen(s.ID) {
 		t.Fatal("Seen before a viewer")
 	}

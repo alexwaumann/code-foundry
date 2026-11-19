@@ -157,6 +157,9 @@ type stores struct {
 	// stopFlagNotifications stops their glue.
 	flags                 pluginFlags
 	stopFlagNotifications func()
+	// stopThreadLook stops the glue that withdraws a thread's request to look
+	// (thread_look.go).
+	stopThreadLook func()
 }
 
 // openStores opens the database, applies migrations, and starts every store. On
@@ -393,6 +396,7 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, threadEnv 
 	s.flags = pluginFlags{threads: s.thread, notes: s.notification}
 	convertLegacyFlags(ctx, log.With("store", "notification"), s.thread, s.flags)
 	s.stopFlagNotifications = startFlagNotifications(ctx, log.With("store", "notification"), s.thread, s.flags, s.bus)
+	s.stopThreadLook = startThreadLook(ctx, log.With("store", "notification"), s.thread, s.thread.Snapshot, s.notification, s.bus)
 	// After thread and terminal: the layout follows their lifecycles (layout.go).
 	if s.stopLayout, err = startLayoutGlue(ctx, layoutGlueOptions{
 		Log: log.With("store", "layout"), Layout: s.layout, Terminals: s.terminal, Bus: s.bus, Threads: s.thread.Snapshot,
@@ -504,6 +508,9 @@ func (s *stores) close() error {
 	}
 	if s.stopFlagNotifications != nil {
 		s.stopFlagNotifications()
+	}
+	if s.stopThreadLook != nil {
+		s.stopThreadLook()
 	}
 	if s.stopGitHubNotifications != nil {
 		s.stopGitHubNotifications()
