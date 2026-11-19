@@ -319,6 +319,10 @@ type Thread struct {
 	// PassedUp counts the open questions of its workers it passed up to the user (passup.go),
 	// which its status shows while its own status is no request. Not persisted.
 	PassedUp int
+	// BusyUnderPassUp: the shown status is the passed-up question (PassedUp's overlay)
+	// and the thread's own status under it is busy. The question does not block the
+	// thread, which works on (waiting.go applyWaitingLocked). Not persisted.
+	BusyUnderPassUp bool
 	// BudgetUSD is the spending limit (0 = none); BudgetHitUSD the budget value the
 	// budget stop last fired for (0 = armed; budget.go). Persisted.
 	BudgetUSD    float64

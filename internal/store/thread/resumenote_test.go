@@ -204,6 +204,9 @@ func TestMidTurn(t *testing.T) {
 		{"finished", Thread{Status: StatusNeedsAttention, StatusReason: "finished"}, false},
 		{"budget reached", Thread{Status: StatusNeedsAttention, StatusReason: ReasonBudgetReached}, false},
 		{"idle", Thread{Status: StatusIdle}, false},
+		{"a passed-up question over a busy lead", Thread{Status: StatusNeedsAttention, StatusReason: "question: From w: Which?", PassedUp: 1, BusyUnderPassUp: true}, true},
+		{"a passed-up question over an idle lead", Thread{Status: StatusNeedsAttention, StatusReason: "question: From w: Which?", PassedUp: 1}, false},
+		{"its own question with one passed up", Thread{Status: StatusNeedsAttention, StatusReason: "question: Mine?", PendingRequestID: "r1", PassedUp: 1}, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

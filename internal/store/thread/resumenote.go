@@ -163,10 +163,11 @@ func (m *Manager) noteInterrupt(id, by string, midTurn bool) {
 	m.log.Info("interrupt note pending", "thread", id, "by", by)
 }
 
-// midTurn reports whether s's published status says a turn is running: busy, or a
-// request pending (a request is asked within a turn; the reason says so on a row
-// loaded from the database too).
+// midTurn reports whether s's published status says a turn is running: busy (also
+// under a passed-up question), or a request pending (a request is asked within a turn;
+// the reason says so on a row loaded from the database too). A worker's question passed
+// up to the user (PassedUp) is shown as a question but says nothing about the lead's turn.
 func midTurn(s Thread) bool {
-	return s.Status == StatusBusy || s.PendingRequestID != "" ||
-		(s.Status == StatusNeedsAttention && (strings.HasPrefix(s.StatusReason, "permission: ") || strings.HasPrefix(s.StatusReason, "question: ")))
+	return s.Status == StatusBusy || s.BusyUnderPassUp || s.PendingRequestID != "" ||
+		(s.PassedUp == 0 && s.Status == StatusNeedsAttention && (strings.HasPrefix(s.StatusReason, "permission: ") || strings.HasPrefix(s.StatusReason, "question: ")))
 }

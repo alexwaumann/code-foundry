@@ -19,7 +19,8 @@
  *   POST /__mock/thread/cache?id=s-r1&ago=<s>  the last result <s> seconds ago (mock/context.ts)
  *
  * thread.send appends the user message, streams a short reply over ~1 s and ends the turn;
- * thread.interrupt ends a running turn as interrupted and withdraws pending requests.
+ * thread.interrupt ends a running turn as interrupted and withdraws its pending requests (not a
+ * worker's question it passed up to the user, which outlives its turn).
  * thread.respond (and ThreadService.Respond) resolves a request like the daemon: once
  * nothing is pending, an allowed tool runs and Claude carries on, a denied one makes Claude
  * reply to the reason, answers are echoed; then the turn ends. thread.set-effort applies at
@@ -105,6 +106,12 @@ export interface ThreadWorld {
    */
   start(id: string, ready: () => void): void;
   setStatus(id: string, status: ThreadStatus, reason: string): void;
+  /**
+   * A worker's question passed up to lead `id` is shown over its own status ("question: From …"),
+   * or no longer (null): the daemon's overlay (internal/store/thread/waiting.go). setStatus then
+   * sets the status under it; statusOf and reasonOf read that one.
+   */
+  passUp(id: string, question: string | null): void;
   setModel(id: string, model: string): void;
   setPermission(id: string, permission: string): void;
   setEffort(id: string, effort: string, pending: boolean): void;
@@ -546,14 +553,16 @@ export class MockThreadLogs {
       if (opts.rest) this.delta(id, opts.rest);
       this.update(id, { ...it, streaming: false, updatedAt: timestampFromDate(new Date()) });
     }
-    if (l.pending.length > 0) {
-      for (const p of l.pending) {
+    // A worker's question it passed up is no request of its turn: it stays open (passup.go unfinished).
+    const own = l.pending.filter((p) => !p.fromThreadId);
+    if (own.length > 0) {
+      for (const p of own) {
         const req = l.items.find((x) => x.id === p.itemId);
         if (req && (req.payload?.case === "permission" || req.payload?.case === "question")) {
           this.update(id, { ...req, payload: { case: req.payload.case, value: { ...req.payload.value, state: ThreadRequestState.CANCELLED, message: "interrupted" } } } as ItemInit);
         }
       }
-      this.setPending(id, []);
+      this.setPending(id, l.pending.filter((p) => p.fromThreadId));
     }
     // A background Agent call stays running until its run ends (mock/agents.ts endAgent); so do its run's calls.
     const runs = this.agents.get(id) ?? [];
@@ -652,13 +661,9 @@ export class MockThreadLogs {
     const item = l.items.find((x) => x.payload?.case === "question" && x.payload.value.requestId === PASSUP_REQUEST);
     if (!item) throw new Error(`thread ${id} has no passed-up question`);
     l.pending = [{ requestId: PASSUP_REQUEST, itemId: item.id ?? "", question: true, toolName: "AskUserQuestion", summary: `From ${w.name}: ${PASSUP_QUESTION}`, fromThreadId: w.id }];
-    this.passUpBefore.set(id, { status: this.world.statusOf(id), reason: this.world.reasonOf(id) });
-    this.world.setStatus(id, ThreadStatus.NEEDS_ATTENTION, `question: From ${w.name}: ${PASSUP_QUESTION}`);
+    this.world.passUp(id, `question: From ${w.name}: ${PASSUP_QUESTION}`);
     this.source({ event: { case: "pending", value: { threadId: id, seq: BigInt(l.seq), pending: l.pending } } });
   }
-
-  /** Each lead's status before its passed-up question (seedPassUp). */
-  private readonly passUpBefore = new Map<string, { status: ThreadStatus; reason: string }>();
 
   /** respond for a passed-up question: as the daemon (internal/store/thread/passup.go answerPassUp). */
   private answerPassUp(id: string, p: PendingInit, req: ItemInit, deny: boolean, answers: Record<string, string>): ItemInit {
@@ -671,8 +676,7 @@ export class MockThreadLogs {
     } as ItemInit;
     this.update(id, resolved);
     this.setPending(id, this.log(id).pending.filter((x) => x.requestId !== p.requestId));
-    const before = this.passUpBefore.get(id) ?? { status: ThreadStatus.IDLE, reason: "at prompt" };
-    this.world.setStatus(id, before.status, before.reason);
+    this.world.passUp(id, null);
     this.calls.push(`pass-up answered ${p.fromThreadId ?? ""}${deny ? " skipped" : ` ${JSON.stringify(answers)}`}`);
     if (!deny && p.fromThreadId && this.logs.has(p.fromThreadId)) this.append(p.fromThreadId, this.item(p.fromThreadId, workerAnswer(id, answers)));
     const wake = answerWake(answers, deny);

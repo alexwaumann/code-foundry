@@ -429,6 +429,45 @@ describe("a Needs you row's lines, one per open request (docs/notes/needs-you-li
     expect(within(rowOf("s:s-2")).getByTestId("row-ask").getAttribute("data-kind")).not.toBe("items");
   });
 
+  // The three cases (docs/notes/pass-up-question.md): the lead stays under Needs you with what it
+  // asks; only a lead that works on under a passed-up question has the working circle before it.
+  describe("whether a Needs you row works on", () => {
+    const passedUp = { ...req(1, { question: true, summary: "From Resize: Should the body drag too?" }), fromThreadId: "s-w" } as ReturnType<typeof req>;
+    const lead = (o: Partial<ThreadView>, ...ps: ReturnType<typeof req>[]) => {
+      act(() => {
+        useThreadsStore.setState((s) => ({ byId: { ...s.byId, "s-2": { ...(s.byId["s-2"] as ThreadView), status: "attention", ...o } } }));
+      });
+      pending("s-2", ...ps);
+    };
+    const working = () => within(rowOf("s:s-2")).queryByTestId("row-ask-working");
+
+    it("its own question: no working circle", () => {
+      render(<ShellSidebarList bodyHeight={800} />);
+      lead({ statusReason: "question: Which base branch?" }, req(1, { question: true, summary: "Which base branch?" }));
+      expect(rowOf("s:s-2").getAttribute("data-section")).toBe("needs");
+      expect(working()).toBeNull();
+    });
+
+    it("a passed-up question while it works: the working circle (\"Working\" for screen readers) before the ask", () => {
+      render(<ShellSidebarList bodyHeight={800} />);
+      lead({ statusReason: "question: From Resize: Should the body drag too?", busyUnderPassUp: true }, passedUp);
+      expect(rowOf("s:s-2").getAttribute("data-section")).toBe("needs");
+      const w = working() as HTMLElement;
+      expect(w.textContent).toBe("Working");
+      expect(w.querySelector("svg")?.getAttribute("aria-hidden")).toBe("true");
+      const ask = within(rowOf("s:s-2")).getByTestId("row-ask");
+      expect(w.compareDocumentPosition(ask) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(ask.getAttribute("data-kind")).toBe("question");
+    });
+
+    it("a passed-up question while it is idle: no working circle", () => {
+      render(<ShellSidebarList bodyHeight={800} />);
+      lead({ statusReason: "question: From Resize: Should the body drag too?" }, passedUp);
+      expect(rowOf("s:s-2").getAttribute("data-section")).toBe("needs");
+      expect(working()).toBeNull();
+    });
+  });
+
   it("only under Needs you: an Active row with open requests shows none", () => {
     render(<ShellSidebarList bodyHeight={800} />);
     pending("s-1", req(1), req(2));

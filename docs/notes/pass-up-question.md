@@ -120,11 +120,46 @@ and sketch 5 section 4, with the brief winning where they differ. Code:
   answer, it assumes: …" (the hover card's wording in the sketch).
 - The Ember skill was not changed (Ember relays its workers' questions its own way).
 
+## A lead that works on under it (follow-up, 2026-11-19)
+
+The first version had a limit: while a pass-up was open the lead's shown status was the
+question even when its Claude was working, so its composer offered no Interrupt and nothing
+said it worked. That contradicted the feature (the lead keeps working), so:
+
+- **The daemon says so.** `Thread.busy_under_pass_up` (Go `BusyUnderPassUp`, not persisted) is
+  set by the overlay (`waiting.go applyWaitingLocked`) when the shown status is the passed-up
+  question and the lead's own (raw) status is BUSY. The status itself is unchanged, so Needs
+  you, the dock badge, the window title and the bell keep counting the question with no new
+  rule. Chosen over the GUI guessing (a pending item with `from_thread_id` says nothing about
+  whether the lead's Claude is on a turn: an idle lead has one too) and over dropping the
+  overlay while busy (every count would then need a pass-up rule of its own). One bool, not
+  the whole raw status: the GUI needs only "is it on a turn", and the timeline has the rest.
+- **Its own question or permission prompt** wins over the overlay as before (it is shown, and
+  the flag is false): that one does block the lead.
+- **The GUI** (`components/thread/activity.ts`): `busy` (Interrupt, the steer placeholder) and
+  `working` (the pill's Working segment, the live turn header) read the flag as busy, and only
+  the lead's own open requests stop `working` (#816's rule was for a thread's own question,
+  which blocks it; a passed-up one does not).
+- **The sidebar row**: the Needs you row keeps the question and gains the working circle in
+  front of it (`ShellRows AskWorking`, "Working" for screen readers), the way #813 put a
+  snoozed thread's working status before its countdown. No time beside it: the question's row
+  has no time either, and the open thread's pill has the turn's.
+- **Interrupt** stops the turn and leaves the question open (as before: `unfinished()` keeps
+  passed-up items). `midTurn` (the interrupt and restart notes) now reads the flag and no
+  longer takes a "question: …" status for a turn while one is passed up (`PassedUp > 0`), so
+  interrupting an idle lead under one leaves no interrupt note.
+- `Thread.busy_tool` is read against the raw status, so the lead's running tool is still
+  reported under the overlay.
+
+Driven against the mock (`make drive`, `workers?state=passup-working`): the lead's row read
+"Working Question" under Needs you; its pane showed the docked question, Working in the pill,
+Interrupt and the steer placeholder; streamed text kept arriving; the worker card kept "asks
+you". Interrupt ended the turn (the call reached the mock) and left the lead in Needs you with
+the question docked and no Working. Answering it while working took the lead to Working with
+Interrupt still there.
+
 ## Limits
 
-- While a pass-up is open the lead's shown status is the question even when its Claude is
-  working: its composer then offers no Interrupt (the status hides the busy). Sending it a
-  message still works.
 - If a lead ran `thread pass-up` from outside a turn (a stopped lead's CLI), the item would be
   appended after its last turn's end; the worker card then treats the next wake as a steer.
   A lead runs it from its turn, where the item lands inside it.
@@ -151,6 +186,13 @@ and sketch 5 section 4, with the brief winning where they differ. Code:
   (`stores/lineage.test.ts`, `lib/passUp.test.ts`), the answer wake's line and sender
   (`lib/wake.test.ts`, `lib/workerRuns.test.ts`), the API mapping (`api/thread.test.ts`), the
   composer not busy (`activity.test.ts`), the mock scenario (`mock/passUp.test.ts`).
+- The working follow-up: Go `TestPassUpKeepsTheLeadsBusy` (the flag through working,
+  compacting, ended, its own question and permission prompt, at its prompt, and after the
+  answer; `midTurn` at each) and `TestMidTurn`'s pass-up rows; vitest `activity.test.ts` (busy,
+  working and the header's linger in each case), `passUpLead.test.tsx` (the composer's Interrupt
+  and the pill's Working wired as ThreadPane wires them, in the three cases: its own question,
+  passed up while working, passed up while idle), `ShellSidebarList.test.tsx` (the row's working
+  circle in the same three), `mock/passUp.test.ts` (the scenario, interrupt, answer, reset).
 - e2e: `e2e/pass-up.spec.ts` only saves the PR's screenshots (SHOTS=<dir>); nothing here needs a
   browser beyond what `shell-needs` and `worker-card` cover.
 
@@ -160,7 +202,10 @@ and sketch 5 section 4, with the brief winning where they differ. Code:
 item inside the lead's turn that ran `thread pass-up`), the lead in Needs you. Its
 `thread.respond` answers it as the daemon does: the item resolves, the worker's log (when it
 has one) gets the lead's message, the lead's status goes back, and a `kind: answer` wake with
-a `[nothing new]` turn lands (`mock/passUp.ts`).
+a `[nothing new]` turn lands (`mock/passUp.ts`). `state=passup-working`: the same with the
+lead still on its turn (a reply streaming; `thread/delta?id=s-wl-lead` streams more), so it is
+`busy_under_pass_up`; `thread.interrupt` ends the turn and keeps the question. The World keeps
+the daemon's overlay (`passUpOverlay`): a status the log store sets lands under it.
 
 ## End to end (2026-11-19)
 
@@ -190,3 +235,4 @@ and the three Claude transcript folders the threads wrote were deleted.
 ## Daemon restart
 
 Yes: a new RPC and verb, new request fields, the status overlay and new wake texts. No migration.
+The follow-up adds a Thread field (`busy_under_pass_up`): a daemon restart for it too.

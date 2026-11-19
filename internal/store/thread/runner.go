@@ -393,7 +393,8 @@ func (r *runner) publishStatus() {
 			save := !r.turn.Equal(r.pubTurn)
 			r.pubTool, r.pubHandled, r.pubTurn = r.tool, r.handled, r.turn
 			r.m.update(r.id, save, func(rec *record) {
-				rec.s.BusyTool = busyToolFor(rec.s.Status, rec.s.StatusReason, r.tool)
+				raw := rec.rawStatus() // not a passed-up question's overlay (waiting.go)
+				rec.s.BusyTool = busyToolFor(raw.st, raw.reason, r.tool)
 				rec.s.HandledThrough = r.handled
 				rec.s.TurnStartedAt = r.turn
 			})

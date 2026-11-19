@@ -1286,7 +1286,8 @@ type Thread struct {
 	// summary, the target the live tool strip shows for a step: "Bash make check", "Read
 	// src/lib/tree.ts", "Edit internal/api/gh.go" (paths relative to the thread's
 	// directory when inside it). With several in flight, the latest started. Empty when
-	// no tool runs, while compacting, and whenever status is not BUSY; a subagent's own
+	// no tool runs, while compacting, and whenever the thread's own status is not BUSY
+	// (BUSY under a passed-up question counts: busy_under_pass_up); a subagent's own
 	// calls (parent_tool_use_id set) do not count, its Agent call does. Not persisted: a
 	// disconnected thread has none. See docs/notes/sidebar-inbox-1-busy-tool.md.
 	BusyTool string `protobuf:"bytes,73,opt,name=busy_tool,json=busyTool,proto3" json:"busy_tool,omitempty"`
@@ -1317,8 +1318,15 @@ type Thread struct {
 	// the turn before it ended (a follow-up or a wake; a message read mid-turn is no new
 	// turn). Unset before any. Persisted; rows older than it are filled from their items.
 	TurnStartedAt *timestamppb.Timestamp `protobuf:"bytes,78,opt,name=turn_started_at,json=turnStartedAt,proto3" json:"turn_started_at,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	// Claude is on a turn under a worker's question the thread passed up to the user
+	// (PassUp): status shows that question (NEEDS_ATTENTION "question: From <worker>: …",
+	// so the thread is listed as asking), while the thread's own status is BUSY. The
+	// question does not block it: it works on, and Interrupt stops it as any working
+	// thread. False otherwise, including under the thread's own question or permission
+	// prompt, which do block it. Not persisted. See docs/notes/pass-up-question.md.
+	BusyUnderPassUp bool `protobuf:"varint,79,opt,name=busy_under_pass_up,json=busyUnderPassUp,proto3" json:"busy_under_pass_up,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *Thread) Reset() {
@@ -1874,6 +1882,13 @@ func (x *Thread) GetTurnStartedAt() *timestamppb.Timestamp {
 		return x.TurnStartedAt
 	}
 	return nil
+}
+
+func (x *Thread) GetBusyUnderPassUp() bool {
+	if x != nil {
+		return x.BusyUnderPassUp
+	}
+	return false
 }
 
 // ThreadMove is a Move under way (Thread.pending_move).
@@ -7785,7 +7800,7 @@ const file_codefoundry_v1_thread_lifecycle_proto_rawDesc = "" +
 	"\x05error\x18\x05 \x01(\tR\x05error\x12\x1e\n" +
 	"\n" +
 	"background\x18\x06 \x01(\bR\n" +
-	"background\"\x80\x1a\n" +
+	"background\"\xad\x1a\n" +
 	"\x06Thread\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12*\n" +
 	"\x11claude_session_id\x18\x02 \x01(\tR\x0fclaudeSessionId\x12\x1d\n" +
@@ -7872,7 +7887,8 @@ const file_codefoundry_v1_thread_lifecycle_proto_rawDesc = "" +
 	"\fpending_move\x18K \x01(\v2\x1a.codefoundry.v1.ThreadMoveR\vpendingMove\x125\n" +
 	"\bsaved_at\x18L \x01(\v2\x1a.google.protobuf.TimestampR\asavedAt\x121\n" +
 	"\x05setup\x18M \x01(\v2\x1b.codefoundry.v1.ThreadSetupR\x05setup\x12B\n" +
-	"\x0fturn_started_at\x18N \x01(\v2\x1a.google.protobuf.TimestampR\rturnStartedAtB\b\n" +
+	"\x0fturn_started_at\x18N \x01(\v2\x1a.google.protobuf.TimestampR\rturnStartedAt\x12+\n" +
+	"\x12busy_under_pass_up\x18O \x01(\bR\x0fbusyUnderPassUpB\b\n" +
 	"\x06_depthJ\x04\b\t\x10\n" +
 	"J\x04\b\x1f\x10 J\x04\b>\x10?R\vterminal_idR\x06renderR\n" +
 	"in_sidebar\"\x8b\x01\n" +
