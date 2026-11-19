@@ -123,7 +123,10 @@ test("a wheel up over a page at its top scrolls the thread, and it stays up", as
   const before = await top();
   const b = await frame.boundingBox();
   if (!b) throw new Error("no frame box");
-  await page.mouse.move(b.x + b.width / 2, b.y + 60);
+  // Low in the frame: a scroll over it is the user's while the frame is :hover (lib/scrollIntent.ts),
+  // and the first 150px tick carries the frame down. From near its top the frame left the pointer in
+  // that same tick, and WebKit sometimes dropped :hover before the scroll event (a snap back).
+  await page.mouse.move(b.x + b.width / 2, b.y + b.height - 60);
   for (let i = 0; i < 3; i++) {
     await page.mouse.wheel(0, -150);
     await page.waitForTimeout(50);
