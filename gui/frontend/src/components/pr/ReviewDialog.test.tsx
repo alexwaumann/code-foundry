@@ -59,9 +59,11 @@ function show(verdict: "approve" | "request-changes" | "comment"): void {
 }
 
 describe("ReviewDialog", () => {
-  it("someone else's pull request: Review #N over its title, Comment | Approve | Request changes all on, no line about the author", () => {
+  it("someone else's pull request: Review over owner/repo #N and its title, Comment | Approve | Request changes all on, no line about the author", () => {
     show("approve");
-    expect(screen.getByTestId("pr-review-dialog-title").textContent).toBe("Review #7");
+    expect(screen.getByTestId("pr-review-dialog-title").textContent).toBe("Review");
+    // The page header's form; the number left the title.
+    expect(screen.getByTestId("pr-review-dialog-repo").textContent).toBe("acme/repo #7");
     expect(screen.getByTestId("pr-review-dialog-pr-title").textContent).toBe("feat(gui): virtualized sidebar tree with thread rows");
     const radios = within(screen.getByRole("radiogroup", { name: "Verdict" })).getAllByRole("radio");
     expect(radios.map((r) => [r.textContent, r.getAttribute("aria-checked"), r.hasAttribute("disabled")])).toEqual([

@@ -24,7 +24,8 @@ const tones: Record<SplitTone, string> = {
  * parts, so it never reads like the Review button beside it; the main part stays
  * focusable and says why in its tooltip (aria-disabled, not disabled), and the chevron
  * still opens the menu, which explains it. While busy both parts are inert and the icon
- * spins.
+ * spins. Given more room than it needs (the header's wrapped status line), the main part
+ * takes it, its words centred; the chevron keeps its width.
  */
 export function SplitButton({
   icon: Icon,
@@ -83,7 +84,7 @@ export function SplitButton({
           aria-busy={busy || undefined}
           aria-describedby={reason ? reasonId : undefined}
           data-reason={reason ?? undefined}
-          className={cn(part, reason !== null ? blockedLook : look, "min-w-0 gap-1.5 rounded-l-md px-2", size === "sm" && "shrink-0", reason !== null && "opacity-50", blocked && "cursor-default")}
+          className={cn(part, reason !== null ? blockedLook : look, "min-w-0 grow justify-center gap-1.5 rounded-l-md px-2", size === "sm" && "shrink-0", reason !== null && "opacity-50", blocked && "cursor-default")}
           onClick={() => {
             if (!blocked) onRun();
           }}

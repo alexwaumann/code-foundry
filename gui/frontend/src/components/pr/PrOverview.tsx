@@ -397,13 +397,16 @@ export { OrderToggle };
 /**
  * Overview: the details (a side column from 680px, a strip over everything narrower), the
  * requirement cards (what is not passing, then one card for what passed), the description
- * (faded out when long) and the conversation.
+ * (faded out when long) and the conversation. From 680px the grid grows to the bottom of
+ * the surface, which fills its scroll area, so the side column's divider reaches the pane's
+ * bottom when the content is shorter than the pane (its one row stretches); taller content
+ * scrolls as before.
  */
 export function PrOverview({ d, prRef, tabKey }: { d: PullRequestDetailView; prRef: PrRef; tabKey: string }) {
   const order = usePrPanelStore((s) => s.byTab[tabKey]?.commentOrder ?? "newest");
   const items = useMemo(() => conversation(d, order), [d, order]);
   return (
-    <div className="grid grid-cols-1 @min-[680px]:grid-cols-[minmax(0,1fr)_216px]" data-testid="pr-overview">
+    <div className="grid grid-cols-1 @min-[680px]:grow @min-[680px]:grid-cols-[minmax(0,1fr)_216px]" data-testid="pr-overview">
       <Details d={d} prRef={prRef} />
       <div className="flex min-w-0 flex-col pb-6 @min-[680px]:col-start-1 @min-[680px]:row-start-1">
         <ReadinessCards d={d} prRef={prRef} tabKey={tabKey} />

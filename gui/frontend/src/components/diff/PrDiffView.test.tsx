@@ -125,7 +125,8 @@ describe("a pull request's diff tab", () => {
     expect(button.dataset.primary).toBe("true");
     fireEvent.click(button);
     await settle();
-    expect(screen.getByTestId("pr-review-dialog-title").textContent).toBe("Review #139");
+    expect(screen.getByTestId("pr-review-dialog-title").textContent).toBe("Review");
+    expect(screen.getByTestId("pr-review-dialog-repo").textContent).toBe(`${SLUG} #139`);
     expect(screen.getByTestId("pr-review-dialog").dataset.verdict).toBe("approve");
     const input = screen.getByTestId("pr-review-dialog-input");
     fireEvent.change(input, { target: { value: "Read the diff." } });

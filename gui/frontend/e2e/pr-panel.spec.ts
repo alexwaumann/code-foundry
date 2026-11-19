@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { CF, invocations, mockPost, resetMock, row } from "./fixtures";
 import { layoutState, paneNode, paneOf, rowNode, threadTab } from "./shell";
-import { openLayout, openPrBesidePage, openPrBesideThread, PR_PANE, prTab, showPr, sizePane, SLUG, tabIn } from "./shell-pages";
+import { openLayout, openPrBesidePage, PR_PANE, prTab, showPr, sizePane, SLUG, tabIn } from "./shell-pages";
 
 /**
  * The Pull request surface in a pull request's tab, beside the Pull Requests page in a pane sized
@@ -89,7 +89,7 @@ test("overview (screenshot)", async ({ page }) => {
 /**
  * Nothing in the header, the cards, the tab bar or Overview sticks out of the surface. The
  * header's buttons sit inside it, right-aligned, overlapping neither each other nor the
- * state's words; a card's buttons stay inside their card, and below 480px a task or Approve
+ * state's words, and on a line of their own they start at its left (they fill it); a card's buttons stay inside their card, and below 480px a task or Approve
  * button sits under its card's text.
  */
 async function layoutFits(page: Page): Promise<void> {
@@ -115,6 +115,8 @@ async function layoutFits(page: Page): Promise<void> {
       if (words) for (const b of parts) if (overlap(r(words), r(b))) out.push(`${b.textContent} overlaps the state`);
       const last = parts.at(-1);
       if (last && Math.abs(r(last).right - r(status).right) > 1) out.push(`the buttons end ${String(r(status).right - r(last).right)}px short of the right`);
+      const first = parts[0];
+      if (words && first && r(footer).top >= r(words).bottom - 1 && Math.abs(r(first).left - r(status).left) > 1) out.push(`wrapped, the buttons start ${String(r(first).left - r(status).left)}px in from the left`);
     }
     for (const card of surface.querySelectorAll('[data-testid="pr-readiness"] > [data-testid="pr-ready-row"]')) {
       for (const el of card.querySelectorAll("button")) if (!within(r(el), r(card))) out.push(`${el.textContent} outside its card`);
@@ -142,18 +144,78 @@ test("the header and the cards fit from 320 to 1000px in every state: nothing ov
   }
 });
 
-test("the status line: the buttons share it when they fit and wrap to their own line, still at the right, when not", async ({ page }) => {
-  await openPrBesideThread(page, "s-3", 142);
-  for (const [width, oneLine] of [
-    [560, true],
-    [320, false],
-  ] as const) {
-    await sizePane(page, PR_PANE, width);
-    await layoutFits(page);
-    const words = await boxOf(page, "pr-ready-headline");
-    const foot = await boxOf(page, "pr-ready-footer");
-    expect(foot.y < words.y + words.height).toBe(oneLine);
-  }
+// Which buttons each state has: src/components/pr/PullRequestSurface.test.tsx ("the header's status and the Overview's cards").
+test("the status line: the buttons share it at their natural size when they fit; wrapped onto their own line they fill it, sharing its width", async ({ page }) => {
+  await page.setViewportSize({ width: 1600, height: 900 });
+  // #146 with the viewer's changes requested: the chip and Squash and merge wrap at the pane's 480px minimum.
+  await openPrBesidePage(page, 146, 760);
+  await page.getByTestId("pr-review-button").click();
+  await page.getByTestId("pr-review-dialog-request-changes").click();
+  await page.getByTestId("pr-review-dialog-input").fill("Please change this.");
+  await page.keyboard.press("Meta+Enter");
+  await expect(page.getByTestId("pr-your-review")).toHaveText("You requested changes");
+  const parts = () =>
+    page.getByTestId("pr-ready-footer").evaluate((f) => {
+      const box = (e: Element) => e.getBoundingClientRect();
+      const chip = f.querySelector('[data-testid="pr-your-review"]');
+      const merge = f.querySelector('[data-testid="pr-merge-button-split"]');
+      if (!chip || !merge) throw new Error("no chip or merge button");
+      const main = merge.querySelector('[data-testid="pr-merge-button"]') as Element;
+      // The space before the icon less the space after the words: 0 when they sit in the middle.
+      const off = (b: Element) => Math.abs(box(b.firstElementChild as Element).left - box(b).left - (box(b).right - box(b.lastElementChild as Element).right));
+      return {
+        chip: box(chip).width,
+        merge: box(merge).width,
+        chevron: box(merge.querySelector('[data-testid="pr-merge-button-menu-button"]') as Element).width,
+        // Icon and words in the middle of the chip and of the merge's main part.
+        chipOff: off(chip),
+        mainOff: off(main),
+      };
+    });
+  const natural = await parts();
+  const words = await boxOf(page, "pr-ready-headline");
+  let foot = await boxOf(page, "pr-ready-footer");
+  expect(foot.y).toBeLessThan(words.y + words.height);
+  await layoutFits(page);
+  await sizePane(page, PR_PANE, 480);
+  foot = await boxOf(page, "pr-ready-footer");
+  expect(foot.y).toBeGreaterThanOrEqual((await boxOf(page, "pr-ready-headline")).y + words.height - 1);
+  // layoutFits: the first starts at the line's left, the last ends at its right.
+  await layoutFits(page);
+  const wrapped = await parts();
+  // Both grew by the same share of the line; the chevron kept its width.
+  expect(wrapped.chip).toBeGreaterThan(natural.chip + 20);
+  expect(Math.abs(wrapped.chip - natural.chip - (wrapped.merge - natural.merge))).toBeLessThanOrEqual(1);
+  expect(wrapped.chevron).toBe(natural.chevron);
+  expect(wrapped.chipOff).toBeLessThanOrEqual(1);
+  expect(wrapped.mainOff).toBeLessThanOrEqual(1);
+});
+
+// The rule (the grid grows from 680px) is layout only; what Overview shows: src/components/pr/PullRequestSurface.test.tsx.
+test("from 680px the side column's divider runs to the pane's bottom under short content; long content scrolls with no border at its bottom", async ({ page }) => {
+  await page.setViewportSize({ width: 1600, height: 900 });
+  await openPrBesidePage(page, 142, 760);
+  const scroll = paneOf(page, PR_PANE).getByTestId("shell-surface-scroll");
+  const bottoms = () =>
+    scroll.evaluate((el) => {
+      const q = (id: string) => el.querySelector(`[data-testid="${id}"]`) as HTMLElement;
+      const borders = ["pr-surface", "pr-overview", "pr-details"].map((id) => getComputedStyle(q(id)).borderBottomWidth);
+      return { scroll: el.getBoundingClientRect().bottom, details: q("pr-details").getBoundingClientRect().bottom, overview: q("pr-overview").getBoundingClientRect().bottom, scrolls: el.scrollHeight > el.clientHeight, borders };
+    });
+  const short = await bottoms();
+  expect(short.scrolls).toBe(false);
+  expect(Math.abs(short.details - short.scroll)).toBeLessThanOrEqual(1);
+  expect(short.borders).toEqual(["0px", "0px", "0px"]);
+  // #145 is taller than the pane: it scrolls, and at the end the column ends with the content, nothing drawn under it.
+  await showPr(page, 145);
+  await scroll.evaluate((el) => {
+    el.scrollTop = el.scrollHeight;
+  });
+  const long = await bottoms();
+  expect(long.scrolls).toBe(true);
+  expect(Math.abs(long.details - long.overview)).toBeLessThanOrEqual(1);
+  expect(Math.abs(long.overview - long.scroll)).toBeLessThanOrEqual(1);
+  expect(long.borders).toEqual(["0px", "0px", "0px"]);
 });
 
 test("the details are a side column from 680px and a strip over the cards below it", async ({ page }) => {
@@ -783,5 +845,61 @@ for (const scheme of ["dark", "light"] as const) {
     await page.getByTestId("pr-review-button").click();
     await expect(page.getByTestId("pr-review-dialog-own")).toBeVisible();
     await shot(page, `review-dialog-author-${scheme}`);
+  });
+}
+
+/** SHOTS=<dir>: the page polish (docs/notes/pr-page-polish.md): the header wide and at the 480px minimum with its buttons wrapped, the running checks' card, both dialogs, a short pull request's side column and Link to thread; dark and light. */
+for (const scheme of ["dark", "light"] as const) {
+  test(`page polish (screenshots, ${scheme})`, async ({ page }) => {
+    test.skip(!shots, "SHOTS=<dir> only: the screenshots are all it adds");
+    await page.emulateMedia({ colorScheme: scheme });
+    await page.setViewportSize({ width: 1400, height: 900 });
+    /** The whole pane, or with `window` the window (a dialog is centred in it). */
+    const full = async (name: string, window = false) => {
+      await page.waitForFunction(() => document.getAnimations().every((a) => a.playState !== "running" || a.effect?.getTiming().iterations === Infinity));
+      const b = await paneOf(page, PR_PANE).boundingBox();
+      if (!b) throw new Error("no pane");
+      await page.screenshot({ path: `${shots ?? ""}/${name}-${scheme}.png`, ...(window ? {} : { clip: b }) });
+    };
+    await openPrBesidePage(page, 160, 760);
+    await page.mouse.move(5, 5);
+    await paneShot(page, `polish-header-wide-${scheme}`);
+    // #163, checks running: the card's still dashed circle beside each check's dot.
+    await showPr(page, 163);
+    await page.mouse.move(5, 5);
+    await paneShot(page, `polish-checks-running-${scheme}`);
+    // #146 with the viewer's changes requested: the chip and Squash and merge wrap at 480px.
+    await showPr(page, 146);
+    await page.getByTestId("pr-review-button").click();
+    await page.getByTestId("pr-review-dialog-request-changes").click();
+    await page.getByTestId("pr-review-dialog-input").fill("Please change this.");
+    await page.keyboard.press("Meta+Enter");
+    await expect(page.getByTestId("pr-your-review")).toBeVisible();
+    await sizePane(page, PR_PANE, 480);
+    await page.mouse.move(5, 5);
+    await paneShot(page, `polish-header-480-${scheme}`);
+    // A short pull request: the side column's divider.
+    await sizePane(page, PR_PANE, 760);
+    await showPr(page, 142);
+    await page.mouse.move(5, 5);
+    await full("polish-side-column");
+    await page.getByTestId("pr-merge-button").click();
+    await expect(page.getByTestId("pr-merge-dialog")).toBeVisible();
+    await full("polish-merge-dialog", true);
+    await page.keyboard.press("Escape");
+    await expect(page.getByTestId("pr-merge-dialog")).toHaveCount(0);
+    await page.getByTestId("pr-review-button").click();
+    await expect(page.getByTestId("pr-review-dialog")).toBeVisible();
+    await full("polish-review-dialog", true);
+    await page.keyboard.press("Escape");
+    await expect(page.getByTestId("pr-review-dialog")).toHaveCount(0);
+    // Link to thread, with two thread tabs in this space.
+    await openLayout(page, rowNode([paneNode("p-1", [threadTab("s-1"), threadTab("s-3")]), paneNode(PR_PANE, [prTab(142)])], [0.45, 0.55]), PR_PANE);
+    await expect(page.getByTestId("pr-surface")).toHaveAttribute("data-pr", `${SLUG}#142`);
+    await sizePane(page, PR_PANE, 760);
+    await page.getByTestId("pr-menu-button").click();
+    await page.getByTestId("pr-menu-link").click();
+    await expect(page.getByTestId("pr-menu-link-threads")).toBeVisible();
+    await full("polish-link-submenu");
   });
 }

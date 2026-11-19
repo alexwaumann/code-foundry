@@ -102,6 +102,15 @@ describe("Overview", () => {
     expect(byTestId("pr-title").textContent).toBe("fix(terminal): resize race between attach and first output");
     expect(byTestId("pr-branches").textContent).toMatch(/main\s*fix\/resize/);
     expect(byTestId("pr-header").dataset.state).toBe("draft");
+    // One block, in this order: owner/repo #number with the ⋯ menu at its right end, the
+    // title, the branches, the status; the ⋯ never sits beside the title.
+    const block = byTestId("pr-title").parentElement as HTMLElement;
+    expect([...block.children].map((c) => (c as HTMLElement).dataset.testid)).toEqual(["pr-top-line", "pr-title", "pr-branches", "pr-status-section"]);
+    expect([...byTestId("pr-top-line").children].map((c) => (c as HTMLElement).dataset.testid)).toEqual(["pr-repo", "pr-actions"]);
+    expect(within(byTestId("pr-actions")).getByTestId("pr-menu-button")).toBeTruthy();
+    expect(byTestId("pr-branches").querySelector("svg")).toBeTruthy();
+    // No divider between the lines and the status.
+    expect(byTestId("pr-status-section").className).not.toMatch(/border/);
     // The details: the author, the ages (Updated for an open one) and the commits.
     expect(byTestId("pr-author").textContent).toBe("alexwaumann");
     expect(byTestId("pr-age-opened").textContent).toMatch(/^Opened\d+[a-z]+ ago$/);
@@ -998,12 +1007,20 @@ describe("the header's status and the Overview's cards", () => {
     expect(queryTestId("pr-check")).toBeNull();
   });
 
-  it("#163: the running checks' card lists them, queued or ticking, and All N checks unfolds the rest", async () => {
+  it("#163: the running checks' card leads with the still dashed circle and lists them, each with its dot, queued or ticking, and All N checks unfolds the rest", async () => {
     renderPrPanel();
     await openPr(163);
     const card = byTestId("pr-readiness").querySelector<HTMLElement>('[data-row="checks"]') as HTMLElement;
     expect(card.dataset.tone).toBe("pending");
+    // The card leads with the app's running mark (the sidebar's Working icon), still, in the
+    // warning tone; no spinner.
+    const icon = within(card).getByTestId("pr-ready-icon");
+    expect(icon.getAttribute("class")).toContain("lucide-circle-dashed");
+    expect(icon.getAttribute("class")).toContain("text-cf-warning-text");
+    expect(icon.getAttribute("class")).not.toMatch(/animate-|lucide-loader/);
     const running = within(card).getAllByTestId("pr-check");
+    // A single running or queued check keeps its own dot, unlike the card's mark.
+    for (const c of running) expect(c.querySelector("svg")?.getAttribute("class")).toContain("lucide-circle-dot");
     expect(running.map((c) => c.dataset.tone)).toEqual(running.map(() => "pending"));
     expect(within(card).getAllByTestId("pr-check-meta").map((m) => m.textContent)).toEqual(expect.arrayContaining([expect.stringMatching(/^(queued|\d+[ms].*)$/) as string]));
     fireEvent.click(within(card).getByTestId("pr-ready-checks-toggle"));
@@ -1071,7 +1088,9 @@ describe("the merge button", () => {
     // The merge's own dialog, not the warning-looking confirm; nothing sent yet.
     expect(queryTestId("confirm-dialog")).toBeNull();
     expect(merges()).toEqual([]);
-    expect(byTestId("pr-merge-dialog-title").textContent).toBe("Squash and merge #142");
+    expect(byTestId("pr-merge-dialog-title").textContent).toBe("Squash and merge");
+    // owner/repo #number as the page header says it, then the title.
+    expect(byTestId("pr-merge-dialog-repo").textContent).toBe(`${SLUG} #142`);
     expect(byTestId("pr-merge-dialog-pr-title").textContent).toBe("feat(gui): virtualized sidebar tree with thread rows");
     expect(byTestId("pr-merge-dialog-into").textContent).toBe("IntomainIts commits become 1");
     expect(byTestId("pr-merge-dialog-from").textContent).toBe("Fromfeat/sidebar");
@@ -1129,7 +1148,7 @@ describe("the merge button", () => {
     await settle();
     fireEvent.click(byTestId("pr-merge-dialog-method-merge"));
     await settle();
-    expect(byTestId("pr-merge-dialog-title").textContent).toBe("Merge #142");
+    expect(byTestId("pr-merge-dialog-title").textContent).toBe("Merge");
     expect(byTestId("pr-merge-dialog-outcome").textContent).toBe("Its commits and a merge commit");
     expect(byTestId("pr-merge-dialog-confirm").textContent).toBe("Merge");
     // The default moved with it: the button behind the dialog says so too.
@@ -1475,14 +1494,17 @@ describe("draft and links", () => {
       });
     });
   };
-  /** Opens ⋯ → Link to thread: its row unfolds the threads under it. */
-  const openLinkMenu = () => {
+  /** Opens ⋯ → Link to thread: the app's shared submenu (ArrowRight on its trigger, as Radix opens one from the keyboard). */
+  const openLinkMenu = async () => {
     openMenu();
-    const row = byTestId("pr-menu-link");
-    expect(row.getAttribute("aria-expanded")).toBe("false");
-    fireEvent.click(row);
-    expect(row.getAttribute("aria-expanded")).toBe("true");
-    return byTestId("pr-menu-link-threads");
+    const trigger = byTestId("pr-menu-link");
+    expect(trigger.getAttribute("aria-haspopup")).toBe("menu");
+    fireEvent.keyDown(trigger, { key: "ArrowRight" });
+    return vi.waitFor(() => {
+      const sub = byTestId("pr-menu-link-threads");
+      expect(sub.dataset.state).toBe("open");
+      return sub;
+    });
   };
   const linkRows = () => screen.getAllByTestId("pr-menu-link-thread").map((r) => ({ thread: r.dataset.thread, name: r.textContent.replace(/Linked$/, ""), linked: r.dataset.linked === "true" }));
 
@@ -1493,19 +1515,17 @@ describe("draft and links", () => {
     setLinks("s-3", [{ slug: SLUG.toUpperCase(), number: 142 }]);
     renderPrPanel();
     await openPr(142);
-    const sub = openLinkMenu();
+    const sub = await openLinkMenu();
+    // A submenu of its own (a menu beside the ⋯ menu), headed, one row per thread tab.
+    expect(sub.getAttribute("role")).toBe("menu");
+    expect(byTestId("pr-menu").contains(sub)).toBe(false);
     expect(within(sub).getByText("Threads open in this space")).toBeTruthy();
     expect(linkRows()).toEqual([
       { thread: "s-1", name: "Refactor sidebar tree", linked: false },
       { thread: "s-3", name: "Fix resize race", linked: true },
     ]);
-    expect(byTestId("pr-menu-link").hasAttribute("aria-disabled")).toBe(false);
-    // Folds and unfolds from the keyboard too, inside the menu.
-    fireEvent.keyDown(screen.getAllByTestId("pr-menu-link-thread")[0] as HTMLElement, { key: "ArrowLeft" });
-    expect(queryTestId("pr-menu-link-threads")).toBeNull();
-    expect(document.activeElement).toBe(byTestId("pr-menu-link"));
-    fireEvent.keyDown(byTestId("pr-menu-link"), { key: "ArrowRight" });
-    expect(byTestId("pr-menu-link-threads")).toBe(byTestId("pr-menu").querySelector('[data-testid="pr-menu-link-threads"]'));
+    expect(byTestId("pr-menu-link").hasAttribute("data-disabled")).toBe(false);
+    expect(byTestId("pr-menu-link").getAttribute("aria-expanded")).toBe("true");
 
     // A ticked row is inert: there is no unlink.
     const ticked = screen.getAllByTestId("pr-menu-link-thread")[1] as HTMLElement;
@@ -1529,7 +1549,7 @@ describe("draft and links", () => {
     await vi.waitFor(() => {
       expect(queryTestId("pr-menu")).toBeNull();
     });
-    openLinkMenu();
+    await openLinkMenu();
     expect(linkRows().map((r) => r.linked)).toEqual([true, true]);
   });
 
@@ -1539,7 +1559,7 @@ describe("draft and links", () => {
     await resetPrStores({ kind: "thread", id: "s-1" }, "spaces");
     renderPrPanel();
     await openPr(142);
-    openLinkMenu();
+    await openLinkMenu();
     expect(linkRows().map((r) => r.thread)).toEqual(["s-1"]);
     daemon.handlers.set("thread.pr.link", () => {
       throw refuse("thread s-1 is archived");
@@ -1552,15 +1572,21 @@ describe("draft and links", () => {
     expect(byTestId("pr-menu")).toBeTruthy();
   });
 
-  it("Link to thread with no thread tab in this space: the row is muted and its submenu says so", async () => {
+  it("Link to thread with no thread tab in this space: the trigger is disabled, like the app's other disabled submenu rows, and opens nothing", async () => {
     seedWorld();
     await resetPrStores();
     renderPrPanel();
     await openPr(142);
-    const sub = openLinkMenu();
-    expect(byTestId("pr-menu-link").getAttribute("aria-disabled")).toBe("true");
-    expect(sub.textContent).toBe("No threads open in this space");
+    openMenu();
+    const trigger = byTestId("pr-menu-link");
+    expect(trigger.hasAttribute("data-disabled")).toBe(true);
+    expect(trigger.getAttribute("aria-disabled")).toBe("true");
+    fireEvent.keyDown(trigger, { key: "ArrowRight" });
+    fireEvent.click(trigger);
+    await settle();
+    expect(queryTestId("pr-menu-link-threads")).toBeNull();
     expect(queryTestId("pr-menu-link-thread")).toBeNull();
+    expect(trigger.getAttribute("aria-expanded")).toBe("false");
   });
 });
 
@@ -1749,7 +1775,8 @@ describe("Review and its dialog", () => {
 
     await openReview();
     expect(byTestId("pr-review-dialog").dataset.verdict).toBe("approve");
-    expect(byTestId("pr-review-dialog-title").textContent).toBe("Review #139");
+    expect(byTestId("pr-review-dialog-title").textContent).toBe("Review");
+    expect(byTestId("pr-review-dialog-repo").textContent).toBe(`${SLUG} #139`);
     expect(queryTestId("pr-review-dialog-own")).toBeNull();
     // No inline composer any more: the review is the dialog's.
     expect(queryTestId("pr-review-composer")).toBeNull();

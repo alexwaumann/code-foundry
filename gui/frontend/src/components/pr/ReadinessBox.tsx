@@ -13,7 +13,6 @@ import {
   GitPullRequestClosed,
   GitPullRequestDraft,
   Loader2,
-  LoaderCircle,
   Lock,
   MessageSquare,
   ShieldAlert,
@@ -26,6 +25,7 @@ import type { PullRequestDetailView } from "@/api/gh";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tip } from "@/components/ui/tooltip";
+import { statusRegistry } from "@/lib/statusRegistry";
 import { cn } from "@/lib/utils";
 import { openUrl, pullRequestKey, useViewerLogin } from "@/stores/gh";
 import { revertPullRequest, setAutoMerge, setPullRequestDraft, toggleSection, useMergingMethod, usePrPanelStore, usePullRequestChange } from "@/stores/prPanel";
@@ -44,10 +44,15 @@ import { useReadiness, useSeedReadiness } from "./useReadiness";
 import { useTaskRouting } from "./useTaskRouting";
 import { toneText } from "./tones";
 
+/**
+ * A card's icon. Running checks take the app's "something is running" mark, the dashed circle
+ * the sidebar's Working rows and thread tabs show (statusRegistry), still, in the card's tone;
+ * a single running check inside the card keeps its own dot (checkIcons.ts).
+ */
 const icons: Record<ReadyIcon, LucideIcon> = {
   draft: GitPullRequestDraft,
   failure: CircleX,
-  running: LoaderCircle,
+  running: statusRegistry.working.icon ?? CircleDashed,
   success: CircleCheck,
   clock: Clock,
   eye: Eye,
@@ -103,15 +108,17 @@ function StatusWords({ d, headline }: { d: PullRequestDetailView; headline: Read
 
 /**
  * The status line: the state at the left, the buttons at the right. The buttons share the
- * line while they fit and wrap to their own line, still at the right, when they do not: the
- * words never grow, the buttons' box takes the rest of the line and starts a new one when
- * that rest is narrower than they are (a flex item breaks to a new line by its content
- * width). On a line of their own too narrow for both, they wrap among themselves.
+ * line while they fit and wrap to their own line when they do not (a flex item breaks to a
+ * new line by its content width). Sharing it they keep their natural size at the right;
+ * on a line of their own they fill it, sharing its width. CSS alone tells the two apart:
+ * the words grow 9999 times as fast as the buttons' box, so on a shared line the box gets
+ * a ten-thousandth of the spare room (under a pixel) and its buttons, which grow to fill
+ * it, stay at their natural size; alone on its line the box gets all of it.
  */
 function StatusLine({ words, buttons }: { words: ReactNode; buttons: ReactNode }) {
   return (
     <div className="flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-2" data-testid="pr-status">
-      <div className="flex min-h-7 max-w-full min-w-0 flex-[0_1_auto] items-center gap-2">{words}</div>
+      <div className="flex min-h-7 max-w-full min-w-0 flex-[9999_1_auto] items-center gap-2">{words}</div>
       {buttons}
     </div>
   );
@@ -175,7 +182,7 @@ export function HeaderStatus({ r, d, prRef, panelKey }: { r: Readiness; d: PullR
       words={<StatusWords d={d} headline={headline} />}
       buttons={
         (f.review || f.main) && (
-          <div className="flex max-w-full min-w-0 flex-[1_1_auto] flex-wrap items-center justify-end gap-1.5" data-testid="pr-ready-footer">
+          <div className="flex max-w-full min-w-0 flex-[1_1_auto] flex-wrap items-center justify-end gap-1.5 *:grow" data-testid="pr-ready-footer">
             {f.review && <ReviewButton prRef={prRef} detail={d} primary={f.reviewPrimary} />}
             <MainActionButton f={f} d={d} prRef={prRef} panelKey={panelKey} />
           </div>
@@ -207,7 +214,7 @@ export function SeededHeaderStatus({ r, d, failed }: { r: SeedReadiness; d: Pull
       }
       buttons={
         pending && (
-          <div className="flex flex-[1_0_auto] items-center justify-end gap-1.5" data-testid="pr-ready-footer-pending">
+          <div className="flex flex-[1_0_auto] items-center justify-end gap-1.5 *:grow" data-testid="pr-ready-footer-pending">
             <Skeleton className="h-7 w-20" />
             <Skeleton className="h-7 w-32" />
           </div>
@@ -314,7 +321,7 @@ function IssueCard({ row, d, prRef, tabKey, viewer, routing }: { row: ReadinessR
       data-tone={row.tone}
       data-task={row.task ?? undefined}
     >
-      <Icon className={cn("mt-0.5 size-3.5 shrink-0", tone(row.tone))} aria-hidden />
+      <Icon className={cn("mt-0.5 size-3.5 shrink-0", tone(row.tone))} aria-hidden data-testid="pr-ready-icon" data-icon={row.icon} />
       <div className={cn("flex min-w-0 flex-1 flex-col", wraps && "@max-[480px]:basis-[calc(100%-24px)]")}>
         {rowTitle(row)}
         {checks ? (

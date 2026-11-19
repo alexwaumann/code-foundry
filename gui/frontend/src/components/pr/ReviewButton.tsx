@@ -41,7 +41,7 @@ export function ReviewButton({ prRef, detail, primary = false, size = "default" 
       aria-disabled={busy !== null || undefined}
       aria-busy={busy !== null || undefined}
       className={cn(
-        "flex shrink-0 items-center rounded-md border shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-cf-focus/60",
+        "flex shrink-0 items-center justify-center rounded-md border shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-cf-focus/60",
         sizes[size],
         busy !== null
           ? "cursor-default bg-cf-canvas text-cf-text-muted dark:border-cf-input dark:bg-cf-input/30"
