@@ -67,12 +67,22 @@ func (m *Manager) Send(ctx context.Context, id string, msg Message) (Item, error
 	it, err := m.send(ctx, id, msg)
 	if err == nil {
 		m.noteLeadSent(id, msg.ByThreadID) // its lead answered its ask (passup.go)
-		if msg.Reply != ReplyNone {        // no reply wanted: no wake for the turn that reads it
-			m.renotify(ctx, id, msg, it)
-		}
-		m.afterThreadSend(ctx, id, msg, it)
+		m.afterSend(ctx, id, msg, it)
 	}
 	return it, err
+}
+
+// afterSend is Send's work once msg was delivered as it: the sender's --notify renewal
+// and the reply bookkeeping. The receiver may have ended the turn that read the message
+// already (a short turn), and then the renewal fires at once and ends; so whether the
+// sender's own worker's answer reaches it is what renotify found, not a later look at
+// the subscriptions, which would add a reply-wait and wake the sender twice.
+func (m *Manager) afterSend(ctx context.Context, id string, msg Message, it Item) {
+	notified := false
+	if msg.Reply != ReplyNone { // no reply wanted: no wake for the turn that reads it
+		notified = m.renotify(ctx, id, msg, it)
+	}
+	m.afterThreadSend(ctx, id, msg, it, notified)
 }
 
 func (m *Manager) send(ctx context.Context, id string, msg Message) (Item, error) {

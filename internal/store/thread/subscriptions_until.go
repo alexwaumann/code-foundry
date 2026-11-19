@@ -184,10 +184,14 @@ func (s *subscriptions) forgetEndedLocked(id string) {
 // message ended (subRec.keep). The new subscription is the ended one's kind (UntilFinished, same
 // group), armed with the message's ordinal: the turn that handles the message wakes the
 // sender. A failure is logged: the message went out.
-func (m *Manager) renotify(ctx context.Context, id string, msg Message, it Item) {
+//
+// notified reports whether the sender holds a subscription to id, other than a
+// reply-wait, that a turn's end fires: a live one, or the renewal, which may have fired
+// and ended already when the turn that read the message was over before this ran.
+func (m *Manager) renotify(ctx context.Context, id string, msg Message, it Item) (notified bool) {
 	by := strings.TrimSpace(msg.ByThreadID)
 	if by == "" || by == id || msg.Origin != OriginUser || msg.NoNotify || msg.compact || m.subs == nil {
-		return
+		return false
 	}
 	s := m.subs
 	s.mu.Lock()
@@ -198,6 +202,7 @@ func (m *Manager) renotify(ctx context.Context, id string, msg Message, it Item)
 			continue
 		}
 		live = true
+		notified = notified || !r.s.ReplyWait()
 		if r.s.UntilFinished() && it.Ordinal > 0 {
 			// The thread works on: the turn that handles this message wakes the sender, not
 			// the end of one that ends before it read it.
@@ -206,19 +211,19 @@ func (m *Manager) renotify(ctx context.Context, id string, msg Message, it Item)
 	}
 	s.mu.Unlock()
 	if !ok || live {
-		return
+		return notified
 	}
 	if it.Ordinal <= 0 {
 		// Nothing to arm with: a plain subscription would fire at once on the finish the
 		// sender already heard about.
 		m.log.Warn("notify not renewed: the send has no message ordinal", "thread", id, "by", by)
-		return
+		return false
 	}
 	res, err := m.Subscribe(ctx, SubscribeOptions{SubscriberID: by, TargetThreadID: id, Condition: ended.Condition, Repeat: true,
 		Group: ended.Group(), endsOnFinish: true, AfterOrdinal: it.Ordinal})
 	if err != nil {
 		m.log.Warn("notify not renewed", "thread", id, "by", by, "err", err)
-		return
+		return false
 	}
 	s.mu.Lock()
 	if _, still := s.ended[ended.ID]; still {
@@ -231,6 +236,7 @@ func (m *Manager) renotify(ctx context.Context, id string, msg Message, it Item)
 	s.mu.Unlock()
 	m.log.Info("notify renewed by a send", "thread", id, "by", by, "subscription", res.Subscription.ID, "fired", res.Fired,
 		"existed", res.Existed, "ordinal", it.Ordinal)
+	return true
 }
 
 // loadEnded keeps a loaded ended record whose threads are both live; false to delete it.

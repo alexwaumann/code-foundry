@@ -192,6 +192,43 @@ The daemon was stopped by its pid; the scratch home, the project and its Claude 
 - Weaker models may still defer a wanted answer to the user. The safety net covers it (the
   sender gets the receiver's last message), but the wording is the lever if that persists.
 
+## Fix: a lead woken twice by its own worker's answer (2026-11-19)
+
+After merge, the sweep on main failed twice on `TestReplyToOwnWorker/with_notify` (`3 wakes,
+want 2`), and `TestNotifyRenewedBySend/the_creator's_send` failed the same way under load. One
+cause, in the daemon, not the tests: the third wake was a real wake item with the reply-wait's
+sentence (`It handled your message: ...`), on top of the renewed `--notify` wake, both
+for the same end of the worker's turn.
+
+Cause: `Send` delivered the message, then `renotify` renewed the lead's `--notify`
+subscription (armed on the message), then `awaitReply` looked at the subscriptions again
+(`answerSubscribed`) to decide whether the lead also needs a reply-wait. When the worker's turn
+ended in between (the test fake answers at once; a loaded daemon or a very short turn can do
+the same), the renewal fired at once and, being a `--notify` one, ended with that finish. The
+second look found no subscription, added a reply-wait armed on the same ordinal, and that
+fired too: the lead woke twice for one report, the noise the reply mark is meant to remove.
+It can reach a real thread, but only in that window (between the delivery and the
+bookkeeping, milliseconds), so it is rare in use; the sweep's machine under load hit it often.
+It was there since #819 (`answerSubscribed` came with it); the merges after it do not touch
+this path (#826 changed only the receiver's From line; #827 and #828 snooze, the waiting
+look and wake texts), so the full suite's load only made it show more often.
+
+Fix: `renotify` says whether the sender holds a subscription a turn's end fires (a live one,
+not a reply-wait, or the renewal, fired or not), decided under the lock at the time it
+renews; `afterSend` (Send's work after delivery) hands that to `awaitReply`, which no longer
+looks again. `answerSubscribed` is gone.
+
+Test: `TestReplyToOwnWorker/turn over before the bookkeeping` ends the worker's turn first,
+then runs `afterSend`, so the order is fixed; a fire queues its wake before `afterSend`
+returns, so waiting for the lead's wake queue to drain (`waitDrained`) counts every wake with
+no sleep. On the old logic it failed 20 of 20; with the fix it passes.
+
+Measured with `-race` binaries of the package. Before, alone: `with_notify` failed 0 of 200 at
+`-cpu 1`, 7 of 200 at 2, 14 of 200 at 8. Before, four copies at once (400 runs per test):
+`TestNotifyRenewedBySend/the_creator's_send` 5 and `with_notify` 7 at `-cpu 2`, 12 and 16 at
+`-cpu 8`, every one `3 wakes, want 2`. After: the whole `TestReplyToOwnWorker` 0 of 200 at
+each of 1, 2 and 8, and both tests 0 of 400 four at a time at 2 and at 8.
+
 ## Daemon restart
 
 Yes: new request and item fields, new refusal and wakes; no migration (the fields live in

@@ -3,7 +3,6 @@ package thread
 import (
 	"context"
 	"fmt"
-	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -221,10 +220,11 @@ func sentText(s SentMessage) string {
 	return "Asked " + who + " · waiting for a reply"
 }
 
-// afterThreadSend does a sent message's reply bookkeeping (Send, once delivered as it):
-// the answer to the receiver's open questions to the sender, the sender's note, and the
-// wake for a wanted reply. Failures are logged: the message went out.
-func (m *Manager) afterThreadSend(ctx context.Context, id string, msg Message, it Item) {
+// afterThreadSend does a sent message's reply bookkeeping (afterSend, once delivered as
+// it): the answer to the receiver's open questions to the sender, the sender's note, and
+// the wake for a wanted reply. notified is renotify's: the sender holds a subscription to
+// the receiver that a turn's end fires. Failures are logged: the message went out.
+func (m *Manager) afterThreadSend(ctx context.Context, id string, msg Message, it Item, notified bool) {
 	by, ok := msg.fromThread(id)
 	if !ok {
 		return
@@ -249,15 +249,17 @@ func (m *Manager) afterThreadSend(ctx context.Context, id string, msg Message, i
 		}
 	}
 	if msg.Reply == ReplyWanted && !msg.NoNotify && known {
-		m.awaitReply(ctx, by, to, rel, it)
+		m.awaitReply(ctx, by, to, rel, it, notified)
 	}
 }
 
 // awaitReply makes sure thread by is woken by to's answer to its message it: a
-// reply-wait subscription (replyArg), unless to is by's own worker and by already holds a
-// subscription its turn's end fires (its --notify one, renewed by this send).
-func (m *Manager) awaitReply(ctx context.Context, by string, to Thread, rel Relation, it Item) {
-	if rel == RelationWorker && m.answerSubscribed(by, to.ID) {
+// reply-wait subscription (replyArg), unless to is by's own worker and by holds a
+// subscription its turn's end fires (notified: its --notify one, renewed by this send).
+// That is renotify's finding, not a look now: the renewal fires and ends at once when the
+// worker's turn ended already, and a reply-wait then would wake by a second time.
+func (m *Manager) awaitReply(ctx context.Context, by string, to Thread, rel Relation, it Item, notified bool) {
+	if rel == RelationWorker && notified {
 		return
 	}
 	if it.Ordinal <= 0 {
@@ -273,24 +275,6 @@ func (m *Manager) awaitReply(ctx context.Context, by string, to Thread, rel Rela
 	}
 	m.log.Info("waiting for a reply", "thread", to.ID, "by", by, "subscription", res.Subscription.ID, "ordinal", it.Ordinal,
 		"fired", res.Fired, "existed", res.Existed)
-}
-
-// answerSubscribed reports whether by holds a subscription to thread id, other than a
-// reply-wait, that a turn's end fires.
-func (m *Manager) answerSubscribed(by, id string) bool {
-	if m.subs == nil {
-		return false
-	}
-	s := m.subs
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	for _, r := range s.byID {
-		if r.s.SubscriberID == by && r.s.TargetKind == TargetThread && r.s.TargetID == id && !r.s.ReplyWait() &&
-			slices.Contains(waitConditions, r.s.Condition) {
-			return true
-		}
-	}
-	return false
 }
 
 // answerAsks takes it, thread by's message just delivered into thread asker, as the
