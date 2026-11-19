@@ -1,11 +1,11 @@
 import { memo, useMemo, type ReactNode } from "react";
 import { Check, Circle, CircleDot } from "lucide-react";
 import type { ToolCallView } from "@/api/thread";
+import { CopyButton } from "@/components/copy/CopyButton";
 import { grammarForPath, highlightLines, shellTokens } from "@/lib/highlight";
 import { fitScrollbar } from "@/lib/scrollbarFit";
 import { obj, objects, parseObject, relPath, str, toolDiff } from "@/lib/toolSummary";
 import { ThreadMarkdown, TokenSpans } from "./Code";
-import { CopyButton } from "./CodeActions";
 import { ToolDiffView } from "./ToolDiffView";
 
 /** Lines of tool output shown before the rest is cut (the block scrolls within its max height). */
@@ -31,14 +31,11 @@ function BashDetail({ t }: { t: ToolCallView }) {
   const lines = clip(output).split("\n");
   return (
     <div className="term selectable" data-testid="thread-bash">
-      <div className="cmd cf-code">
+      <div className="cmd cf-cmd">
         <span className="pr">$ </span>
         <TokenSpans tokens={shellTokens(command)} />
-        {command && (
-          <div className="cf-code-actions">
-            <CopyButton text={command} label="Copy command" />
-          </div>
-        )}
+        {/* Icon only (its name in the tooltip), always shown, in the room the row keeps at its right (codeActions.css). */}
+        {command && <CopyButton text={command} label="Copy command" testId="code-copy" className="cf-cmd-copy size-[22px] hover:bg-cf-control-hover" />}
       </div>
       {output && (
         <div ref={fitScrollbar} className="out">

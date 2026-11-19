@@ -166,3 +166,43 @@ func TestFactsWithoutJobControl(t *testing.T) {
 		t.Errorf("Foreground = %q, want none (the main process is the foreground group)", got.Foreground)
 	}
 }
+
+// AtPrompt reads the foreground group when asked: a shell at its prompt is, one running a
+// job is not, and an exited one is not. Each step waits for the sampled Foreground to show
+// the change first, so the read cannot race the fork.
+func TestAtPrompt(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+	recheck := make([]time.Duration, 600)
+	for i := range recheck {
+		recheck[i] = 100 * time.Millisecond
+	}
+	m := newTestManager(t, Options{FactsDelay: 50 * time.Millisecond, FactsRecheck: recheck})
+	term, err := m.Create(ctx, Spec{Argv: []string{"/bin/zsh", "-f", "-i"}, Cwd: t.TempDir(), Env: []string{"PS1=%% "}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	at := func(want bool, when string) {
+		t.Helper()
+		got, err := m.AtPrompt(ctx, term.ID)
+		if err != nil || got != want {
+			t.Errorf("%s: AtPrompt = %v, %v; want %v", when, got, err, want)
+		}
+	}
+	at(true, "a new shell")
+	if err := m.Write(ctx, term.ID, []byte("sleep 600\n")); err != nil {
+		t.Fatal(err)
+	}
+	waitTerminal(t, ctx, m, term.ID, "sleep in the foreground", func(t Terminal) bool { return t.Foreground == "sleep 600" })
+	at(false, "while sleep runs")
+	if err := m.Write(ctx, term.ID, []byte{3}); err != nil { // ^C
+		t.Fatal(err)
+	}
+	waitTerminal(t, ctx, m, term.ID, "sleep ended", func(t Terminal) bool { return t.Foreground == "" && t.LastCommand == "sleep 600" })
+	at(true, "back at the prompt")
+	if err := m.Kill(ctx, term.ID); err != nil {
+		t.Fatal(err)
+	}
+	waitTerminal(t, ctx, m, term.ID, "exit", func(t Terminal) bool { return t.State == StateExited })
+	at(false, "exited")
+}

@@ -34,6 +34,9 @@ type Deps struct {
 	// TerminalBracketedPaste reports whether a terminal reads bracketed pastes;
 	// terminal.new --run then pastes its command. Nil: it types it.
 	TerminalBracketedPaste func(ctx context.Context, id string) (bool, error)
+	// TerminalAtPrompt reports whether a terminal's shell is at its prompt now;
+	// terminal.new --quick --run types into a busy quick terminal never. Nil: not checked.
+	TerminalAtPrompt func(ctx context.Context, id string) (bool, error)
 	// Project backs project.*. Nil works like Terminal.
 	Project command.ProjectBackend
 	// NotGit reports a context in a project without git: it gates project.worktree.*,
@@ -188,7 +191,7 @@ func Register(r *command.Registry, d Deps) error {
 		command.RegisterDaemon(r, d.Daemon),
 		command.RegisterUI(r, d.Emitter, command.WithTerminalTabs(d.Layout, d.Terminal)),
 		command.RegisterPresence(r, d.Presence),
-		command.RegisterTerminal(r, command.TerminalDeps{Terminal: d.Terminal, Project: d.Project, Thread: d.Thread, IsShell: d.IsShellTerminal, AwaitOutput: d.AwaitTerminalOutput, BracketedPaste: d.TerminalBracketedPaste, Layout: d.Layout}),
+		command.RegisterTerminal(r, command.TerminalDeps{Terminal: d.Terminal, Project: d.Project, Thread: d.Thread, IsShell: d.IsShellTerminal, AwaitOutput: d.AwaitTerminalOutput, BracketedPaste: d.TerminalBracketedPaste, AtPrompt: d.TerminalAtPrompt, Layout: d.Layout}),
 		command.RegisterProject(r, d.Project, d.NotGit),
 		command.RegisterProjectAdd(r, d.Project, d.Clone, command.AddProjectDialog{Emitter: d.Emitter, Viewed: d.Presence.Viewed}),
 		command.RegisterProjectAddWorkspace(r, d.Project, d.Workspace),

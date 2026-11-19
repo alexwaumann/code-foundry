@@ -61,9 +61,7 @@ test("Run in terminal runs the block once in a new shell of the thread, which st
   await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-thread-id", THREAD);
   const block = page.locator('[data-testid="thread-text"]').last().locator(".cf-code").filter({ has: page.locator('pre[data-lang="bash"]') });
   await expect(block).toContainText("echo run-$((6*7))");
-  await block.hover();
   const run = block.getByTestId("code-run");
-  await expect(block.locator(".cf-code-actions")).toHaveCSS("opacity", "1");
   await expect(block.getByTestId("code-copy")).toBeVisible();
   await shots(page, "block");
 

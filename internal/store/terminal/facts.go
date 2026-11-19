@@ -70,6 +70,17 @@ func (a *actor) readFacts() factSample {
 	return s
 }
 
+// atPrompt reports whether the main process (the shell) is the PTY's foreground group
+// now: what readFacts samples, read when asked. Unknown (the ioctl failed, the process
+// has exited) is false.
+func (a *actor) atPrompt() bool {
+	if a.exited {
+		return false
+	}
+	pg := foregroundGroup(a.master)
+	return pg > 0 && pg == a.cur.Pid
+}
+
 // factsSoon schedules a sample FactsDelay from now, unless one is due sooner, and
 // restarts the quiet rechecks after it.
 func (a *actor) factsSoon() {

@@ -9,7 +9,7 @@ import { linkPath } from "@/lib/pathChips";
 import { fitScrollbar } from "@/lib/scrollbarFit";
 import { cn } from "@/lib/utils";
 import { useAttachmentUrl } from "@/stores/attachments";
-import { CodeActions } from "./CodeActions";
+import { CodeHeader } from "./CodeActions";
 import { CodeRunContext, type CodeRunCtx } from "./codeContext";
 import { PathChip } from "./PathChip";
 
@@ -23,13 +23,14 @@ export function TokenSpans({ tokens }: { tokens: readonly Token[] }): ReactNode 
 }
 
 /**
- * A fenced code block, highlighted with the terminal palette (lib/highlight), with Copy
- * (and Run in terminal for a shell block in Claude's reply) at its top right.
+ * A fenced code block: a header row with its language, Copy (and Run for a shell block in
+ * Claude's reply), then the code, highlighted with the terminal palette (lib/highlight).
  */
 export const CodeBlock = memo(function CodeBlock({ lang, code }: { lang: string; code: string }) {
   const lines = useMemo(() => highlightLines(code, grammarFor(lang)), [code, lang]);
   return (
     <div className="cf-code">
+      <CodeHeader lang={lang} code={code} />
       <pre ref={fitScrollbar} data-lang={lang || undefined}>
         <code>
           {lines.map((l, i) => (
@@ -40,7 +41,6 @@ export const CodeBlock = memo(function CodeBlock({ lang, code }: { lang: string;
           ))}
         </code>
       </pre>
-      <CodeActions lang={lang} code={code} />
     </div>
   );
 });

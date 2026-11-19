@@ -1,11 +1,12 @@
 import { expect, test, type Page } from "@playwright/test";
-import { expectTooltip, invocations, mockPost, openApp, resetMock, row, writes } from "./fixtures";
-import { keyboardIn, terminalTabs } from "./shell-terminals";
+import { invocations, mockPost, openApp, resetMock, row, writes } from "./fixtures";
+import { keyboardIn, quickHost, terminalTabs } from "./shell-terminals";
 
 /**
- * Copy and Run in terminal on a thread's code blocks (components/thread/CodeActions.tsx,
- * docs/notes/code-block-actions.md), over the mock's scripted thread s-r1. SHOTS=<dir>
- * saves screenshots.
+ * A thread's code blocks' header (components/thread/CodeActions.tsx, docs/notes/code-block-header.md):
+ * always shown, Run into the thread's quick terminal (a new linked tab when it is busy), over
+ * the mock's scripted thread s-r1. What the header holds is CodeActions.test.tsx's; here only
+ * what a browser shows. SHOTS=<dir> saves screenshots.
  */
 
 test.beforeEach(async () => {
@@ -43,77 +44,91 @@ const reply = (page: Page) => pane(page).locator('[data-testid="thread-text"]').
 const bashBlock = (page: Page) => reply(page).locator(".cf-code").filter({ has: page.locator('pre[data-lang="bash"]') });
 const goBlock = (page: Page) => reply(page).locator(".cf-code").filter({ has: page.locator('pre[data-lang="go"]') });
 
-test("Run in terminal: hidden while the block streams, then a new terminal tab linked to the thread runs the command", async ({ page }) => {
+test("Run: the header is there while the block streams (no Run yet), then Run types into the thread's quick terminal, and into a new linked tab while that one is busy", async ({ page }) => {
   await streamToBash(page);
-  // The Go block is finished: Copy only. The bash block is still being written: no Run yet.
+  // The Go block is finished: Copy only. The bash block is still being written: its header, no Run yet.
   await expect(goBlock(page).getByTestId("code-copy")).toHaveCount(1);
   await expect(goBlock(page).getByTestId("code-run")).toHaveCount(0);
+  await expect(bashBlock(page).getByTestId("code-lang")).toHaveText("bash");
   await expect(bashBlock(page).getByTestId("code-run")).toHaveCount(0);
+  await shot(page, "code-block-streaming");
 
   await mockPost("thread/finish?rest=" + encodeURIComponent("\n```\n"));
   await expect(pane(page).locator('[data-testid="thread-text"][data-streaming]')).toHaveCount(0);
   const run = bashBlock(page).getByTestId("code-run");
   await expect(run).toHaveCount(1);
-  // Hidden until the block is hovered (or a button has the keyboard).
-  const actions = bashBlock(page).locator(".cf-code-actions");
-  await expect(actions).toHaveCSS("opacity", "0");
-  await bashBlock(page).hover();
-  await expect(actions).toHaveCSS("opacity", "1");
-  await shot(page, "code-block-hover");
-  await expectTooltip(page, run, "Run in terminal");
+  // Shown with no pointer over the block: no hover reveal, no fade.
+  await page.mouse.move(0, 0);
+  await expect(bashBlock(page).getByTestId("code-head")).toHaveCSS("opacity", "1");
+  await expect(run).toHaveCSS("opacity", "1");
+  await expect(run).toHaveCSS("transition-duration", "0s");
+  // The header sits above the code, not over it.
+  const head = await bashBlock(page).getByTestId("code-head").boundingBox();
+  const code = await bashBlock(page).locator("pre").boundingBox();
+  expect(head && code && head.y + head.height <= code.y).toBe(true);
+  await shot(page, "code-block-header");
 
-  await expect(terminalTabs(page)).toHaveCount(0);
+  await expect(quickHost(page)).toHaveCount(0);
   await expect(page.getByTestId("thread-timeline")).toHaveAttribute("data-at-bottom", "true");
   await run.click();
-  // One terminal.new with --run in the thread's context, nothing typed by the GUI.
+  // terminal.new --quick --run in the thread's context, nothing typed by the GUI.
   await expect
-    .poll(async () => (await invocations()).filter((i) => i.name === "terminal.new").map((i) => ({ run: i.args.run, thread: i.context?.activeThreadId })))
-    .toEqual([{ run: BASH_CMD, thread: "s-r1" }]);
-  // A new terminal tab linked to s-r1, beside its thread (placed by the rules), active, live, with the keyboard.
-  await expect(terminalTabs(page)).toHaveCount(1);
-  await expect(terminalTabs(page).first()).toHaveAttribute("data-active", /.*/);
-  await expect(page.getByTestId("shell-linked-row")).toBeVisible();
-  const id = await host(page).getAttribute("data-terminal-id");
-  expect(id).toMatch(/^t-new-/);
-  await expect(host(page)).toHaveAttribute("data-attach-phase", "live");
-  // The thread stays in its own pane, the block still on screen.
+    .poll(async () => (await invocations()).filter((i) => i.name === "terminal.new").map((i) => ({ quick: i.args.quick, run: i.args.run, thread: i.context?.activeThreadId })))
+    .toEqual([{ quick: "true", run: BASH_CMD, thread: "s-r1" }]);
+  // The quick terminal opens under the conversation, live, with the keyboard; no tab.
+  await expect(quickHost(page)).toHaveAttribute("data-attach-phase", "live");
+  await expect.poll(() => keyboardIn(page, "quick-terminal-host")).toBe(true);
+  await expect(terminalTabs(page)).toHaveCount(0);
+  const quick = (await quickHost(page).getAttribute("data-terminal-id")) ?? "";
+  await expect.poll(async () => (await writes()).filter((w) => w.id === quick)).toEqual([{ id: quick, data: `${BASH_CMD}\r` }]);
+  // The thread stays in its pane, its timeline at its end above the quick terminal.
   await expect(pane(page)).toHaveAttribute("data-thread-id", "s-r1");
-  await expect(bashBlock(page)).toBeInViewport();
+  await expect(page.getByTestId("thread-timeline")).toHaveAttribute("data-at-bottom", "true");
+  await shot(page, "code-block-ran-quick");
+
+  // Busy: a command still runs in the quick terminal. Run never types into it: a new tab linked to the thread runs it.
+  await mockPost(`terminal/facts?id=${quick}&foreground=${encodeURIComponent(BASH_CMD)}`);
+  await run.click();
+  await expect(terminalTabs(page)).toHaveCount(1);
+  await expect(host(page)).toHaveAttribute("data-attach-phase", "live");
   await expect.poll(() => keyboardIn(page, "shell-terminal-host")).toBe(true);
-  // The daemon typed the command and Return into that shell, once.
+  const id = (await host(page).getAttribute("data-terminal-id")) ?? "";
+  expect(id).toMatch(/^t-new-/);
   await expect.poll(async () => (await writes()).filter((w) => w.id === id)).toEqual([{ id, data: `${BASH_CMD}\r` }]);
+  expect((await writes()).filter((w) => w.id === quick)).toHaveLength(1);
   // Renderer-agnostic (WebGL has no DOM text): the tab's host is window.__cfTerminal.
   await expect.poll(() => screenText(page)).toContain(BASH_CMD);
-  await shot(page, "code-block-ran");
-
-  // Again: another fresh tab beside the first (the first stays open).
-  await bashBlock(page).hover();
-  await run.click();
-  await expect(terminalTabs(page)).toHaveCount(2);
-  await expect(host(page)).not.toHaveAttribute("data-terminal-id", id ?? "");
+  await shot(page, "code-block-ran-busy");
 });
 
-test("Run in terminal: the thread's timeline stays at its end when the terminal opens beside it", async ({ page }) => {
+test("Copied changes neither the header's height nor where its label and Run sit", async ({ page }) => {
+  // WebKit lets no page write the clipboard unprompted here: the write resolves, as a user's click would.
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, "clipboard", { value: { writeText: () => Promise.resolve() }, configurable: true });
+  });
   await streamToBash(page);
   await mockPost("thread/finish?rest=" + encodeURIComponent("\n```\n"));
   await expect(pane(page).locator('[data-testid="thread-text"][data-streaming]')).toHaveCount(0);
+  const block = bashBlock(page);
+  await expect(block.getByTestId("code-run")).toHaveCount(1);
   await expect(page.getByTestId("thread-timeline")).toHaveAttribute("data-at-bottom", "true");
-  await bashBlock(page).hover();
-  await bashBlock(page).getByTestId("code-run").click();
-  await expect(host(page)).toHaveAttribute("data-attach-phase", "live");
-  await expect(page.getByTestId("thread-timeline")).toHaveAttribute("data-at-bottom", "true");
+  const boxes = async () => ({
+    head: await block.getByTestId("code-head").boundingBox(),
+    lang: await block.getByTestId("code-lang").boundingBox(),
+    run: await block.getByTestId("code-run").boundingBox(),
+    copy: await block.getByTestId("code-copy").boundingBox(),
+  });
+  const before = await boxes();
+  await block.getByTestId("code-copy").click();
+  await expect(block.getByTestId("code-copy")).toHaveAttribute("data-copied", "true");
+  await shot(page, "code-block-copied");
+  expect(await boxes()).toEqual(before);
 });
 
-// A Bash row's Copy command (and no Run) is CodeActions.test.tsx's.
-// Copy putting the raw code (not the highlighted markup) on the clipboard and showing Copied for a moment: src/components/thread/CodeActions.test.tsx ("copies the raw code…").
-
-test("the buttons are keyboard reachable: focus shows them", async ({ page }) => {
+test("the buttons are keyboard reachable", async ({ page }) => {
   await streamToBash(page);
   await mockPost("thread/finish?rest=" + encodeURIComponent("\n```\n"));
-  const run = bashBlock(page).getByTestId("code-run");
-  // Hidden until hovered (the first test); focus shows them too, with no pointer.
-  await run.focus();
-  await expect(bashBlock(page).locator(".cf-code-actions")).toHaveCSS("opacity", "1");
+  await bashBlock(page).getByTestId("code-run").focus();
   // WebKit (like Safari and the Wails window) moves between buttons with Option+Tab.
   await page.keyboard.press("Alt+Tab");
   await expect(bashBlock(page).getByTestId("code-copy")).toBeFocused();

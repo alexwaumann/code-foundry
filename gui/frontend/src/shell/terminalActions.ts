@@ -10,7 +10,7 @@ import { notify } from "@/lib/notify";
 import { isNotFound } from "@/api/errors";
 import { errorMessage } from "@/api/stream";
 import type { UiContextView } from "@/api/command";
-import { terminalIdFromResult } from "@/api/terminal";
+import { isQuickTerminalResult, terminalIdFromResult } from "@/api/terminal";
 import { PROJECT_LABEL, THREAD_LABEL, WORKTREE_LABEL } from "@/lib/termlabel";
 import { activeTerminalId, getUiContext, worktreeContext } from "@/stores/context";
 import { invokeConfirmed, refreshCommands, runCommandForResult, useCommandsStore } from "@/stores/commands";
@@ -198,10 +198,24 @@ export async function openTerminalIn(id: string, pane: string): Promise<void> {
   if (tab) requestPaneFocus(tab.paneId);
 }
 
-/** A code block's "Run in terminal": a new terminal tab of the thread, linked to it, runs the command. */
-export async function runInLinkedTerminal(threadId: string, command: string): Promise<void> {
-  const res = await runCommandForResult("terminal.new", { run: command }, { ctx: getUiContext({ kind: "thread", id: threadId }), quiet: true });
-  await intoNewTerminal(res?.resultJson);
+/**
+ * A code block's Run: the thread's quick terminal types the command (terminal.new --quick --run;
+ * started when the thread has none), then opens with the keyboard in it (terminal.quick, as cmd+j
+ * does). When a command is still running there, or the daemon cannot tell, it never types into it:
+ * a new terminal tab linked to the thread runs the command instead and the keyboard goes there.
+ * The daemon decides, under the lock that serializes the quick terminal (internal/command,
+ * TerminalDeps.AtPrompt), so two clicks cannot both see it idle. See docs/notes/code-block-header.md.
+ */
+export async function runInQuickTerminal(threadId: string, command: string): Promise<void> {
+  const res = await runCommandForResult("terminal.new", { quick: "true", run: command }, { ctx: getUiContext({ kind: "thread", id: threadId }), quiet: true });
+  if (!res) return;
+  if (!isQuickTerminalResult(res.resultJson)) {
+    await intoNewTerminal(res.resultJson);
+    return;
+  }
+  // Asked first: the terminal mounts once the commit arrives, and takes the keyboard then.
+  focusQuick(threadId);
+  await afterRev(await quickCommand({ id: threadId, open: "true", focus: "true" }));
 }
 
 /** Runs terminal.quick and answers the rev its layout commit got (0 when it failed). */
