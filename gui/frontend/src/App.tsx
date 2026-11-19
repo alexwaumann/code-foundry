@@ -40,6 +40,7 @@ import { useUiStore, type FocusRegion } from "@/stores/ui";
 import { startViewSync } from "@/stores/views";
 import { startFileEditGuards } from "@/stores/fileEditGuards";
 import { startArchiveCleanup } from "@/stores/archiveCleanup";
+import { startPutAwayUndo } from "@/stores/putAwayUndo";
 import { startWelcomeSync } from "@/stores/welcome";
 import { startArrivals } from "@/stores/arrivals";
 import { startDockAlerts } from "@/stores/dockAlerts";
@@ -75,6 +76,7 @@ function startApp(): () => void {
     installKeybindings(),
     startViewSync(),
     startArchiveCleanup(),
+    startPutAwayUndo(),
     startFileEditGuards(),
     startWelcomeSync(),
     startUpdateSync(),
@@ -134,7 +136,8 @@ export function App() {
         <ActionDialog />
         <ActionRunDialog />
         <RemoveSpaceDialog />
-        <Toaster position="bottom-right" offset={{ bottom: 20, right: 20 }} />
+        {/* left: the put-away Undo toast's corner (bottom-left, docs/notes/put-away-undo.md); the rest show bottom right. */}
+        <Toaster position="bottom-right" offset={{ bottom: 20, right: 20, left: 20 }} />
       </div>
     </TooltipProvider>
   );

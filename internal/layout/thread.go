@@ -707,9 +707,11 @@ func (o *MoveThreadToSpace) apply(t *tx) (Result, error) {
 }
 
 // ArchiveThread closes a thread's tab and its linked tabs in every space (Result.Closed: the
-// caller ends the terminals among them) and forgets what the layout stored for it. Terminals
-// of its remembered set, which kept running, are in Result.Ended. An archived thread lives in
-// no space: it falls back to the default space, and unarchiving moves it where it belongs.
+// caller ends the terminals among them) and forgets what the layout stored for it. A pane
+// whose only tab was the thread's stays, the space's empty composer in its place
+// (keep_pane.go). Terminals of its remembered set, which kept running, are in Result.Ended.
+// An archived thread lives in no space: it falls back to the default space, and unarchiving
+// moves it where it belongs.
 type ArchiveThread struct {
 	Thread string `json:"thread"`
 }
@@ -723,17 +725,28 @@ func (o *ArchiveThread) apply(t *tx) (Result, error) {
 	}
 	res := Result{}
 	for _, sp := range t.st.Spaces {
-		var gone []*Tab
+		// Its linked tabs first, then its own: a pane left holding only the thread's own tab
+		// stays, with New thread in its place (keep_pane.go).
+		var gone, linked, own []*Tab
 		for _, p := range Panes(sp.Root) {
 			for _, tb := range p.Tabs {
-				if tb.Thread == o.Thread {
-					gone = append(gone, tb)
+				switch {
+				case tb.Thread != o.Thread:
+					continue
+				case tb.Kind == "thread":
+					own = append(own, tb)
+				default:
+					linked = append(linked, tb)
 				}
+				gone = append(gone, tb)
 			}
 		}
 		wasFocused := false
-		for _, tb := range gone {
+		for _, tb := range append(linked, own...) {
 			_, p, _ := t.st.FindTab(tb.ID)
+			if tb.Kind == "thread" && t.composerInPlace(sp, p, tb.ID) != nil {
+				continue
+			}
 			wasFocused = wasFocused || focusedTab(sp) == tb.ID
 			detach(sp, p, tb.ID)
 			forget(sp, tb.ID)
@@ -767,7 +780,8 @@ func runningTerminals(r *Remembered) []*Tab {
 
 // SnoozeThread closes a thread as close_thread does: its tab when open, and its linked tabs
 // in its space, remembered (Result.Kept); their terminals and its quick terminal keep
-// running. It is not recorded for reopen_closed. Where its tab was is remembered
+// running. It is not recorded for reopen_closed. A pane whose only tab it was stays, the
+// space's empty composer in its place (keep_pane.go). Where its tab was is remembered
 // (ThreadState.SnoozedTab), so the snooze ending puts it back there (set_snoozed). The
 // layout then knows the thread is snoozed (ThreadState.Snoozed): its tab, opened before
 // then, shows only its conversation (docs/notes/snooze-without-teardown.md).
@@ -797,11 +811,15 @@ func (o *SnoozeThread) apply(t *tx) (Result, error) {
 		if len(p.Tabs) == 1 {
 			away.Beside = BesideInfo(sp.Root, p.ID)
 		}
-		wasFocused := focusedTab(sp) == id
-		detach(sp, p, id)
-		forget(sp, id)
-		if wasFocused {
-			refocus(sp)
+		if c := t.composerInPlace(sp, p, id); c != nil {
+			away.Composer = c.ID // the pane stays, showing New thread (keep_pane.go)
+		} else {
+			wasFocused := focusedTab(sp) == id
+			detach(sp, p, id)
+			forget(sp, id)
+			if wasFocused {
+				refocus(sp)
+			}
 		}
 		res = Result{Space: sp.ID, Pane: p.ID, Tab: id, Closed: []*Tab{tb}, Kept: kept}
 	} else if sp := t.st.Space(t.st.SpaceOf(o.Thread)); sp != nil {

@@ -39,6 +39,7 @@ import { presentFullscreen } from "@/shell/fullscreen";
 import { switchSpaceAt } from "@/shell/spaceActions";
 import { shellDrawn } from "@/stores/shellView";
 import { openNextNeedsPopup } from "@/stores/needs";
+import { dismissUndo, runUndo, UNDO_CHORD, undoShowing } from "@/stores/putAwayUndo";
 import { notify } from "@/lib/notify";
 import { chordFromEvent, normalizeChord, terminalYieldable } from "./chord";
 
@@ -641,6 +642,9 @@ function isEditable(el: Element | null): boolean {
 
 /**
  * Key precedence:
+ *  0. While the put-away Undo toast shows (stores/putAwayUndo.ts): cmd+z runs its Undo and
+ *     Escape closes it, before everything below, a focused text field, terminal or the palette
+ *     included (cmd+z is otherwise the field's). With no undo toast, both go on as below.
  *  1. Global view actions (cmd+k, cmd+b, cmd+1..9, ctrl+cmd+1..9,
  *     zoom) always win (cmd+1..9 belong to the project picker while it is open).
  *  2. A focused terminal, a thread prompt's text ([data-chord-yield]) or the File tab's code
@@ -659,6 +663,13 @@ export function handleKeyDown(e: KeyboardEvent): void {
   if (e.target instanceof Element && e.target.closest("[data-key-recorder]")) return;
   const chord = chordFromEvent(e);
   if (!chord) return;
+  if (undoShowing() && (chord === UNDO_CHORD || chord === "escape")) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (chord === UNDO_CHORD) runUndo();
+    else dismissUndo();
+    return;
+  }
   // The project picker takes cmd+1..9 for its rows (the picker handles them itself).
   const palette = useUiStore.getState().palette;
   if (palette.open && palette.page === "projects" && /^cmd\+[1-9]$/.test(chord)) return;

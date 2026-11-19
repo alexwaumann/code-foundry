@@ -6,6 +6,7 @@ import (
 	"errors"
 	"log/slog"
 	"slices"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -322,8 +323,10 @@ func TestLayoutGlueSnoozeAndUndo(t *testing.T) {
 			e.eventually("the thread's tabs close", func() bool { return !threadOpen(e.state(), "th-a") })
 			settle()
 			st := e.state()
-			if n := len(core.Panes(st.Space(st.CurrentSpace).Root)); n != 0 {
-				t.Fatalf("%d panes still open: %+v", n, st.Space(st.CurrentSpace).Root)
+			// The thread's pane held only its tab once its set was put away: it stays, with
+			// New thread in its place (docs/notes/put-away-undo.md).
+			if got := tabsByPane(st.Space(st.CurrentSpace)); len(got) != 1 || !strings.HasSuffix(got[0], ":compose//") {
+				t.Fatalf("tabs after the snooze %v, want the thread's pane with only the empty composer", got)
 			}
 			ts := st.Threads["th-a"]
 			if ts == nil || !ts.Snoozed || ts.SnoozedTab == nil || ts.Remembered == nil || len(ts.Remembered.Tabs) != 3 {
@@ -466,6 +469,32 @@ func TestLayoutGlueArchiveAndRemove(t *testing.T) {
 				t.Errorf("something of th-a stayed: %+v %+v", st.Threads["th-a"], st.Space(other).Root)
 			}
 		})
+	}
+}
+
+// An archive keeps a pane whose only tab was the thread's, New thread in its place, with the
+// focus it had; a pane with other tabs shows its next one (docs/notes/put-away-undo.md).
+func TestLayoutGlueArchiveKeepsThePane(t *testing.T) {
+	e := newGlueEnv(t, []thread.Thread{th("th-a"), th("th-b"), th("th-c")}, nil)
+	a := e.apply(&core.OpenThread{Thread: "th-a", Focus: true}).Result
+	b := e.apply(&core.OpenThread{Thread: "th-b", Edge: core.Right}).Result
+	e.apply(&core.OpenThread{Thread: "th-c", Pane: b.Pane, Focus: true})
+	e.apply(&core.FocusTab{Tab: a.Tab})
+
+	e.goings(e.ctx, "th-a", thread.ShellsArchived)
+	e.eventually("th-a's tab closes", func() bool { return !threadOpen(e.state(), "th-a") })
+	st := e.state()
+	sp := st.Space(st.CurrentSpace)
+	_, p := st.FindPane(a.Pane)
+	if p == nil || len(p.Tabs) != 1 || p.Tabs[0].Kind != "compose" || sp.Focus != a.Pane {
+		t.Fatalf("th-a's pane after the archive %+v (focus %s), want it kept with New thread and the focus", p, sp.Focus)
+	}
+
+	e.goings(e.ctx, "th-b", thread.ShellsArchived)
+	e.eventually("th-b's tab closes", func() bool { return !threadOpen(e.state(), "th-b") })
+	st = e.state()
+	if got := tabsByPane(st.Space(st.CurrentSpace)); !slices.Equal(got, []string{a.Pane + ":compose//", b.Pane + ":thread/th-c/"}) {
+		t.Errorf("tabs after the second archive %v, want th-c in front of th-b's pane", got)
 	}
 }
 

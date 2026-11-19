@@ -344,6 +344,14 @@ when the first working version is whole. Nothing partial is released.
   set, over the same terminals; when its tab was not open at the snooze, the set waits for its tab's
   next open. A tab opened while the thread is still snoozed (a preview or a kept tab) shows only the
   conversation and brings back nothing yet: the set comes back beside it when the snooze ends.
+- **A pane a put-away empties stays.** When an archive or a snooze (from anywhere: this window,
+  another, the CLI) closes a thread's tab that was its pane's only tab once its linked tabs are
+  out, the pane does not close: the space's empty composer (New thread) takes the tab's place, in
+  front and with the focus the tab had (moved from another pane that holds other tabs too; when it
+  is alone in a pane of its own, the space already shows it and the pane closes as before). A pane
+  with other tabs shows its next one. When the snooze ends, the tab goes back in place of that
+  composer while nothing was typed in it, else beside it. The window opens no other thread
+  (docs/notes/put-away-undo.md).
 - **The thread's header** in a pane holds the branch chip, the thread info toggle and one three-dot
   menu with submenus (Open, Move to space, rename, snooze, archive, close).
 - **Thread info is per thread.** The toggle (and cmd+shift+i, for the focused tab's thread) shows or

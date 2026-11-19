@@ -193,13 +193,15 @@ type ThreadState struct {
 
 // SnoozedTab is the place of a thread's tab a snooze closed: its space, its pane and its
 // index in the pane's strip, whether it was the pane's active tab, and, when it was its
-// pane's only tab, where that pane sat.
+// pane's only tab, where that pane sat and the composer tab that took its place there
+// (keep_pane.go), which the wake replaces while it is still an empty composer.
 type SnoozedTab struct {
-	Space  string  `json:"space"`
-	Pane   string  `json:"pane"`
-	Index  int     `json:"index"`
-	Active bool    `json:"active,omitempty"`
-	Beside *Beside `json:"beside,omitempty"`
+	Space    string  `json:"space"`
+	Pane     string  `json:"pane"`
+	Index    int     `json:"index"`
+	Active   bool    `json:"active,omitempty"`
+	Beside   *Beside `json:"beside,omitempty"`
+	Composer string  `json:"composer,omitempty"`
 }
 
 // Quick is the thread's quick terminal slot.

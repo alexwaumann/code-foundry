@@ -2645,8 +2645,9 @@ export class World {
   private layoutSeen = new Map<string, LayoutSeen>();
 
   /**
-   * The daemon's layout glue for a thread's change (internal/daemon/layout.go): a snooze closes its
-   * tabs as closing its tab does; unarchived, woken, renamed or pinned keeps its tab when that is a
+   * The daemon's layout glue for a thread's change (internal/daemon/layout.go): an archive closes its
+   * tabs everywhere and a snooze its tabs in its space, a pane whose only tab was its own staying with
+   * New thread in its place (docs/notes/put-away-undo.md); unarchived, woken, renamed or pinned keeps its tab when that is a
    * preview; a wake clears the layout's snoozed mark and puts back the tab the snooze closed.
    */
   private layoutGlue(s: MockThread): void {
@@ -2654,6 +2655,7 @@ export class World {
     const was = this.layoutSeen.get(s.id);
     this.layoutSeen.set(s.id, now);
     if (!was) return;
+    if (!was.archived && now.archived) this.layout.threadArchived(s.id);
     if (!was.snoozed && now.snoozed) this.layout.threadSnoozed(s.id);
     const woke = was.snoozed && !now.snoozed;
     const keep = woke || (was.archived && !now.archived) || (!was.pinned && now.pinned) || was.name !== now.name;

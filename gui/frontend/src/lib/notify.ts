@@ -9,8 +9,9 @@
  * In progress is a state, not a level: notifyProgress shows a neutral card with a spinner,
  * and a later notify with the same id turns it into its result in place.
  */
-import { createElement, type ReactNode } from "react";
+import { createElement, Fragment, type ReactNode } from "react";
 import { toast } from "sonner";
+import { formatChord } from "@/keys/chord";
 
 export type NoticeLevel = "success" | "info" | "warning" | "error";
 
@@ -21,6 +22,8 @@ export type NoticeId = string | number;
 export interface NoticeButton {
   label: string;
   onClick: () => void;
+  /** The key that runs it too ("cmd+z"), drawn quieter inside the button after its label, as the app draws chords. */
+  chord?: string;
 }
 
 interface NoticeContent {
@@ -33,7 +36,17 @@ interface NoticeContent {
 }
 
 export interface Notice extends NoticeContent {
-  level: NoticeLevel;
+  /**
+   * A level tints the card; "neutral" is the plain card, for a confirmation that carries its next
+   * step (the put-away Undo toast, docs/notes/put-away-undo.md).
+   */
+  level: NoticeLevel | "neutral";
+  /** The icon on the title line in place of the level's (a neutral card has none of its own). */
+  icon?: ReactNode;
+  /** Where it shows: the window's bottom-left corner; left out, the Toaster's (bottom right). */
+  position?: "bottom-left";
+  /** Called once it closes, however: its timer, its close button, a button, dismissNotice. Not when a notify with its id replaces it. */
+  onClose?: () => void;
   /** The strong button (Open, Undo). */
   action?: NoticeButton;
   /** The quiet button before it (Show in Finder, Edit). */
@@ -50,6 +63,12 @@ export interface Notice extends NoticeContent {
    * its onClick, then closes the toast.
    */
   buttons?: NoticeButton[];
+}
+
+/** A button's label, with its chord after it, quieter (as FileEditBar and the menus draw one). */
+function buttonLabel(b: NoticeButton): ReactNode {
+  if (!b.chord) return b.label;
+  return createElement(Fragment, null, b.label, createElement("span", { className: "ml-1.5 font-normal opacity-70", "data-chord": "" }, formatChord(b.chord)));
 }
 
 /** The card's button look (components/ui/sonner.tsx's action and cancel), for a `buttons` row. */
@@ -77,7 +96,7 @@ function buttonRow(buttons: NoticeButton[], id: NoticeId): ReactNode {
             toast.dismiss(id);
           },
         },
-        b.label,
+        buttonLabel(b),
       ),
     ),
   );
@@ -86,8 +105,9 @@ function buttonRow(buttons: NoticeButton[], id: NoticeId): ReactNode {
 /** Shows a toast; returns its id. Showing one again with the same id replaces it in place. */
 export function notify(n: Notice): NoticeId {
   let id = n.id;
-  let action: ReactNode | NoticeButton | undefined = n.action;
-  let cancel = n.cancel;
+  const asButton = (b: NoticeButton | undefined) => (b ? { label: buttonLabel(b), onClick: b.onClick } : undefined);
+  let action: ReactNode | ReturnType<typeof asButton> = asButton(n.action);
+  let cancel = asButton(n.cancel);
   if (n.buttons && n.buttons.length > 0) {
     // The row's buttons close their own toast, so it needs its id before sonner makes one.
     const rowId = n.id ?? `notice-row-${String(++buttonRows)}`;
@@ -97,11 +117,16 @@ export function notify(n: Notice): NoticeId {
   }
   // Every option is passed, set or not: sonner merges an update into the toast it replaces,
   // so a result that replaces a progress toast must clear what it does not set.
-  return toast[n.level](n.title, {
+  const show = n.level === "neutral" ? toast : toast[n.level];
+  return show(n.title, {
     id,
     description: n.description,
     action,
     cancel,
+    icon: n.icon,
+    position: n.position,
+    onDismiss: n.onClose,
+    onAutoClose: n.onClose,
     duration: n.sticky ? Infinity : n.duration,
     closeButton: (n.sticky ?? false) || (n.closable ?? false),
   });

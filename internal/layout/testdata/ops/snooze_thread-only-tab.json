@@ -1,5 +1,5 @@
 {
-  "doc": "Snoozing a thread whose tab was its pane's only tab closes the pane; the wake rebuilds it beside its old neighbour at its old share, without the focus.",
+  "doc": "Snoozing a thread whose tab was its pane's only tab keeps the pane: the space's empty composer takes the tab's place (keep_pane.go), and the snooze remembers it and where the pane sat, for the wake.",
   "state": {
     "v": 1,
     "spaces": [
@@ -40,10 +40,19 @@
         "id": "sp-a",
         "name": "Space A",
         "root": {
-          "t": "pane",
-          "id": "p-o",
-          "tabs": [{"id":"t-o","kind":"thread","thread":"th-o"}],
-          "active": "t-o"
+          "t": "split",
+          "id": "s-r",
+          "dir": "row",
+          "kids": [
+            {
+              "t": "pane",
+              "id": "p-o",
+              "tabs": [{"id":"t-o","kind":"thread","thread":"th-o"}],
+              "active": "t-o"
+            },
+            {"t":"pane","id":"p-a","tabs":[{"id":"t-n1","kind":"compose"}],"active":"t-n1"}
+          ],
+          "sizes": [0.7,0.3]
         },
         "focus": "p-o"
       }
@@ -59,7 +68,8 @@
           "pane": "p-a",
           "index": 0,
           "active": true,
-          "beside": {"neighbours":["p-o"],"edge":"right","frac":0.3}
+          "beside": {"neighbours":["p-o"],"edge":"right","frac":0.3},
+          "composer": "t-n1"
         }
       }
     }
