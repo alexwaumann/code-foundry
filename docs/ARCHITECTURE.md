@@ -1545,6 +1545,10 @@ tab's preview) run in sandboxed frames that never touch the API
   (`docs/notes/page-frame-links.md`, `docs/notes/page-preview-serving.md`). A frame that went to another site anyway is covered with
   Reload, and the bridge follows a page to its own other files (`docs/notes/leftovers-pages.md`). A page saves a file with `file.export`
   instead, into its thread's checkout, after the user allows it (`docs/notes/page-save.md`).
+  A page unloaded behind another tab or space, or in a card scrolled far away, loads afresh
+  when shown again, where the reader left it: frame.js reports the document's scroll and puts
+  back the one the app's ping hands it; the GUI keeps it per tab or card in memory
+  (`docs/notes/pages-tab-polish.md`).
 * **Who owns a page** (`internal/store/page`, `docs/notes/page-ownership-daemon.md`,
   `page-storage-per-file.md`): every thread that showed a page file (`view.inline`,
   `view.open.page`) or whose Claude wrote it (Write, Edit, MultiEdit) owns it, one row each,

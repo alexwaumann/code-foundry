@@ -125,7 +125,7 @@ async function shown(page: Page, file: string, jsx: "ready" | "error" | null = "
 const colour = (page: Page, file: string, testId: string, prop = "color") =>
   doc(page, file).getByTestId(testId).evaluate((el, p) => getComputedStyle(el).getPropertyValue(p), prop);
 
-test("a colour or weight utility beats a type role, in both schemes: Badge and Button text, text-body text-cf-error-text", async ({ page }) => {
+test("a colour or weight utility beats a type role, in both schemes: Badge and Button text, status Badges, text-body text-cf-error-text", async ({ page }) => {
   for (const scheme of ["dark", "light"] as const) {
     await page.emulateMedia({ colorScheme: scheme });
     if (scheme === "dark") await openPages(page);
@@ -140,6 +140,11 @@ test("a colour or weight utility beats a type role, in both schemes: Badge and B
     expect(await colour(page, "roles", "button")).toBe(onAccent);
     // Not the caption role's muted colour (the destructive Badge is foreground on dark, its own on light).
     expect(await colour(page, "roles", "badge-destructive")).not.toBe(await colour(page, "roles", "ref-muted"));
+    // A status Badge is the theme's tint and its text colour, over the caption role's.
+    for (const status of ["success", "warning", "error"] as const) {
+      expect(await colour(page, "roles", `badge-${status}`)).toBe(await colour(page, "roles", `ref-${status}`));
+      expect(await colour(page, "roles", `badge-${status}`, "background-color")).toBe(await colour(page, "roles", `ref-${status}-surface`, "background-color"));
+    }
   }
   await page.emulateMedia({ colorScheme: null });
   await snap(page, "roles");

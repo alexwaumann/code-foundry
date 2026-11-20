@@ -36,6 +36,8 @@ vi.mock("@/stores/fileStamps", () => ({
 }));
 const { FILES_RELOAD_MS, FRAME_REVEAL_MS, HTML_PREVIEW_SANDBOX, HtmlFrame, LEFT_WAIT_MS, OPEN_GAP_MS, THREAD_PAGE_SANDBOX } = await import("./HtmlFrame");
 
+const { keepPageScroll, pageScrollKey, pageScrollOf, resetPageScroll } = await import("./pageScroll");
+
 const URL_ = "http://127.0.0.1:4100/preview/g1/page.html";
 const PAGES = "http://127.0.0.1:4100";
 
@@ -437,5 +439,80 @@ describe("HtmlFrame", () => {
       [null, true],
       ["t-1", false],
     ]);
+  });
+});
+
+describe("HtmlFrame: where the reader left the page (docs/notes/pages-tab-polish.md)", () => {
+  const KEY = pageScrollKey("tab", "thread:s-1", "/Users/me/page.html");
+  afterEach(resetPageScroll);
+
+  /** A frame keeping its scroll under `scrollKey`, with the pings its loads post. */
+  function placed(thread: string | null, scrollKey = KEY) {
+    const ui = <HtmlFrame url={URL_} name="page.html" thread={thread} testId="frame" scrollKey={scrollKey} />;
+    const view = render(ui);
+    const frame = () => screen.getByTestId<HTMLIFrameElement>("frame");
+    const pings: Record<string, unknown>[] = [];
+    const spy = () => {
+      const win = frame().contentWindow;
+      if (!win) throw new Error("no frame window");
+      vi.spyOn(win, "postMessage").mockImplementation((m: unknown) => {
+        const msg = m as Record<string, unknown>;
+        if (msg.type === "cf:ping") pings.push(msg);
+      });
+    };
+    spy();
+    const send = (data: unknown) => {
+      act(() => {
+        window.dispatchEvent(new MessageEvent("message", { data, origin: thread === null ? "null" : PAGES, source: frame().contentWindow }));
+      });
+    };
+    return { view, ui, frame, pings, send, spy };
+  }
+
+  it.each([
+    ["a thread's page", "t-1"],
+    ["an opaque page", null],
+  ])("keeps its own file's scroll and hands it back with the first ping of the next frame's load (%s)", (_name, thread) => {
+    const first = placed(thread);
+    fireEvent.load(first.frame());
+    expect(first.pings).toEqual([{ type: "cf:ping", seq: 1 }]);
+    first.send({ type: "cf:scroll", x: 0, y: 640, path: "/preview/g1/page.html" });
+    // Another file the page went on to is not where the frame loads it.
+    first.send({ type: "cf:scroll", x: 0, y: 99, path: "/preview/g1/other.html" });
+    expect(pageScrollOf(KEY)).toEqual({ x: 0, y: 640 });
+    // The tab goes behind another, and is shown again: a new frame.
+    cleanup();
+    const again = placed(thread);
+    fireEvent.load(again.frame());
+    expect(again.pings).toEqual([{ type: "cf:ping", seq: 1, scroll: { x: 0, y: 640, path: "/preview/g1/page.html" } }]);
+    // The page's own later loads in that frame (a link back to its file) start at its top.
+    fireEvent.load(again.frame());
+    expect(again.pings[1]).toEqual({ type: "cf:ping", seq: 2 });
+  });
+
+  it("hands back nothing under another key, or with none", () => {
+    keepPageScroll(KEY, { x: 0, y: 300 });
+    const other = placed("t-1", pageScrollKey("tab", "thread:s-1", "/Users/me/else.html"));
+    fireEvent.load(other.frame());
+    expect(other.pings).toEqual([{ type: "cf:ping", seq: 1 }]);
+    cleanup();
+    const none = placed("t-1", "");
+    none.send({ type: "cf:scroll", x: 0, y: 50, path: "/preview/g1/page.html" });
+    fireEvent.load(none.frame());
+    expect(none.pings).toEqual([{ type: "cf:ping", seq: 1 }]);
+    expect(pageScrollOf(KEY)).toEqual({ x: 0, y: 300 });
+  });
+
+  it("hands it back after a reload of the frame (a theme reload, Reload)", () => {
+    keepPageScroll(KEY, { x: 0, y: 300 });
+    const f = placed("t-1");
+    fireEvent.load(f.frame());
+    f.send({ type: "cf:scroll", x: 0, y: 420, path: "/preview/g1/page.html" });
+    // A new owner thread is a new frame load (its key), as a theme reload is.
+    f.view.rerender(<HtmlFrame url={URL_} name="page.html" thread="t-2" testId="frame" scrollKey={KEY} />);
+    f.pings.length = 0;
+    f.spy();
+    fireEvent.load(f.frame());
+    expect(f.pings).toEqual([{ type: "cf:ping", seq: 1, scroll: { x: 0, y: 420, path: "/preview/g1/page.html" } }]);
   });
 });

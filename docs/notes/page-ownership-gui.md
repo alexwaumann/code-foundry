@@ -5,6 +5,11 @@
 > file (`PageService`) when the daemon says `storage_per_file`. The `owned` row and the storage row
 > of the tables below are as they were then.
 
+> Changed by `pages-tab-polish.md`: the footer now says what is true in every state ("Can use
+> Code Foundry for this thread", "Asking to use Code Foundry", "Not allowed to use Code
+> Foundry"); "as before" and "Nothing is said when the owner is the tab's own thread" below
+> are as they were then.
+
 The daemon keeps who owns every page file and the user's answer for a page no thread owns
 (`page-ownership-daemon.md`, the contract). The File tab's frame now takes both from the
 preview grant (`FilePreview.page`) and never reads a thread's log to decide which thread a

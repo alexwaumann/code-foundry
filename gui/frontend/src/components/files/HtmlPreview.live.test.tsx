@@ -83,8 +83,11 @@ afterEach(() => {
 describe("HtmlPreview follows the daemon's word about its page", () => {
   it("stopped allowing in another window: the page source reads the grant again, the live page loads again refused and the footer says so", async () => {
     previewFile.mockResolvedValue(grant(ALLOWED));
-    render(<HtmlPreview path={REAL} text="x" name="board.html" />);
+    const ui = <HtmlPreview path={REAL} text="x" name="board.html" />;
+    const { rerender } = render(ui);
     await screen.findByTestId("file-html-frame");
+    // The frame's effects (its message listener) may still be pending: a rerender runs them first (pages-tab-polish.md).
+    rerender(ui);
     const posts = hello();
     await waitFor(() => {
       expect(posts).toContainEqual(expect.objectContaining({ type: "cf:ready", thread: null }));
@@ -118,7 +121,8 @@ describe("HtmlPreview follows the daemon's word about its page", () => {
 
   it("its owner removed: the tab reads the grant again and is the page no thread owns, asked about, not a dead thread's", async () => {
     previewFile.mockResolvedValue(grant(OWNED));
-    render(<HtmlPreview path={REAL} text="x" name="board.html" />, { wrapper: inTab("thread:s-2") });
+    const ui = <HtmlPreview path={REAL} text="x" name="board.html" />;
+    const { rerender } = render(ui, { wrapper: inTab("thread:s-2") });
     await screen.findByTestId("file-html-frame");
     expect(screen.getByTestId("file-html-footer-owner").textContent).toBe("Board");
     expect(screen.getByTestId("file-html-frame").getAttribute("sandbox")).toBe(THREAD_PAGE_SANDBOX);
@@ -131,6 +135,8 @@ describe("HtmlPreview follows the daemon's word about its page", () => {
     });
     expect(screen.queryByTestId("file-html-footer-owner")).toBeNull();
     expect(footer().dataset.consent).toBe("not-asked");
+    // The new frame's effects may still be pending: a rerender runs them before the hello.
+    rerender(ui);
     hello();
     expect(await screen.findByTestId("page-consent")).toBeTruthy();
   });

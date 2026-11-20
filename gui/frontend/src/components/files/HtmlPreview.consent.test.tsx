@@ -1,5 +1,5 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import type { ReactNode } from "react";
+import type { ComponentType, ReactElement, ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { FilePreview } from "@/api/files";
 import type { PageAccessView } from "@/api/page";
@@ -61,12 +61,28 @@ function framePage() {
   return { frame, posts, say, of: (type: string) => posts.filter((p) => p.type === type) };
 }
 
+/**
+ * Renders the preview and returns its frame once the frame's effects have run. The grant
+ * resolves outside act, so React may commit the frame and run that commit's effects (the
+ * frame's message listener, its bridge host) in a later scheduler task: findByTestId can
+ * return in between, when the machine is loaded, and a hello said then reaches nobody
+ * (docs/notes/pages-tab-polish.md). React runs a commit's pending effects before it starts
+ * the next update, so one rerender settles them.
+ */
+async function showPage(ui: ReactElement, wrapper?: ComponentType<{ children: ReactNode }>): Promise<HTMLIFrameElement> {
+  const { rerender } = render(ui, wrapper ? { wrapper } : undefined);
+  const frame = await screen.findByTestId<HTMLIFrameElement>("file-html-frame");
+  rerender(ui);
+  return frame;
+}
+
 function inTab(key: string) {
   return ({ children }: { children: ReactNode }) => <PanelKeyContext.Provider value={key}>{children}</PanelKeyContext.Provider>;
 }
 
 const footer = () => screen.getByTestId("file-html-footer");
 const SANDBOXED = "Sandboxed from Code Foundry · scripts and network on · loads files under ~/real";
+const NOT_ALLOWED_FOOTER = "Not allowed to use Code Foundry · scripts and network on · loads files under ~/real";
 
 beforeEach(() => {
   useThreadsStore.setState({ byId: { "s-2": { id: "s-2", name: "Fix login" } as ThreadView }, order: ["s-2"] });
@@ -83,8 +99,8 @@ afterEach(() => {
 describe("HtmlPreview: a page no thread owns, not asked about yet", () => {
   it("asks nothing of a page that never loads the bridge", async () => {
     previewFile.mockResolvedValue(grant(access()));
-    render(<HtmlPreview path={TAB} text="x" name="board.html" />);
-    const { frame } = (await screen.findByTestId("file-html-frame"), framePage());
+    await showPage(<HtmlPreview path={TAB} text="x" name="board.html" />);
+    const { frame } = framePage();
     fireEvent.load(frame);
     expect(screen.queryByTestId("page-consent")).toBeNull();
     expect(footer().textContent).toBe(SANDBOXED);
@@ -93,12 +109,12 @@ describe("HtmlPreview: a page no thread owns, not asked about yet", () => {
 
   it("asks once the page says hello, holding its ready; Allow runs page.allow with the resolved path, reads the grant again and lets the ready go", async () => {
     previewFile.mockResolvedValue(grant(access()));
-    render(<HtmlPreview path={TAB} text="x" name="board.html" />);
-    await screen.findByTestId("file-html-frame");
+    await showPage(<HtmlPreview path={TAB} text="x" name="board.html" />);
     const page = framePage();
     page.say("cf:hello");
     const band = await screen.findByTestId("page-consent");
     expect(band.textContent).toContain("Let this page use Code Foundry?");
+    expect(screen.getByTestId("file-html-footer-state").textContent).toBe("Asking to use Code Foundry");
     expect(page.of("cf:asking")).toHaveLength(1);
     expect(page.of("cf:ready")).toHaveLength(0);
     // The page renders behind the band, untouched: its frame is not loaded again.
@@ -124,8 +140,7 @@ describe("HtmlPreview: a page no thread owns, not asked about yet", () => {
 
   it("Don't allow runs page.disallow; the held ready says the user has not allowed the page", async () => {
     previewFile.mockResolvedValue(grant(access()));
-    render(<HtmlPreview path={TAB} text="x" name="board.html" />);
-    await screen.findByTestId("file-html-frame");
+    await showPage(<HtmlPreview path={TAB} text="x" name="board.html" />);
     const page = framePage();
     page.say("cf:hello");
     runCommandForResult.mockResolvedValue({ message: "", resultJson: "" });
@@ -142,8 +157,7 @@ describe("HtmlPreview: a page no thread owns, not asked about yet", () => {
 
   it("keeps asking when the command fails (it toasts), the buttons back", async () => {
     previewFile.mockResolvedValue(grant(access()));
-    render(<HtmlPreview path={TAB} text="x" name="board.html" />);
-    await screen.findByTestId("file-html-frame");
+    await showPage(<HtmlPreview path={TAB} text="x" name="board.html" />);
     framePage().say("cf:hello");
     runCommandForResult.mockResolvedValue(null);
     fireEvent.click(await screen.findByTestId("page-consent-allow"));
@@ -157,12 +171,11 @@ describe("HtmlPreview: a page no thread owns, not asked about yet", () => {
 describe("HtmlPreview: the footer", () => {
   it.each([
     ["allowed: the state, and Stop allowing runs page.disallow", "allowed", "Can use Code Foundry · scripts and network on · loads files under ~/real", "Stop allowing", "page.disallow"],
-    ["not allowed: the usual footer, and Allow Code Foundry runs page.allow", "refused", SANDBOXED, "Allow Code Foundry", "page.allow"],
+    ["not allowed: says so, and Allow Code Foundry runs page.allow", "refused", NOT_ALLOWED_FOOTER, "Allow Code Foundry", "page.allow"],
   ] as const)("%s", async (_name, consent, text, button, verb) => {
     previewFile.mockResolvedValue(grant(access({ consent, answer: consent })));
     runCommandForResult.mockResolvedValue({ message: "", resultJson: "" });
-    render(<HtmlPreview path={TAB} text="x" name="board.html" />);
-    await screen.findByTestId("file-html-frame");
+    await showPage(<HtmlPreview path={TAB} text="x" name="board.html" />);
     const link = screen.getByTestId("file-html-consent");
     expect(link.textContent).toBe(button);
     expect(footer().querySelector("span.truncate")?.textContent).toBe(text);
@@ -176,8 +189,7 @@ describe("HtmlPreview: the footer", () => {
   it("an answer that changes what a page already had loads it again, so it starts over under the new one", async () => {
     previewFile.mockResolvedValue(grant(access({ consent: "refused", answer: "refused" })));
     runCommandForResult.mockResolvedValue({ message: "", resultJson: "" });
-    render(<HtmlPreview path={TAB} text="x" name="board.html" />);
-    await screen.findByTestId("file-html-frame");
+    await showPage(<HtmlPreview path={TAB} text="x" name="board.html" />);
     const page = framePage();
     page.say("cf:hello");
     await waitFor(() => {
@@ -194,11 +206,10 @@ describe("HtmlPreview: the footer", () => {
   it.each([
     ["a page owned by another thread names it, and has its bridge", "thread:s-1", "Can use Code Foundry for Fix login · scripts and network on · loads files under ~/real", THREAD_PAGE_SANDBOX],
     ["in an unlinked tab too", "", "Can use Code Foundry for Fix login · scripts and network on · loads files under ~/real", THREAD_PAGE_SANDBOX],
-    ["a page owned by the tab's own thread names nobody", "thread:s-2", SANDBOXED, THREAD_PAGE_SANDBOX],
+    ["a page owned by the tab's own thread says it can use Code Foundry for it, naming nobody", "thread:s-2", "Can use Code Foundry for this thread · scripts and network on · loads files under ~/real", THREAD_PAGE_SANDBOX],
   ])("%s", async (_name, key, text, sandbox) => {
     previewFile.mockResolvedValue(grant(access({ consent: "owned", ownerThread: "s-2", ownerSource: "written" })));
-    render(<HtmlPreview path={TAB} text="x" name="board.html" />, { wrapper: inTab(key) });
-    const frame = await screen.findByTestId("file-html-frame");
+    const frame = await showPage(<HtmlPreview path={TAB} text="x" name="board.html" />, inTab(key));
     expect(footer().querySelector("span.truncate")?.textContent).toBe(text);
     expect(frame.getAttribute("sandbox")).toBe(sandbox);
     expect(screen.queryByTestId("file-html-consent")).toBeNull();
@@ -209,8 +220,7 @@ describe("HtmlPreview: the footer", () => {
 
   it("a file that is no page: the usual footer, never asked, its calls refused with the reason", async () => {
     previewFile.mockResolvedValue(grant(access({ path: "", consent: "unavailable", answer: "unavailable", unavailableReason: "a.htm is outside your home folder" })));
-    render(<HtmlPreview path={TAB} text="x" name="board.html" />);
-    await screen.findByTestId("file-html-frame");
+    await showPage(<HtmlPreview path={TAB} text="x" name="board.html" />);
     const page = framePage();
     page.say("cf:hello");
     await waitFor(() => {

@@ -5,6 +5,7 @@ import { readFile } from "@/api/files";
 import { CodeBody } from "@/components/files/CodeBody";
 import { HtmlFrame } from "@/components/files/HtmlFrame";
 import { PageErrors } from "@/components/files/PageErrors";
+import { pageScrollKey } from "@/components/files/pageScroll";
 import { usePreviewGrant, type PreviewGrant } from "@/components/files/previewGrant";
 import { pageStoragePath } from "@/components/files/usePageThread";
 import { useFileChanges, useTabRead } from "@/components/files/useTabRead";
@@ -166,6 +167,7 @@ function CardBody({
   covered,
   onResize,
   onPageErrors,
+  scrollKey,
 }: {
   threadId: string;
   page: InlinePage;
@@ -177,6 +179,8 @@ function CardBody({
   covered?: boolean;
   onResize?: (h: number) => void;
   onPageErrors?: (errors: readonly PageError[]) => void;
+  /** Where the reader left the page is kept under this (HtmlFrame `scrollKey`): the card's, not the lightbox's. */
+  scrollKey?: string;
 }) {
   if (grant.loading)
     return (
@@ -210,6 +214,7 @@ function CardBody({
       onResize={onResize}
       onPageErrors={onPageErrors}
       testId="thread-html-frame"
+      {...(scrollKey ? { scrollKey } : {})}
     />
   );
 }
@@ -420,7 +425,7 @@ function HtmlCard({ threadId, id, page, flash }: { threadId: string; id: string;
           }
         />
       </Strip>
-      <CardBody threadId={threadId} page={page} grant={grant} source={source} height={height} version={version} covered={covered} onResize={onResize} onPageErrors={setErrors} />
+      <CardBody threadId={threadId} page={page} grant={grant} source={source} height={height} version={version} covered={covered} onResize={onResize} onPageErrors={setErrors} scrollKey={pageScrollKey("card", threadId, id, page.abs)} />
     </div>
   );
 }

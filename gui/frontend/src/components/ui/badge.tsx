@@ -6,7 +6,9 @@ import { Slot } from "radix-ui"
 /**
  * shadcn's Badge (new-york). `destructive` follows the Button's destructive (the theme's
  * destructive-foreground on light, a softer fill with the foreground on dark) instead of
- * shadcn's fixed light text, which the palette guard refuses.
+ * shadcn's fixed light text, which the palette guard refuses. `success`, `warning` and `error`
+ * are a status in the theme's own tints (its `cf-*-surface` fill and `cf-*-text`), as the app's
+ * status pills are, so a page's status needs no colours of its own (docs/notes/pages-tab-polish.md).
  */
 const badgeVariants = cva(
   "inline-flex w-fit shrink-0 items-center justify-center gap-1 overflow-hidden rounded-md border px-2 py-0.5 text-caption-sm font-medium whitespace-nowrap transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 [&>svg]:pointer-events-none [&>svg]:size-3",
@@ -18,6 +20,9 @@ const badgeVariants = cva(
         destructive:
           "border-transparent bg-destructive text-destructive-foreground focus-visible:ring-destructive/20 dark:bg-destructive/60 dark:text-foreground dark:focus-visible:ring-destructive/40 [a&]:hover:bg-destructive/90",
         outline: "text-foreground [a&]:hover:bg-accent [a&]:hover:text-accent-foreground",
+        success: "border-transparent bg-cf-success-surface text-cf-success-text [a&]:hover:bg-cf-success/15",
+        warning: "border-transparent bg-cf-warning-surface text-cf-warning-text [a&]:hover:bg-cf-warning/15",
+        error: "border-transparent bg-cf-error-surface text-cf-error-text [a&]:hover:bg-cf-error/15",
       },
     },
     defaultVariants: {

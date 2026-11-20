@@ -4,11 +4,14 @@ import { Button } from "@/components/ui/button";
 import { tildify } from "@/lib/path";
 import type { PageError } from "@/lib/pageErrors";
 import { cn } from "@/lib/utils";
+import { usePanelKey } from "@/shell/panelKeyContext";
 import { answerPage } from "@/stores/pageAnswers";
 import { useThreadsStore } from "@/stores/threads";
 import { HtmlFrame } from "./HtmlFrame";
 import { PageConsentBand } from "./PageConsentBand";
 import { PageErrors } from "./PageErrors";
+import { pageFooterLead } from "./pageFooter";
+import { pageScrollKey } from "./pageScroll";
 import { usePreviewGrant } from "./previewGrant";
 import { usePageThread } from "./usePageThread";
 import { FileEmptyState, FileLoading } from "./states";
@@ -28,16 +31,19 @@ import { FileEmptyState, FileLoading } from "./states";
  * Whom the page acts for comes with the grant (usePageThread; docs/notes/page-ownership-gui.md,
  * page-storage-per-file.md): the tab's own thread when it owns the page, else the page's first
  * owner, named in the footer when that is not the tab's thread; for a page no thread owns, the
- * user's answer. Its storage is its file's either way. A page not asked about yet that loads the bridge
+ * user's answer. The footer says which, in every state (pageFooterLead). Its storage is its file's either way. A page not asked about yet that loads the bridge
  * gets the band (PageConsentBand) above it; the footer shows the answer and changes it
  * (Stop allowing, Allow Code Foundry). The tab follows the daemon's word about the page
  * whenever it changes (docs/notes/page-access-live.md): an answer given anywhere or a new or
  * removed owner (the page event, stores/pageAnswers.ts), a Refresh, an edit, and a call the
  * daemon refused because the page may not use Code Foundry any more (`onStale`) read the grant
- * again; the frame follows the new grant (HtmlFrame).
+ * again; the frame follows the new grant (HtmlFrame). Where the reader left the page is kept
+ * per tab (the panel and the file) while the app runs, and the page opens there when the tab
+ * loads it again (HtmlFrame `scrollKey`, docs/notes/pages-tab-polish.md).
  */
 export function HtmlPreview({ path, text, name, page: own, reloads = 0 }: { path: string; text: string; name: string; page?: { title: string } | undefined; /** The user's Refresh presses: each loads the page again, as written. */ reloads?: number }) {
   const grant = usePreviewGrant("", path);
+  const panelKey = usePanelKey();
   const page = usePageThread(path, own, grant.preview);
   const access = page.access;
   // A new key remounts the frame when the text changes (derived state, not an effect, so the first render loads once).
@@ -88,8 +94,7 @@ export function HtmlPreview({ path, text, name, page: own, reloads = 0 }: { path
     });
   };
   const scope = grant.preview.singleFile ? "loads this file only" : `loads files under ${tildify(grant.preview.scope)}`;
-  // What the footer leads with: the answer that lets the page use Code Foundry, or the sandbox.
-  const lead = consent === "allowed" ? "Can use Code Foundry" : page.actsFor ? "Can use Code Foundry for" : null;
+  const lead = pageFooterLead(page, asking);
   return (
     <div className="flex min-h-0 flex-1 flex-col" data-testid="file-html">
       {asking && <PageConsentBand busy={answering} onAnswer={answer} />}
@@ -109,28 +114,23 @@ export function HtmlPreview({ path, text, name, page: own, reloads = 0 }: { path
         className="min-h-0 flex-1"
         onPageErrors={setErrors}
         testId="file-html-frame"
+        scrollKey={pageScrollKey("tab", panelKey, path)}
       />
       <div className="flex shrink-0 items-center gap-1.5 border-t border-cf-divider px-3 py-1 text-caption-sm" data-testid="file-html-footer" data-consent={consent ?? undefined}>
         <ShieldCheck className={cn("size-3 shrink-0", consent === "allowed" && "text-cf-success-text", asking && "text-cf-warning-text")} aria-hidden />
         <span className="min-w-0 truncate">
-          {lead ? (
-            <>
-              <span className="text-cf-text" data-testid="file-html-footer-state">
-                {lead}
-                {page.actsFor && (
-                  <>
-                    {" "}
-                    <span className="font-medium" data-testid="file-html-footer-owner">
-                      {ownerName}
-                    </span>
-                  </>
-                )}
-              </span>
-              {` · scripts and network on · ${scope}`}
-            </>
-          ) : (
-            `Sandboxed from Code Foundry · scripts and network on · ${scope}`
-          )}
+          <span className={cn(lead.strong && "text-cf-text")} data-testid="file-html-footer-state">
+            {lead.text}
+            {lead.owner && (
+              <>
+                {" "}
+                <span className="font-medium" data-testid="file-html-footer-owner">
+                  {ownerName}
+                </span>
+              </>
+            )}
+          </span>
+          {` · scripts and network on · ${scope}`}
         </span>
         <div className="-my-1 ml-auto flex shrink-0 items-center gap-1.5">
           {(consent === "allowed" || consent === "refused") && (

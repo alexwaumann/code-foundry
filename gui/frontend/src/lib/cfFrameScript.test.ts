@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import SRC from "../../../../internal/preview/frame.js?raw";
 import { pageOpenUrl, pageUnsupported } from "@/components/files/previewGrant";
 
@@ -110,8 +110,32 @@ function load(opts: { at?: string; embedded?: boolean; navigation?: object; nest
   };
   if (opts.navigation) win.navigation = opts.navigation;
   const at = new URL(opts.at ?? `http://${HOST}/preview/g/page.html`);
+  // The document's own scroll: a viewport over a document that can be scrolled up to `max`.
+  const scroll = { x: 0, y: 0, max: 0, frames: [] as (() => void)[], grown: [] as (() => void)[] };
+  Object.defineProperties(win, {
+    scrollX: { get: () => scroll.x },
+    scrollY: { get: () => scroll.y },
+  });
+  win.scrollTo = (a: number | { left?: number; top?: number }, b?: number) => {
+    const o = typeof a === "number" ? { left: a, top: b ?? 0 } : a;
+    scroll.x = 0;
+    scroll.y = Math.max(0, Math.min(scroll.max, o.top ?? 0));
+  };
+  win.requestAnimationFrame = (fn: () => void) => {
+    scroll.frames.push(fn);
+    return scroll.frames.length;
+  };
+  win.ResizeObserver = class {
+    constructor(cb: () => void) {
+      scroll.grown.push(cb);
+    }
+    observe() {}
+    disconnect() {}
+  };
   const location = {
     host: at.host,
+    pathname: at.pathname,
+    hash: at.hash,
     get href() {
       return at.href;
     },
@@ -174,8 +198,33 @@ function load(opts: { at?: string; embedded?: boolean; navigation?: object; nest
     win[name] = w;
     return w;
   };
+  const scroller = {
+    /** Scrolled to y, as the page or the user would, and the scroll event that follows. */
+    to: (y: number) => {
+      scroll.y = Math.max(0, Math.min(scroll.max, y));
+      document.dispatchEvent(new Event("scroll"));
+    },
+    /** The document grew (or shrank) to scroll up to max: the browser clamps, and resize observers hear it. */
+    grow: (max: number) => {
+      scroll.max = max;
+      scroll.y = Math.min(scroll.y, max);
+      for (const cb of scroll.grown) cb();
+    },
+    /** Runs the animation frames asked for so far. */
+    frame: () => {
+      for (const fn of scroll.frames.splice(0)) fn();
+    },
+    y: () => scroll.y,
+  };
+  /** The user's own hand: an event of type, trusted. */
+  const hand = (type: string) => {
+    trusted = true;
+    document.dispatchEvent(new Event(type, { bubbles: true }));
+  };
   return {
     message,
+    scroller,
+    hand,
     frames,
     frame,
     opened,
@@ -724,5 +773,108 @@ describe("what the app reads from the frame script", () => {
     expect(pageUnsupported({ type: "cf:unsupported", what: "download" })?.message).toContain('cf.run("file.export"');
     expect(pageUnsupported({ type: "cf:unsupported", what: "toString" })).toBeNull();
     expect(pageUnsupported({ type: "cf:open", what: "alert" })).toBeNull();
+  });
+});
+
+describe("the page's scroll (docs/notes/pages-tab-polish.md)", () => {
+  const PATH = "/preview/g/page.html";
+  const ping = (f: ReturnType<typeof load>, y: number, path = PATH) => {
+    f.message({ type: "cf:ping", seq: 1, scroll: { x: 0, y, path } });
+  };
+
+  it("tells the app where it is scrolled to, at most once a frame, with its path", () => {
+    const f = load();
+    f.scroller.grow(2000);
+    f.scroller.to(100);
+    f.scroller.to(300);
+    expect(f.posted).toEqual([]);
+    f.scroller.frame();
+    f.scroller.to(0);
+    f.scroller.frame();
+    expect(f.posted).toEqual([
+      { type: "cf:scroll", x: 0, y: 300, path: PATH },
+      { type: "cf:scroll", x: 0, y: 0, path: PATH },
+    ]);
+  });
+
+  it("says nothing from a frame inside the page", () => {
+    const f = load({ nested: true });
+    f.scroller.grow(2000);
+    f.scroller.to(100);
+    f.scroller.frame();
+    expect(f.posted).toEqual([]);
+  });
+
+  it("goes back where the app's ping says, and tries again as the document grows", () => {
+    const f = load();
+    f.scroller.grow(200);
+    ping(f, 640);
+    expect(f.scroller.y()).toBe(200);
+    // The page drew more (its data came): the place can be reached now.
+    f.scroller.grow(2000);
+    expect(f.scroller.y()).toBe(640);
+    // Reached: a later growth leaves the reader alone.
+    f.scroller.to(10);
+    f.scroller.grow(3000);
+    expect(f.scroller.y()).toBe(10);
+  });
+
+  it.each([
+    ["another file", `http://${HOST}${PATH}`, (f: ReturnType<typeof load>) => {
+      ping(f, 640, "/preview/g/other.html");
+    }, 0],
+    ["a hash route or an anchor", `http://${HOST}${PATH}#/board`, (f: ReturnType<typeof load>) => {
+      ping(f, 640);
+    }, 0],
+    ["a page that placed itself on load", `http://${HOST}${PATH}`, (f: ReturnType<typeof load>) => {
+      f.scroller.to(50);
+      ping(f, 640);
+    }, 50],
+    ["the user already scrolling", `http://${HOST}${PATH}`, (f: ReturnType<typeof load>) => {
+      f.hand("wheel");
+      ping(f, 640);
+    }, 0],
+  ])("leaves the page where it is: %s", (_name, at, act, want) => {
+    const f = load({ at });
+    f.scroller.grow(2000);
+    act(f);
+    expect(f.scroller.y()).toBe(want);
+    f.scroller.grow(3000);
+    expect(f.scroller.y()).toBe(want);
+  });
+
+  it.each([
+    ["the user scrolls", (f: ReturnType<typeof load>) => {
+      f.hand("wheel");
+    }],
+    ["the user presses a key", (f: ReturnType<typeof load>) => {
+      f.hand("keydown");
+    }],
+    ["the page scrolls itself", (f: ReturnType<typeof load>) => {
+      f.scroller.to(150);
+    }],
+  ])("stops trying once %s", (_name, then) => {
+    const f = load();
+    f.scroller.grow(200);
+    ping(f, 640);
+    then(f);
+    const y = f.scroller.y();
+    f.scroller.grow(2000);
+    expect(f.scroller.y()).toBe(y);
+  });
+
+  it("stops trying after a while", () => {
+    let now = 1000;
+    const clock = vi.spyOn(performance, "now").mockImplementation(() => now);
+    try {
+      const f = load();
+      f.scroller.grow(200);
+      ping(f, 640);
+      now += 3001;
+      f.scroller.grow(2000);
+      expect(f.scroller.y()).toBe(200);
+    } finally {
+      clock.mockRestore();
+    }
   });
 });
