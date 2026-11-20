@@ -1573,6 +1573,12 @@ tab's preview) run in sandboxed frames that never touch the API
   makes the request, so a page reaches an API that does not allow the pages origin. No
   cookies, Origin or Code Foundry token; never to loopback, link-local or the daemon's own
   ports (`docs/notes/bridge-fetch.md`).
+* **Page checks** (`page.check`, `PageService.CheckPage`; `docs/notes/page-self-check.md`):
+  the app's host renders the page once in its hidden shot window (a `ShotRequest` with a
+  `page`, `internal/shot`), in a card's frame acting for its thread, and the frame reports what
+  it saw (script, loader and resource errors from frame.js, the bridge's refusals from the
+  host and from bridge.js itself, its height) with an optional PNG. Nothing that needs a click
+  runs, nothing is asked, and its cf.storage writes are not saved.
 * `ThreadService.ShowHtml` and `ShowTheme` put a page or a theme card in the conversation
   (`docs/notes/inline-html.md`, `docs/notes/theme-model-flow.md`); the `code-foundry-pages`
   skill teaches the model to write pages for the bridge and the library.

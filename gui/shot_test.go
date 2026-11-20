@@ -74,10 +74,14 @@ func (p *fakeShotPanel) show(width, height int, req shotPageRequest) error {
 	return nil
 }
 
-func (p *fakeShotPanel) snapshot() <-chan shotPicture {
+func (p *fakeShotPanel) snapshot(clip int) <-chan shotPicture {
 	p.mu.Lock()
 	id := p.shown
-	p.logs = append(p.logs, "snapshot:"+id)
+	if clip > 0 {
+		p.logs = append(p.logs, fmt.Sprintf("snapshot:%s clip=%d", id, clip))
+	} else {
+		p.logs = append(p.logs, "snapshot:"+id)
+	}
 	p.mu.Unlock()
 	ch := make(chan shotPicture, 1)
 	if p.picture != nil {

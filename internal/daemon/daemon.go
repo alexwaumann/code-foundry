@@ -278,6 +278,8 @@ func Run(ctx context.Context, opts Options) (retErr error) {
 	eventsAPI := api.NewEvents(api.EventsDeps{Bus: events, Project: st.project, Terminal: st.terminal, Thread: st.thread, Gh: st.gh, GitOps: st.gitops, Settings: st.settings, Update: st.update, Workspace: st.workspace, Action: st.action, Plugin: plugins, Skill: st.skills, Memory: st.memory, Themes: st.themes, Search: st.search, Layout: st.layout, Notification: st.notification, Pages: pages, Done: ctx.Done(), Clients: clients})
 	// Plugins subscribe to the same events (events/subscribe).
 	plugins.SetEvents(api.NewPluginFeed(eventsAPI, log.With("component", "plugins")))
+	// page.check renders a page in the app's hidden shot window (docs/notes/page-self-check.md).
+	pageAPI := api.NewPage(pages, st.home, pageFetch).WithChecks(shots)
 	if err := all.Register(commands, all.Deps{
 		Daemon: command.DaemonInfo{
 			PID: os.Getpid(), Version: opts.Version, Started: started, Home: p.Home(), Socket: p.Socket(),
@@ -348,6 +350,7 @@ func Run(ctx context.Context, opts Options) (retErr error) {
 		ShippedSkills: shippedSkills(log, p.Claude()),
 		Layout:        st.layout,
 		Pages:         pages,
+		PageCheck:     pageAPI,
 		PagesRoot:     p.Pages(),
 		PageShown: func(ctx context.Context, id, path string) {
 			if err := pages.Record(ctx, id, path, page.Shown); err != nil {
@@ -415,7 +418,7 @@ func Run(ctx context.Context, opts Options) (retErr error) {
 		dictationAPI.Route(),
 		searchAPI.Route(),
 		filesystemAPI.Route(),
-		api.NewPage(pages, st.home, pageFetch).Route(),
+		pageAPI.Route(),
 		api.NewLayout(st.layout).WithImporter(legacyImport{
 			log: log.With("store", "layout"), layout: st.layout, terminals: st.terminal, threads: st.thread.Snapshot,
 			projects: st.project.Snapshot, plugins: plugins.Snapshot,

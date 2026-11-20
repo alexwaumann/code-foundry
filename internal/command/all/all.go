@@ -139,6 +139,9 @@ type Deps struct {
 	// Unimplemented. PageShown records a page view.open.page showed (ViewDeps.PageShown).
 	Pages     command.PageBackend
 	PageShown func(ctx context.Context, threadID, path string)
+	// PageCheck backs page.check (PageService.CheckPage); nil registers it failing with
+	// Unimplemented.
+	PageCheck command.PageChecker
 	// PagesRoot is the threads' pages directories' folder (ViewDeps.PagesRoot).
 	PagesRoot string
 	// ShippedSkills lists the skills the daemon ships to every thread (skills.Shipped),
@@ -229,6 +232,7 @@ func Register(r *command.Registry, d Deps) error {
 			Workspaces: d.Workspace, Layout: d.Layout, PageShown: d.PageShown, PagesRoot: d.PagesRoot,
 		}),
 		command.RegisterPage(r, d.Pages),
+		command.RegisterPageCheck(r, d.PageCheck),
 		command.RegisterFileExport(r, command.FileExportDeps{Thread: d.Thread, Files: d.FileExports}),
 		command.RegisterUsage(r, d.Thread),
 		command.RegisterWorkspace(r, d.Workspace),

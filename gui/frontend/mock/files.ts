@@ -276,6 +276,20 @@ export const BOARD_PAGE = `${HOME}/notes/board.html`;
 /** A page that calls Code Foundry through /cf/bridge.js (mock/bridge-page.html; docs/notes/bridge-2-gui.md). */
 export const BRIDGE_PAGE_HTML = readFileSync(new URL("./bridge-page.html", import.meta.url), "utf8");
 
+/**
+ * A page with a misspelt verb and an undefined variable (e2e/page-check.spec.ts;
+ * docs/notes/page-self-check.md): a page check reports both.
+ */
+export const CHECK_BROKEN_HTML = `<!doctype html>
+<html><head><title>Broken</title><link rel="stylesheet" href="/cf/theme.css"><script src="/cf/bridge.js"></script></head>
+<body><p>Threads</p>
+<script>
+cf.ready.then(() => cf.run("thraed.list")).catch(() => {});
+const total = totl + 1;
+</script>
+</body></html>
+`;
+
 /** Where the daemon places the first-run welcome page (internal/skills welcome.go). */
 export const WELCOME_PAGE = `${HOME}/.code-foundry/pages/welcome.html`;
 /** The page itself, from the pages skill (the one source the daemon embeds). */
@@ -342,6 +356,7 @@ function fixtures(): Map<string, Entry> {
     // Another file of the same page, under the same grant (e2e/bridge.spec.ts).
     [`${CF}/docs/bridge-next.html`, text(BRIDGE_PAGE_HTML, "text/html")],
     [`${CF}/docs/probe.html`, text(PROBE_PAGE_HTML, "text/html")],
+    [`${CF}/docs/check-broken.html`, text(CHECK_BROKEN_HTML, "text/html")],
     // The page library's pages (mock/pagelib/; e2e/page-library.spec.ts).
     ...Object.entries(pagelibPages()).map(([name, html]): [string, Entry] => [`${CF}/docs/pagelib/${name}`, text(html, "text/html")]),
     // Outside every project, as the daemon places it (e2e/welcome-page.spec.ts).

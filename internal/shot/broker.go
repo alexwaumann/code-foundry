@@ -1,6 +1,8 @@
 // Package shot brokers screenshots of plugin surfaces between whoever asks
 // (PluginService.ShotSurface: the CLI's plugin surface --shot) and the app's host, which
-// draws them (docs/notes/plugin-surface-shot-daemon.md). The host holds one capturer
+// draws them (docs/notes/plugin-surface-shot-daemon.md), and page checks
+// (PageService.CheckPage, a ShotRequest with a page: docs/notes/page-self-check.md), which
+// the host renders the same way and answers with a report. The host holds one capturer
 // stream (UiService.WatchShots) and answers each request by its id (UiService.PublishShot);
 // the broker numbers requests, waits for the answer with a timeout and caps its size. It
 // owns no process and imports no store: with no capturer, a shot fails at once.
@@ -49,7 +51,7 @@ var (
 	ErrUnknownID  = errors.New("no screenshot is waiting on this id (it timed out or was never asked)")
 	ErrTooLarge   = fmt.Errorf("the PNG is over %d MiB", MaxPNG>>20)
 	ErrNotPNG     = errors.New("the bytes are not a PNG")
-	ErrEmpty      = errors.New("an answer needs a PNG or an error")
+	ErrEmpty      = errors.New("an answer needs a PNG or an error (a page check's, its report)")
 )
 
 // CaptureError is the app's own reason it could not draw a shot.
@@ -59,9 +61,13 @@ func (e *CaptureError) Error() string { return e.Reason }
 
 // Result is a shot as the app drew it.
 type Result struct {
+	// PNG is the snapshot; a page check's may be empty (not asked for, or not drawn: its
+	// report's shot_error says why).
 	PNG []byte
 	// ContentHeight is the view's content height in CSS pixels.
 	ContentHeight int
+	// PageReport is a page check's report; nil for a surface.
+	PageReport *v1.PageCheckReport
 }
 
 // pngMagic starts every PNG.
@@ -76,6 +82,8 @@ type capturer struct {
 type waiter struct {
 	by  *capturer
 	res chan answer
+	// page: the request is a page check, answered by a report.
+	page bool
 }
 
 type answer struct {
@@ -143,15 +151,17 @@ func (b *Broker) Connected() bool {
 	return b.cap != nil
 }
 
-// Shoot asks the capturer for req (its id is set here) and waits for the answer: the PNG,
-// the app's *CaptureError, ErrNoCapturer, ErrBusy, ErrTimeout, ErrGone, or ctx's error.
+// Shoot asks the capturer for req (its id is set here) and waits for the answer: the PNG
+// (and a page check's report), the app's *CaptureError, ErrNoCapturer, ErrBusy, ErrTimeout,
+// ErrGone, or ctx's error. A page check waits its settle time longer.
 func (b *Broker) Shoot(ctx context.Context, req *v1.ShotRequest) (Result, error) {
 	id, err := newID()
 	if err != nil {
 		return Result{}, err
 	}
 	req.Id = id
-	w := &waiter{res: make(chan answer, 1)}
+	w := &waiter{res: make(chan answer, 1), page: req.GetPage() != nil}
+	wait := b.timeout + time.Duration(req.GetPage().GetSettleMs())*time.Millisecond
 	b.mu.Lock()
 	if b.cap == nil {
 		b.mu.Unlock()
@@ -172,7 +182,7 @@ func (b *Broker) Shoot(ctx context.Context, req *v1.ShotRequest) (Result, error)
 		b.mu.Unlock()
 	}()
 
-	t := time.NewTimer(b.timeout)
+	t := time.NewTimer(wait)
 	defer t.Stop()
 	select {
 	case a := <-w.res:
@@ -192,9 +202,11 @@ func (b *Broker) Shoot(ctx context.Context, req *v1.ShotRequest) (Result, error)
 	}
 }
 
-// Publish answers the request id with a PNG or the app's reason it has none. An oversize
-// or invalid PNG fails both the publish and the shot waiting on it.
-func (b *Broker) Publish(id string, png []byte, reason string, contentHeight int) error {
+// Publish answers the request m.id with a PNG or the app's reason it has none; a page
+// check's with its report, and a PNG only if one was drawn. An oversize or invalid PNG fails
+// both the publish and the shot waiting on it.
+func (b *Broker) Publish(m *v1.PublishShotRequest) error {
+	id, png, reason, contentHeight := m.GetId(), m.GetPng(), m.GetError(), int(m.GetContentHeight())
 	b.mu.Lock()
 	w, ok := b.waiting[id]
 	if ok {
@@ -210,6 +222,10 @@ func (b *Broker) Publish(id string, png []byte, reason string, contentHeight int
 	}
 	var a answer
 	switch {
+	case w.page && m.GetPageReport() == nil:
+		a.err = ErrEmpty
+	case w.page && len(png) == 0:
+		a.res = Result{PageReport: m.GetPageReport(), ContentHeight: max(contentHeight, 0)}
 	case len(png) == 0:
 		a.err = ErrEmpty
 	case len(png) > b.maxPNG:
@@ -217,7 +233,7 @@ func (b *Broker) Publish(id string, png []byte, reason string, contentHeight int
 	case !bytes.HasPrefix(png, pngMagic):
 		a.err = ErrNotPNG
 	default:
-		a.res = Result{PNG: png, ContentHeight: max(contentHeight, 0)}
+		a.res = Result{PNG: png, ContentHeight: max(contentHeight, 0), PageReport: m.GetPageReport()}
 	}
 	w.res <- a
 	return a.err

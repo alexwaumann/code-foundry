@@ -101,6 +101,14 @@
     return e;
   }
 
+  // A call refused here, before it reached the app (no click for a verb that changes
+  // something, args it cannot send, no such source): the page gets the error as before, and
+  // the app is told, for a page check (cf:refused; docs/notes/page-self-check.md).
+  function refused(call, e) {
+    if (e && e.name === "CfError") post({ type: "cf:refused", call: String(call).slice(0, 200), code: String(e.code), message: String(e.message).slice(0, 500) });
+    return e;
+  }
+
   // Gestures: transient user activation, or a real press, click or key in the page in the
   // last 5 s. Either is enough: in the app's old side panel WebKit reported isActive false
   // inside a genuine click's handler (docs/notes/bridge-fix-c-gui.md), so the API alone
@@ -192,7 +200,7 @@
       clean = normalizeArgs(args);
       if (tooLarge({ type: "cf:run", verb: verb, args: clean })) throw cfError("invalid", verb + ": the args are too large: 256 KiB of text at most, all together (base64 makes bytes a third larger)");
     } catch (e) {
-      return Promise.reject(e);
+      return Promise.reject(refused(typeof verb === "string" && verb ? verb : "cf.run", e));
     }
     return whenReady(READY_MS).then(function () {
       // Only a command the app has (cf:ready's verbs; none from an older app, or one that could
@@ -201,7 +209,7 @@
       // page after a click it does not need.
       var verbs = readyMsg.verbs;
       var known = !Array.isArray(verbs) || verbs.length === 0 || verbs.indexOf(verb) >= 0;
-      if (!readOnly[verb] && !gesture && known && !readyMsg.refusal) throw gestureError(verb);
+      if (!readOnly[verb] && !gesture && known && !readyMsg.refusal) throw refused(verb, gestureError(verb));
       return new Promise(function (resolve, reject) {
         var id = nextId();
         var p = { resolve: resolve, reject: reject, timer: 0, left: timeout, until: 0, verb: verb, total: timeout, msg: { type: "cf:run", id: id, verb: verb, args: clean }, sent: false };
@@ -324,7 +332,7 @@
     try {
       msg = fetchMessage(url, init);
     } catch (e) {
-      return Promise.reject(e);
+      return Promise.reject(refused("cf.fetch", e));
     }
     return whenReady(READY_MS).then(function () {
       if (!may("fetch")) throw denied("cf.fetch");
@@ -367,12 +375,12 @@
 
   function on(source, fn, onError) {
     if (typeof source !== "string" || source === "" || typeof fn !== "function") {
-      throw cfError("invalid", "cf.on(source, fn): a source name and a function");
+      throw refused("cf.on", cfError("invalid", "cf.on(source, fn): a source name and a function"));
     }
     // Before cf:ready, and on a page given no sources (the app refuses its calls, saying why), every name.
     var known = readyMsg && cf.sources.length > 0 ? cf.sources : SOURCES;
     if (known.indexOf(source) < 0) {
-      throw cfError("invalid", "cf.on: no source " + source + "; the sources are " + known.join(", "));
+      throw refused('cf.on("' + source + '")', cfError("invalid", "cf.on: no source " + source + "; the sources are " + known.join(", ")));
     }
     var id = nextId();
     subs[id] = { source: source, fn: fn, onError: typeof onError === "function" ? onError : null };

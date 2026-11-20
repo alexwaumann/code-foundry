@@ -17,7 +17,11 @@
 // answers nothing went to another site, and the app offers to load the page again
 // (docs/notes/leftovers-pages.md). The answer also says what the document loaded from its
 // own origin and whether it uses the app's theme, so the app reloads it ({ type: "cf:reload" })
-// when one of its files is written, and on a theme change only when it uses the theme; a page
+// when one of its files is written, and on a theme change only when it uses the theme, and
+// how tall the document is and how far the page library's TSX loader got (a page check:
+// docs/notes/page-self-check.md). The page's uncaught errors and rejections, the files it
+// could not load and the loader's own errors go to the app too ({ type: "cf:script-error",
+// kind, message, where }; the loader's end is { type: "cf:loader", state }); a page
 // in an opaque origin keeps localStorage, sessionStorage and cookies in memory until it
 // reloads (docs/notes/page-frame-states.md). It says where the page is scrolled to
 // ({ type: "cf:scroll" }) and goes back there when the app's ping hands that back, so a page
@@ -28,6 +32,8 @@
   if (window.parent === window || window.__cfFrame) return;
   window.__cfFrame = true;
   var parent = window.parent;
+  // The lines this script adds to the document (see at()).
+  var ADDED = document.currentScript && document.currentScript.text ? document.currentScript.text.split("\n").length - 1 : 0;
   var GESTURE_MS = 5000; // how long after a press or key a window.open counts as the user's
   var MAX_URL = 2048;
   var MAX_TEXT = 200;
@@ -292,6 +298,73 @@
   function report(what, text) {
     if (answered || !pageTop) unsupported(what, text);
     else early.push([what, text]);
+  }
+
+  // The page's own errors (a page check reads them; docs/notes/page-self-check.md): held
+  // until the app's ping like the reports above, at most MAX_ERRORS of them per document.
+  var MAX_ERRORS = 50;
+  var errorsTold = 0;
+  var heldErrors = [];
+  function tellError(kind, message, where) {
+    if (!pageTop || errorsTold >= MAX_ERRORS) return;
+    errorsTold++;
+    var m = { type: "cf:script-error", kind: kind, message: String(message).slice(0, 2000), where: String(where || "").slice(0, MAX_URL) };
+    if (answered) post(m);
+    else heldErrors.push(m);
+  }
+  // "page.html:42:13" from a file URL and its line and column; "" without a file. The daemon
+  // writes this script in just after <head>, so a line the browser gives in the document is
+  // this script's own line count past the file's. A TSX module's blob URL is named by the
+  // page library's loader (/cf/jsx.js), which runs it.
+  function at(file, line, col) {
+    if (!file) return "";
+    file = String(file);
+    var named = /^blob:/.test(file) && typeof window.__cfSourceName === "function" ? window.__cfSourceName(file) || file : file;
+    var name = named.split(/[?#]/)[0].split("/").pop() || named;
+    var n = Number(line) || 0;
+    if (n > ADDED && file.split(/[?#]/)[0] === location.href.split(/[?#]/)[0]) n -= ADDED;
+    return n ? name + ":" + n + (col ? ":" + col : "") : name;
+  }
+  // Where a stack's first frame is, as at() says it.
+  function stackAt(stack) {
+    var m = /([^\s@()]+):(\d+):(\d+)/.exec(String(stack || ""));
+    return m ? at(m[1], m[2], m[3]) : "";
+  }
+  function errorText(err) {
+    if (err && typeof err === "object" && typeof err.message === "string") return (err.name && err.name !== "Error" ? err.name + ": " : "") + err.message;
+    return String(err);
+  }
+  window.addEventListener(
+    "error",
+    function (e) {
+      var el = e.target;
+      if (el && el !== window && el.nodeType === 1) {
+        // A script, stylesheet, image or frame that did not load (it does not bubble).
+        var url = el.src || el.href || "";
+        if (url) tellError("resource", el.localName + " did not load", url);
+        return;
+      }
+      var msg = e.message || "";
+      if (/^ResizeObserver loop/.test(msg)) return;
+      if (e.error) tellError("script", errorText(e.error), at(e.filename, e.lineno, e.colno) || stackAt(e.error.stack));
+      else tellError("script", msg === "Script error." ? "Script error. (the browser hid it: thrown inside code of another origin)" : msg, at(e.filename, e.lineno, e.colno));
+    },
+    true,
+  );
+  window.addEventListener("unhandledrejection", function (e) {
+    var r = e.reason;
+    tellError("rejection", errorText(r), r && typeof r === "object" ? stackAt(r.stack) : "");
+  });
+  // The page library's loader (/cf/jsx.js) says what it could not run and when it is done.
+  window.addEventListener("cf:jsx", function (e) {
+    var d = e.detail || {};
+    if (typeof d.error === "string") tellError("loader", d.error, "");
+    else if (typeof d.state === "string" && pageTop) post({ type: "cf:loader", state: d.state });
+  });
+  // How tall the document is, and the loader's state on <html> ("" without it).
+  function shape() {
+    var root = document.documentElement;
+    return { height: Math.ceil(Math.max(root ? root.scrollHeight : 0, document.body ? document.body.scrollHeight : 0)), loader: (root && root.getAttribute("data-cf-jsx")) || "" };
   }
   var opaque = false;
   try {
@@ -595,10 +668,12 @@
       if (m.type !== "cf:ping" || typeof m.seq !== "number") return;
       noteLoaded();
       answered = true;
-      post({ type: "cf:here", seq: m.seq, files: files.slice(), theme: themed() });
+      var now = shape();
+      post({ type: "cf:here", seq: m.seq, files: files.slice(), theme: themed(), height: now.height, loader: now.loader });
       early.splice(0).forEach(function (r) {
         unsupported(r[0], r[1]);
       });
+      heldErrors.splice(0).forEach(post);
       var at = m.scroll;
       if (pageTop && at && typeof at === "object" && typeof at.path === "string") restoreScroll(at);
       return;

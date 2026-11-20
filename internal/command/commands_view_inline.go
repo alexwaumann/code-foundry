@@ -386,5 +386,6 @@ func (d ViewDeps) runInline(ctx context.Context, uctx Context, a Args) (Result, 
 			}
 		}
 	}
+	msg += "\n" + NextCheckLine(a.Path("path"), len(out.Warnings))
 	return Result{JSON: out, Message: msg, Warnings: out.Warnings}, nil
 }

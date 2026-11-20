@@ -75,7 +75,7 @@ func (x UiIntent_Notify_Level) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use UiIntent_Notify_Level.Descriptor instead.
 func (UiIntent_Notify_Level) EnumDescriptor() ([]byte, []int) {
-	return file_codefoundry_v1_ui_proto_rawDescGZIP(), []int{14, 9, 0}
+	return file_codefoundry_v1_ui_proto_rawDescGZIP(), []int{15, 9, 0}
 }
 
 // ThemeContrastIssue is one pair of resolved slots that falls short (the GUI's
@@ -419,7 +419,8 @@ func (*WatchShotsRequest) Descriptor() ([]byte, []int) {
 }
 
 // ShotRequest asks the app's host to draw a plugin surface in a hidden window of the
-// viewport's size and snapshot it (ShotSurfaceRequest, with an id).
+// viewport's size and snapshot it (ShotSurfaceRequest, with an id); or, with page, to
+// render a page and check it (PageService.CheckPage).
 type ShotRequest struct {
 	state      protoimpl.MessageState `protogen:"open.v1"`
 	Id         string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -427,8 +428,10 @@ type ShotRequest struct {
 	Instance   string                 `protobuf:"bytes,3,opt,name=instance,proto3" json:"instance,omitempty"`
 	MinVersion uint64                 `protobuf:"varint,4,opt,name=min_version,json=minVersion,proto3" json:"min_version,omitempty"`
 	// CSS pixels, within ShotSurfaceRequest's bounds.
-	Width         int32 `protobuf:"varint,5,opt,name=width,proto3" json:"width,omitempty"`
-	Height        int32 `protobuf:"varint,6,opt,name=height,proto3" json:"height,omitempty"`
+	Width  int32 `protobuf:"varint,5,opt,name=width,proto3" json:"width,omitempty"`
+	Height int32 `protobuf:"varint,6,opt,name=height,proto3" json:"height,omitempty"`
+	// A page check in place of a surface: answered with PublishShotRequest.page_report.
+	Page          *PageShot `protobuf:"bytes,7,opt,name=page,proto3" json:"page,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -505,6 +508,86 @@ func (x *ShotRequest) GetHeight() int32 {
 	return 0
 }
 
+func (x *ShotRequest) GetPage() *PageShot {
+	if x != nil {
+		return x.Page
+	}
+	return nil
+}
+
+// PageShot is the page a check renders (docs/notes/page-self-check.md).
+type PageShot struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The resolved path.
+	Path string `protobuf:"bytes,1,opt,name=path,proto3" json:"path,omitempty"`
+	// The thread the page acts for; "" for a page the user allowed, which no thread owns.
+	ThreadId string `protobuf:"bytes,2,opt,name=thread_id,json=threadId,proto3" json:"thread_id,omitempty"`
+	// The most to wait for the page to settle, in ms.
+	SettleMs int32 `protobuf:"varint,3,opt,name=settle_ms,json=settleMs,proto3" json:"settle_ms,omitempty"`
+	// Snapshot the card's frame too.
+	Png           bool `protobuf:"varint,4,opt,name=png,proto3" json:"png,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PageShot) Reset() {
+	*x = PageShot{}
+	mi := &file_codefoundry_v1_ui_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PageShot) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PageShot) ProtoMessage() {}
+
+func (x *PageShot) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_ui_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PageShot.ProtoReflect.Descriptor instead.
+func (*PageShot) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_ui_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *PageShot) GetPath() string {
+	if x != nil {
+		return x.Path
+	}
+	return ""
+}
+
+func (x *PageShot) GetThreadId() string {
+	if x != nil {
+		return x.ThreadId
+	}
+	return ""
+}
+
+func (x *PageShot) GetSettleMs() int32 {
+	if x != nil {
+		return x.SettleMs
+	}
+	return 0
+}
+
+func (x *PageShot) GetPng() bool {
+	if x != nil {
+		return x.Png
+	}
+	return false
+}
+
 type PublishShotRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// The ShotRequest's id.
@@ -515,13 +598,16 @@ type PublishShotRequest struct {
 	Error string `protobuf:"bytes,3,opt,name=error,proto3" json:"error,omitempty"`
 	// How tall the view's content is in CSS pixels.
 	ContentHeight int32 `protobuf:"varint,4,opt,name=content_height,json=contentHeight,proto3" json:"content_height,omitempty"`
+	// A page check's report (ShotRequest.page): it answers the request with or without a
+	// PNG (its shot_error says why there is none).
+	PageReport    *PageCheckReport `protobuf:"bytes,5,opt,name=page_report,json=pageReport,proto3" json:"page_report,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *PublishShotRequest) Reset() {
 	*x = PublishShotRequest{}
-	mi := &file_codefoundry_v1_ui_proto_msgTypes[7]
+	mi := &file_codefoundry_v1_ui_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -533,7 +619,7 @@ func (x *PublishShotRequest) String() string {
 func (*PublishShotRequest) ProtoMessage() {}
 
 func (x *PublishShotRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_ui_proto_msgTypes[7]
+	mi := &file_codefoundry_v1_ui_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -546,7 +632,7 @@ func (x *PublishShotRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PublishShotRequest.ProtoReflect.Descriptor instead.
 func (*PublishShotRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_ui_proto_rawDescGZIP(), []int{7}
+	return file_codefoundry_v1_ui_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *PublishShotRequest) GetId() string {
@@ -577,6 +663,13 @@ func (x *PublishShotRequest) GetContentHeight() int32 {
 	return 0
 }
 
+func (x *PublishShotRequest) GetPageReport() *PageCheckReport {
+	if x != nil {
+		return x.PageReport
+	}
+	return nil
+}
+
 type PublishShotResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -585,7 +678,7 @@ type PublishShotResponse struct {
 
 func (x *PublishShotResponse) Reset() {
 	*x = PublishShotResponse{}
-	mi := &file_codefoundry_v1_ui_proto_msgTypes[8]
+	mi := &file_codefoundry_v1_ui_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -597,7 +690,7 @@ func (x *PublishShotResponse) String() string {
 func (*PublishShotResponse) ProtoMessage() {}
 
 func (x *PublishShotResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_ui_proto_msgTypes[8]
+	mi := &file_codefoundry_v1_ui_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -610,7 +703,7 @@ func (x *PublishShotResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PublishShotResponse.ProtoReflect.Descriptor instead.
 func (*PublishShotResponse) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_ui_proto_rawDescGZIP(), []int{8}
+	return file_codefoundry_v1_ui_proto_rawDescGZIP(), []int{9}
 }
 
 type PublishThemeRequest struct {
@@ -628,7 +721,7 @@ type PublishThemeRequest struct {
 
 func (x *PublishThemeRequest) Reset() {
 	*x = PublishThemeRequest{}
-	mi := &file_codefoundry_v1_ui_proto_msgTypes[9]
+	mi := &file_codefoundry_v1_ui_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -640,7 +733,7 @@ func (x *PublishThemeRequest) String() string {
 func (*PublishThemeRequest) ProtoMessage() {}
 
 func (x *PublishThemeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_ui_proto_msgTypes[9]
+	mi := &file_codefoundry_v1_ui_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -653,7 +746,7 @@ func (x *PublishThemeRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PublishThemeRequest.ProtoReflect.Descriptor instead.
 func (*PublishThemeRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_ui_proto_rawDescGZIP(), []int{9}
+	return file_codefoundry_v1_ui_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *PublishThemeRequest) GetId() string {
@@ -685,7 +778,7 @@ type PublishThemeResponse struct {
 
 func (x *PublishThemeResponse) Reset() {
 	*x = PublishThemeResponse{}
-	mi := &file_codefoundry_v1_ui_proto_msgTypes[10]
+	mi := &file_codefoundry_v1_ui_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -697,7 +790,7 @@ func (x *PublishThemeResponse) String() string {
 func (*PublishThemeResponse) ProtoMessage() {}
 
 func (x *PublishThemeResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_ui_proto_msgTypes[10]
+	mi := &file_codefoundry_v1_ui_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -710,7 +803,7 @@ func (x *PublishThemeResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PublishThemeResponse.ProtoReflect.Descriptor instead.
 func (*PublishThemeResponse) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_ui_proto_rawDescGZIP(), []int{10}
+	return file_codefoundry_v1_ui_proto_rawDescGZIP(), []int{11}
 }
 
 type GetThemeRequest struct {
@@ -721,7 +814,7 @@ type GetThemeRequest struct {
 
 func (x *GetThemeRequest) Reset() {
 	*x = GetThemeRequest{}
-	mi := &file_codefoundry_v1_ui_proto_msgTypes[11]
+	mi := &file_codefoundry_v1_ui_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -733,7 +826,7 @@ func (x *GetThemeRequest) String() string {
 func (*GetThemeRequest) ProtoMessage() {}
 
 func (x *GetThemeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_ui_proto_msgTypes[11]
+	mi := &file_codefoundry_v1_ui_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -746,7 +839,7 @@ func (x *GetThemeRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetThemeRequest.ProtoReflect.Descriptor instead.
 func (*GetThemeRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_ui_proto_rawDescGZIP(), []int{11}
+	return file_codefoundry_v1_ui_proto_rawDescGZIP(), []int{12}
 }
 
 // GetThemeResponse is the theme PublishThemeRequest last carried.
@@ -763,7 +856,7 @@ type GetThemeResponse struct {
 
 func (x *GetThemeResponse) Reset() {
 	*x = GetThemeResponse{}
-	mi := &file_codefoundry_v1_ui_proto_msgTypes[12]
+	mi := &file_codefoundry_v1_ui_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -775,7 +868,7 @@ func (x *GetThemeResponse) String() string {
 func (*GetThemeResponse) ProtoMessage() {}
 
 func (x *GetThemeResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_ui_proto_msgTypes[12]
+	mi := &file_codefoundry_v1_ui_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -788,7 +881,7 @@ func (x *GetThemeResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetThemeResponse.ProtoReflect.Descriptor instead.
 func (*GetThemeResponse) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_ui_proto_rawDescGZIP(), []int{12}
+	return file_codefoundry_v1_ui_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *GetThemeResponse) GetId() string {
@@ -827,7 +920,7 @@ type WatchIntentsRequest struct {
 
 func (x *WatchIntentsRequest) Reset() {
 	*x = WatchIntentsRequest{}
-	mi := &file_codefoundry_v1_ui_proto_msgTypes[13]
+	mi := &file_codefoundry_v1_ui_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -839,7 +932,7 @@ func (x *WatchIntentsRequest) String() string {
 func (*WatchIntentsRequest) ProtoMessage() {}
 
 func (x *WatchIntentsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_ui_proto_msgTypes[13]
+	mi := &file_codefoundry_v1_ui_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -852,7 +945,7 @@ func (x *WatchIntentsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WatchIntentsRequest.ProtoReflect.Descriptor instead.
 func (*WatchIntentsRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_ui_proto_rawDescGZIP(), []int{13}
+	return file_codefoundry_v1_ui_proto_rawDescGZIP(), []int{14}
 }
 
 type UiIntent struct {
@@ -876,7 +969,7 @@ type UiIntent struct {
 
 func (x *UiIntent) Reset() {
 	*x = UiIntent{}
-	mi := &file_codefoundry_v1_ui_proto_msgTypes[14]
+	mi := &file_codefoundry_v1_ui_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -888,7 +981,7 @@ func (x *UiIntent) String() string {
 func (*UiIntent) ProtoMessage() {}
 
 func (x *UiIntent) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_ui_proto_msgTypes[14]
+	mi := &file_codefoundry_v1_ui_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -901,7 +994,7 @@ func (x *UiIntent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UiIntent.ProtoReflect.Descriptor instead.
 func (*UiIntent) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_ui_proto_rawDescGZIP(), []int{14}
+	return file_codefoundry_v1_ui_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *UiIntent) GetIntent() isUiIntent_Intent {
@@ -1080,7 +1173,7 @@ type UiIntent_StageComposer struct {
 
 func (x *UiIntent_StageComposer) Reset() {
 	*x = UiIntent_StageComposer{}
-	mi := &file_codefoundry_v1_ui_proto_msgTypes[17]
+	mi := &file_codefoundry_v1_ui_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1092,7 +1185,7 @@ func (x *UiIntent_StageComposer) String() string {
 func (*UiIntent_StageComposer) ProtoMessage() {}
 
 func (x *UiIntent_StageComposer) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_ui_proto_msgTypes[17]
+	mi := &file_codefoundry_v1_ui_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1105,7 +1198,7 @@ func (x *UiIntent_StageComposer) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UiIntent_StageComposer.ProtoReflect.Descriptor instead.
 func (*UiIntent_StageComposer) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_ui_proto_rawDescGZIP(), []int{14, 0}
+	return file_codefoundry_v1_ui_proto_rawDescGZIP(), []int{15, 0}
 }
 
 func (x *UiIntent_StageComposer) GetThreadId() string {
@@ -1139,7 +1232,7 @@ type UiIntent_InvokeCommand struct {
 
 func (x *UiIntent_InvokeCommand) Reset() {
 	*x = UiIntent_InvokeCommand{}
-	mi := &file_codefoundry_v1_ui_proto_msgTypes[18]
+	mi := &file_codefoundry_v1_ui_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1151,7 +1244,7 @@ func (x *UiIntent_InvokeCommand) String() string {
 func (*UiIntent_InvokeCommand) ProtoMessage() {}
 
 func (x *UiIntent_InvokeCommand) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_ui_proto_msgTypes[18]
+	mi := &file_codefoundry_v1_ui_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1164,7 +1257,7 @@ func (x *UiIntent_InvokeCommand) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UiIntent_InvokeCommand.ProtoReflect.Descriptor instead.
 func (*UiIntent_InvokeCommand) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_ui_proto_rawDescGZIP(), []int{14, 1}
+	return file_codefoundry_v1_ui_proto_rawDescGZIP(), []int{15, 1}
 }
 
 func (x *UiIntent_InvokeCommand) GetName() string {
@@ -1210,7 +1303,7 @@ type UiIntent_ShowAgentRun struct {
 
 func (x *UiIntent_ShowAgentRun) Reset() {
 	*x = UiIntent_ShowAgentRun{}
-	mi := &file_codefoundry_v1_ui_proto_msgTypes[19]
+	mi := &file_codefoundry_v1_ui_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1222,7 +1315,7 @@ func (x *UiIntent_ShowAgentRun) String() string {
 func (*UiIntent_ShowAgentRun) ProtoMessage() {}
 
 func (x *UiIntent_ShowAgentRun) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_ui_proto_msgTypes[19]
+	mi := &file_codefoundry_v1_ui_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1235,7 +1328,7 @@ func (x *UiIntent_ShowAgentRun) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UiIntent_ShowAgentRun.ProtoReflect.Descriptor instead.
 func (*UiIntent_ShowAgentRun) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_ui_proto_rawDescGZIP(), []int{14, 2}
+	return file_codefoundry_v1_ui_proto_rawDescGZIP(), []int{15, 2}
 }
 
 func (x *UiIntent_ShowAgentRun) GetThreadId() string {
@@ -1264,7 +1357,7 @@ type UiIntent_PlayAlertSound struct {
 
 func (x *UiIntent_PlayAlertSound) Reset() {
 	*x = UiIntent_PlayAlertSound{}
-	mi := &file_codefoundry_v1_ui_proto_msgTypes[20]
+	mi := &file_codefoundry_v1_ui_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1276,7 +1369,7 @@ func (x *UiIntent_PlayAlertSound) String() string {
 func (*UiIntent_PlayAlertSound) ProtoMessage() {}
 
 func (x *UiIntent_PlayAlertSound) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_ui_proto_msgTypes[20]
+	mi := &file_codefoundry_v1_ui_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1289,7 +1382,7 @@ func (x *UiIntent_PlayAlertSound) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UiIntent_PlayAlertSound.ProtoReflect.Descriptor instead.
 func (*UiIntent_PlayAlertSound) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_ui_proto_rawDescGZIP(), []int{14, 3}
+	return file_codefoundry_v1_ui_proto_rawDescGZIP(), []int{15, 3}
 }
 
 func (x *UiIntent_PlayAlertSound) GetVolume() int32 {
@@ -1316,7 +1409,7 @@ type UiIntent_ShowView struct {
 
 func (x *UiIntent_ShowView) Reset() {
 	*x = UiIntent_ShowView{}
-	mi := &file_codefoundry_v1_ui_proto_msgTypes[21]
+	mi := &file_codefoundry_v1_ui_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1328,7 +1421,7 @@ func (x *UiIntent_ShowView) String() string {
 func (*UiIntent_ShowView) ProtoMessage() {}
 
 func (x *UiIntent_ShowView) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_ui_proto_msgTypes[21]
+	mi := &file_codefoundry_v1_ui_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1341,7 +1434,7 @@ func (x *UiIntent_ShowView) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UiIntent_ShowView.ProtoReflect.Descriptor instead.
 func (*UiIntent_ShowView) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_ui_proto_rawDescGZIP(), []int{14, 4}
+	return file_codefoundry_v1_ui_proto_rawDescGZIP(), []int{15, 4}
 }
 
 func (x *UiIntent_ShowView) GetName() string {
@@ -1371,7 +1464,7 @@ type UiIntent_FocusThread struct {
 
 func (x *UiIntent_FocusThread) Reset() {
 	*x = UiIntent_FocusThread{}
-	mi := &file_codefoundry_v1_ui_proto_msgTypes[22]
+	mi := &file_codefoundry_v1_ui_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1383,7 +1476,7 @@ func (x *UiIntent_FocusThread) String() string {
 func (*UiIntent_FocusThread) ProtoMessage() {}
 
 func (x *UiIntent_FocusThread) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_ui_proto_msgTypes[22]
+	mi := &file_codefoundry_v1_ui_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1396,7 +1489,7 @@ func (x *UiIntent_FocusThread) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UiIntent_FocusThread.ProtoReflect.Descriptor instead.
 func (*UiIntent_FocusThread) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_ui_proto_rawDescGZIP(), []int{14, 5}
+	return file_codefoundry_v1_ui_proto_rawDescGZIP(), []int{15, 5}
 }
 
 func (x *UiIntent_FocusThread) GetThreadId() string {
@@ -1422,7 +1515,7 @@ type UiIntent_FocusTerminal struct {
 
 func (x *UiIntent_FocusTerminal) Reset() {
 	*x = UiIntent_FocusTerminal{}
-	mi := &file_codefoundry_v1_ui_proto_msgTypes[23]
+	mi := &file_codefoundry_v1_ui_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1434,7 +1527,7 @@ func (x *UiIntent_FocusTerminal) String() string {
 func (*UiIntent_FocusTerminal) ProtoMessage() {}
 
 func (x *UiIntent_FocusTerminal) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_ui_proto_msgTypes[23]
+	mi := &file_codefoundry_v1_ui_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1447,7 +1540,7 @@ func (x *UiIntent_FocusTerminal) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UiIntent_FocusTerminal.ProtoReflect.Descriptor instead.
 func (*UiIntent_FocusTerminal) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_ui_proto_rawDescGZIP(), []int{14, 6}
+	return file_codefoundry_v1_ui_proto_rawDescGZIP(), []int{15, 6}
 }
 
 func (x *UiIntent_FocusTerminal) GetTerminalId() string {
@@ -1467,7 +1560,7 @@ type UiIntent_FocusProject struct {
 
 func (x *UiIntent_FocusProject) Reset() {
 	*x = UiIntent_FocusProject{}
-	mi := &file_codefoundry_v1_ui_proto_msgTypes[24]
+	mi := &file_codefoundry_v1_ui_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1479,7 +1572,7 @@ func (x *UiIntent_FocusProject) String() string {
 func (*UiIntent_FocusProject) ProtoMessage() {}
 
 func (x *UiIntent_FocusProject) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_ui_proto_msgTypes[24]
+	mi := &file_codefoundry_v1_ui_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1492,7 +1585,7 @@ func (x *UiIntent_FocusProject) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UiIntent_FocusProject.ProtoReflect.Descriptor instead.
 func (*UiIntent_FocusProject) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_ui_proto_rawDescGZIP(), []int{14, 7}
+	return file_codefoundry_v1_ui_proto_rawDescGZIP(), []int{15, 7}
 }
 
 func (x *UiIntent_FocusProject) GetProjectId() string {
@@ -1519,7 +1612,7 @@ type UiIntent_OpenPalette struct {
 
 func (x *UiIntent_OpenPalette) Reset() {
 	*x = UiIntent_OpenPalette{}
-	mi := &file_codefoundry_v1_ui_proto_msgTypes[25]
+	mi := &file_codefoundry_v1_ui_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1531,7 +1624,7 @@ func (x *UiIntent_OpenPalette) String() string {
 func (*UiIntent_OpenPalette) ProtoMessage() {}
 
 func (x *UiIntent_OpenPalette) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_ui_proto_msgTypes[25]
+	mi := &file_codefoundry_v1_ui_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1544,7 +1637,7 @@ func (x *UiIntent_OpenPalette) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UiIntent_OpenPalette.ProtoReflect.Descriptor instead.
 func (*UiIntent_OpenPalette) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_ui_proto_rawDescGZIP(), []int{14, 8}
+	return file_codefoundry_v1_ui_proto_rawDescGZIP(), []int{15, 8}
 }
 
 func (x *UiIntent_OpenPalette) GetQuery() string {
@@ -1578,7 +1671,7 @@ type UiIntent_Notify struct {
 
 func (x *UiIntent_Notify) Reset() {
 	*x = UiIntent_Notify{}
-	mi := &file_codefoundry_v1_ui_proto_msgTypes[26]
+	mi := &file_codefoundry_v1_ui_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1590,7 +1683,7 @@ func (x *UiIntent_Notify) String() string {
 func (*UiIntent_Notify) ProtoMessage() {}
 
 func (x *UiIntent_Notify) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_ui_proto_msgTypes[26]
+	mi := &file_codefoundry_v1_ui_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1603,7 +1696,7 @@ func (x *UiIntent_Notify) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UiIntent_Notify.ProtoReflect.Descriptor instead.
 func (*UiIntent_Notify) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_ui_proto_rawDescGZIP(), []int{14, 9}
+	return file_codefoundry_v1_ui_proto_rawDescGZIP(), []int{15, 9}
 }
 
 func (x *UiIntent_Notify) GetLevel() UiIntent_Notify_Level {
@@ -1666,7 +1759,7 @@ var File_codefoundry_v1_ui_proto protoreflect.FileDescriptor
 
 const file_codefoundry_v1_ui_proto_rawDesc = "" +
 	"\n" +
-	"\x17codefoundry/v1/ui.proto\x12\x0ecodefoundry.v1\x1a\x1ccodefoundry/v1/command.proto\x1a\x1bcodefoundry/v1/plugin.proto\"\x8a\x01\n" +
+	"\x17codefoundry/v1/ui.proto\x12\x0ecodefoundry.v1\x1a\x1ccodefoundry/v1/command.proto\x1a\x19codefoundry/v1/page.proto\x1a\x1bcodefoundry/v1/plugin.proto\"\x8a\x01\n" +
 	"\x12ThemeContrastIssue\x12\x12\n" +
 	"\x04slot\x18\x01 \x01(\tR\x04slot\x12\x18\n" +
 	"\aagainst\x18\x02 \x01(\tR\aagainst\x12\x14\n" +
@@ -1686,7 +1779,7 @@ const file_codefoundry_v1_ui_proto_rawDesc = "" +
 	"\x19PublishThemeReportRequest\x125\n" +
 	"\areports\x18\x01 \x03(\v2\x1b.codefoundry.v1.ThemeReportR\areports\"\x1c\n" +
 	"\x1aPublishThemeReportResponse\"\x13\n" +
-	"\x11WatchShotsRequest\"\xb6\x01\n" +
+	"\x11WatchShotsRequest\"\xe4\x01\n" +
 	"\vShotRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12,\n" +
 	"\x03ref\x18\x02 \x01(\v2\x1a.codefoundry.v1.SurfaceRefR\x03ref\x12\x1a\n" +
@@ -1694,12 +1787,20 @@ const file_codefoundry_v1_ui_proto_rawDesc = "" +
 	"\vmin_version\x18\x04 \x01(\x04R\n" +
 	"minVersion\x12\x14\n" +
 	"\x05width\x18\x05 \x01(\x05R\x05width\x12\x16\n" +
-	"\x06height\x18\x06 \x01(\x05R\x06height\"s\n" +
+	"\x06height\x18\x06 \x01(\x05R\x06height\x12,\n" +
+	"\x04page\x18\a \x01(\v2\x18.codefoundry.v1.PageShotR\x04page\"j\n" +
+	"\bPageShot\x12\x12\n" +
+	"\x04path\x18\x01 \x01(\tR\x04path\x12\x1b\n" +
+	"\tthread_id\x18\x02 \x01(\tR\bthreadId\x12\x1b\n" +
+	"\tsettle_ms\x18\x03 \x01(\x05R\bsettleMs\x12\x10\n" +
+	"\x03png\x18\x04 \x01(\bR\x03png\"\xb5\x01\n" +
 	"\x12PublishShotRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x10\n" +
 	"\x03png\x18\x02 \x01(\fR\x03png\x12\x14\n" +
 	"\x05error\x18\x03 \x01(\tR\x05error\x12%\n" +
-	"\x0econtent_height\x18\x04 \x01(\x05R\rcontentHeight\"\x15\n" +
+	"\x0econtent_height\x18\x04 \x01(\x05R\rcontentHeight\x12@\n" +
+	"\vpage_report\x18\x05 \x01(\v2\x1f.codefoundry.v1.PageCheckReportR\n" +
+	"pageReport\"\x15\n" +
 	"\x13PublishShotResponse\"\xb9\x01\n" +
 	"\x13PublishThemeRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x16\n" +
@@ -1806,7 +1907,7 @@ func file_codefoundry_v1_ui_proto_rawDescGZIP() []byte {
 }
 
 var file_codefoundry_v1_ui_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_codefoundry_v1_ui_proto_msgTypes = make([]protoimpl.MessageInfo, 29)
+var file_codefoundry_v1_ui_proto_msgTypes = make([]protoimpl.MessageInfo, 30)
 var file_codefoundry_v1_ui_proto_goTypes = []any{
 	(UiIntent_Notify_Level)(0),         // 0: codefoundry.v1.UiIntent.Notify.Level
 	(*ThemeContrastIssue)(nil),         // 1: codefoundry.v1.ThemeContrastIssue
@@ -1816,69 +1917,73 @@ var file_codefoundry_v1_ui_proto_goTypes = []any{
 	(*PublishThemeReportResponse)(nil), // 5: codefoundry.v1.PublishThemeReportResponse
 	(*WatchShotsRequest)(nil),          // 6: codefoundry.v1.WatchShotsRequest
 	(*ShotRequest)(nil),                // 7: codefoundry.v1.ShotRequest
-	(*PublishShotRequest)(nil),         // 8: codefoundry.v1.PublishShotRequest
-	(*PublishShotResponse)(nil),        // 9: codefoundry.v1.PublishShotResponse
-	(*PublishThemeRequest)(nil),        // 10: codefoundry.v1.PublishThemeRequest
-	(*PublishThemeResponse)(nil),       // 11: codefoundry.v1.PublishThemeResponse
-	(*GetThemeRequest)(nil),            // 12: codefoundry.v1.GetThemeRequest
-	(*GetThemeResponse)(nil),           // 13: codefoundry.v1.GetThemeResponse
-	(*WatchIntentsRequest)(nil),        // 14: codefoundry.v1.WatchIntentsRequest
-	(*UiIntent)(nil),                   // 15: codefoundry.v1.UiIntent
-	nil,                                // 16: codefoundry.v1.PublishThemeRequest.VarsEntry
-	nil,                                // 17: codefoundry.v1.GetThemeResponse.VarsEntry
-	(*UiIntent_StageComposer)(nil),     // 18: codefoundry.v1.UiIntent.StageComposer
-	(*UiIntent_InvokeCommand)(nil),     // 19: codefoundry.v1.UiIntent.InvokeCommand
-	(*UiIntent_ShowAgentRun)(nil),      // 20: codefoundry.v1.UiIntent.ShowAgentRun
-	(*UiIntent_PlayAlertSound)(nil),    // 21: codefoundry.v1.UiIntent.PlayAlertSound
-	(*UiIntent_ShowView)(nil),          // 22: codefoundry.v1.UiIntent.ShowView
-	(*UiIntent_FocusThread)(nil),       // 23: codefoundry.v1.UiIntent.FocusThread
-	(*UiIntent_FocusTerminal)(nil),     // 24: codefoundry.v1.UiIntent.FocusTerminal
-	(*UiIntent_FocusProject)(nil),      // 25: codefoundry.v1.UiIntent.FocusProject
-	(*UiIntent_OpenPalette)(nil),       // 26: codefoundry.v1.UiIntent.OpenPalette
-	(*UiIntent_Notify)(nil),            // 27: codefoundry.v1.UiIntent.Notify
-	nil,                                // 28: codefoundry.v1.UiIntent.InvokeCommand.ArgsEntry
-	nil,                                // 29: codefoundry.v1.UiIntent.ShowView.ParamsEntry
-	(*SurfaceRef)(nil),                 // 30: codefoundry.v1.SurfaceRef
-	(*UiContext)(nil),                  // 31: codefoundry.v1.UiContext
+	(*PageShot)(nil),                   // 8: codefoundry.v1.PageShot
+	(*PublishShotRequest)(nil),         // 9: codefoundry.v1.PublishShotRequest
+	(*PublishShotResponse)(nil),        // 10: codefoundry.v1.PublishShotResponse
+	(*PublishThemeRequest)(nil),        // 11: codefoundry.v1.PublishThemeRequest
+	(*PublishThemeResponse)(nil),       // 12: codefoundry.v1.PublishThemeResponse
+	(*GetThemeRequest)(nil),            // 13: codefoundry.v1.GetThemeRequest
+	(*GetThemeResponse)(nil),           // 14: codefoundry.v1.GetThemeResponse
+	(*WatchIntentsRequest)(nil),        // 15: codefoundry.v1.WatchIntentsRequest
+	(*UiIntent)(nil),                   // 16: codefoundry.v1.UiIntent
+	nil,                                // 17: codefoundry.v1.PublishThemeRequest.VarsEntry
+	nil,                                // 18: codefoundry.v1.GetThemeResponse.VarsEntry
+	(*UiIntent_StageComposer)(nil),     // 19: codefoundry.v1.UiIntent.StageComposer
+	(*UiIntent_InvokeCommand)(nil),     // 20: codefoundry.v1.UiIntent.InvokeCommand
+	(*UiIntent_ShowAgentRun)(nil),      // 21: codefoundry.v1.UiIntent.ShowAgentRun
+	(*UiIntent_PlayAlertSound)(nil),    // 22: codefoundry.v1.UiIntent.PlayAlertSound
+	(*UiIntent_ShowView)(nil),          // 23: codefoundry.v1.UiIntent.ShowView
+	(*UiIntent_FocusThread)(nil),       // 24: codefoundry.v1.UiIntent.FocusThread
+	(*UiIntent_FocusTerminal)(nil),     // 25: codefoundry.v1.UiIntent.FocusTerminal
+	(*UiIntent_FocusProject)(nil),      // 26: codefoundry.v1.UiIntent.FocusProject
+	(*UiIntent_OpenPalette)(nil),       // 27: codefoundry.v1.UiIntent.OpenPalette
+	(*UiIntent_Notify)(nil),            // 28: codefoundry.v1.UiIntent.Notify
+	nil,                                // 29: codefoundry.v1.UiIntent.InvokeCommand.ArgsEntry
+	nil,                                // 30: codefoundry.v1.UiIntent.ShowView.ParamsEntry
+	(*SurfaceRef)(nil),                 // 31: codefoundry.v1.SurfaceRef
+	(*PageCheckReport)(nil),            // 32: codefoundry.v1.PageCheckReport
+	(*UiContext)(nil),                  // 33: codefoundry.v1.UiContext
 }
 var file_codefoundry_v1_ui_proto_depIdxs = []int32{
 	1,  // 0: codefoundry.v1.ThemeReport.issues:type_name -> codefoundry.v1.ThemeContrastIssue
 	2,  // 1: codefoundry.v1.ThemeReport.stale:type_name -> codefoundry.v1.ThemeStalePin
 	3,  // 2: codefoundry.v1.PublishThemeReportRequest.reports:type_name -> codefoundry.v1.ThemeReport
-	30, // 3: codefoundry.v1.ShotRequest.ref:type_name -> codefoundry.v1.SurfaceRef
-	16, // 4: codefoundry.v1.PublishThemeRequest.vars:type_name -> codefoundry.v1.PublishThemeRequest.VarsEntry
-	17, // 5: codefoundry.v1.GetThemeResponse.vars:type_name -> codefoundry.v1.GetThemeResponse.VarsEntry
-	24, // 6: codefoundry.v1.UiIntent.focus_terminal:type_name -> codefoundry.v1.UiIntent.FocusTerminal
-	25, // 7: codefoundry.v1.UiIntent.focus_project:type_name -> codefoundry.v1.UiIntent.FocusProject
-	26, // 8: codefoundry.v1.UiIntent.open_palette:type_name -> codefoundry.v1.UiIntent.OpenPalette
-	27, // 9: codefoundry.v1.UiIntent.notify:type_name -> codefoundry.v1.UiIntent.Notify
-	23, // 10: codefoundry.v1.UiIntent.focus_thread:type_name -> codefoundry.v1.UiIntent.FocusThread
-	22, // 11: codefoundry.v1.UiIntent.show_view:type_name -> codefoundry.v1.UiIntent.ShowView
-	21, // 12: codefoundry.v1.UiIntent.play_alert_sound:type_name -> codefoundry.v1.UiIntent.PlayAlertSound
-	20, // 13: codefoundry.v1.UiIntent.show_agent_run:type_name -> codefoundry.v1.UiIntent.ShowAgentRun
-	19, // 14: codefoundry.v1.UiIntent.invoke_command:type_name -> codefoundry.v1.UiIntent.InvokeCommand
-	18, // 15: codefoundry.v1.UiIntent.stage_composer:type_name -> codefoundry.v1.UiIntent.StageComposer
-	28, // 16: codefoundry.v1.UiIntent.InvokeCommand.args:type_name -> codefoundry.v1.UiIntent.InvokeCommand.ArgsEntry
-	31, // 17: codefoundry.v1.UiIntent.InvokeCommand.context:type_name -> codefoundry.v1.UiContext
-	29, // 18: codefoundry.v1.UiIntent.ShowView.params:type_name -> codefoundry.v1.UiIntent.ShowView.ParamsEntry
-	0,  // 19: codefoundry.v1.UiIntent.Notify.level:type_name -> codefoundry.v1.UiIntent.Notify.Level
-	14, // 20: codefoundry.v1.UiService.WatchIntents:input_type -> codefoundry.v1.WatchIntentsRequest
-	10, // 21: codefoundry.v1.UiService.PublishTheme:input_type -> codefoundry.v1.PublishThemeRequest
-	12, // 22: codefoundry.v1.UiService.GetTheme:input_type -> codefoundry.v1.GetThemeRequest
-	4,  // 23: codefoundry.v1.UiService.PublishThemeReport:input_type -> codefoundry.v1.PublishThemeReportRequest
-	6,  // 24: codefoundry.v1.UiService.WatchShots:input_type -> codefoundry.v1.WatchShotsRequest
-	8,  // 25: codefoundry.v1.UiService.PublishShot:input_type -> codefoundry.v1.PublishShotRequest
-	15, // 26: codefoundry.v1.UiService.WatchIntents:output_type -> codefoundry.v1.UiIntent
-	11, // 27: codefoundry.v1.UiService.PublishTheme:output_type -> codefoundry.v1.PublishThemeResponse
-	13, // 28: codefoundry.v1.UiService.GetTheme:output_type -> codefoundry.v1.GetThemeResponse
-	5,  // 29: codefoundry.v1.UiService.PublishThemeReport:output_type -> codefoundry.v1.PublishThemeReportResponse
-	7,  // 30: codefoundry.v1.UiService.WatchShots:output_type -> codefoundry.v1.ShotRequest
-	9,  // 31: codefoundry.v1.UiService.PublishShot:output_type -> codefoundry.v1.PublishShotResponse
-	26, // [26:32] is the sub-list for method output_type
-	20, // [20:26] is the sub-list for method input_type
-	20, // [20:20] is the sub-list for extension type_name
-	20, // [20:20] is the sub-list for extension extendee
-	0,  // [0:20] is the sub-list for field type_name
+	31, // 3: codefoundry.v1.ShotRequest.ref:type_name -> codefoundry.v1.SurfaceRef
+	8,  // 4: codefoundry.v1.ShotRequest.page:type_name -> codefoundry.v1.PageShot
+	32, // 5: codefoundry.v1.PublishShotRequest.page_report:type_name -> codefoundry.v1.PageCheckReport
+	17, // 6: codefoundry.v1.PublishThemeRequest.vars:type_name -> codefoundry.v1.PublishThemeRequest.VarsEntry
+	18, // 7: codefoundry.v1.GetThemeResponse.vars:type_name -> codefoundry.v1.GetThemeResponse.VarsEntry
+	25, // 8: codefoundry.v1.UiIntent.focus_terminal:type_name -> codefoundry.v1.UiIntent.FocusTerminal
+	26, // 9: codefoundry.v1.UiIntent.focus_project:type_name -> codefoundry.v1.UiIntent.FocusProject
+	27, // 10: codefoundry.v1.UiIntent.open_palette:type_name -> codefoundry.v1.UiIntent.OpenPalette
+	28, // 11: codefoundry.v1.UiIntent.notify:type_name -> codefoundry.v1.UiIntent.Notify
+	24, // 12: codefoundry.v1.UiIntent.focus_thread:type_name -> codefoundry.v1.UiIntent.FocusThread
+	23, // 13: codefoundry.v1.UiIntent.show_view:type_name -> codefoundry.v1.UiIntent.ShowView
+	22, // 14: codefoundry.v1.UiIntent.play_alert_sound:type_name -> codefoundry.v1.UiIntent.PlayAlertSound
+	21, // 15: codefoundry.v1.UiIntent.show_agent_run:type_name -> codefoundry.v1.UiIntent.ShowAgentRun
+	20, // 16: codefoundry.v1.UiIntent.invoke_command:type_name -> codefoundry.v1.UiIntent.InvokeCommand
+	19, // 17: codefoundry.v1.UiIntent.stage_composer:type_name -> codefoundry.v1.UiIntent.StageComposer
+	29, // 18: codefoundry.v1.UiIntent.InvokeCommand.args:type_name -> codefoundry.v1.UiIntent.InvokeCommand.ArgsEntry
+	33, // 19: codefoundry.v1.UiIntent.InvokeCommand.context:type_name -> codefoundry.v1.UiContext
+	30, // 20: codefoundry.v1.UiIntent.ShowView.params:type_name -> codefoundry.v1.UiIntent.ShowView.ParamsEntry
+	0,  // 21: codefoundry.v1.UiIntent.Notify.level:type_name -> codefoundry.v1.UiIntent.Notify.Level
+	15, // 22: codefoundry.v1.UiService.WatchIntents:input_type -> codefoundry.v1.WatchIntentsRequest
+	11, // 23: codefoundry.v1.UiService.PublishTheme:input_type -> codefoundry.v1.PublishThemeRequest
+	13, // 24: codefoundry.v1.UiService.GetTheme:input_type -> codefoundry.v1.GetThemeRequest
+	4,  // 25: codefoundry.v1.UiService.PublishThemeReport:input_type -> codefoundry.v1.PublishThemeReportRequest
+	6,  // 26: codefoundry.v1.UiService.WatchShots:input_type -> codefoundry.v1.WatchShotsRequest
+	9,  // 27: codefoundry.v1.UiService.PublishShot:input_type -> codefoundry.v1.PublishShotRequest
+	16, // 28: codefoundry.v1.UiService.WatchIntents:output_type -> codefoundry.v1.UiIntent
+	12, // 29: codefoundry.v1.UiService.PublishTheme:output_type -> codefoundry.v1.PublishThemeResponse
+	14, // 30: codefoundry.v1.UiService.GetTheme:output_type -> codefoundry.v1.GetThemeResponse
+	5,  // 31: codefoundry.v1.UiService.PublishThemeReport:output_type -> codefoundry.v1.PublishThemeReportResponse
+	7,  // 32: codefoundry.v1.UiService.WatchShots:output_type -> codefoundry.v1.ShotRequest
+	10, // 33: codefoundry.v1.UiService.PublishShot:output_type -> codefoundry.v1.PublishShotResponse
+	28, // [28:34] is the sub-list for method output_type
+	22, // [22:28] is the sub-list for method input_type
+	22, // [22:22] is the sub-list for extension type_name
+	22, // [22:22] is the sub-list for extension extendee
+	0,  // [0:22] is the sub-list for field type_name
 }
 
 func init() { file_codefoundry_v1_ui_proto_init() }
@@ -1887,8 +1992,9 @@ func file_codefoundry_v1_ui_proto_init() {
 		return
 	}
 	file_codefoundry_v1_command_proto_init()
+	file_codefoundry_v1_page_proto_init()
 	file_codefoundry_v1_plugin_proto_init()
-	file_codefoundry_v1_ui_proto_msgTypes[14].OneofWrappers = []any{
+	file_codefoundry_v1_ui_proto_msgTypes[15].OneofWrappers = []any{
 		(*UiIntent_FocusTerminal_)(nil),
 		(*UiIntent_FocusProject_)(nil),
 		(*UiIntent_OpenPalette_)(nil),
@@ -1906,7 +2012,7 @@ func file_codefoundry_v1_ui_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_codefoundry_v1_ui_proto_rawDesc), len(file_codefoundry_v1_ui_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   29,
+			NumMessages:   30,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

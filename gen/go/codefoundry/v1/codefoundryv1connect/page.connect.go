@@ -42,6 +42,8 @@ const (
 	PageServiceSetPageStorageProcedure = "/codefoundry.v1.PageService/SetPageStorage"
 	// PageServiceProxyFetchProcedure is the fully-qualified name of the PageService's ProxyFetch RPC.
 	PageServiceProxyFetchProcedure = "/codefoundry.v1.PageService/ProxyFetch"
+	// PageServiceCheckPageProcedure is the fully-qualified name of the PageService's CheckPage RPC.
+	PageServiceCheckPageProcedure = "/codefoundry.v1.PageService/CheckPage"
 )
 
 // PageServiceClient is a client for the codefoundry.v1.PageService service.
@@ -64,6 +66,16 @@ type PageServiceClient interface {
 	// limits and errors, at most 8 requests at once per page file (more wait). The consent
 	// errors of PageStorage.
 	ProxyFetch(context.Context, *connect.Request[v1.PageProxyFetchRequest]) (*connect.Response[v1.PageProxyFetchResponse], error)
+	// CheckPage has the app render the page once, off screen, as a card of the thread it acts
+	// for would show it, and answers what that render saw (page.check;
+	// docs/notes/page-self-check.md): whether it loaded, its script, loader and resource
+	// errors, the bridge calls refused or failed, what the frame could not do, its height and
+	// how long it took to settle, and a PNG when asked. The render is the app host's
+	// (UiService.WatchShots): nothing that needs a click runs, no question is asked, and its
+	// cf.storage writes are not saved. FailedPrecondition when no app window is open (the
+	// message says so) or no thread owns the page and the user has not allowed it; the path
+	// errors of GetPage; DeadlineExceeded when the app did not answer in time.
+	CheckPage(context.Context, *connect.Request[v1.CheckPageRequest]) (*connect.Response[v1.CheckPageResponse], error)
 }
 
 // NewPageServiceClient constructs a client for the codefoundry.v1.PageService service. By default,
@@ -101,6 +113,12 @@ func NewPageServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			connect.WithSchema(pageServiceMethods.ByName("ProxyFetch")),
 			connect.WithClientOptions(opts...),
 		),
+		checkPage: connect.NewClient[v1.CheckPageRequest, v1.CheckPageResponse](
+			httpClient,
+			baseURL+PageServiceCheckPageProcedure,
+			connect.WithSchema(pageServiceMethods.ByName("CheckPage")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -110,6 +128,7 @@ type pageServiceClient struct {
 	pageStorage    *connect.Client[v1.PageFileStorageRequest, v1.PageFileStorageResponse]
 	setPageStorage *connect.Client[v1.SetPageFileStorageRequest, v1.SetPageFileStorageResponse]
 	proxyFetch     *connect.Client[v1.PageProxyFetchRequest, v1.PageProxyFetchResponse]
+	checkPage      *connect.Client[v1.CheckPageRequest, v1.CheckPageResponse]
 }
 
 // GetPage calls codefoundry.v1.PageService.GetPage.
@@ -132,6 +151,11 @@ func (c *pageServiceClient) ProxyFetch(ctx context.Context, req *connect.Request
 	return c.proxyFetch.CallUnary(ctx, req)
 }
 
+// CheckPage calls codefoundry.v1.PageService.CheckPage.
+func (c *pageServiceClient) CheckPage(ctx context.Context, req *connect.Request[v1.CheckPageRequest]) (*connect.Response[v1.CheckPageResponse], error) {
+	return c.checkPage.CallUnary(ctx, req)
+}
+
 // PageServiceHandler is an implementation of the codefoundry.v1.PageService service.
 type PageServiceHandler interface {
 	// GetPage says who owns the page and whether it may use the bridge.
@@ -152,6 +176,16 @@ type PageServiceHandler interface {
 	// limits and errors, at most 8 requests at once per page file (more wait). The consent
 	// errors of PageStorage.
 	ProxyFetch(context.Context, *connect.Request[v1.PageProxyFetchRequest]) (*connect.Response[v1.PageProxyFetchResponse], error)
+	// CheckPage has the app render the page once, off screen, as a card of the thread it acts
+	// for would show it, and answers what that render saw (page.check;
+	// docs/notes/page-self-check.md): whether it loaded, its script, loader and resource
+	// errors, the bridge calls refused or failed, what the frame could not do, its height and
+	// how long it took to settle, and a PNG when asked. The render is the app host's
+	// (UiService.WatchShots): nothing that needs a click runs, no question is asked, and its
+	// cf.storage writes are not saved. FailedPrecondition when no app window is open (the
+	// message says so) or no thread owns the page and the user has not allowed it; the path
+	// errors of GetPage; DeadlineExceeded when the app did not answer in time.
+	CheckPage(context.Context, *connect.Request[v1.CheckPageRequest]) (*connect.Response[v1.CheckPageResponse], error)
 }
 
 // NewPageServiceHandler builds an HTTP handler from the service implementation. It returns the path
@@ -185,6 +219,12 @@ func NewPageServiceHandler(svc PageServiceHandler, opts ...connect.HandlerOption
 		connect.WithSchema(pageServiceMethods.ByName("ProxyFetch")),
 		connect.WithHandlerOptions(opts...),
 	)
+	pageServiceCheckPageHandler := connect.NewUnaryHandler(
+		PageServiceCheckPageProcedure,
+		svc.CheckPage,
+		connect.WithSchema(pageServiceMethods.ByName("CheckPage")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/codefoundry.v1.PageService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case PageServiceGetPageProcedure:
@@ -195,6 +235,8 @@ func NewPageServiceHandler(svc PageServiceHandler, opts ...connect.HandlerOption
 			pageServiceSetPageStorageHandler.ServeHTTP(w, r)
 		case PageServiceProxyFetchProcedure:
 			pageServiceProxyFetchHandler.ServeHTTP(w, r)
+		case PageServiceCheckPageProcedure:
+			pageServiceCheckPageHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -218,4 +260,8 @@ func (UnimplementedPageServiceHandler) SetPageStorage(context.Context, *connect.
 
 func (UnimplementedPageServiceHandler) ProxyFetch(context.Context, *connect.Request[v1.PageProxyFetchRequest]) (*connect.Response[v1.PageProxyFetchResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.PageService.ProxyFetch is not implemented"))
+}
+
+func (UnimplementedPageServiceHandler) CheckPage(context.Context, *connect.Request[v1.CheckPageRequest]) (*connect.Response[v1.CheckPageResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.PageService.CheckPage is not implemented"))
 }

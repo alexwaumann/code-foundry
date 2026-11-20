@@ -248,6 +248,14 @@ export class MockPages {
       { cmd: def("page.get", "Show Page Access", "Who owns an HTML page and whether the user allowed it to use Code Foundry", true), when: always, run: (_ctx: UiContext | undefined, args: Record<string, string>) => Promise.resolve({ message: args.path ?? "", resultJson: view(args.path ?? "") }) },
       { cmd: def("page.allow", "Allow Page", "Let an HTML page no thread owns use Code Foundry"), when: always, run: (ctx: UiContext | undefined, args: Record<string, string>) => answer(ctx, args, "allowed") },
       { cmd: def("page.disallow", "Stop Allowing Page", "Stop an HTML page no thread owns from using Code Foundry"), when: always, run: (ctx: UiContext | undefined, args: Record<string, string>) => answer(ctx, args, "refused") },
+      // The mock has no app host to render a page in: it says so, as the daemon does with no window.
+      { cmd: def("page.check", "Check Page", "Render an HTML page once in the app, off screen, and say what that render saw", true), when: always, run: (_ctx: UiContext | undefined, args: Record<string, string>) => this.checkPage(args.path ?? "").then(() => ({ message: "", resultJson: "" })) },
     ];
+  }
+
+  /** PageService.CheckPage (docs/notes/page-self-check.md): the mock has no app host to render a page in, so it answers as a daemon with no window open does, after the path's own errors. */
+  checkPage(path: string): Promise<never> {
+    this.resolved(path);
+    return Promise.reject(new ConnectError("no Code Foundry window is open to render the page, so nothing was checked (open the app: code-foundry gui)", Code.FailedPrecondition));
   }
 }

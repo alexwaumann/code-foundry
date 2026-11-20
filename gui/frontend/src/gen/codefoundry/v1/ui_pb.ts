@@ -6,6 +6,8 @@ import type { GenEnum, GenFile, GenMessage, GenService } from "@bufbuild/protobu
 import { enumDesc, fileDesc, messageDesc, serviceDesc } from "@bufbuild/protobuf/codegenv2";
 import type { UiContext } from "./command_pb";
 import { file_codefoundry_v1_command } from "./command_pb";
+import type { PageCheckReport } from "./page_pb";
+import { file_codefoundry_v1_page } from "./page_pb";
 import type { SurfaceRef } from "./plugin_pb";
 import { file_codefoundry_v1_plugin } from "./plugin_pb";
 import type { Message } from "@bufbuild/protobuf";
@@ -14,7 +16,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file codefoundry/v1/ui.proto.
  */
 export const file_codefoundry_v1_ui: GenFile = /*@__PURE__*/
-  fileDesc("Chdjb2RlZm91bmRyeS92MS91aS5wcm90bxIOY29kZWZvdW5kcnkudjEiYwoSVGhlbWVDb250cmFzdElzc3VlEgwKBHNsb3QYASABKAkSDwoHYWdhaW5zdBgCIAEoCRINCgVsYWJlbBgDIAEoCRINCgVyYXRpbxgEIAEoARIQCghyZXF1aXJlZBgFIAEoASJNCg1UaGVtZVN0YWxlUGluEgwKBHNsb3QYASABKAkSDgoGcGlubmVkGAIgASgJEg0KBWJhc2lzGAMgASgJEg8KB2Rlcml2ZWQYBCABKAkijAEKC1RoZW1lUmVwb3J0EgoKAmlkGAEgASgJEg8KB3ZlcnNpb24YAiABKAkSMgoGaXNzdWVzGAMgAygLMiIuY29kZWZvdW5kcnkudjEuVGhlbWVDb250cmFzdElzc3VlEiwKBXN0YWxlGAQgAygLMh0uY29kZWZvdW5kcnkudjEuVGhlbWVTdGFsZVBpbiJJChlQdWJsaXNoVGhlbWVSZXBvcnRSZXF1ZXN0EiwKB3JlcG9ydHMYASADKAsyGy5jb2RlZm91bmRyeS52MS5UaGVtZVJlcG9ydCIcChpQdWJsaXNoVGhlbWVSZXBvcnRSZXNwb25zZSITChFXYXRjaFNob3RzUmVxdWVzdCKIAQoLU2hvdFJlcXVlc3QSCgoCaWQYASABKAkSJwoDcmVmGAIgASgLMhouY29kZWZvdW5kcnkudjEuU3VyZmFjZVJlZhIQCghpbnN0YW5jZRgDIAEoCRITCgttaW5fdmVyc2lvbhgEIAEoBBINCgV3aWR0aBgFIAEoBRIOCgZoZWlnaHQYBiABKAUiVAoSUHVibGlzaFNob3RSZXF1ZXN0EgoKAmlkGAEgASgJEgsKA3BuZxgCIAEoDBINCgVlcnJvchgDIAEoCRIWCg5jb250ZW50X2hlaWdodBgEIAEoBSIVChNQdWJsaXNoU2hvdFJlc3BvbnNlIpsBChNQdWJsaXNoVGhlbWVSZXF1ZXN0EgoKAmlkGAEgASgJEg4KBnNjaGVtZRgCIAEoCRI7CgR2YXJzGAMgAygLMi0uY29kZWZvdW5kcnkudjEuUHVibGlzaFRoZW1lUmVxdWVzdC5WYXJzRW50cnkaKwoJVmFyc0VudHJ5EgsKA2tleRgBIAEoCRINCgV2YWx1ZRgCIAEoCToCOAEiFgoUUHVibGlzaFRoZW1lUmVzcG9uc2UiEQoPR2V0VGhlbWVSZXF1ZXN0IqgBChBHZXRUaGVtZVJlc3BvbnNlEgoKAmlkGAEgASgJEg4KBnNjaGVtZRgCIAEoCRI4CgR2YXJzGAMgAygLMiouY29kZWZvdW5kcnkudjEuR2V0VGhlbWVSZXNwb25zZS5WYXJzRW50cnkSEQoJcHVibGlzaGVkGAQgASgIGisKCVZhcnNFbnRyeRILCgNrZXkYASABKAkSDQoFdmFsdWUYAiABKAk6AjgBIhUKE1dhdGNoSW50ZW50c1JlcXVlc3Qi2QwKCFVpSW50ZW50EkAKDmZvY3VzX3Rlcm1pbmFsGAEgASgLMiYuY29kZWZvdW5kcnkudjEuVWlJbnRlbnQuRm9jdXNUZXJtaW5hbEgAEj4KDWZvY3VzX3Byb2plY3QYAiABKAsyJS5jb2RlZm91bmRyeS52MS5VaUludGVudC5Gb2N1c1Byb2plY3RIABI8CgxvcGVuX3BhbGV0dGUYAyABKAsyJC5jb2RlZm91bmRyeS52MS5VaUludGVudC5PcGVuUGFsZXR0ZUgAEjEKBm5vdGlmeRgEIAEoCzIfLmNvZGVmb3VuZHJ5LnYxLlVpSW50ZW50Lk5vdGlmeUgAEjwKDGZvY3VzX3RocmVhZBgFIAEoCzIkLmNvZGVmb3VuZHJ5LnYxLlVpSW50ZW50LkZvY3VzVGhyZWFkSAASNgoJc2hvd192aWV3GAYgASgLMiEuY29kZWZvdW5kcnkudjEuVWlJbnRlbnQuU2hvd1ZpZXdIABJDChBwbGF5X2FsZXJ0X3NvdW5kGAcgASgLMicuY29kZWZvdW5kcnkudjEuVWlJbnRlbnQuUGxheUFsZXJ0U291bmRIABI/Cg5zaG93X2FnZW50X3J1bhgIIAEoCzIlLmNvZGVmb3VuZHJ5LnYxLlVpSW50ZW50LlNob3dBZ2VudFJ1bkgAEkAKDmludm9rZV9jb21tYW5kGAkgASgLMiYuY29kZWZvdW5kcnkudjEuVWlJbnRlbnQuSW52b2tlQ29tbWFuZEgAEkAKDnN0YWdlX2NvbXBvc2VyGAogASgLMiYuY29kZWZvdW5kcnkudjEuVWlJbnRlbnQuU3RhZ2VDb21wb3NlckgAGjAKDVN0YWdlQ29tcG9zZXISEQoJdGhyZWFkX2lkGAEgASgJEgwKBHRleHQYAiABKAkaxgEKDUludm9rZUNvbW1hbmQSDAoEbmFtZRgBIAEoCRI+CgRhcmdzGAIgAygLMjAuY29kZWZvdW5kcnkudjEuVWlJbnRlbnQuSW52b2tlQ29tbWFuZC5BcmdzRW50cnkSKgoHY29udGV4dBgDIAEoCzIZLmNvZGVmb3VuZHJ5LnYxLlVpQ29udGV4dBIOCgZjYWxsZXIYBCABKAkaKwoJQXJnc0VudHJ5EgsKA2tleRgBIAEoCRINCgV2YWx1ZRgCIAEoCToCOAEaMQoMU2hvd0FnZW50UnVuEhEKCXRocmVhZF9pZBgBIAEoCRIOCgZydW5faWQYAiABKAkaIAoOUGxheUFsZXJ0U291bmQSDgoGdm9sdW1lGAEgASgFGpcBCghTaG93VmlldxIMCgRuYW1lGAEgASgJEj0KBnBhcmFtcxgDIAMoCzItLmNvZGVmb3VuZHJ5LnYxLlVpSW50ZW50LlNob3dWaWV3LlBhcmFtc0VudHJ5Gi0KC1BhcmFtc0VudHJ5EgsKA2tleRgBIAEoCRINCgV2YWx1ZRgCIAEoCToCOAFKBAgCEANSCXRocmVhZF9pZBoyCgtGb2N1c1RocmVhZBIRCgl0aHJlYWRfaWQYASABKAkSEAoIZXhwbGljaXQYAiABKAgaJAoNRm9jdXNUZXJtaW5hbBITCgt0ZXJtaW5hbF9pZBgBIAEoCRo5CgxGb2N1c1Byb2plY3QSEgoKcHJvamVjdF9pZBgBIAEoCRIVCg13b3JrdHJlZV9wYXRoGAIgASgJGhwKC09wZW5QYWxldHRlEg0KBXF1ZXJ5GAEgASgJGrICCgZOb3RpZnkSNAoFbGV2ZWwYASABKA4yJS5jb2RlZm91bmRyeS52MS5VaUludGVudC5Ob3RpZnkuTGV2ZWwSDQoFdGl0bGUYAiABKAkSDAoEYm9keRgDIAEoCRIMCgRsaW5rGAQgASgJEhIKCmxpbmtfbGFiZWwYBSABKAkSFgoOc2Vjb25kYXJ5X2xpbmsYBiABKAkSHAoUc2Vjb25kYXJ5X2xpbmtfbGFiZWwYByABKAkSFgoOdW5sZXNzX3Nob3dpbmcYCCABKAkiZQoFTGV2ZWwSFQoRTEVWRUxfVU5TUEVDSUZJRUQQABIOCgpMRVZFTF9JTkZPEAESEQoNTEVWRUxfV0FSTklORxACEg8KC0xFVkVMX0VSUk9SEAMSEQoNTEVWRUxfU1VDQ0VTUxAEQggKBmludGVudDKnBAoJVWlTZXJ2aWNlElEKDFdhdGNoSW50ZW50cxIjLmNvZGVmb3VuZHJ5LnYxLldhdGNoSW50ZW50c1JlcXVlc3QaGC5jb2RlZm91bmRyeS52MS5VaUludGVudCIAMAESWwoMUHVibGlzaFRoZW1lEiMuY29kZWZvdW5kcnkudjEuUHVibGlzaFRoZW1lUmVxdWVzdBokLmNvZGVmb3VuZHJ5LnYxLlB1Ymxpc2hUaGVtZVJlc3BvbnNlIgASTwoIR2V0VGhlbWUSHy5jb2RlZm91bmRyeS52MS5HZXRUaGVtZVJlcXVlc3QaIC5jb2RlZm91bmRyeS52MS5HZXRUaGVtZVJlc3BvbnNlIgASbQoSUHVibGlzaFRoZW1lUmVwb3J0EikuY29kZWZvdW5kcnkudjEuUHVibGlzaFRoZW1lUmVwb3J0UmVxdWVzdBoqLmNvZGVmb3VuZHJ5LnYxLlB1Ymxpc2hUaGVtZVJlcG9ydFJlc3BvbnNlIgASUAoKV2F0Y2hTaG90cxIhLmNvZGVmb3VuZHJ5LnYxLldhdGNoU2hvdHNSZXF1ZXN0GhsuY29kZWZvdW5kcnkudjEuU2hvdFJlcXVlc3QiADABElgKC1B1Ymxpc2hTaG90EiIuY29kZWZvdW5kcnkudjEuUHVibGlzaFNob3RSZXF1ZXN0GiMuY29kZWZvdW5kcnkudjEuUHVibGlzaFNob3RSZXNwb25zZSIAQr8BChJjb20uY29kZWZvdW5kcnkudjFCB1VpUHJvdG9QAVpHZ2l0aHViLmNvbS9hbGV4d2F1bWFubi9jb2RlLWZvdW5kcnkvZ2VuL2dvL2NvZGVmb3VuZHJ5L3YxO2NvZGVmb3VuZHJ5djGiAgNDWFiqAg5Db2RlZm91bmRyeS5WMcoCDkNvZGVmb3VuZHJ5XFYx4gIaQ29kZWZvdW5kcnlcVjFcR1BCTWV0YWRhdGHqAg9Db2RlZm91bmRyeTo6VjFiBnByb3RvMw", [file_codefoundry_v1_command, file_codefoundry_v1_plugin]);
+  fileDesc("Chdjb2RlZm91bmRyeS92MS91aS5wcm90bxIOY29kZWZvdW5kcnkudjEiYwoSVGhlbWVDb250cmFzdElzc3VlEgwKBHNsb3QYASABKAkSDwoHYWdhaW5zdBgCIAEoCRINCgVsYWJlbBgDIAEoCRINCgVyYXRpbxgEIAEoARIQCghyZXF1aXJlZBgFIAEoASJNCg1UaGVtZVN0YWxlUGluEgwKBHNsb3QYASABKAkSDgoGcGlubmVkGAIgASgJEg0KBWJhc2lzGAMgASgJEg8KB2Rlcml2ZWQYBCABKAkijAEKC1RoZW1lUmVwb3J0EgoKAmlkGAEgASgJEg8KB3ZlcnNpb24YAiABKAkSMgoGaXNzdWVzGAMgAygLMiIuY29kZWZvdW5kcnkudjEuVGhlbWVDb250cmFzdElzc3VlEiwKBXN0YWxlGAQgAygLMh0uY29kZWZvdW5kcnkudjEuVGhlbWVTdGFsZVBpbiJJChlQdWJsaXNoVGhlbWVSZXBvcnRSZXF1ZXN0EiwKB3JlcG9ydHMYASADKAsyGy5jb2RlZm91bmRyeS52MS5UaGVtZVJlcG9ydCIcChpQdWJsaXNoVGhlbWVSZXBvcnRSZXNwb25zZSITChFXYXRjaFNob3RzUmVxdWVzdCKwAQoLU2hvdFJlcXVlc3QSCgoCaWQYASABKAkSJwoDcmVmGAIgASgLMhouY29kZWZvdW5kcnkudjEuU3VyZmFjZVJlZhIQCghpbnN0YW5jZRgDIAEoCRITCgttaW5fdmVyc2lvbhgEIAEoBBINCgV3aWR0aBgFIAEoBRIOCgZoZWlnaHQYBiABKAUSJgoEcGFnZRgHIAEoCzIYLmNvZGVmb3VuZHJ5LnYxLlBhZ2VTaG90IksKCFBhZ2VTaG90EgwKBHBhdGgYASABKAkSEQoJdGhyZWFkX2lkGAIgASgJEhEKCXNldHRsZV9tcxgDIAEoBRILCgNwbmcYBCABKAgiigEKElB1Ymxpc2hTaG90UmVxdWVzdBIKCgJpZBgBIAEoCRILCgNwbmcYAiABKAwSDQoFZXJyb3IYAyABKAkSFgoOY29udGVudF9oZWlnaHQYBCABKAUSNAoLcGFnZV9yZXBvcnQYBSABKAsyHy5jb2RlZm91bmRyeS52MS5QYWdlQ2hlY2tSZXBvcnQiFQoTUHVibGlzaFNob3RSZXNwb25zZSKbAQoTUHVibGlzaFRoZW1lUmVxdWVzdBIKCgJpZBgBIAEoCRIOCgZzY2hlbWUYAiABKAkSOwoEdmFycxgDIAMoCzItLmNvZGVmb3VuZHJ5LnYxLlB1Ymxpc2hUaGVtZVJlcXVlc3QuVmFyc0VudHJ5GisKCVZhcnNFbnRyeRILCgNrZXkYASABKAkSDQoFdmFsdWUYAiABKAk6AjgBIhYKFFB1Ymxpc2hUaGVtZVJlc3BvbnNlIhEKD0dldFRoZW1lUmVxdWVzdCKoAQoQR2V0VGhlbWVSZXNwb25zZRIKCgJpZBgBIAEoCRIOCgZzY2hlbWUYAiABKAkSOAoEdmFycxgDIAMoCzIqLmNvZGVmb3VuZHJ5LnYxLkdldFRoZW1lUmVzcG9uc2UuVmFyc0VudHJ5EhEKCXB1Ymxpc2hlZBgEIAEoCBorCglWYXJzRW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgJOgI4ASIVChNXYXRjaEludGVudHNSZXF1ZXN0ItkMCghVaUludGVudBJACg5mb2N1c190ZXJtaW5hbBgBIAEoCzImLmNvZGVmb3VuZHJ5LnYxLlVpSW50ZW50LkZvY3VzVGVybWluYWxIABI+Cg1mb2N1c19wcm9qZWN0GAIgASgLMiUuY29kZWZvdW5kcnkudjEuVWlJbnRlbnQuRm9jdXNQcm9qZWN0SAASPAoMb3Blbl9wYWxldHRlGAMgASgLMiQuY29kZWZvdW5kcnkudjEuVWlJbnRlbnQuT3BlblBhbGV0dGVIABIxCgZub3RpZnkYBCABKAsyHy5jb2RlZm91bmRyeS52MS5VaUludGVudC5Ob3RpZnlIABI8Cgxmb2N1c190aHJlYWQYBSABKAsyJC5jb2RlZm91bmRyeS52MS5VaUludGVudC5Gb2N1c1RocmVhZEgAEjYKCXNob3dfdmlldxgGIAEoCzIhLmNvZGVmb3VuZHJ5LnYxLlVpSW50ZW50LlNob3dWaWV3SAASQwoQcGxheV9hbGVydF9zb3VuZBgHIAEoCzInLmNvZGVmb3VuZHJ5LnYxLlVpSW50ZW50LlBsYXlBbGVydFNvdW5kSAASPwoOc2hvd19hZ2VudF9ydW4YCCABKAsyJS5jb2RlZm91bmRyeS52MS5VaUludGVudC5TaG93QWdlbnRSdW5IABJACg5pbnZva2VfY29tbWFuZBgJIAEoCzImLmNvZGVmb3VuZHJ5LnYxLlVpSW50ZW50Lkludm9rZUNvbW1hbmRIABJACg5zdGFnZV9jb21wb3NlchgKIAEoCzImLmNvZGVmb3VuZHJ5LnYxLlVpSW50ZW50LlN0YWdlQ29tcG9zZXJIABowCg1TdGFnZUNvbXBvc2VyEhEKCXRocmVhZF9pZBgBIAEoCRIMCgR0ZXh0GAIgASgJGsYBCg1JbnZva2VDb21tYW5kEgwKBG5hbWUYASABKAkSPgoEYXJncxgCIAMoCzIwLmNvZGVmb3VuZHJ5LnYxLlVpSW50ZW50Lkludm9rZUNvbW1hbmQuQXJnc0VudHJ5EioKB2NvbnRleHQYAyABKAsyGS5jb2RlZm91bmRyeS52MS5VaUNvbnRleHQSDgoGY2FsbGVyGAQgASgJGisKCUFyZ3NFbnRyeRILCgNrZXkYASABKAkSDQoFdmFsdWUYAiABKAk6AjgBGjEKDFNob3dBZ2VudFJ1bhIRCgl0aHJlYWRfaWQYASABKAkSDgoGcnVuX2lkGAIgASgJGiAKDlBsYXlBbGVydFNvdW5kEg4KBnZvbHVtZRgBIAEoBRqXAQoIU2hvd1ZpZXcSDAoEbmFtZRgBIAEoCRI9CgZwYXJhbXMYAyADKAsyLS5jb2RlZm91bmRyeS52MS5VaUludGVudC5TaG93Vmlldy5QYXJhbXNFbnRyeRotCgtQYXJhbXNFbnRyeRILCgNrZXkYASABKAkSDQoFdmFsdWUYAiABKAk6AjgBSgQIAhADUgl0aHJlYWRfaWQaMgoLRm9jdXNUaHJlYWQSEQoJdGhyZWFkX2lkGAEgASgJEhAKCGV4cGxpY2l0GAIgASgIGiQKDUZvY3VzVGVybWluYWwSEwoLdGVybWluYWxfaWQYASABKAkaOQoMRm9jdXNQcm9qZWN0EhIKCnByb2plY3RfaWQYASABKAkSFQoNd29ya3RyZWVfcGF0aBgCIAEoCRocCgtPcGVuUGFsZXR0ZRINCgVxdWVyeRgBIAEoCRqyAgoGTm90aWZ5EjQKBWxldmVsGAEgASgOMiUuY29kZWZvdW5kcnkudjEuVWlJbnRlbnQuTm90aWZ5LkxldmVsEg0KBXRpdGxlGAIgASgJEgwKBGJvZHkYAyABKAkSDAoEbGluaxgEIAEoCRISCgpsaW5rX2xhYmVsGAUgASgJEhYKDnNlY29uZGFyeV9saW5rGAYgASgJEhwKFHNlY29uZGFyeV9saW5rX2xhYmVsGAcgASgJEhYKDnVubGVzc19zaG93aW5nGAggASgJImUKBUxldmVsEhUKEUxFVkVMX1VOU1BFQ0lGSUVEEAASDgoKTEVWRUxfSU5GTxABEhEKDUxFVkVMX1dBUk5JTkcQAhIPCgtMRVZFTF9FUlJPUhADEhEKDUxFVkVMX1NVQ0NFU1MQBEIICgZpbnRlbnQypwQKCVVpU2VydmljZRJRCgxXYXRjaEludGVudHMSIy5jb2RlZm91bmRyeS52MS5XYXRjaEludGVudHNSZXF1ZXN0GhguY29kZWZvdW5kcnkudjEuVWlJbnRlbnQiADABElsKDFB1Ymxpc2hUaGVtZRIjLmNvZGVmb3VuZHJ5LnYxLlB1Ymxpc2hUaGVtZVJlcXVlc3QaJC5jb2RlZm91bmRyeS52MS5QdWJsaXNoVGhlbWVSZXNwb25zZSIAEk8KCEdldFRoZW1lEh8uY29kZWZvdW5kcnkudjEuR2V0VGhlbWVSZXF1ZXN0GiAuY29kZWZvdW5kcnkudjEuR2V0VGhlbWVSZXNwb25zZSIAEm0KElB1Ymxpc2hUaGVtZVJlcG9ydBIpLmNvZGVmb3VuZHJ5LnYxLlB1Ymxpc2hUaGVtZVJlcG9ydFJlcXVlc3QaKi5jb2RlZm91bmRyeS52MS5QdWJsaXNoVGhlbWVSZXBvcnRSZXNwb25zZSIAElAKCldhdGNoU2hvdHMSIS5jb2RlZm91bmRyeS52MS5XYXRjaFNob3RzUmVxdWVzdBobLmNvZGVmb3VuZHJ5LnYxLlNob3RSZXF1ZXN0IgAwARJYCgtQdWJsaXNoU2hvdBIiLmNvZGVmb3VuZHJ5LnYxLlB1Ymxpc2hTaG90UmVxdWVzdBojLmNvZGVmb3VuZHJ5LnYxLlB1Ymxpc2hTaG90UmVzcG9uc2UiAEK/AQoSY29tLmNvZGVmb3VuZHJ5LnYxQgdVaVByb3RvUAFaR2dpdGh1Yi5jb20vYWxleHdhdW1hbm4vY29kZS1mb3VuZHJ5L2dlbi9nby9jb2RlZm91bmRyeS92MTtjb2RlZm91bmRyeXYxogIDQ1hYqgIOQ29kZWZvdW5kcnkuVjHKAg5Db2RlZm91bmRyeVxWMeICGkNvZGVmb3VuZHJ5XFYxXEdQQk1ldGFkYXRh6gIPQ29kZWZvdW5kcnk6OlYxYgZwcm90bzM", [file_codefoundry_v1_command, file_codefoundry_v1_page, file_codefoundry_v1_plugin]);
 
 /**
  * ThemeContrastIssue is one pair of resolved slots that falls short (the GUI's
@@ -184,7 +186,8 @@ export const WatchShotsRequestSchema: GenMessage<WatchShotsRequest> = /*@__PURE_
 
 /**
  * ShotRequest asks the app's host to draw a plugin surface in a hidden window of the
- * viewport's size and snapshot it (ShotSurfaceRequest, with an id).
+ * viewport's size and snapshot it (ShotSurfaceRequest, with an id); or, with page, to
+ * render a page and check it (PageService.CheckPage).
  *
  * @generated from message codefoundry.v1.ShotRequest
  */
@@ -220,6 +223,13 @@ export type ShotRequest = Message<"codefoundry.v1.ShotRequest"> & {
    * @generated from field: int32 height = 6;
    */
   height: number;
+
+  /**
+   * A page check in place of a surface: answered with PublishShotRequest.page_report.
+   *
+   * @generated from field: codefoundry.v1.PageShot page = 7;
+   */
+  page?: PageShot | undefined;
 };
 
 /**
@@ -228,6 +238,48 @@ export type ShotRequest = Message<"codefoundry.v1.ShotRequest"> & {
  */
 export const ShotRequestSchema: GenMessage<ShotRequest> = /*@__PURE__*/
   messageDesc(file_codefoundry_v1_ui, 6);
+
+/**
+ * PageShot is the page a check renders (docs/notes/page-self-check.md).
+ *
+ * @generated from message codefoundry.v1.PageShot
+ */
+export type PageShot = Message<"codefoundry.v1.PageShot"> & {
+  /**
+   * The resolved path.
+   *
+   * @generated from field: string path = 1;
+   */
+  path: string;
+
+  /**
+   * The thread the page acts for; "" for a page the user allowed, which no thread owns.
+   *
+   * @generated from field: string thread_id = 2;
+   */
+  threadId: string;
+
+  /**
+   * The most to wait for the page to settle, in ms.
+   *
+   * @generated from field: int32 settle_ms = 3;
+   */
+  settleMs: number;
+
+  /**
+   * Snapshot the card's frame too.
+   *
+   * @generated from field: bool png = 4;
+   */
+  png: boolean;
+};
+
+/**
+ * Describes the message codefoundry.v1.PageShot.
+ * Use `create(PageShotSchema)` to create a new message.
+ */
+export const PageShotSchema: GenMessage<PageShot> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_ui, 7);
 
 /**
  * @generated from message codefoundry.v1.PublishShotRequest
@@ -260,6 +312,14 @@ export type PublishShotRequest = Message<"codefoundry.v1.PublishShotRequest"> & 
    * @generated from field: int32 content_height = 4;
    */
   contentHeight: number;
+
+  /**
+   * A page check's report (ShotRequest.page): it answers the request with or without a
+   * PNG (its shot_error says why there is none).
+   *
+   * @generated from field: codefoundry.v1.PageCheckReport page_report = 5;
+   */
+  pageReport?: PageCheckReport | undefined;
 };
 
 /**
@@ -267,7 +327,7 @@ export type PublishShotRequest = Message<"codefoundry.v1.PublishShotRequest"> & 
  * Use `create(PublishShotRequestSchema)` to create a new message.
  */
 export const PublishShotRequestSchema: GenMessage<PublishShotRequest> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_ui, 7);
+  messageDesc(file_codefoundry_v1_ui, 8);
 
 /**
  * @generated from message codefoundry.v1.PublishShotResponse
@@ -280,7 +340,7 @@ export type PublishShotResponse = Message<"codefoundry.v1.PublishShotResponse"> 
  * Use `create(PublishShotResponseSchema)` to create a new message.
  */
 export const PublishShotResponseSchema: GenMessage<PublishShotResponse> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_ui, 8);
+  messageDesc(file_codefoundry_v1_ui, 9);
 
 /**
  * @generated from message codefoundry.v1.PublishThemeRequest
@@ -314,7 +374,7 @@ export type PublishThemeRequest = Message<"codefoundry.v1.PublishThemeRequest"> 
  * Use `create(PublishThemeRequestSchema)` to create a new message.
  */
 export const PublishThemeRequestSchema: GenMessage<PublishThemeRequest> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_ui, 9);
+  messageDesc(file_codefoundry_v1_ui, 10);
 
 /**
  * @generated from message codefoundry.v1.PublishThemeResponse
@@ -327,7 +387,7 @@ export type PublishThemeResponse = Message<"codefoundry.v1.PublishThemeResponse"
  * Use `create(PublishThemeResponseSchema)` to create a new message.
  */
 export const PublishThemeResponseSchema: GenMessage<PublishThemeResponse> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_ui, 10);
+  messageDesc(file_codefoundry_v1_ui, 11);
 
 /**
  * @generated from message codefoundry.v1.GetThemeRequest
@@ -340,7 +400,7 @@ export type GetThemeRequest = Message<"codefoundry.v1.GetThemeRequest"> & {
  * Use `create(GetThemeRequestSchema)` to create a new message.
  */
 export const GetThemeRequestSchema: GenMessage<GetThemeRequest> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_ui, 11);
+  messageDesc(file_codefoundry_v1_ui, 12);
 
 /**
  * GetThemeResponse is the theme PublishThemeRequest last carried.
@@ -376,7 +436,7 @@ export type GetThemeResponse = Message<"codefoundry.v1.GetThemeResponse"> & {
  * Use `create(GetThemeResponseSchema)` to create a new message.
  */
 export const GetThemeResponseSchema: GenMessage<GetThemeResponse> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_ui, 12);
+  messageDesc(file_codefoundry_v1_ui, 13);
 
 /**
  * @generated from message codefoundry.v1.WatchIntentsRequest
@@ -389,7 +449,7 @@ export type WatchIntentsRequest = Message<"codefoundry.v1.WatchIntentsRequest"> 
  * Use `create(WatchIntentsRequestSchema)` to create a new message.
  */
 export const WatchIntentsRequestSchema: GenMessage<WatchIntentsRequest> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_ui, 13);
+  messageDesc(file_codefoundry_v1_ui, 14);
 
 /**
  * @generated from message codefoundry.v1.UiIntent
@@ -466,7 +526,7 @@ export type UiIntent = Message<"codefoundry.v1.UiIntent"> & {
  * Use `create(UiIntentSchema)` to create a new message.
  */
 export const UiIntentSchema: GenMessage<UiIntent> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_ui, 14);
+  messageDesc(file_codefoundry_v1_ui, 15);
 
 /**
  * StageComposer puts text in a thread's composer without sending it (composer.stage,
@@ -494,7 +554,7 @@ export type UiIntent_StageComposer = Message<"codefoundry.v1.UiIntent.StageCompo
  * Use `create(UiIntent_StageComposerSchema)` to create a new message.
  */
 export const UiIntent_StageComposerSchema: GenMessage<UiIntent_StageComposer> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_ui, 14, 0);
+  messageDesc(file_codefoundry_v1_ui, 15, 0);
 
 /**
  * InvokeCommand asks the GUI to run a command through its normal flow (runCommand):
@@ -533,7 +593,7 @@ export type UiIntent_InvokeCommand = Message<"codefoundry.v1.UiIntent.InvokeComm
  * Use `create(UiIntent_InvokeCommandSchema)` to create a new message.
  */
 export const UiIntent_InvokeCommandSchema: GenMessage<UiIntent_InvokeCommand> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_ui, 14, 1);
+  messageDesc(file_codefoundry_v1_ui, 15, 1);
 
 /**
  * ShowAgentRun selects a thread and shows one of its own subagent runs (spawn depth 1)
@@ -562,7 +622,7 @@ export type UiIntent_ShowAgentRun = Message<"codefoundry.v1.UiIntent.ShowAgentRu
  * Use `create(UiIntent_ShowAgentRunSchema)` to create a new message.
  */
 export const UiIntent_ShowAgentRunSchema: GenMessage<UiIntent_ShowAgentRun> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_ui, 14, 2);
+  messageDesc(file_codefoundry_v1_ui, 15, 2);
 
 /**
  * PlayAlertSound plays the attention alert sound once (notifications.test, a preview:
@@ -584,7 +644,7 @@ export type UiIntent_PlayAlertSound = Message<"codefoundry.v1.UiIntent.PlayAlert
  * Use `create(UiIntent_PlayAlertSoundSchema)` to create a new message.
  */
 export const UiIntent_PlayAlertSoundSchema: GenMessage<UiIntent_PlayAlertSound> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_ui, 14, 3);
+  messageDesc(file_codefoundry_v1_ui, 15, 3);
 
 /**
  * ShowView opens a named GUI view: "help", "settings", "usage". "settings.<page
@@ -615,7 +675,7 @@ export type UiIntent_ShowView = Message<"codefoundry.v1.UiIntent.ShowView"> & {
  * Use `create(UiIntent_ShowViewSchema)` to create a new message.
  */
 export const UiIntent_ShowViewSchema: GenMessage<UiIntent_ShowView> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_ui, 14, 4);
+  messageDesc(file_codefoundry_v1_ui, 15, 4);
 
 /**
  * @generated from message codefoundry.v1.UiIntent.FocusThread
@@ -641,7 +701,7 @@ export type UiIntent_FocusThread = Message<"codefoundry.v1.UiIntent.FocusThread"
  * Use `create(UiIntent_FocusThreadSchema)` to create a new message.
  */
 export const UiIntent_FocusThreadSchema: GenMessage<UiIntent_FocusThread> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_ui, 14, 5);
+  messageDesc(file_codefoundry_v1_ui, 15, 5);
 
 /**
  * @generated from message codefoundry.v1.UiIntent.FocusTerminal
@@ -658,7 +718,7 @@ export type UiIntent_FocusTerminal = Message<"codefoundry.v1.UiIntent.FocusTermi
  * Use `create(UiIntent_FocusTerminalSchema)` to create a new message.
  */
 export const UiIntent_FocusTerminalSchema: GenMessage<UiIntent_FocusTerminal> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_ui, 14, 6);
+  messageDesc(file_codefoundry_v1_ui, 15, 6);
 
 /**
  * @generated from message codefoundry.v1.UiIntent.FocusProject
@@ -680,7 +740,7 @@ export type UiIntent_FocusProject = Message<"codefoundry.v1.UiIntent.FocusProjec
  * Use `create(UiIntent_FocusProjectSchema)` to create a new message.
  */
 export const UiIntent_FocusProjectSchema: GenMessage<UiIntent_FocusProject> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_ui, 14, 7);
+  messageDesc(file_codefoundry_v1_ui, 15, 7);
 
 /**
  * @generated from message codefoundry.v1.UiIntent.OpenPalette
@@ -699,7 +759,7 @@ export type UiIntent_OpenPalette = Message<"codefoundry.v1.UiIntent.OpenPalette"
  * Use `create(UiIntent_OpenPaletteSchema)` to create a new message.
  */
 export const UiIntent_OpenPaletteSchema: GenMessage<UiIntent_OpenPalette> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_ui, 14, 8);
+  messageDesc(file_codefoundry_v1_ui, 15, 8);
 
 /**
  * @generated from message codefoundry.v1.UiIntent.Notify
@@ -763,7 +823,7 @@ export type UiIntent_Notify = Message<"codefoundry.v1.UiIntent.Notify"> & {
  * Use `create(UiIntent_NotifySchema)` to create a new message.
  */
 export const UiIntent_NotifySchema: GenMessage<UiIntent_Notify> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_ui, 14, 9);
+  messageDesc(file_codefoundry_v1_ui, 15, 9);
 
 /**
  * @generated from enum codefoundry.v1.UiIntent.Notify.Level
@@ -802,7 +862,7 @@ export enum UiIntent_Notify_Level {
  * Describes the enum codefoundry.v1.UiIntent.Notify.Level.
  */
 export const UiIntent_Notify_LevelSchema: GenEnum<UiIntent_Notify_Level> = /*@__PURE__*/
-  enumDesc(file_codefoundry_v1_ui, 14, 9, 0);
+  enumDesc(file_codefoundry_v1_ui, 15, 9, 0);
 
 /**
  * UiService lets the daemon (and the CLI through it) steer a running GUI.

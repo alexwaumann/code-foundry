@@ -20,6 +20,37 @@ export interface DaemonEndpoint {
 }
 
 /**
+ * PageCheckIssue is one problem a page check saw.
+ */
+export interface PageCheckIssue {
+    "kind": string;
+    "call": string;
+    "code": string;
+    "message": string;
+    "where": string;
+    "count": number;
+}
+
+/**
+ * PageChecked is the page's report of a page check (frontend/src/lib/pageCheck.ts
+ * PageCheckReport; page.proto's PageCheckReport).
+ */
+export interface PageChecked {
+    "loaded": boolean;
+    "loader": string;
+    "problems": PageCheckIssue[] | null;
+    "height": number;
+    "pageHeight": number;
+    "resized": boolean;
+    "settleMs": number;
+    "settled": boolean;
+    "busy": number;
+    "storageWrites": number;
+    "calls": number;
+    "failure": string;
+}
+
+/**
  * ShotRendered is the page's report of a surface drawn and measured.
  */
 export interface ShotRendered {

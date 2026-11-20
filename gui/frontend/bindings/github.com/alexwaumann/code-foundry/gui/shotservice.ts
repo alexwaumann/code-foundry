@@ -16,6 +16,14 @@ import { Call as $Call, CancellablePromise as $CancellablePromise } from "@wails
 import * as $models from "./models.js";
 
 /**
+ * Checked is the page's report of page check id: what the render saw. The host snapshots the
+ * card's frame when the check asked for a PNG.
+ */
+export function Checked(id: string, r: $models.PageChecked): $CancellablePromise<void> {
+    return $Call.ByID(542329614, id, r);
+}
+
+/**
  * Failed is the page's report that request id could not be drawn: failure is its kind
  * ("plugin-down", "failed", "unavailable", "timeout", "invalid"), reason its words.
  */

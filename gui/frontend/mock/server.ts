@@ -553,6 +553,7 @@ function routes(router: ConnectRouter): void {
     pageStorage: (req) => world.pages.pageStorage(req.path),
     setPageStorage: (req) => world.pages.setPageStorage(req.path, req.key, req.value),
     proxyFetch: (req, ctx) => (world.pages.checkFetch(req.path), mockProxyFetch(req, ctx.signal)),
+    checkPage: (req) => world.pages.checkPage(req.path),
   });
   router.service(GhService, {
     getViewer: () => ({ viewer: world.gh.dashboard.viewer, authenticated: world.gh.authenticated, fetchedAt: world.gh.dashboard.fetchedAt }),

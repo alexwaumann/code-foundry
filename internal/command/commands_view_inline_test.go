@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strings"
 	"testing"
 
 	"connectrpc.com/connect"
@@ -187,8 +188,8 @@ func TestViewInline(t *testing.T) {
 			if got.String() != tt.wantReq.String() {
 				t.Errorf("ShowHtml request = %v, want %v", got, tt.wantReq)
 			}
-			if res.Message != tt.wantMsg {
-				t.Errorf("message = %q, want %q", res.Message, tt.wantMsg)
+			if msg, next, _ := strings.Cut(res.Message, "\n"); msg != tt.wantMsg || !strings.HasPrefix(next, "static checks: ") {
+				t.Errorf("message = %q, want %q and the next step", res.Message, tt.wantMsg)
 			}
 			out, ok := res.JSON.(command.InlineResult)
 			if !ok || out.Item != "html-1" || out.Thread != "s-aaaaaaaaaaa1" || (out.Panel != nil) != tt.wantPanel || out.Reused != (tt.shown && tt.args["again"] == "") {

@@ -84,8 +84,10 @@ func TestPanelPage(t *testing.T) {
 				return
 			}
 			openedTab(t, reg, emit, res, "s-aaaaaaaaaaa1", tt.wantParams)
-			if res.Message != tt.wantMsg {
-				t.Errorf("message = %q, want %q", res.Message, tt.wantMsg)
+			// The next step's line (NextCheckLine) is for the model: only under a message.
+			msg, next, cut := strings.Cut(res.Message, "\n")
+			if msg != tt.wantMsg || cut != (tt.wantMsg != "") || cut && next != command.NextCheckLine(tt.args["path"], len(tt.wantWarnings)) {
+				t.Errorf("message = %q, want %q and the next step", res.Message, tt.wantMsg)
 			}
 			if !slices.Equal(res.Warnings, tt.wantWarnings) {
 				t.Errorf("warnings = %q, want %q", res.Warnings, tt.wantWarnings)

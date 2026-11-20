@@ -152,7 +152,7 @@ func TestViewOpenPlacesALinkedTab(t *testing.T) {
 					t.Errorf("JSON = %+v, want tab %s in pane %s by rule 5, unfocused", res.JSON, tabs[0].ID, p.ID)
 				}
 				want := "opened tab " + tabs[0].ID + " in pane " + p.ID + " for thread " + self + " (in a new pane right of the thread); windows=1"
-				if res.Message != want {
+				if msg, _, _ := strings.Cut(res.Message, "\nstatic checks: "); msg != want {
 					t.Errorf("message = %q, want %q", res.Message, want)
 				}
 				if v.kind != "mcp" && maps2(tabs[0].Params) == "" {

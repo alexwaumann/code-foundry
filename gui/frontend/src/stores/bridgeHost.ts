@@ -55,6 +55,11 @@
  * The storage is the frame's page's, so a document of the page that goes on to another file
  * of its own in the frame keeps it.
  *
+ * A page check's copy (`check`; docs/notes/page-self-check.md) answers as any frame does, but
+ * every refusal is reported (a `gesture` too: the page did that on load), its runs, fetches
+ * and ready are counted in flight, its cf.storage writes are kept in the page's copy and
+ * never saved, and it never asks the user.
+ *
  * The daemon has the last word on a page's access (docs/notes/page-access-live.md): a page
  * alone's run names its page (pageContext's pagePath), and Invoke refuses it unless the user
  * allows the page now. A refusal for the page's access (that one, PageService's consent errors,
@@ -330,6 +335,15 @@ export interface BridgeFrame {
    * read again, and setPage (or a new host) follows it. Once per access.
    */
   onStale?: () => void;
+  /** A page check's copy (lib/pageCheck.ts): what the page does is counted, nothing is saved or asked. */
+  check?: BridgeCheck;
+}
+
+/** What a page check counts of the bridge (lib/pageCheck.ts PageCheckTap). */
+export interface BridgeCheck {
+  busy: (delta: 1 | -1) => void;
+  call: () => void;
+  stored: () => void;
 }
 
 export function createBridgeHost(frame: BridgeFrame): BridgeHost {
@@ -403,7 +417,7 @@ export function createBridgeHost(frame: BridgeFrame): BridgeHost {
   ) => {
     if (disposed || forDoc !== doc) return;
     post(forDoc, errorResult(id, error, declined));
-    if (reported.has(error.code)) frame.onError?.({ call, code: error.code, message: error.message, atMs: Date.now() });
+    if (frame.check || reported.has(error.code)) frame.onError?.({ call, code: error.code, message: error.message, atMs: Date.now() });
   };
 
   /** Why the page may make no call now, or null when it may. */
@@ -450,6 +464,7 @@ export function createBridgeHost(frame: BridgeFrame): BridgeHost {
       post(forDoc, readyMessage({ kind: "none", refusal: m.error.message }, publishedTheme(), []));
       return;
     }
+    frame.check?.busy(1);
     const access = m.kind === "thread" ? { kind: "thread" as const, thread: { id: m.id, name: useThreadsStore.getState().byId[m.id]?.name ?? "" } } : { kind: "page" as const };
     const verbs = listed().then(
       (cmds) => cmds,
@@ -464,6 +479,7 @@ export function createBridgeHost(frame: BridgeFrame): BridgeHost {
     void Promise.all([verbs, storage]).then(([cmds, values]) => {
       const readOnly = cmds.filter((c) => c.readOnly).map((c) => c.name);
       post(forDoc, readyMessage(access, publishedTheme(), readOnly, values, cmds.map((c) => c.name)));
+      frame.check?.busy(-1);
     });
   };
 
@@ -472,6 +488,12 @@ export function createBridgeHost(frame: BridgeFrame): BridgeHost {
     const sk = storageKey(m);
     if (sk === null) {
       post(forDoc, errorResult(id, noBridge() ?? NO_THREAD));
+      return;
+    }
+    // A check's copy: the page has the write already (bridge.js applies it at once); it is not saved.
+    if (frame.check) {
+      frame.check.stored();
+      post(forDoc, okResult(id, { message: "", resultJson: "" }));
       return;
     }
     const file = storageFile(m);
@@ -525,6 +547,8 @@ export function createBridgeHost(frame: BridgeFrame): BridgeHost {
 
   /** Puts a question to the user: the answer, a no if the page gave up on it first. */
   const question = async (forDoc: number, id: CallId, req: ConfirmRequest): Promise<boolean> => {
+    // A check never asks: what needs a yes is not tried.
+    if (frame.check) return false;
     const call = { cancelled: false, req };
     asking.set(id, call);
     asks.open = true;
@@ -559,6 +583,7 @@ export function createBridgeHost(frame: BridgeFrame): BridgeHost {
   };
 
   const run = async (forDoc: number, id: CallId, verb: string, args: Record<string, string>, present: boolean) => {
+    frame.check?.call();
     const none = noBridge();
     if (none) {
       fail(forDoc, id, verb, none, null, noBridgeReported());
@@ -572,6 +597,7 @@ export function createBridgeHost(frame: BridgeFrame): BridgeHost {
     }
     const abort = new AbortController();
     running.set(id, abort);
+    frame.check?.busy(1);
     const asked = { declined: false, refused: null as BridgeError | null, started: false };
     try {
       const cmds = await listed().catch(() => []);
@@ -628,11 +654,13 @@ export function createBridgeHost(frame: BridgeFrame): BridgeHost {
       else fail(forDoc, id, verb, e);
     } finally {
       if (running.get(id) === abort) running.delete(id);
+      frame.check?.busy(-1);
     }
   };
 
   const fetch = async (forDoc: number, m: Extract<PageMessage, { kind: "fetch" }>) => {
     const call = fetchCall(m.url);
+    frame.check?.call();
     const none = noBridge();
     if (none) {
       fail(forDoc, m.id, call, none, null, noBridgeReported(FETCH_REPORTED));
@@ -645,6 +673,7 @@ export function createBridgeHost(frame: BridgeFrame): BridgeHost {
     }
     const abort = new AbortController();
     running.set(m.id, abort);
+    frame.check?.busy(1);
     const at = mode;
     const req: ProxyFetchCall = { url: m.url, method: m.method, headers: m.headers, body: m.body, timeoutMs: m.timeout };
     try {
@@ -659,6 +688,7 @@ export function createBridgeHost(frame: BridgeFrame): BridgeHost {
       fail(forDoc, m.id, call, at.kind === "page" ? pageErrorOf(err) : bridgeErrorOf(err), null, FETCH_REPORTED);
     } finally {
       if (running.get(m.id) === abort) running.delete(m.id);
+      frame.check?.busy(-1);
     }
   };
 
@@ -672,6 +702,7 @@ export function createBridgeHost(frame: BridgeFrame): BridgeHost {
 
   const on = (forDoc: number, id: CallId, source: string) => {
     const call = `cf.on("${source}")`;
+    frame.check?.call();
     const none = noBridge();
     if (none) {
       fail(forDoc, id, call, none, null, noBridgeReported());
