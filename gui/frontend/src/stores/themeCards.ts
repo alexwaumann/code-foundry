@@ -72,13 +72,13 @@ export function themeUndoState(t: ThemeUndoTarget, saved: ThemeFile | null, slot
   const name = current?.name ?? t.id;
   const previousName = own ? name : (look.theme(t.previous)?.name ?? t.previous);
   if (own ? slot === t.id && current?.version === t.version : slot === t.previous) {
-    return { kind: "undone", tip: own ? `${name} has its previous colours again` : `The ${t.scheme} theme is ${previousName} again` };
+    return { kind: "undone", tip: own ? `${name} has its previous colors again` : `The ${t.scheme} theme is ${previousName} again` };
   }
   // Only while the slot shows this card's colours: Undo on an old card would replace what
   // the user (or a later save) chose since.
   if (slot !== t.id || !current || (saved && !samePaint(current, saved))) return { kind: "hidden" };
   const there = !t.gone && (own ? current.version === t.version || look.history(t.id).includes(t.version) : look.theme(t.previous) !== undefined);
-  if (!there) return { kind: "gone", tip: own ? `The previous colours of ${name} are no longer kept` : `${previousName} was deleted` };
+  if (!there) return { kind: "gone", tip: own ? `The previous colors of ${name} are no longer kept` : `${previousName} was deleted` };
   return { kind: "undo", tip: own ? null : `Back to ${previousName}` };
 }
 

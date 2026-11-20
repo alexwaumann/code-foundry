@@ -116,7 +116,7 @@ describe("a thread's setup on the row", () => {
   it.each<[StatusLineKind, string, RowTone, TimeMode]>([
     ["settingUp", "Setting up", "info", "status"],
     ["setupFailed", "Setup failed", "error", "none"],
-    ["setupCancelled", "Cancelled", "muted", "none"],
+    ["setupCancelled", "Canceled", "muted", "none"],
   ])("%s", (kind, word, tone, timeMode) => {
     expect(statusRegistry[kind]).toMatchObject({ word, tone, timeMode });
   });

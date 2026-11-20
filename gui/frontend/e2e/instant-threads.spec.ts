@@ -53,7 +53,7 @@ test("Cancel: the rows give way to one quiet line, the note comes, and Try again
   const id = await sendFromComposer(page, "running");
   await page.getByTestId("thread-setup-cancel").click();
   await expect(page.locator('[data-testid="thread-setup"][data-phase="cancelled"]')).toBeVisible();
-  await expect(page.getByTestId("thread-setup-reason")).toHaveText("Setup cancelled, so your message was not sent.");
+  await expect(page.getByTestId("thread-setup-reason")).toHaveText("Setup canceled, so your message was not sent.");
   await page.getByTestId("thread-setup-retry").click();
   await expect(page.getByTestId("thread-setup-note")).toHaveCount(0);
   await expect(page.getByTestId("thread-setup-live")).toBeVisible();
@@ -76,7 +76,7 @@ for (const scheme of ["dark", "light"] as const) {
     await expect(page.getByTestId("thread-setup-note")).toBeVisible();
     await shot("composer-failed");
     await setup(id, "cancelled");
-    await expect(page.getByTestId("thread-setup-reason")).toContainText("Setup cancelled");
+    await expect(page.getByTestId("thread-setup-reason")).toContainText("Setup canceled");
     await shot("composer-cancelled");
     await page.getByTestId("thread-setup-edit").click();
     await expect(page.getByTestId("composer-input")).toBeFocused();

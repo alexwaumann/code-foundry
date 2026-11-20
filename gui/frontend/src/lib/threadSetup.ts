@@ -310,7 +310,7 @@ export function setupView(s: ThreadSetupView | null | undefined, nowMs: number, 
       const ms = setupTookMs(s);
       // Whole seconds, but for a cancel inside the first one, which "0s" would misstate.
       const took = ms === null ? "" : ms < 1000 ? tookText(ms) : wholeSeconds(ms);
-      return { kind: "cancelled", label: took ? `Setup cancelled after ${took}` : "Setup cancelled" };
+      return { kind: "cancelled", label: took ? `Setup canceled after ${took}` : "Setup canceled" };
     }
     case "done": {
       if (setupRowPhase(s, seen) !== "done") return { kind: "none" };
@@ -341,7 +341,7 @@ export function setupFailure(s: ThreadSetupView): string {
 
 /** The composer's note on a setup that did not finish (components/thread/SetupNote.tsx); null otherwise, and while one runs. */
 export function setupNoteLine(s: ThreadSetupView | null | undefined): string | null {
-  if (s?.phase === "cancelled") return "Setup cancelled, so your message was not sent.";
+  if (s?.phase === "cancelled") return "Setup canceled, so your message was not sent.";
   if (s?.phase === "failed") return `${setupFailure(s) || "Setup failed"}, so your message was not sent.`;
   return null;
 }

@@ -1324,7 +1324,7 @@ describe("a thread's setup", () => {
 
   it("cancelled: Cancelled, muted, nothing on line 3", () => {
     renderRow({ worktreePath: "", state: "disconnected", status: "idle", statusReason: "setup cancelled", setup: setup("cancelled") });
-    expect(screen.getByTestId("row-status-word").textContent).toBe("Cancelled");
+    expect(screen.getByTestId("row-status-word").textContent).toBe("Canceled");
     expect(screen.getByTestId("row-status").className).toContain("text-cf-sidebar-muted-foreground");
     expect(screen.queryByTestId("row-branch")).toBeNull();
   });

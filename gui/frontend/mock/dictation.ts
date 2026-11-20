@@ -444,7 +444,7 @@ export class MockDictation {
         when: () => this.download !== null,
         run: () => {
           this.cancelDownload();
-          return "download cancelled";
+          return "download canceled";
         },
       },
       {

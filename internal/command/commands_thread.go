@@ -140,7 +140,7 @@ func RegisterThread(r *Registry, b ThreadBackend) error {
 			Title:     "Send to Thread",
 			Description: "Send a message to a thread, also while it works: Claude picks it up mid-turn. " +
 				"A thread whose Claude is not running starts with it. During a setup it waits behind the first prompt; " +
-				"after a failed or cancelled setup it tries the setup again. " +
+				"after a failed or canceled setup it tries the setup again. " +
 				"From a thread: a snoozed thread gets it and stays snoozed; an archived thread it did not create refuses it (read it, or ask the user). " +
 				"From a thread to another thread, reply is required: wanted when you need its answer (you are woken when it answers; do not poll), " +
 				"none for an instruction, a hand-off or information (it does not confirm or report back, and you do not hear back).",
@@ -717,7 +717,7 @@ func FormatThreadItems(snap *v1.ThreadItemsSnapshot, full bool) string {
 				switch p := c.GetPrevious(); {
 				case p == "":
 				case p == t.GetId():
-					body += " (undo: its colours before"
+					body += " (undo: its colors before"
 				default:
 					body += " (undo: " + p
 				}

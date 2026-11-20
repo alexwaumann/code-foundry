@@ -30,7 +30,7 @@ import (
 // first prompt, until Claude has it.
 
 // errSetupCancelled is how a setup stage stopped by CancelSetup ends.
-var errSetupCancelled = errors.New("the setup was cancelled")
+var errSetupCancelled = errors.New("the setup was canceled")
 
 // SetupMessage is a message of a setup that never reached Claude.
 type SetupMessage struct {
@@ -401,7 +401,7 @@ func (m *Manager) CancelSetup(ctx context.Context, id string) (Thread, []string,
 		return Thread{}, nil, err
 	}
 	if s.Setup.Phase != SetupCancelled {
-		return s, nil, fmt.Errorf("%w: thread %s's setup failed before it could be cancelled: %s", ErrFailedPrecondition, id, s.Setup.Error)
+		return s, nil, fmt.Errorf("%w: thread %s's setup failed before it could be canceled: %s", ErrFailedPrecondition, id, s.Setup.Error)
 	}
 	return s, j.kept, nil
 }
@@ -431,7 +431,7 @@ func (m *Manager) DiscardSetup(ctx context.Context, id string) (SetupDraft, erro
 	switch {
 	case err != nil:
 	case !rec.s.setupStopped() || rec.setup != nil:
-		err = fmt.Errorf("%w: only a failed or cancelled setup can be discarded; thread %s has none", ErrFailedPrecondition, id)
+		err = fmt.Errorf("%w: only a failed or canceled setup can be discarded; thread %s has none", ErrFailedPrecondition, id)
 	case rec.s.Removing:
 		err = fmt.Errorf("%w: thread %s is being removed", ErrFailedPrecondition, id)
 	}

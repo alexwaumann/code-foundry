@@ -470,7 +470,7 @@ export class MockThemes {
         },
       },
       {
-        cmd: cmd("theme.restore", "Restore Theme Colours", "Put back an earlier version of one of your themes: each save keeps the version it replaces (the last 10).", [
+        cmd: cmd("theme.restore", "Restore Theme Colors", "Put back an earlier version of one of your themes: each save keeps the version it replaces (the last 10).", [
           { name: "theme", type: ArgType.ENUM, required: true, description: "One of your themes' ids", enumValues: this.sorted().map((t) => t.id) },
           { name: "version", type: ArgType.STRING, required: true, description: "The version to put back (a theme card's previous_version)" },
         ]),
@@ -495,7 +495,7 @@ export class MockThemes {
         },
       },
       {
-        cmd: cmd("theme.check", "Check Theme Contrast", "Print the app's contrast check of one of your themes: each pair of colours that falls short and each pin whose rule the base has moved.", [
+        cmd: cmd("theme.check", "Check Theme Contrast", "Print the app's contrast check of one of your themes: each pair of colors that falls short and each pin whose rule the base has moved.", [
           { name: "theme", type: ArgType.ENUM, required: true, description: "One of your themes' ids (theme list marks them)", enumValues: this.sorted().map((t) => t.id) },
         ]),
         when: always,

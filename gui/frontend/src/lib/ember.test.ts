@@ -457,7 +457,7 @@ describe("the board", () => {
     expect((card ? workerRows(card) : []).map((r) => [r.title, r.meta.text, r.branch, r.outcome])).toEqual([
       ["Worker", "Finished", "", ""],
       ["Go side", "done", "cf/wails-go", "Bumped; tests pass"],
-      ["Docs", "cancelled", "", ""],
+      ["Docs", "canceled", "", ""],
     ]);
   });
 

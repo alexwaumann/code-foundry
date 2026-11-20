@@ -19,7 +19,7 @@ import (
 )
 
 // errCancelled means the user answered no to a confirmation prompt (exit 1).
-var errCancelled = errors.New("cancelled")
+var errCancelled = errors.New("canceled")
 
 // stdinIsTerminal reports whether stdin and stderr are terminals, so a prompt can be
 // shown and answered.
@@ -105,7 +105,7 @@ func (cl *cli) invoke(ctx context.Context, cmd *v1.Command, uctx *v1.UiContext, 
 			if d := cr.GetDeclined(); d != nil {
 				return d, nil
 			}
-			fmt.Fprintf(cl.stderr, "code-foundry %s: cancelled\n", name)
+			fmt.Fprintf(cl.stderr, "code-foundry %s: canceled\n", name)
 			return nil, errCancelled
 		}
 		req.Confirmed = true

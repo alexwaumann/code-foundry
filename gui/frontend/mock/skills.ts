@@ -508,7 +508,7 @@ export class MockSkills {
         run: (_c, a) => {
           this.record("skill.browse", a, ["query", "tier", "kind", "limit", "offset", "refresh"]);
           if (a.refresh === "true") this.refreshNow();
-          if (this.noRegistries) return `Claude Code has no plugin marketplace; add your organisation's with: claude plugin marketplace add <owner>/<repo> (for example the ${SKILL_MARKETPLACE} repository)`;
+          if (this.noRegistries) return `Claude Code has no plugin marketplace; add your organization's with: claude plugin marketplace add <owner>/<repo> (for example the ${SKILL_MARKETPLACE} repository)`;
           const { hits, total } = searchEntries(this.catalogue(), { text: a.query ?? "", tier: (a.tier ?? "") as Tier | "", kind: (a.kind ?? "") as Kind | "", limit: Number(a.limit ?? 50), offset: Number(a.offset ?? 0) });
           const lines = hits.map((e) => `${e.name}  ${e.kind}  ${e.tier}  ${e.version}`);
           if (total > hits.length) lines.push(`${String(hits.length)} of ${String(total)} shown (--limit or --offset shows more)`);
@@ -645,7 +645,7 @@ export class MockSkills {
           this.record("skill.refresh", a, []);
           if (this.noRegistries) {
             this.bump();
-            return { message: `Claude Code has no plugin marketplace; add your organisation's with: claude plugin marketplace add <owner>/<repo> (for example the ${SKILL_MARKETPLACE} repository)`, resultJson: "[]" };
+            return { message: `Claude Code has no plugin marketplace; add your organization's with: claude plugin marketplace add <owner>/<repo> (for example the ${SKILL_MARKETPLACE} repository)`, resultJson: "[]" };
           }
           await new Promise((r) => setTimeout(r, STEP_MS * 3));
           const err = this.refreshNow();

@@ -150,7 +150,7 @@ function BaseSection({ analysis }: { analysis: EditorAnalysis }) {
   if (!draft) return null;
   const base = draft.base;
   return (
-    <section aria-label="Base colours" data-testid="editor-base">
+    <section aria-label="Base colors" data-testid="editor-base">
       <SectionHeading heading="Base" note="what the theme supplies" />
       <div className="px-1.5">
         {/* What the daemon would refuse: a surface its scheme cannot carry under the Surface row, anything else on top. */}
@@ -426,5 +426,5 @@ function RefusalLine({ message }: { message: string }) {
 function emptyLine(pinnedOnly: boolean, filter: string, pins: number): string {
   if (!pinnedOnly) return `No slot matches “${filter}”.`;
   if (pins > 0 && filter.trim()) return `No pinned slot matches “${filter}”.`;
-  return "No slot is pinned. Change a slot's colour to pin it.";
+  return "No slot is pinned. Change a slot's color to pin it.";
 }

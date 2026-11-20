@@ -240,7 +240,7 @@ describe("the list", { timeout: 30_000 }, () => {
     expect(screen.getByTestId("themes-issues").textContent).toContain('draft.json did not load: base.accent: "#5fb3" is not #rrggbb');
     expect(searchbox().placeholder).toBe("Search 17 dark themes");
     // A curated row has Customise but no Delete.
-    expect(within(option("Dracula")).getByRole("button", { name: "Customise Dracula" })).toBeTruthy();
+    expect(within(option("Dracula")).getByRole("button", { name: "Customize Dracula" })).toBeTruthy();
     expect(within(option("Dracula")).queryByRole("button", { name: "Delete Dracula" })).toBeNull();
     // The light slot has its own.
     fireEvent.click(screen.getByTestId("themes-slot-light"));
@@ -276,7 +276,7 @@ describe("the list", { timeout: 30_000 }, () => {
     publish();
     open();
     expect(screen.getByTestId("themes-yours").textContent).toContain("Yours · 0");
-    expect(screen.getByTestId("themes-yours").textContent).toContain("Customise a theme to make one of your own.");
+    expect(screen.getByTestId("themes-yours").textContent).toContain("Customize a theme to make one of your own.");
     disk.user = seed();
     publish();
     expect(names("themes-yours")).toEqual(["Mocha, warmer", "Ocean Dusk"]);
@@ -467,7 +467,7 @@ describe("Customise and Delete", { timeout: 30_000 }, () => {
     open();
     // A curated theme has no Delete.
     expect(within(option("Dracula")).queryByRole("button", { name: "Delete Dracula" })).toBeNull();
-    fireEvent.click(within(option("Dracula")).getByRole("button", { name: "Customise Dracula" }));
+    fireEvent.click(within(option("Dracula")).getByRole("button", { name: "Customize Dracula" }));
     await waitFor(() => {
       expect(names("themes-yours")).toEqual(["Dracula copy", "Mocha, warmer", "Ocean Dusk"]);
     });
@@ -481,7 +481,7 @@ describe("Customise and Delete", { timeout: 30_000 }, () => {
     expect(themeSlots().dark).toBe("github-dark");
 
     // Customise again: the first copy was never saved, so it goes before the next is made, which takes its id.
-    fireEvent.click(within(option("Dracula")).getByRole("button", { name: "Customise Dracula" }));
+    fireEvent.click(within(option("Dracula")).getByRole("button", { name: "Customize Dracula" }));
     await waitFor(() => {
       expect(themeCalls()).toEqual(["theme.duplicate dracula", "theme.delete dracula-copy", "theme.duplicate dracula"]);
     });
@@ -496,7 +496,7 @@ describe("Customise and Delete", { timeout: 30_000 }, () => {
     await waitFor(() => {
       expect(screen.queryByTestId("theme-save-dialog")).toBeNull();
     });
-    fireEvent.click(within(option("Dracula")).getByRole("button", { name: "Customise Dracula" }));
+    fireEvent.click(within(option("Dracula")).getByRole("button", { name: "Customize Dracula" }));
     await waitFor(() => {
       expect(scope().dataset.theme).toBe("dracula-copy-2");
     });
@@ -505,7 +505,7 @@ describe("Customise and Delete", { timeout: 30_000 }, () => {
 
   it("a double-click on Customise makes one copy; closing it unsaved deletes it and the preview goes back to the slot's", async () => {
     open();
-    const btn = within(option("Nord")).getByRole("button", { name: "Customise Nord" });
+    const btn = within(option("Nord")).getByRole("button", { name: "Customize Nord" });
     fireEvent.click(btn, { detail: 1 });
     fireEvent.click(btn, { detail: 2 });
     fireEvent.doubleClick(btn);
@@ -539,7 +539,7 @@ describe("Customise and Delete", { timeout: 30_000 }, () => {
 describe("the editor", { timeout: 30_000 }, () => {
   it("leaving with changes asks: another row, then closing the page; Discard leaves and the unsaved Customise copy goes", async () => {
     open();
-    fireEvent.click(within(option("Dracula")).getByRole("button", { name: "Customise Dracula" }));
+    fireEvent.click(within(option("Dracula")).getByRole("button", { name: "Customize Dracula" }));
     await screen.findByTestId("theme-inspector");
     expect(scope().dataset.theme).toBe("dracula-copy");
     setBase("accent", "#ff79c6");
@@ -671,7 +671,7 @@ describe("the editor", { timeout: 30_000 }, () => {
 
     fireEvent.click(screen.getByTestId("editor-slot-sidebar-row-hover"));
     expect(screen.getByTestId("slot-view").dataset.slot).toBe("--cf-sidebar-row-hover");
-    expect(screen.getByTestId("slot-view").textContent).toContain("Change the colour below to pin it.");
+    expect(screen.getByTestId("slot-view").textContent).toContain("Change the color below to pin it.");
     typeHex("#334455");
     expect(screen.getByTestId("slot-view-yours").textContent).toContain("#334455");
     expect(screen.getByTestId("slot-view-derived")).toBeTruthy();
@@ -751,7 +751,7 @@ describe("the editor", { timeout: 30_000 }, () => {
     fireEvent.click(screen.getByTestId("themes-save"));
     const dialog = await screen.findByTestId("theme-save-dialog");
     const rows = () => within(dialog).getAllByTestId("theme-save-contrast");
-    const unfixable = rows().filter((r) => r.textContent.includes("No colour on control-hover reaches 4.5:1; change the surface or the base colour."));
+    const unfixable = rows().filter((r) => r.textContent.includes("No color on control-hover reaches 4.5:1; change the surface or the base color."));
     expect(unfixable.length).toBeGreaterThan(0);
     for (const r of unfixable) expect(within(r).queryByTestId("theme-save-fix")).toBeNull();
   });

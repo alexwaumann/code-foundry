@@ -232,7 +232,7 @@ describe("Edit", () => {
 
   it("refused: the thread and its row come back, with the reason on its error line", async () => {
     daemon.handlers.set("thread.setup.discard", () => {
-      throw refuse("only a failed or cancelled setup can be discarded", Code.FailedPrecondition);
+      throw refuse("only a failed or canceled setup can be discarded", Code.FailedPrecondition);
     });
     expect(await editSetup(ID)).toBe(false);
     expect(useUiStore.getState().selection).toEqual({ kind: "thread", id: ID });

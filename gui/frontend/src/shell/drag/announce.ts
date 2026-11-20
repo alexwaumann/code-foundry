@@ -64,7 +64,7 @@ export function droppedText(source: DragSource, target: DropTarget | null, names
 }
 
 export function cancelledText(source: DragSource, names: DragNames): string {
-  return `Moving ${lower(sourceText(source, names))} was cancelled.`;
+  return `Moving ${lower(sourceText(source, names))} was canceled.`;
 }
 
 function lower(s: string): string {

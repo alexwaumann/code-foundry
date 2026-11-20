@@ -93,7 +93,7 @@ func (r Report) Check() error {
 		case !IsSlot(p.Slot):
 			return bad("stale pin %d: %q is not a slot", i, p.Slot)
 		case !anyHexPattern.MatchString(p.Pinned) || !anyHexPattern.MatchString(p.Basis) || !anyHexPattern.MatchString(p.Derived):
-			return bad("stale pin %d (%s): colours are lowercase #rrggbb or #rrggbbaa", i, p.Slot)
+			return bad("stale pin %d (%s): colors are lowercase #rrggbb or #rrggbbaa", i, p.Slot)
 		}
 	}
 	return nil

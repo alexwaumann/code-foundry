@@ -161,7 +161,7 @@ func themeCheckCommand(d ThemeDeps, userIDs func() []string, needThemes func() e
 		NoPalette: true,
 		ReadOnly:  true,
 		Title:     "Check Theme Contrast",
-		Description: "Print the app's contrast check of one of your themes: each pair of colours that falls short (the ratio it has and needs) " +
+		Description: "Print the app's contrast check of one of your themes: each pair of colors that falls short (the ratio it has and needs) " +
 			"and each pin whose rule the base has moved. The app checks a theme when its file changes; with the app closed nothing is checked.",
 		Category:     "Settings",
 		NoKeybinding: true,

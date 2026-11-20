@@ -123,7 +123,7 @@ describe("a thread's setup", () => {
     ["running: the step it is on", { ...row, setup: setup("running", [fetching]) }, "settingUp", "Fetching origin/main", "Setting up · Fetching origin/main"],
     ["only starting Claude reads as working", { ...row, setup: setup("running", [start]) }, "working", "", "Working"],
     ["failed: why", { ...row, state: "disconnected", status: "error", statusReason: "setup failed", setup: setup("failed", [failedStep]) }, "setupFailed", "Could not create the worktree", "Setup failed · Could not create the worktree"],
-    ["cancelled: quiet", { ...row, state: "disconnected", status: "idle", statusReason: "setup cancelled", setup: setup("cancelled", []) }, "setupCancelled", "", "Cancelled"],
+    ["cancelled: quiet", { ...row, state: "disconnected", status: "idle", statusReason: "setup cancelled", setup: setup("cancelled", []) }, "setupCancelled", "", "Canceled"],
     ["done: as any thread", { ...row, state: "connected", statusReason: "working", setup: setup("done", [fetching]) }, "working", "", "Working"],
     ["a deleted transcript still wins", { ...row, transcriptMissing: true, setup: setup("failed", [failedStep]) }, "transcriptDeleted", "", "Transcript deleted"],
   ])("%s", (_, s, kind, detail, text) => {

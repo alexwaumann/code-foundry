@@ -523,7 +523,7 @@ export function ShellDnd({ children }: { children: ReactNode }) {
       onDragCancel: () => {
         const e = ended.current;
         if (!e) return undefined;
-        return e.group.length > 1 ? `Moving ${groupText(e.group, names())} was cancelled.` : cancelledText(e.source, names());
+        return e.group.length > 1 ? `Moving ${groupText(e.group, names())} was canceled.` : cancelledText(e.source, names());
       },
     };
   }, []);

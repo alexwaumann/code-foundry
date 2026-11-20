@@ -99,7 +99,7 @@ function sleep(ms: number, signal: AbortSignal): Promise<void> {
     const t = setTimeout(resolve, ms);
     signal.addEventListener("abort", () => {
       clearTimeout(t);
-      reject(new ConnectError("clone cancelled", Code.Canceled));
+      reject(new ConnectError("clone canceled", Code.Canceled));
     });
   });
 }

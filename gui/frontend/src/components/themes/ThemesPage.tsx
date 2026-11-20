@@ -205,7 +205,7 @@ export function ThemesPage() {
                       {yours.map((t) => (
                         <ThemeRow key={t.id} theme={t} previewed={t.id === shownId} current={t.id === slots[slot]} />
                       ))}
-                      {yours.length === 0 && !query && <p className="px-2 pb-1 text-caption-sm">Customise a theme to make one of your own.</p>}
+                      {yours.length === 0 && !query && <p className="px-2 pb-1 text-caption-sm">Customize a theme to make one of your own.</p>}
                       <ThemeIssues issues={shownIssues} />
                     </ListSection>
                   )}
@@ -433,8 +433,8 @@ function RowActions({ theme }: { theme: Theme }) {
           Edit
         </Button>
       )}
-      <Button variant="ghost" size="xs" className="text-cf-text-muted hover:text-cf-text" onClick={() => void customiseTheme(theme.id)} aria-label={`Customise ${theme.name}`}>
-        Customise
+      <Button variant="ghost" size="xs" className="text-cf-text-muted hover:text-cf-text" onClick={() => void customiseTheme(theme.id)} aria-label={`Customize ${theme.name}`}>
+        Customize
       </Button>
       {theme.user && (
         <Tip label="Delete">

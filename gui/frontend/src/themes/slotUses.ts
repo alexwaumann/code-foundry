@@ -75,7 +75,7 @@ export const SLOT_USES: Readonly<Record<string, string>> = {
   "--terminal-selection": "selected text in a focused terminal",
   "--terminal-selection-inactive": "the selection in a terminal without focus",
   ...Object.fromEntries(
-    Array.from({ length: 16 }, (_, n) => [`--terminal-ansi-${String(n)}`, `terminal colour ${String(n)} (${n >= 8 ? "bright " : ""}${ANSI_NAMES[n % 8] ?? ""}); syntax colours start from the palette`]),
+    Array.from({ length: 16 }, (_, n) => [`--terminal-ansi-${String(n)}`, `terminal color ${String(n)} (${n >= 8 ? "bright " : ""}${ANSI_NAMES[n % 8] ?? ""}); syntax colors start from the palette`]),
   ),
   "--syn-fg": "plain code in the file and diff views",
   "--syn-kw": "keywords in code blocks and the file and diff views",

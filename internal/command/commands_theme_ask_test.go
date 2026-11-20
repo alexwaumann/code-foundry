@@ -59,12 +59,12 @@ func TestThemeAsk(t *testing.T) {
 		setup   string // a light user theme with this id, saved first
 	}{
 		{name: "from the Themes page", uctx: gui, args: map[string]string{"description": "warm dark, teal accent"}, message: "warm dark, teal accent",
-			want: []string{"The user asked for a colour theme on Code Foundry's Themes page (Ask the model); their first message in this thread describes it. " +
+			want: []string{"The user asked for a color theme on Code Foundry's Themes page (Ask the model); their first message in this thread describes it. " +
 				"The current dark theme is Ocean Dusk (ocean-dusk) and the light theme is GitHub Light (github-light). ",
 				"save it with `code-foundry theme save --file <path> --apply`", "(the code-foundry skill's reference/making-a-theme.md)."},
 			mode: v1.PermissionMode_PERMISSION_MODE_AUTO},
 		{name: "from the CLI, a model and supervised", args: map[string]string{"description": "sepia", "model": command.ThreadModels[0], "permission": "supervised"}, message: "sepia",
-			want: []string{"The user wants a colour theme for Code Foundry; their first message"},
+			want: []string{"The user wants a color theme for Code Foundry; their first message"},
 			mode: v1.PermissionMode_PERMISSION_MODE_SUPERVISED, model: command.ThreadModels[0]},
 		{name: "a light pair", uctx: gui, args: map[string]string{"pair": "ocean-dusk"}, message: "Make a light pair for my theme Ocean Dusk.",
 			want: []string{"They want a light pair for their theme ocean-dusk (`code-foundry theme show ocean-dusk` prints it): same hues, a light scheme, " +

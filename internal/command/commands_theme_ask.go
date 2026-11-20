@@ -42,9 +42,9 @@ const MaxThemeAskBytes = 4 << 10
 // message, which is the user's words alone, so the bubble and the provisional name (the
 // first line, until the utility model names the thread) are theirs.
 func ThemeAskContext(onPage bool, dark, light theme.Theme, pair *theme.File, pairID string) string {
-	where := "The user wants a colour theme for Code Foundry"
+	where := "The user wants a color theme for Code Foundry"
 	if onPage {
-		where = "The user asked for a colour theme on Code Foundry's Themes page (Ask the model)"
+		where = "The user asked for a color theme on Code Foundry's Themes page (Ask the model)"
 	}
 	ctx := fmt.Sprintf("%s; their first message in this thread describes it. The current dark theme is %s (%s) and the light theme is %s (%s). "+
 		"Make the theme they describe, save it with `code-foundry theme save --file <path> --apply`, and keep refining it in this thread "+
@@ -115,7 +115,7 @@ func RegisterThemeAsk(r *Registry, d ThemeAskDeps) error {
 		Name:  "theme.ask",
 		Page:  PageDrives,
 		Title: "Ask the Model for a Theme…",
-		Description: "Start a thread that makes the colour theme you describe: the model saves and applies it, and the thread shows it as a card " +
+		Description: "Start a thread that makes the color theme you describe: the model saves and applies it, and the thread shows it as a card " +
 			"with Undo and Edit. Keep refining it there. --pair asks for the other scheme's pair of one of your themes.",
 		Category: "Settings",
 		Args: []ArgSpec{

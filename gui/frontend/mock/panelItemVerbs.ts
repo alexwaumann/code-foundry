@@ -216,7 +216,7 @@ export function panelItemCommands(lookup: (id: string) => ItemThread | undefined
         name: "view.open.file", noPalette: true,
         title: "Open File Tab",
         category: "View",
-        description: `Open a file in a File tab ${lead}text with syntax colours and an optional line marked, markdown rendered, images, PDFs, and HTML pages run interactively.`,
+        description: `Open a file in a File tab ${lead}text with syntax colors and an optional line marked, markdown rendered, images, PDFs, and HTML pages run interactively.`,
         keybindings: [],
         args: [
           { name: "path", type: ArgType.PATH, required: true, description: "File to show: absolute, ~/…, or relative to the current directory; under the home directory" },

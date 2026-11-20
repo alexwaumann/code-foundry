@@ -15,7 +15,7 @@ import (
 
 // WarnUnknownClass takes the classes, joined.
 const WarnUnknownClass = "page uses classes /cf/ui.css does not have, so they do nothing: %s. /cf/ui.css is a fixed set, " +
-	"not all of Tailwind: layout, spacing, sizes on the 4px scale, the type roles, rounded-*, the cf colours " +
+	"not all of Tailwind: layout, spacing, sizes on the 4px scale, the type roles, rounded-*, the cf colors " +
 	"(bg-, text-, border- and hover:bg-cf-surface-raised, text-cf-text-muted, bg-cf-error-surface…); use one of those, " +
 	`a style attribute or a rule in the page's own <style>, or add <script src="/cf/tailwind.js"></script> for any utility`
 

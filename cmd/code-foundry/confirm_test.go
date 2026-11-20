@@ -76,7 +76,7 @@ func TestInvokeSecondStage(t *testing.T) {
 	}{
 		{name: "terminal: yes twice deletes", cmd: "x.remove", interactive: true, stdin: "y\ny\n", wantMsg: "removed /wt/d", wantForced: true,
 			wantStderr: []string{"Remove /wt/d? [y/N] ", "cf/d at /wt/d has uncommitted work: 2 modified. Delete it? [y/N] "}},
-		{name: "terminal: no to the second", cmd: "x.remove", interactive: true, stdin: "y\nn\n", wantErr: errCancelled, wantStderr: []string{"cancelled"}},
+		{name: "terminal: no to the second", cmd: "x.remove", interactive: true, stdin: "y\nn\n", wantErr: errCancelled, wantStderr: []string{"canceled"}},
 		{name: "terminal: no to the second keeps the declined result", cmd: "x.cleanup", interactive: true, stdin: "y\nn\n",
 			wantMsg: "kept 1 worktree: cf/d (uncommitted changes)"},
 		{name: "terminal with --yes: the second is not asked", cmd: "x.remove", yes: true, interactive: true, wantErr: errUsage,

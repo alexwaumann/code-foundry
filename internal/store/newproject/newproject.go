@@ -382,7 +382,7 @@ func (s *Store) Deletable(path string) bool {
 func (s *Store) classify(ctx, runCtx context.Context, err error) error {
 	switch {
 	case ctx.Err() != nil:
-		return fmt.Errorf("publish cancelled: %w", ctx.Err())
+		return fmt.Errorf("publish canceled: %w", ctx.Err())
 	case errors.Is(runCtx.Err(), context.DeadlineExceeded):
 		return fmt.Errorf("publish took longer than %s: %w", s.opts.PublishTimeout, context.DeadlineExceeded)
 	}

@@ -143,7 +143,7 @@ func registerEmberTasks(r *Registry, d EmberDeps) error {
 			Args:         []ArgSpec{idArg, {Name: "why", Type: String, Positional: true, Description: "Why it is dropped"}},
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
 				s := ember.StateCancelled
-				return update(ctx, a.String("id"), "cancelled:", ember.TaskUpdate{State: &s, Outcome: ptr(a, "why")})
+				return update(ctx, a.String("id"), "canceled:", ember.TaskUpdate{State: &s, Outcome: ptr(a, "why")})
 			},
 		},
 		Command{

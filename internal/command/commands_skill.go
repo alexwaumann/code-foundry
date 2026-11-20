@@ -467,7 +467,7 @@ func browseView(snap *skill.Snapshot, res marketplace.Result) SkillBrowseView {
 }
 
 // noMarketplace is skill.browse's answer when Claude Code has no marketplace.
-const noMarketplace = "Claude Code has no plugin marketplace; add your organisation's with: claude plugin marketplace add <owner>/<repo> " +
+const noMarketplace = "Claude Code has no plugin marketplace; add your organization's with: claude plugin marketplace add <owner>/<repo> " +
 	"(for example the " + skill.ExpectedMarketplace + " repository)"
 
 func formatSkillBrowse(v SkillBrowseView) string {

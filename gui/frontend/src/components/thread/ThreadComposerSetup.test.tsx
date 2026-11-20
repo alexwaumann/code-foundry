@@ -171,7 +171,7 @@ describe("the setup's note", () => {
     put({ setup: setup("cancelled"), state: "disconnected", status: "idle", statusReason: "setup cancelled" });
     composer(false);
     const n = screen.getByTestId("thread-setup-note");
-    expect(within(n).getByTestId("thread-setup-reason").textContent).toBe("Setup cancelled, so your message was not sent.");
+    expect(within(n).getByTestId("thread-setup-reason").textContent).toBe("Setup canceled, so your message was not sent.");
     expect(n.querySelector("svg")?.getAttribute("class")).toContain("text-cf-text-muted");
   });
 
