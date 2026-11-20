@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
+import { X } from "lucide-react";
 import { pluginLogs, type PluginLogLineView } from "@/api/plugin";
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { errorMessage } from "@/api/stream";
 import { cn } from "@/lib/utils";
 import { tildify } from "@/lib/path";
@@ -50,8 +52,17 @@ export function LogsDialog({ plugin, displayName, onClose }: { plugin: string; d
         if (!open) onClose();
       }}
     >
-      <DialogContent className="flex max-h-[80vh] max-w-3xl flex-col gap-3 p-5" data-testid="plugin-logs">
-        <div className="space-y-0.5">
+      <DialogContent
+        className="flex max-h-[80vh] max-w-3xl flex-col gap-3 p-5"
+        data-testid="plugin-logs"
+        onOpenAutoFocus={(e) => {
+          // The × is its only control: the dialog itself takes focus on open, not the ×.
+          if (!(e.currentTarget instanceof HTMLElement)) return;
+          e.preventDefault();
+          e.currentTarget.focus();
+        }}
+      >
+        <div className="space-y-0.5 pr-8">
           <DialogTitle>{displayName} log</DialogTitle>
           <DialogDescription className="font-mono text-caption-sm break-all">{path ? tildify(path) : "…"}</DialogDescription>
         </div>
@@ -66,6 +77,11 @@ export function LogsDialog({ plugin, displayName, onClose }: { plugin: string; d
             </div>
           ))}
         </div>
+        <DialogClose asChild>
+          <Button type="button" variant="ghost" size="icon-sm" className="absolute top-2.5 right-2.5" aria-label="Close" data-testid="plugin-logs-close">
+            <X aria-hidden />
+          </Button>
+        </DialogClose>
       </DialogContent>
     </Dialog>
   );

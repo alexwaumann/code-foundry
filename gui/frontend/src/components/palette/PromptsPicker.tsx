@@ -104,9 +104,9 @@ export function PromptsPicker({ close }: { close: () => void }) {
         )}
       </CommandList>
       <div className="flex items-center gap-3 border-t px-3 py-1.5 text-caption-sm" data-testid="prompt-history-hints">
-        <Hint keys={["↵"]}>Insert into composer</Hint>
-        <Hint keys={["⌘↵"]}>Show in thread</Hint>
-        <Hint keys={["⌘C"]}>Copy</Hint>
+        <Hint keys={["⏎"]}>insert into composer</Hint>
+        <Hint keys={["⌘", "⏎"]}>show in thread</Hint>
+        <Hint keys={["⌘", "C"]}>copy</Hint>
       </div>
     </Command>
   );

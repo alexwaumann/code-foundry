@@ -85,7 +85,7 @@ describe("skill settings model", () => {
   it("every confirm carries the restart warning; Remove says it deletes a skill you wrote", () => {
     const skill = { kind: "skill" as const, name: "my-notes", dir: "/Users/dev/.claude/skills/my-notes" };
     for (const a of ["uninstall", "remove"] as const) expect(confirmCopy(a, skill).body).toContain(RESTART_WARNING);
-    expect(confirmCopy("remove", skill)).toMatchObject({ title: "Remove my-notes?", label: "Remove" });
+    expect(confirmCopy("remove", skill)).toMatchObject({ title: "Delete my-notes?", label: "Delete" });
     expect(confirmCopy("remove", skill).body).toContain("deletes /Users/dev/.claude/skills/my-notes, a skill you wrote");
     expect(confirmCopy("uninstall", { ...skill, kind: "plugin", name: "enterprise-data" }).body).toContain("removes the plugin and its skills");
   });
@@ -200,7 +200,7 @@ describe("a row's main action and switch", () => {
     ["missing", { state: "missing" as const, update: offer }, null, null, undefined, { kind: "reinstall" }],
     ["local", { state: "local" as const }, null, null, undefined, null],
     ["uninstalling", { update: offer }, "uninstall", null, undefined, { kind: "working", words: "Uninstalling…" }],
-    ["removing", { state: "local" as const }, "remove", null, undefined, { kind: "working", words: "Removing…" }],
+    ["removing", { state: "local" as const }, "remove", null, undefined, { kind: "working", words: "Deleting…" }],
     ["setup again, from the menu", {}, "setup", null, undefined, { kind: "working", words: "Starting setup…" }],
     ["the row's own Run setup spins itself", { needsSetup: true }, "setup", null, undefined, { kind: "setup" }],
   ] as const)("%s", (_name, o, busy, failure, updated, want) => {
@@ -224,7 +224,7 @@ describe("a row's menu", () => {
   it.each([
     ["a skill", row({ name: "x" }), ["View SKILL.md", "---", "Uninstall"]],
     ["a skill with a setup script", row({ name: "x", setupScript: "install.sh" }), ["View SKILL.md", "Run setup again", "---", "Uninstall"]],
-    ["a local skill", row({ name: "x", state: "local", registry: "" }), ["View SKILL.md", "---", "Remove"]],
+    ["a local skill", row({ name: "x", state: "local", registry: "" }), ["View SKILL.md", "---", "Delete"]],
     ["a missing skill", row({ name: "x", state: "missing", setupScript: "install.sh" }), ["Uninstall"]],
     ["a Claude Code plugin", row({ name: "x", kind: "plugin" }), ["Uninstall"]],
     ["a skill with no folder on record", row({ name: "x", dir: "" }), ["Uninstall"]],

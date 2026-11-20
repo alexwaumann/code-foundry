@@ -5,8 +5,8 @@ import { appPath, mockPost, resetMock } from "./fixtures";
  * A daemon from before the shell, whatever version it reports (docs/notes/shell-24d-spec-differences.md,
  * 5): it has no LayoutService, so its mux answers the window's Get with a plain 404 through the
  * tunnel, and its event stream never sends a layout. What only the real transport shows: that 404
- * reaches the window as "no such service", and after the wait the notice with Restart Now takes
- * the waiting text's place. What the notice and Restart Now do is vitest's (shell/layoutService,
+ * reaches the window as "no such service", and after the wait the notice with Restart now takes
+ * the waiting text's place. What the notice and Restart now do is vitest's (shell/layoutService,
  * components/shell/ShellNotice and Shell tests). SHOTS=<dir> for the PR's screenshots.
  */
 
@@ -21,13 +21,13 @@ test.afterEach(async () => {
   await mockPost("layout/service?off=0");
 });
 
-test("a daemon without the layout service: after the wait, the notice says so and offers Restart Now", async ({ page }) => {
+test("a daemon without the layout service: after the wait, the notice says so and offers Restart now", async ({ page }) => {
   await open(page);
   // The wait (Shell LAYOUT_WAIT_MS, 5 s), then one Get answered with the mux's 404.
   const notice = page.getByTestId("shell-old-daemon");
   await expect(notice).toBeVisible({ timeout: 15_000 });
   await expect(notice.getByRole("heading")).toHaveText("The running daemon is older than this window");
-  await expect(notice.getByRole("button", { name: "Restart Now" })).toBeEnabled();
+  await expect(notice.getByRole("button", { name: "Restart now" })).toBeEnabled();
   await expect(page.getByText("Waiting for the daemon to send this window's layout…")).toHaveCount(0);
   await expect(page.getByTestId("shell-grid")).toHaveCount(0);
 });

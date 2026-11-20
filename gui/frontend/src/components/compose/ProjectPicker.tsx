@@ -5,6 +5,7 @@ import { rankPickerRows, usePickerRows, type PickerRow } from "./useProjectRows"
 import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Kbd } from "@/components/ui/kbd";
 import { HOME_KEY } from "@/lib/compose";
+import { cn } from "@/lib/utils";
 import { composeIn, composeInWorkspace, composeNoProject } from "@/stores/compose";
 import { addProject } from "@/stores/projectActions";
 import { useUiStore } from "@/stores/ui";
@@ -12,12 +13,13 @@ import { useUiStore } from "@/stores/ui";
 /** cmdk value of the pinned "Add a project…" row (project.add). */
 const ADD_PROJECT_VALUE = "__add-project";
 
-const hints = [
-  ["↑↓", "Navigate"],
-  ["Enter", "Select"],
-  ["Backspace", "Back"],
-  ["Esc", "Close"],
-] as const;
+/** The footer's key hints, in the finders' style: the keys, then a lower-case verb; close at the end. */
+const hints: readonly { keys: readonly string[]; label: string; end?: true }[] = [
+  { keys: ["↑", "↓"], label: "move" },
+  { keys: ["⏎"], label: "select" },
+  { keys: ["⌫"], label: "back" },
+  { keys: ["esc"], label: "close", end: true },
+];
 
 /**
  * The palette's project picker: thread.new's presentation in the GUI. One flat list, no
@@ -93,7 +95,7 @@ export function ProjectPicker({ close }: { close: () => void }) {
       {/* Not the scroll region itself: that is the rows' div, so Add a project stays put below it. */}
       <CommandList className="max-h-none overflow-visible">
         <div className="max-h-[min(420px,60vh/var(--cf-zoom))] scroll-py-1 overflow-x-hidden overflow-y-auto" data-testid="picker-rows" data-command-scroll>
-          <CommandEmpty>{!loaded ? "Loading projects…" : "No matching projects."}</CommandEmpty>
+          <CommandEmpty>{!loaded ? "Loading projects…" : workspaces.length > 0 ? "No matching workspaces or projects." : "No matching projects."}</CommandEmpty>
           {visible.length > 0 && <div className="p-1">{visible.map(rowFor)}</div>}
         </div>
         {/* The way to a project that is not listed yet: the Add Project dialog (project.add). */}
@@ -117,9 +119,13 @@ export function ProjectPicker({ close }: { close: () => void }) {
         </div>
       </CommandList>
       <div className="flex items-center gap-3 border-t px-3 py-1.5 text-caption-sm" data-testid="picker-hints">
-        {hints.map(([key, label]) => (
-          <span key={key} className="flex items-center gap-1">
-            <Kbd size="sm">{key}</Kbd>
+        {hints.map(({ keys, label, end }) => (
+          <span key={label} className={cn("flex items-center gap-1", end && "ml-auto")}>
+            {keys.map((k) => (
+              <Kbd key={k} size="sm">
+                {k}
+              </Kbd>
+            ))}{" "}
             {label}
           </span>
         ))}

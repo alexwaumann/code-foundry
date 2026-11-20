@@ -32,7 +32,7 @@ async function settleThreads(busy: number): Promise<void> {
   if (busy > 0) await mockPost(`threads?project=repo-cf&count=${String(busy)}&status=busy&prefix=Job`);
 }
 
-// Up to date (Check Again, Checked just now, the repo, × as the only close): src/components/update/UpdateDialog.test.tsx.
+// Up to date (Check again, Checked just now, the repo, × as the only close): src/components/update/UpdateDialog.test.tsx.
 test("up to date: no chip, and the update source rides the one events stream", async ({ page }) => {
   await openApp(page);
   await expect(page.getByTestId("daemon-status")).toBeVisible();
@@ -44,9 +44,9 @@ test("up to date: no chip, and the update source rides the one events stream", a
 // the palette's app.update.check opening the dialog and the re-list on a new state: src/stores/update.test.ts;
 // the "Download v0.2.0" title is the daemon's (internal/command/commands_update_test.go).
 
-// Downloading, the busy-thread list (live), Install and Restart Now: unit-tested in src/components/update/UpdateDialog.test.tsx.
+// Downloading, the busy-thread list (live), Install and restart now: unit-tested in src/components/update/UpdateDialog.test.tsx.
 
-test("a check downloads at once; a failed automatic download falls back to Download; Install and Restart Now", async ({ page }) => {
+test("a check downloads at once; a failed automatic download falls back to Download; Install and restart now", async ({ page }) => {
   await openApp(page);
   await settleThreads(0);
   await mockPost("thread/stop?id=s-2&reason=idle&code=0");
@@ -95,6 +95,6 @@ test("a check downloads at once; a failed automatic download falls back to Downl
 
 // daemon.restart asking first: its message is the daemon's (internal/command/commands_update_test.go TestDaemonRestart); the confirm flow is src/stores/commands.test.ts and src/components/confirm/ConfirmDialog.test.tsx.
 
-// A failed download and Try Again: unit-tested in src/components/update/UpdateDialog.test.tsx.
+// A failed download and Try again: unit-tested in src/components/update/UpdateDialog.test.tsx.
 
 // Dev builds saying updates are off, and a check's refusal in the dialog: src/components/update/UpdateDialog.test.tsx ("disabled: …").

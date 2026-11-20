@@ -29,7 +29,7 @@ interface UpdateSlice {
   /** An action the dialog started and is waiting on. */
   pending: UpdateAction | null;
   /**
-   * Restart Now succeeded: the dialog shows "Restarting…" ("Installing and restarting…"
+   * Restart now succeeded: the dialog shows "Restarting…" ("Installing and restarting…"
    * when it installed a download) until the window goes away. null before.
    */
   restarting: Restarting | null;
@@ -95,7 +95,7 @@ const actionCommands: Record<Exclude<UpdateAction, "restart">, string> = {
 };
 
 /**
- * Restart Now: app.restart installs a downloaded update, closes the threads, asks the
+ * Restart now: app.restart installs a downloaded update, closes the threads, asks the
  * window host to relaunch once the daemon has exited, and exits. The dialog is the confirmation, so it goes in with
  * confirmed set (no second confirm dialog). A daemon older than app.restart (absent
  * from the command list, or NotFound) gets daemon.restart and the host's own Relaunch.
@@ -153,7 +153,7 @@ export async function runUpdateAction(action: UpdateAction): Promise<boolean> {
  * shell draws the window. A pre-tunnel daemon's status can only come from events, which need the
  * tunnel, so without this call a window updated by `install.sh` would sit on a running old daemon
  * with nothing live, no chip and no dialog; a pre-layout one streams, but the shell has nothing
- * to draw. The dialog's Restart Now is app.restart, a plain call, and the host follows it over the
+ * to draw. The dialog's Restart now is app.restart, a plain call, and the host follows it over the
  * Unix socket. Restarting by itself would cut off working threads, so it asks.
  */
 function watchForOldDaemon(): () => void {

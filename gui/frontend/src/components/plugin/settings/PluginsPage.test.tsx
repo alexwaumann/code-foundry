@@ -373,6 +373,12 @@ describe("Settings → Plugins: a row's menu", () => {
       expect(screen.getByTestId("plugin-logs").textContent).toContain("hello is up");
     });
     expect(m.logs).toHaveBeenCalledWith("hello", 300, expect.anything());
+    // The dialog itself has focus, not the ×; the × closes it.
+    expect(document.activeElement).toBe(screen.getByTestId("plugin-logs"));
+    fireEvent.click(within(screen.getByTestId("plugin-logs")).getByRole("button", { name: "Close" }));
+    await waitFor(() => {
+      expect(screen.queryByTestId("plugin-logs")).toBeNull();
+    });
   });
 
   it("Open <surface> runs its show command", async () => {
@@ -592,6 +598,10 @@ describe("Settings → Plugins: the page menu", () => {
     expect(status.dataset.error).toBe("true");
     expect(status.textContent).toContain("Not found, or your gh login cannot read it. Showing what it listed last time.");
     expect(status.textContent).toContain("skipped one");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Close" }));
+    await waitFor(() => {
+      expect(screen.queryByTestId("plugin-registries")).toBeNull();
+    });
   });
 });
 
@@ -726,7 +736,7 @@ describe("Settings → Plugins: the uninstall dialog", () => {
     const text = () => screen.getByTestId("uninstall-dialog").textContent;
     expect(text()).toContain("Uninstall Test Watcher?");
     expect(text()).not.toContain("thread");
-    expect(text()).toContain("It stops and its package goes from ~/.code-foundry/plugins.");
+    expect(text()).toContain("It stops and its package is removed from ~/.code-foundry/plugins.");
     expect(text()).toContain("Its data (~/.code-foundry/plugin-data/test-watcher), secrets and the consent you gave stay for a reinstall.");
     fireEvent.click(dialog().getByTestId("uninstall-purge"));
     expect(text()).not.toContain("stay for a reinstall");

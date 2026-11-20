@@ -144,6 +144,22 @@ describe("compose drafts", () => {
     expect(getDraft("repo-cf")).toMatchObject({ projects: ["repo-cf"], text: `Use and ${sk("repo-cf")} on then ${sk("")}` });
   });
 
+  it.each([
+    ["toggling a project out", () => toggleDraftProject(cf, "repo-gp"), "Remove gp from the thread?", "Remove"],
+    ["one project as the set", () => setDraftProject(cf, "repo-sk"), "Switch to sk?", "Switch"],
+    ["a workspace as the set", () => pickDraftWorkspace(cf, "w-1"), "Switch to login?", "Switch"],
+    ["clearing the set", () => clearDraftSet(cf), "Clear the projects?", "Clear"],
+  ])("%s with tags in the text: the confirm's button says what it does", async (_, act, title, confirmLabel) => {
+    await toggleDraftProject(cf, "repo-gp");
+    updateDraft("repo-cf", { text: `Use ${sk("repo-cf")} and ${sk("repo-gp")} ` });
+    const done = act();
+    await vi.waitFor(() => {
+      expect(useConfirmStore.getState().pending).toMatchObject({ title, confirmLabel });
+    });
+    answerConfirm(false);
+    await expect(done).resolves.toBe(false);
+  });
+
   it("a workspace row: its members become the set and it the reference (its default primary); again: unchanged", async () => {
     await pickDraftWorkspace(cf, "w-1");
     expect(draftSet(cf, getDraft("repo-cf"))).toMatchObject({ projectIds: ["repo-gp", "repo-sk"], workspaceId: "w-1", primary: "repo-sk", isSet: true });

@@ -27,7 +27,7 @@ afterEach(() => {
 });
 
 describe("the no-layout notice", () => {
-  it("waits, until the daemon says it has no layout service: then what is wrong, and Restart Now", () => {
+  it("waits, until the daemon says it has no layout service: then what is wrong, and Restart now", () => {
     render(<ShellNotice kind="no-layout" />);
     expect(screen.getByTestId("shell-notice").textContent).toBe("Waiting for the daemon to send this window's layout…");
     expect(screen.queryByRole("button")).toBeNull();
@@ -37,7 +37,7 @@ describe("the no-layout notice", () => {
     });
     expect(screen.getByRole("heading").textContent).toBe("The running daemon is older than this window");
     expect(screen.queryByText(/Waiting for the daemon/)).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "Restart Now" }));
+    fireEvent.click(screen.getByRole("button", { name: "Restart now" }));
     expect(restarts).toHaveBeenCalledTimes(1);
 
     // Sent: the button says so and does nothing more; a failure shows why and the button again.
@@ -50,7 +50,7 @@ describe("the no-layout notice", () => {
       useLayoutServiceStore.setState({ restarting: false, error: "this daemon cannot restart itself" });
     });
     expect(screen.getByTestId("shell-old-daemon-error").textContent).toBe("this daemon cannot restart itself");
-    expect(screen.getByRole("button", { name: "Restart Now" }).hasAttribute("disabled")).toBe(false);
+    expect(screen.getByRole("button", { name: "Restart now" }).hasAttribute("disabled")).toBe(false);
   });
 });
 

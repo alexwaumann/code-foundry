@@ -118,7 +118,7 @@ export function MergeDialog({
                 data-testid="pr-merge-dialog-delete-branch"
               />
               <label htmlFor={deleteId} className="text-label">
-                Delete it on origin after merging
+                Delete it on GitHub after merging
               </label>
             </Row>
           )}

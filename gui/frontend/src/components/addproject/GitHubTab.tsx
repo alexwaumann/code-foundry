@@ -61,7 +61,7 @@ function ProgressLog({ lines }: { lines: readonly CloneProgressView[] }) {
   return (
     <div ref={ref} className="max-h-40 overflow-y-auto rounded-md border bg-cf-surface-sunken/30 px-3 py-2 text-caption-sm font-mono leading-relaxed text-cf-text" data-testid="add-project-clone-progress">
       {lines.length === 0 ? (
-        <div className="text-cf-text-muted">Starting gh repo clone…</div>
+        <div className="text-cf-text-muted">Starting the clone…</div>
       ) : (
         lines.map((l, i) => (
           <div key={i} className="break-all whitespace-pre-wrap" data-testid="add-project-clone-line" data-transient={l.transient ? "true" : undefined}>
@@ -283,7 +283,7 @@ export function GitHubTab({ active }: { active: boolean }) {
         </p>
       )}
       {view.kind === "idle" && !inputError && (
-        <p className="text-caption">Press Enter to look up a repository or search GitHub. Clones go to ~/.code-foundry/projects/&lt;owner&gt;/&lt;repo&gt; with gh.</p>
+        <p className="text-caption">Press Enter to look up a repository or search GitHub. Clones go to ~/.code-foundry/projects/&lt;owner&gt;/&lt;repo&gt;.</p>
       )}
       {view.kind === "loading" && (
         <p className="flex items-center gap-2 text-caption" data-testid="add-project-github-loading">

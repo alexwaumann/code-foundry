@@ -111,7 +111,7 @@ describe("workspaceNameError", () => {
     ["empty", "  ", [], "Name it."],
     ["the primary keyword", "Workspace", [], "“workspace” is reserved."],
     ["taken, any case", "MONO", ["mono"], "A workspace named “MONO” exists."],
-    ["too long", "x".repeat(101), [], "At most 100 bytes."],
+    ["too long", "x".repeat(101), [], "That name is too long."],
   ])("%s", (_n, name, others, want) => {
     expect(workspaceNameError(name, others)).toBe(want);
   });

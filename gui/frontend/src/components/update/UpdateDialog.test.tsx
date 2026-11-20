@@ -102,13 +102,13 @@ describe("useCutOffThreadIds", () => {
 });
 
 describe("UpdateDialog", () => {
-  it("up to date: Check Again, when it checked and the repo; × is the only close", () => {
+  it("up to date: Check again, when it checked and the repo; × is the only close", () => {
     show(status("idle", { lastCheckedAt: new Date() }));
     expect(chip()).toBeNull();
     expect(dialog().dataset.variant).toBe("upToDate");
     expect(text("update-state")).toBe("You’re up to date");
     expect(dialog().textContent).toContain("Code Foundry v0.1.0 is the latest version.");
-    expect(text("update-check")).toBe("Check Again");
+    expect(text("update-check")).toBe("Check again");
     expect(text("update-meta")).toContain("Checked just now");
     expect(text("update-meta")).toContain("github.com/alexwaumann/code-foundry");
     expect(q("update-later")).toBeNull();
@@ -156,7 +156,7 @@ describe("UpdateDialog", () => {
     expect(chip()).toEqual(["downloading", "Downloading v0.2.0…", null]);
   });
 
-  it("downloaded with busy threads names them, follows them live, and Install and Restart Now runs app.restart confirmed", async () => {
+  it("downloaded with busy threads names them, follows them live, and Install and restart now runs app.restart confirmed", async () => {
     setThreads([thread("s-1", "Refactor sidebar tree", finished), thread("s-2", "Port renderer", waiting), thread("j-1", "Job 1", working), thread("j-2", "Job 2", working), thread("s-5", "Idle one", idle)]);
     show(status("downloaded", { notesUrl: "https://example.com/notes" }));
     expect(dialog().dataset.stateName).toBe("downloaded");
@@ -170,7 +170,7 @@ describe("UpdateDialog", () => {
     expect(text("update-later")).toBe("Wait, I’ll restart later");
     expect(text("update-meta")).toContain("Running v0.1.0");
     expect(q("update-close")).toBeNull();
-    expect(text("update-restart")).toBe("Install and Restart Now");
+    expect(text("update-restart")).toBe("Install and restart now");
     expect(chip()).toEqual(["downloaded", "v0.2.0 downloaded", "Restart to apply"]);
 
     // Another busy thread shows up live.
@@ -204,7 +204,7 @@ describe("UpdateDialog", () => {
       "Install and restart to finish updating. The app and the daemon update together, so nothing ends up out of sync. No thread is working or waiting on you, so nothing will be interrupted.",
     );
     expect(q("update-busy-threads")).toBeNull();
-    expect(text("update-restart")).toBe("Install and Restart Now");
+    expect(text("update-restart")).toBe("Install and restart now");
     expect(text("update-later")).toBe("Later");
   });
 
@@ -216,20 +216,20 @@ describe("UpdateDialog", () => {
     expect(dialog().textContent).toContain("Restart to finish updating. No thread is working or waiting on you, so nothing will be interrupted.");
     expect(dialog().textContent).not.toMatch(/connect|open/);
     expect(q("update-busy-threads")).toBeNull();
-    expect(text("update-restart")).toBe("Restart Now");
+    expect(text("update-restart")).toBe("Restart now");
     expect(text("update-later")).toBe("Later");
     fireEvent.click(within(dialog()).getByTestId("update-later"));
     expect(useUpdateStore.getState().dialogOpen).toBe(false);
   });
 
-  it("a failed download shows the reason; Try Again downloads again", async () => {
+  it("a failed download shows the reason; Try again downloads again", async () => {
     show(status("failed", { failureReason: "installer: exit status 1: error: checksum mismatch" }));
     expect(dialog().dataset.variant).toBe("failed");
     expect(text("update-failure")).toBe("installer: exit status 1: error: checksum mismatch");
     expect(text("update-state")).toBe("Couldn’t update to v0.2.0");
     expect(dialog().textContent).toContain("Nothing changed. You’re still on v0.1.0.");
     expect(dialog().textContent).toContain("Installer exited with status 1");
-    expect(text("update-download")).toBe("Try Again");
+    expect(text("update-download")).toBe("Try again");
     expect(text("update-later")).toBe("Not now");
     expect(q("update-close")).toBeNull();
     expect(chip()).toEqual(["failed", "Update failed", "Details"]);
@@ -240,7 +240,7 @@ describe("UpdateDialog", () => {
     setStatus(status("downloaded"));
     expect(dialog().dataset.stateName).toBe("downloaded");
     expect(dialog().dataset.variant).toMatch(/^ready/);
-    expect(text("update-restart")).toBe("Install and Restart Now");
+    expect(text("update-restart")).toBe("Install and restart now");
   });
 
   it("disabled: updates are off, with the reason and a ×; no chip; a check says why it failed", async () => {

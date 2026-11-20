@@ -147,7 +147,7 @@ function SaveBody() {
             </div>
           ) : (
             <p className="text-caption" data-testid="theme-save-clean">
-              Every contrast pair reads, and no pin is stale.
+              Every contrast pair passes and no pin is stale.
             </p>
           )}
           {isSlot ? (

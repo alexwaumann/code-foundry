@@ -579,7 +579,7 @@ export function createBridgeHost(frame: BridgeFrame): BridgeHost {
       const id = mode.id;
       return `${page} in thread ${quotedName(useThreadsStore.getState().byId[id]?.name || id)}`;
     }
-    return frame.pagePath ? `${page} at ${tildify(frame.pagePath)}, in no thread` : `${page}, in no thread`;
+    return frame.pagePath ? `${page} at ${tildify(frame.pagePath)}` : page;
   };
 
   const run = async (forDoc: number, id: CallId, verb: string, args: Record<string, string>, present: boolean) => {

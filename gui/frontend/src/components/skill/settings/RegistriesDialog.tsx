@@ -1,7 +1,8 @@
-import { TriangleAlert } from "lucide-react";
+import { TriangleAlert, X } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 import { CatalogNotice } from "@/components/settings/catalog/CatalogList";
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { useNow } from "@/lib/clock";
 import { cn } from "@/lib/utils";
 import { useSkillMarketplaceStore, useSkillRegistriesError } from "@/stores/skill";
@@ -61,8 +62,17 @@ export function RegistriesDialog({ onClose }: { onClose: () => void }) {
         if (!open) onClose();
       }}
     >
-      <DialogContent className="flex max-h-[80vh] max-w-2xl flex-col gap-3 p-5" data-testid="skill-registries">
-        <div className="space-y-0.5">
+      <DialogContent
+        className="flex max-h-[80vh] max-w-2xl flex-col gap-3 p-5"
+        data-testid="skill-registries"
+        onOpenAutoFocus={(e) => {
+          // The × is its only control: the dialog itself takes focus on open, not the ×.
+          if (!(e.currentTarget instanceof HTMLElement)) return;
+          e.preventDefault();
+          e.currentTarget.focus();
+        }}
+      >
+        <div className="space-y-0.5 pr-8">
           <DialogTitle>Registries</DialogTitle>
           <DialogDescription>The marketplaces Claude Code has. Refresh marketplaces in the page&apos;s ⋯ menu updates them, as the hourly check does.</DialogDescription>
         </div>
@@ -87,6 +97,11 @@ export function RegistriesDialog({ onClose }: { onClose: () => void }) {
             <RegistryRow key={n} name={n} className={i > 0 ? "border-t border-cf-border" : undefined} />
           ))}
         </div>
+        <DialogClose asChild>
+          <Button type="button" variant="ghost" size="icon-sm" className="absolute top-2.5 right-2.5" aria-label="Close" data-testid="skill-registries-close">
+            <X aria-hidden />
+          </Button>
+        </DialogClose>
       </DialogContent>
     </Dialog>
   );

@@ -250,13 +250,19 @@ function goneTagsConfirm(text: string, gone: readonly string[], title: string, c
  * there are any). The base resets when the projects change. Resolves false when the user
  * cancelled or the draft is busy.
  */
-async function writeSet(target: ComposeTarget, picked: readonly string[], workspace: string | undefined, title: string): Promise<boolean> {
+async function writeSet(
+  target: ComposeTarget,
+  picked: readonly string[],
+  workspace: string | undefined,
+  title: string,
+  confirmLabel: string,
+): Promise<boolean> {
   const key = draftKey(target);
   const before = getDraft(key);
   if (before.phase !== "idle") return false;
   const was = draftSet(target, before);
   const gone = was.picked.filter((id) => !picked.includes(id));
-  const ask = goneTagsConfirm(before.text, gone, title, "Remove");
+  const ask = goneTagsConfirm(before.text, gone, title, confirmLabel);
   if (ask && !(await requestConfirm(ask))) return false;
   const d = getDraft(key);
   let text = d.text;
@@ -286,7 +292,7 @@ export async function toggleDraftProject(target: ComposeTarget, projectId: strin
   const set = draftSet(target, getDraft(draftKey(target)));
   const last = set.picked.includes(projectId) && set.picked.length === 1;
   const name = useProjectsStore.getState().byId[projectId]?.name ?? projectId;
-  return writeSet(target, toggled(set.picked, projectId), last ? "" : undefined, `Remove ${name} from the thread?`);
+  return writeSet(target, toggled(set.picked, projectId), last ? "" : undefined, `Remove ${name} from the thread?`, "Remove");
 }
 
 /**
@@ -299,13 +305,13 @@ export async function setDraftProject(target: ComposeTarget, projectId: string):
   if (target.kind === "like") return false;
   if (!(projectId in useProjectsStore.getState().byId)) return false;
   const name = useProjectsStore.getState().byId[projectId]?.name ?? projectId;
-  return writeSet(target, [projectId], "", `Switch to ${name}?`);
+  return writeSet(target, [projectId], "", `Switch to ${name}?`, "Switch");
 }
 
 /** Empties the draft's set (the chip row's Clear): the composer's empty state until a project or a workspace is picked. */
 export async function clearDraftSet(target: ComposeTarget): Promise<boolean> {
   if (target.kind === "home" || target.kind === "like") return false;
-  return writeSet(target, [], "", "Clear the projects?");
+  return writeSet(target, [], "", "Clear the projects?", "Clear");
 }
 
 /** A draft whose set was emptied (every project of its workspace taken out): nothing to send until a project is picked. */
@@ -325,7 +331,7 @@ export async function pickDraftWorkspace(target: ComposeTarget, workspaceId: str
   if (!ws) return false;
   const known = useProjectsStore.getState().byId;
   const members = ws.members.map((m) => m.projectId).filter((id) => id in known);
-  return writeSet(target, members, workspaceId, `Switch to ${ws.name}?`);
+  return writeSet(target, members, workspaceId, `Switch to ${ws.name}?`, "Switch");
 }
 
 /**
@@ -345,6 +351,7 @@ export async function removeDraftWorkspace(target: ComposeTarget): Promise<boole
     set.picked.filter((id) => !members.has(id)),
     "",
     `Remove ${name} from the thread?`,
+    "Remove",
   );
 }
 

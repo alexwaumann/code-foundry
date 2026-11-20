@@ -462,7 +462,7 @@ Services (v1):
   downloads it at once (`docs/notes/update-auto-download.md`); Download (`app.update`) is
   the fallback by hand. A download only stages the release in `app.new`; the install on disk changes inside the restart, so a
   window reopened meanwhile still matches its daemon. Nothing restarts automatically.
-  `app.restart` (the GUI's "Restart Now"; confirmed, warning about busy threads) installs
+  `app.restart` (the GUI's "Restart now"; confirmed, warning about busy threads) installs
   a downloaded update (two renames), publishes `restart_requested`, then the daemon exits
   like `daemon.restart`; GUI hosts relaunch once their Watch stream ends and the new
   window auto-starts the installed daemon. `app.relaunch` and `daemon.restart` restart

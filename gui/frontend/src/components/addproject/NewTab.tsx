@@ -137,8 +137,11 @@ export function NewTab({ active }: { active: boolean }) {
           </span>
         )}
         {created && (
-          <span className="text-caption text-cf-success-text" data-testid="add-project-new-created">
-            Created {created.name}. It stays a local project until it is published; closing this dialog deletes it.
+          <span className="text-caption" data-testid="add-project-new-created">
+            <span className="text-cf-success-text">Created {created.name}.</span>{" "}
+            <span className="text-cf-warning-text" data-testid="add-project-new-created-warning">
+              Closing this dialog without publishing deletes it.{publish && " Keep it local keeps it."}
+            </span>
           </span>
         )}
       </div>

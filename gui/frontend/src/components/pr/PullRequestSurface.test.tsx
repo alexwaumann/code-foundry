@@ -1098,7 +1098,7 @@ describe("the merge button", () => {
     expect(byTestId("pr-merge-dialog-into").textContent).toBe("IntomainIts commits become 1");
     expect(byTestId("pr-merge-dialog-from").textContent).toBe("Fromfeat/sidebar");
     expect(["merge", "squash", "rebase"].map((m) => checked(`pr-merge-dialog-method-${m}`))).toEqual(["false", "true", "false"]);
-    expect(byTestId("pr-merge-dialog-branch").textContent).toBe("BranchDelete it on origin after merging");
+    expect(byTestId("pr-merge-dialog-branch").textContent).toBe("BranchDelete it on GitHub after merging");
     expect(byTestId("pr-merge-dialog-delete-branch").getAttribute("aria-checked")).toBe("true");
     expect(byTestId("pr-merge-dialog-confirm").textContent).toBe("Squash and merge");
     expect(document.activeElement).toBe(byTestId("pr-merge-dialog-confirm"));

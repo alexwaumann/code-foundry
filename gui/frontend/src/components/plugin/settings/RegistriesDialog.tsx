@@ -1,9 +1,10 @@
-import { TriangleAlert } from "lucide-react";
+import { TriangleAlert, X } from "lucide-react";
 import type { SettingPageView, SettingsSchemaView } from "@/api/settings";
 import { focusSetting } from "@/components/settings/focus";
 import { pageSections } from "@/components/settings/model";
 import { SettingsSection } from "@/components/settings/SectionCard";
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { useNow } from "@/lib/clock";
 import { cn } from "@/lib/utils";
 import { usePluginRegistryStore } from "@/stores/pluginRegistry";
@@ -62,7 +63,7 @@ export function RegistriesDialog({ schema, page, focusField, onClose }: { schema
           if (focusField && focusSetting(REGISTRIES_SETTING)) e.preventDefault();
         }}
       >
-        <div className="mb-3 space-y-0.5">
+        <div className="mb-3 space-y-0.5 pr-8">
           <DialogTitle>Registries</DialogTitle>
           <DialogDescription>Where Browse all reads its plugins from. Installing asks for your consent before anything runs.</DialogDescription>
         </div>
@@ -70,6 +71,11 @@ export function RegistriesDialog({ schema, page, focusField, onClose }: { schema
         {pageSections(schema, page).map((sf) => (
           <SettingsSection key={sf.section.id} schema={schema} pageId={page.id} section={sf} bare />
         ))}
+        <DialogClose asChild>
+          <Button type="button" variant="ghost" size="icon-sm" className="absolute top-2.5 right-2.5" aria-label="Close" data-testid="plugin-registries-close">
+            <X aria-hidden />
+          </Button>
+        </DialogClose>
       </DialogContent>
     </Dialog>
   );

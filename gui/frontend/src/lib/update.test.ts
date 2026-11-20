@@ -401,13 +401,13 @@ describe("updateView", () => {
     ["available", status("available"), null, none, null, "Download v0.2.0"],
     ["available tip", status("available", { targetVersion: "v0.15.0-tip.3" }), null, none, null, "Download v0.15.0 (tip 3)"],
     ["downloading", status("downloading"), null, none, null, null],
-    ["downloaded", status("downloaded"), null, none, null, "Install and Restart Now"],
-    ["downloaded, busy", status("downloaded"), null, { busy: 2 }, null, "Install and Restart Now"],
-    ["installed", status("installed"), null, none, null, "Restart Now"],
-    ["restart required, busy", status("restartRequired"), null, { busy: 1 }, null, "Restart Now"],
-    ["partly applied", status("idle"), "v0.2.0", none, null, "Restart Now"],
-    ["failed", status("failed"), null, none, null, "Try Again"],
-    ["up to date", status("idle"), null, none, null, "Check Again"],
+    ["downloaded", status("downloaded"), null, none, null, "Install and restart now"],
+    ["downloaded, busy", status("downloaded"), null, { busy: 2 }, null, "Install and restart now"],
+    ["installed", status("installed"), null, none, null, "Restart now"],
+    ["restart required, busy", status("restartRequired"), null, { busy: 1 }, null, "Restart now"],
+    ["partly applied", status("idle"), "v0.2.0", none, null, "Restart now"],
+    ["failed", status("failed"), null, none, null, "Try again"],
+    ["up to date", status("idle"), null, none, null, "Check again"],
     ["restarting", status("installed"), null, none, { install: "v0.2.0" }, null],
     ["disabled", status("idle", { enabled: false }), null, none, null, null],
   ])("primary: %s", (_name, st, gui, threads, restarting, want) => {
@@ -489,11 +489,11 @@ describe("predatesShell", () => {
     expect(compareVersions(TUNNEL_SINCE, SHELL_SINCE)).toBe(-1);
   });
 
-  it("a daemon from before the layout gets Restart Now, as one from before the tunnel", () => {
+  it("a daemon from before the layout gets Restart now, as one from before the tunnel", () => {
     const st = status("idle", { currentVersion: "v0.21.8-tip.2", targetVersion: "v0.21.8-tip.2" });
     const v = updateView(st, "v0.22.0-tip.3", { busy: 0 }, null, true);
     expect(v.variant).toBe("partlyApplied");
-    expect(v.primary).toBe("Restart Now");
+    expect(v.primary).toBe("Restart now");
   });
 });
 
@@ -506,7 +506,7 @@ describe("a daemon from before the tunnel", () => {
     const st = status(state, { currentVersion: "v0.21.5", targetVersion: "v0.21.6" });
     const v = updateView(st, gui, { busy: 0 }, null, true);
     expect(v.variant).toBe("partlyApplied");
-    expect(v.primary).toBe("Restart Now");
+    expect(v.primary).toBe("Restart now");
     expect(v.body).toBe("The app is on v0.22.0 but the daemon is still on v0.21.5; nothing updates live until you restart.");
     expect(updateBadge(st, gui, true)).toEqual({ kind: "installed", label: "v0.22.0 installed", cta: "Restart to apply" });
   });

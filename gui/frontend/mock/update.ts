@@ -119,7 +119,7 @@ export class MockUpdater {
   /** Download progress step interval. */
   stepMs = 250;
   relaunches = 0;
-  /** app.restart runs (Restart Now). */
+  /** app.restart runs (Restart now). */
   restarts = 0;
   private timers: ReturnType<typeof setTimeout>[] = [];
   /** A newer release is replacing the download (one at a time). */
@@ -197,7 +197,7 @@ export class MockUpdater {
     s.lastCheckedAt = new Date();
     s.latestVersion = this.latest;
     s.lastCheckError = "";
-    // A download running decides; a failure of the latest stays (Try Again).
+    // A download running decides; a failure of the latest stays (Try again).
     if (s.state === UpdateState.DOWNLOADING || (s.state === UpdateState.FAILED && s.targetVersion === this.latest)) {
       this.emit();
       return s;
@@ -365,7 +365,7 @@ export class MockUpdater {
         run: () => (this.relaunch() === 0 ? "no app window is connected; open it with `code-foundry gui`" : "relaunching the app"),
       },
       {
-        // The update dialog's (Install and) Restart Now (confirmed: the dialog is the
+        // The update dialog's (Install and) restart now (confirmed: the dialog is the
         // confirmation). The real daemon installs a download, stops threads, asks the
         // window host to relaunch once it has exited, and exits; the mock comes back as the
         // installed version, like daemon.restart.

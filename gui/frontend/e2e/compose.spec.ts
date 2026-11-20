@@ -297,7 +297,7 @@ test("image chips: inserted at the caret, one unit for arrows and Backspace, × 
   await expect(dialog).toBeVisible();
   await expect(dialog.getByRole("heading")).toHaveText("Remove image.png from the message?");
   await expect(dialog).toContainText("It is referenced in your text; removing it also removes every reference.");
-  await expect(dialog.getByTestId("confirm-ok")).toHaveText("Confirm");
+  await expect(dialog.getByTestId("confirm-ok")).toHaveText("Remove");
   const box = await dialog.boundingBox();
   const vp = page.viewportSize();
   expect(Math.abs((box?.y ?? 0) + (box?.height ?? 0) / 2 - (vp?.height ?? 0) / 2)).toBeLessThan(2);
