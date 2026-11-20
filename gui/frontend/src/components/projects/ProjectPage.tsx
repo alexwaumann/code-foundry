@@ -111,14 +111,14 @@ export function ProjectPage({ projectId, pageKey }: { projectId: string; pageKey
   const compact = width < PROJECT_TITLE_COMPACT_BELOW;
   // A checkout's or a leftover's row has no activation: its right-click menu (ContextMenu key, Shift+F10) holds what it does.
   const navItems = useMemo<NavItem[]>(() => (git ? [...paths, ...leftovers].map((p) => ({ key: projectWorktreeKey(projectId, p) })) : []), [git, paths, leftovers, projectId]);
-  const nav = useNav(navItems);
+  // A row asked for (revealOnProjectsPage) takes the cursor once this page lists it; the ask is
+  // then answered, and going back to null lets the same row be asked for again.
   const reveal = useProjectsPageStore((s) => s.reveal);
-  const setCursor = nav.ctx.setCursor;
+  const asked = reveal !== null && navItems.some((it) => it.key === reveal) ? reveal : null;
+  const nav = useNav(navItems, { follow: asked });
   useEffect(() => {
-    if (reveal === null || !navItems.some((it) => it.key === reveal)) return;
-    setCursor(reveal);
-    clearProjectsPageReveal(reveal);
-  }, [reveal, navItems, setCursor]);
+    if (asked !== null) clearProjectsPageReveal(asked);
+  }, [asked]);
   const rootRef = useRef<HTMLDivElement>(null);
   const scrollRef = usePageScroll(pageKey, widthRef);
   // On mount the page takes the keyboard, unless it opens in a shell pane without the focus.

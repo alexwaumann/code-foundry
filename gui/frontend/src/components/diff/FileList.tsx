@@ -1,4 +1,4 @@
-import { useEffect, useMemo, type ReactNode } from "react";
+import { useMemo, type ReactNode } from "react";
 import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp } from "lucide-react";
 import type { CompareView } from "@/api/compare";
 import { HeaderAction } from "@/components/files/FileHeader";
@@ -115,13 +115,8 @@ export function FileList({
       })),
     [shown, onPick],
   );
-  const nav = useNav(items);
-  const { setCursor } = nav;
-  const currentKey = current?.key ?? null;
   // When the file on screen changes, not when the list does: the cursor is the reader's.
-  useEffect(() => {
-    if (currentKey !== null) setCursor(currentKey);
-  }, [currentKey, setCursor]);
+  const nav = useNav(items, { follow: current?.key ?? null });
 
   // A filter holds for these too, folded away or not: it is what the reader asked to walk.
   const at = current ? shown.findIndex((r) => r.key === current.key) : -1;

@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useMemo } from "react";
 import { ChevronRight } from "lucide-react";
 import type { CompareCommitView, CompareLogView } from "@/api/compare";
 import { Age } from "@/components/prs/PrBits";
@@ -43,11 +43,7 @@ export function CommitList({ log, current, open, onOpen, onPick, rail, height }:
       })),
     [log, onPick],
   );
-  const nav = useNav(items);
-  const { setCursor } = nav;
-  useEffect(() => {
-    if (current) setCursor(`c:${current}`);
-  }, [current, setCursor]);
+  const nav = useNav(items, { follow: current ? `c:${current}` : null });
   const rows = commitRows(log.commits.length, height, rail);
   return (
     <Collapsible open={open} onOpenChange={onOpen} className="shrink-0 border-t border-cf-divider" data-testid="diff-commits" data-open={open}>
