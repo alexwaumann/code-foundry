@@ -1,13 +1,14 @@
 import { useMemo, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { sidebarAnchor } from "@/lib/inSidebar";
-import { buildShellSections, draftKey, shellRows, type MainRow, type ShellRow } from "@/lib/shellSections";
+import { buildShellSections, shellRows, type MainRow, type ShellRow } from "@/lib/shellSections";
 import { isSnoozed } from "@/lib/snooze";
-import { FOOTERS, keyedRowCache, threadKey, type FooterSection, type HeaderRow, type Row } from "@/lib/tree";
+import { FOOTERS, keyedRowCache, type FooterSection, type HeaderRow, type Row } from "@/lib/tree";
 import { decodeThreadListKeys, useThreadListKeys } from "@/stores/context";
 import { useCurrentSpaceId, useLayoutStore } from "@/stores/layout";
 import { useCurrentDrafts, useNeedsScope, useThreadSpaces } from "@/stores/shellList";
 import { useShellSidebarStore } from "@/stores/shellSidebar";
+import { focusedDraftOf, selectedRowKeyOf } from "@/stores/sidebarCursor";
 import { useThreadsStore } from "@/stores/threads";
 import { useUiStore } from "@/stores/ui";
 
@@ -84,16 +85,12 @@ export function useShellListRows({ expandAll = false }: { expandAll?: boolean } 
 
 /**
  * The row the window's focus highlights: the focused tab's thread (its nearest shown ancestor for
- * a hidden child), or the draft whose composer is the focused tab.
+ * a hidden child), or the draft whose composer is the focused tab. Its change drops an old
+ * keyboard cursor: stores/sidebarCursor.ts.
  */
 export function useSelectedRowKey(): string | null {
   const id = useUiStore((s) => (s.selection.kind === "thread" ? s.selection.id : null));
   const anchor = useThreadsStore((s) => (id === null ? null : sidebarAnchor(s.byId, id)));
-  const draft = useLayoutStore((s) => {
-    const pane = s.panes[s.spaces[s.currentSpaceId]?.focus ?? ""];
-    const tab = s.tabs[pane?.active ?? ""];
-    return tab?.kind === "compose" ? (tab.params.draft ?? "") : "";
-  });
-  if (anchor !== null) return threadKey(anchor);
-  return draft ? draftKey(draft) : null;
+  const draft = useLayoutStore(focusedDraftOf);
+  return selectedRowKeyOf(anchor, draft);
 }

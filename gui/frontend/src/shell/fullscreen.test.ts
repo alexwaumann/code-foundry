@@ -110,6 +110,27 @@ describe("full screen state", () => {
     expect(fullscreenPaneOf({ currentSpaceId: "sp-a", spaces: { "sp-a": { id: "sp-a", name: "", focus: "", mru: [], drafts: [] } }, panes: {} }, "sp-a")).toBe("");
   });
 
+  // No pane grid is mounted here: the rule is the layout's (docs/notes/shell-reset-rules.md).
+  it.each([
+    { name: "the window leaving its space", away: { current: "sp-b" } },
+    { name: "the layout going (no space, no pane)", away: null },
+  ])("ends on $name, and coming back does not resume it", async ({ away }) => {
+    await seed("p-1");
+    enterFullscreen();
+    if (away) await seed("p-1", away);
+    else resetLayout();
+    expect(fs()).toBe("");
+    await seed("p-1");
+    expect(fullscreenOn()).toBe(false);
+  });
+
+  it("a layout change that keeps a pane to show keeps it", async () => {
+    await seed("p-1");
+    enterFullscreen();
+    await seed("p-2", { active: "t-th" });
+    expect(fs()).toBe("sp-a");
+  });
+
   it("turning it off or on again puts the floating composer back at its spot, collapsed", async () => {
     await seed("p-1");
     enterFullscreen();

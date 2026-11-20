@@ -1,13 +1,13 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { zoomFactor } from "@/lib/zoom";
 import { afterRev, runLayoutCommand } from "@/shell/commands";
-import { leaveFullscreen, useFullscreenPane } from "@/shell/fullscreen";
+import { useFullscreenPane } from "@/shell/fullscreen";
 import { shellFrame } from "@/shell/geometry/rails";
 import { panesOf, type Frame, type GeoNode } from "@/shell/geometry/types";
 import { dragSizes, evenSizes, gutterCursor, gutterReach, sizesArg, startDrag, withSizes, type GutterDrag } from "@/shell/resize";
 import { reportViewport } from "@/shell/viewport";
 import { geoTree, useCurrentSpaceId, useLayoutStore, useTree, type LayoutState } from "@/stores/layout";
-import { setShellFrame, useShellViewStore } from "@/stores/shellView";
+import { setShellFrame } from "@/stores/shellView";
 import { EmptySpace } from "./EmptySpace";
 import { Gutter } from "./Gutter";
 import { PaneView } from "./PaneView";
@@ -48,7 +48,6 @@ export function PaneGrid() {
   const focus = useLayoutStore((s) => s.spaces[spaceId]?.focus ?? "");
   const mru = useLayoutStore((s) => s.spaces[spaceId]?.mru);
   const full = useFullscreenPane();
-  const fullscreenSpace = useShellViewStore((s) => s.fullscreen);
   const ref = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState<{ w: number; h: number } | null>(null);
   const [drag, setDrag] = useState<{ d: GutterDrag; sizes: number[]; delta?: number } | null>(null);
@@ -83,10 +82,6 @@ export function PaneGrid() {
     if (full) return fullscreenFrame(full, size.w, size.h);
     return shellFrame({ root: shown, w: size.w, h: size.h, focus, mru });
   }, [shown, size, full, focus, mru]);
-  // Full screen ends when its space is left or has no pane to show.
-  useEffect(() => {
-    if (fullscreenSpace && !full) leaveFullscreen();
-  }, [fullscreenSpace, full]);
   useEffect(() => {
     setShellFrame(frame);
   }, [frame]);

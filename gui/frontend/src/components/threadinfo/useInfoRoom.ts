@@ -12,13 +12,10 @@ import { dropCardRoom, hideThreadInfoOverlay, setCardRoom, useCardRoom } from "@
 export function useInfoRoom(threadId: string): [ref: RefObject<HTMLDivElement | null>, fits: boolean] {
   const [rowRef, rowWidth] = useWidth(1280);
   const fits = cardFits(rowWidth);
+  // Another thread's body arriving, or room again, hides the overlay: setCardRoom's rules.
   useEffect(() => {
     setCardRoom(fits, threadId);
   }, [fits, threadId]);
-  // Another thread hides the overlay (unless it was shown for that one: the sidebar's linked PRs tag).
-  useEffect(() => {
-    if (useCardRoom.getState().overlayFor !== threadId) hideThreadInfoOverlay();
-  }, [threadId]);
   useEffect(
     () => () => {
       dropCardRoom(threadId);
