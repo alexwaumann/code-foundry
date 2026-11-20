@@ -71,9 +71,15 @@ describe("another thread's line", () => {
     { name: "live, minutes", row: { live: true, start: NOW - 3 * M, end: null }, want: "3m" },
     { name: "live, seconds", row: { live: true, start: NOW - 12_000, end: null }, want: "12s" },
     { name: "live, no start", row: { live: true, start: null, end: null }, want: "" },
-    { name: "frozen", row: { live: false, start: NOW - 3 * M, end: NOW - M }, want: sentTime(NOW - M) },
   ])("peerTime: $name", ({ row, want }) => {
     expect(peerTime(row, NOW)).toBe(want);
+  });
+
+  // The wanted text is made here, under the test's clock: sentTime leaves the date out for
+  // a time today, so one made while the table is built (the real clock) names the date on
+  // any day but NOW's and never matches.
+  it("peerTime: frozen", () => {
+    expect(peerTime({ live: false, start: NOW - 3 * M, end: NOW - M }, NOW)).toBe(sentTime(NOW - M));
   });
 });
 
