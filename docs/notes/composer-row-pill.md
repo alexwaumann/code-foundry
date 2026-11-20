@@ -8,7 +8,7 @@ in the layout, and in it one pill of segments. Frontend only, apart from two moc
 
 ## What it is
 
-- `components/thread/ComposerRow.tsx`: the row (`composer-row`, 32px, always there) and the pill
+- `components/thread/ComposerRow.tsx`: the row (`composer-row`, 36px, always there) and the pill
   (`composer-pill`), centred, its segments left to right: **Working**, **Snooze**, **Waiting**,
   **Stop waiting** (idle only), **Jump to bottom**. Only the ones that apply; none, an empty row.
   Mounted in `ThreadPane`'s and `InlineThread`'s docks (the Needs-you popup and plugin thread nodes)
@@ -77,9 +77,17 @@ it shows everything).
 ## Geometry
 
 - The row takes the place of the dock's 32px top padding (`padding-top: 0` while the dock holds
-  one): the pill sits at the row's top, 4px above the composer, and an empty dock is exactly as
-  tall as it was before. The first try (8px padding, row, 4px gap) made the dock 12px taller and
-  pushed a long answer's top under the tab strip.
+  one) and is 36px (`h-9`): the 28px pill sits at the row's top, 8px above the composer card, and
+  the dock is 4px taller than with the padding alone. The first try (8px padding, row, 4px gap)
+  made the dock 12px taller and pushed a long answer's top under the tab strip.
+- **8px, not 4 (2026-11-20).** The row was first 32px, the pill 4px above the composer; a user
+  asked for more room. Shots of the real app at 4, 8 and 12px; 8 was agreed. The row grew by 4px
+  rather than the pill moving down in it, so the row stays one fixed height and the timeline's
+  bottom edge rises 4px (`bottomInset` is the measured dock, so nothing else changes). Same in the
+  inline dock (Needs-you popup, plugin thread nodes), which shares the rule. Ember's chat and the
+  subagent view have no row and are unchanged. The menus open upward from the pill with their own
+  `sideOffset`, so they move with it. `e2e/composer-row.spec.ts` asserts the row is 36px with and
+  without a pill and the gap is 8px.
 - The row is always in the dock, so `bottomInset` (the dock's measured height) includes it and
   nothing moves when a segment comes or goes (`e2e/composer-row.spec.ts`).
 - The row has `pointer-events: none`; only the pill takes the pointer, so the fade's margins stay

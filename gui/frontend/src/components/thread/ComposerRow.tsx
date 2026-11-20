@@ -234,7 +234,8 @@ function usePillStep(segs: readonly PillSegment[]): {
 
 /**
  * The row above a thread's composer (docs/notes/composer-row-pill.md): always in the layout at
- * its fixed height, so nothing moves when what it shows changes. Centred in it, one pill of
+ * its fixed height (36px: the 28px pill at its top, 8px above the composer), so nothing moves
+ * when what it shows changes. Centred in it, one pill of
  * segments, left to right: Working (the live turn's circle, word and time), the snooze (a menu
  * upward), Waiting on (a panel upward), Stop waiting while idle, and Jump to bottom while the
  * list is scrolled up. With none of them the row is empty. When the pill does not fit, its
@@ -338,7 +339,7 @@ export function ComposerRow({ threadId, working, bridge }: { threadId: string; w
   };
 
   return (
-    <div ref={rowRef} className="composer-row relative flex h-8 items-start justify-center text-caption-sm text-cf-text" data-testid="composer-row">
+    <div ref={rowRef} className="composer-row relative flex h-9 items-start justify-center text-caption-sm text-cf-text" data-testid="composer-row">
       <Measurer ref={measureRef} segs={segs} d={d} />
       {segs.length > 0 && (
         <div
