@@ -58,10 +58,9 @@ export function UninstallDialog({ name, onClose }: { name: string; onClose: () =
             Cancel
           </Button>
           <Button
-            variant="outline"
+            variant="destructive"
             size="sm"
             autoFocus
-            className="border-cf-error/40 bg-transparent text-cf-error-text hover:bg-cf-error-surface hover:text-cf-error-text dark:border-cf-error/40 dark:bg-transparent"
             onClick={() => {
               onClose();
               void uninstallPlugin(name, purge);
