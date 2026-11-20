@@ -1,4 +1,4 @@
-import { createContext, useCallback, useMemo, useRef, useState } from "react";
+import { createContext, useCallback, useMemo, useState } from "react";
 
 /**
  * Keyboard cursor over a page's rows (the Pull Requests page, the Projects pages, the diff
@@ -36,8 +36,16 @@ export interface NavReveal {
   pay: (key: string) => boolean;
 }
 
-function createReveal(): NavReveal {
+/** The cursor's own reveal: `moved` owes the row a cursor moves to, unless the cursor was already there. */
+interface CursorReveal extends NavReveal {
+  moved: (key: string) => void;
+}
+
+function createReveal(): CursorReveal {
   let owed: string | null = null;
+  // The key the cursor last moved to: the same key again moves nothing, so no row would answer
+  // and the debt would wait for one to mount.
+  let last: string | null = null;
   return {
     owe: (key) => {
       owed = key;
@@ -48,6 +56,10 @@ function createReveal(): NavReveal {
       owed = null;
       return true;
     },
+    moved: (key) => {
+      if (key !== last) owed = key;
+      last = key;
+    },
   };
 }
 
@@ -55,19 +67,44 @@ export const NavContext = createContext<NavCtx>({ cursorKey: null, setCursor: ()
 
 export const navId = (key: string): string => `nav-${key.replace(/[^A-Za-z0-9_-]/g, "_")}`;
 
-export function useNav(items: readonly NavItem[]) {
-  const [cursor, setCursorState] = useState<string | null>(null);
+export interface NavOptions {
+  /**
+   * A key the parent owns that the cursor follows (the file or commit on screen): each time it
+   * changes to a key, the cursor moves there in the same render and its row is owed a scroll
+   * into view, as `setCursor` does. Between changes the cursor is the user's: a new list, or
+   * the key going back to null, leaves it where it is. A key not among the items is held until
+   * a list has it, as `setCursor`'s is.
+   */
+  follow?: string | null;
+}
+
+export function useNav(items: readonly NavItem[], { follow = null }: NavOptions = {}) {
+  const [reveal] = useState(() => {
+    const r = createReveal();
+    if (follow !== null) r.moved(follow);
+    return r;
+  });
+  const [cursor, setCursorState] = useState<string | null>(follow);
+  // Adjusting state to a new key during render (React's documented pattern), so the cursor is
+  // never a render behind the key; the reveal is owed here too, and the row pays it once shown.
+  const [followed, setFollowed] = useState(follow);
+  if (follow !== followed) {
+    setFollowed(follow);
+    if (follow !== null) {
+      reveal.moved(follow);
+      setCursorState(follow);
+    }
+  }
   const byKey = useMemo(() => new Map(items.map((it, i) => [it.key, { it, i }])), [items]);
   // A cursor whose row went away falls back to the first row (no cursor until used).
   const cursorKey = cursor !== null && byKey.has(cursor) ? cursor : null;
-  const [reveal] = useState(createReveal);
-  const last = useRef<string | null>(null);
-  const setCursor = useCallback((key: string) => {
-    // The same key again moves nothing, so no row would answer and it would wait for one to mount.
-    if (key !== last.current) reveal.owe(key);
-    last.current = key;
-    setCursorState(key);
-  }, [reveal]);
+  const setCursor = useCallback(
+    (key: string) => {
+      reveal.moved(key);
+      setCursorState(key);
+    },
+    [reveal],
+  );
   const activate = useCallback(
     (key: string) => {
       setCursor(key);
