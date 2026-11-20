@@ -16,7 +16,18 @@ interface Lch {
   readonly h: number;
 }
 
+interface Held {
+  readonly hex: string;
+  readonly lch: Lch;
+}
+
 const clamp = (x: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, x));
+
+/** A hex's OKLCH; a grey (chroma about 0) has no hue of its own and takes `greyHue` when given. */
+function lchOf(hex: string, greyHue?: number): Lch {
+  const [l, c, h] = toOklch(hex);
+  return { l, c, h: c < 0.002 && greyHue !== undefined ? greyHue : h };
+}
 
 /** `#rrggbb` from OKLCH, with `#rrggbbaa`'s alpha appended when alpha < 1. */
 function hexOf({ l, c, h }: Lch, alpha: number): string {
@@ -53,26 +64,21 @@ function paint(canvas: HTMLCanvasElement | null, w: number, h: number, px: (x: n
  */
 export function ColourPicker({ value, onChange, onEscape, label, tint, autoFocus }: { value: string; onChange: (hex: string) => void; onEscape?: () => void; label: string; tint?: boolean; autoFocus?: boolean }) {
   const [hexInvalid, setHexInvalid] = useState(false);
-  const [lch, setLch] = useState<Lch>(() => {
-    const [l, c, h] = toOklch(value);
-    return { l, c, h };
-  });
-  const alpha = alphaOf(value);
-  const emitted = useRef(value);
+  // The OKLCH shown and the hex it stands for: the value it was given, or the one it last sent.
+  const [held, setHeld] = useState<Held>(() => ({ hex: value, lch: lchOf(value) }));
   // A value from outside (another field, Revert, a base change): take its OKLCH, keeping the hue of a grey.
-  useEffect(() => {
-    if (value === emitted.current) return;
-    emitted.current = value;
-    const [l, c, h] = toOklch(value);
-    setLch((cur) => ({ l, c, h: c < 0.002 ? cur.h : h }));
-  }, [value]);
+  // Its own echo matches the held hex. The updater checks again against the latest held state,
+  // so a parent render that lands before the picker's own update (a store's re-render may run
+  // at a higher priority than a pointer move's) cannot overwrite what was just sent.
+  if (held.hex !== value) setHeld((cur) => (cur.hex === value ? cur : { hex: value, lch: lchOf(value, cur.lch.h) }));
+  const { lch } = held;
+  const alpha = alphaOf(value);
 
   // Chroma is held to what sRGB has at this lightness and hue, so the fields say what the hex is.
   const emit = (want: Lch, a = alpha) => {
     const next = { ...want, c: Math.min(want.c, maxChroma(want.l, want.h)) };
-    setLch(next);
     const hex = hexOf(next, a);
-    emitted.current = hex;
+    setHeld({ hex, lch: next });
     onChange(hex);
   };
 
