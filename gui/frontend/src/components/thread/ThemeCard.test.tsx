@@ -126,7 +126,7 @@ describe("ThemeCard", () => {
     expect(within(card).queryByTestId("thread-theme-apply")).toBeNull();
   });
 
-  it("Undo hides once the slot moves on and comes back with it; a refinement's Undo restores the colours before", async () => {
+  it("Undo hides once the slot moves on and comes back with it; a refinement's Undo restores the colours before", () => {
     // The first card applied Ocean Dusk over GitHub Dark; the refinement (v2) replaced v1's colours.
     const warmer: UserThemeFile = { ...OCEAN, version: "v2", base: { ...OCEAN.base, accent: "#e0a060" } };
     show({ file: OCEAN, applied: true, previous: "github-dark" }, { file: warmer, applied: true, previous: "ocean-dusk", version: "v1" });
@@ -143,7 +143,8 @@ describe("ThemeCard", () => {
     themes([warmer, LATTE], { "ocean-dusk": ["v1"] });
     expect(undoOf(first)).toBeNull();
     expect(undoOf(second)?.textContent).toBe("Undo");
-    expect(await tipOf(second)).toBe("Undo restores the previous colours");
+    // Its own colours back: "Undo" says it all, so no tooltip (a Tip without a label marks no data-tip).
+    expect(within(second).getByTestId("thread-theme-undo-tip").hasAttribute("data-tip")).toBe(false);
     fireEvent.click(undoOf(second) as HTMLButtonElement);
     expect(ran().at(-1)).toEqual(["theme.restore", { theme: "ocean-dusk", version: "v1" }]);
     // v1 is back: the refinement reads Undone, and the first card's Undo is offered again.

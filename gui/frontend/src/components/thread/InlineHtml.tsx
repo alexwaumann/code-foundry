@@ -308,7 +308,7 @@ function Actions({
       />
       <Action label="Reload page" icon={RotateCw} disabled={source} onClick={onReload} testId="thread-html-reload" />
       {onExpand && <Action label="Expand" icon={Maximize2} onClick={onExpand} testId="thread-html-expand" />}
-      <Action label={source ? "Show the page" : "Source"} icon={Code} pressed={source} disabled={failed} onClick={onSource} testId="thread-html-source-toggle" />
+      <Action label={source ? "Show page" : "Show source"} icon={Code} pressed={source} disabled={failed} onClick={onSource} testId="thread-html-source-toggle" />
     </>
   );
 }

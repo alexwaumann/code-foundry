@@ -113,7 +113,7 @@ async function sendIntoAPIError(page: Page): Promise<void> {
 }
 
 // An API error in place of a reply: the notice and Send again in src/components/thread/ThreadComposerSend.test.tsx; the
-// red error row with no answer and no Copy answer in src/components/thread/rows.test.tsx.
+// red error row with no answer and no Copy reply in src/components/thread/rows.test.tsx.
 
 // The reason's first line without Claude Code's prefix, and Edit with no draft: unit-tested in src/lib/failedPrompt.test.ts
 

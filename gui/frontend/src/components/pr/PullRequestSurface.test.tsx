@@ -260,6 +260,9 @@ describe("Activity", () => {
     expect(entries().at(-1)?.dataset.kind).toBe("opened");
     // The bar counts timeline entries (not the header's comments, which include thread replies) and commits.
     expect(byTestId("pr-timeline-counts").textContent).toMatch(/10 entries\s*·\s*4/);
+    const commits = byTestId("pr-timeline-counts").lastElementChild as HTMLElement;
+    commits.tabIndex = 0;
+    expect(tooltipText(commits)).toBe("4 commits");
     fireEvent.click(byTestId("pr-timeline-order"));
     expect(entries()[0]?.dataset.kind).toBe("opened");
     // A commit opens on GitHub.

@@ -4,7 +4,7 @@
  * (components/compose) use these; they hold no state.
  */
 import type { PermissionModeView } from "@/api/threads";
-import { retainProjectTags } from "./prompt";
+import { middleTruncate, retainProjectTags } from "./prompt";
 
 export interface Choice {
   value: string;
@@ -408,6 +408,18 @@ export function longPdfNotice(name: string, pages: number): string {
 /** "1 page", "12 pages". */
 export function pageCount(pages: number): string {
   return `${String(pages)} ${pages === 1 ? "page" : "pages"}`;
+}
+
+/** What a sent attachment chip says when the app no longer has its file. */
+export const ATTACHMENT_GONE = "This file is no longer kept, so it cannot be opened";
+
+/**
+ * An attachment chip's tooltip: the full name when the chip cuts it (middleTruncate), then
+ * `extra` lines (a PDF's size, why it cannot open); null when there is nothing to add.
+ */
+export function attachmentChipTip(name: string, extra: readonly string[] = []): string | null {
+  const lines = [middleTruncate(name) === name ? "" : name, ...extra].filter(Boolean);
+  return lines.length ? lines.join("\n") : null;
 }
 
 /** An attachment tile's label: "Preview a.png, 58 KB", "Preview spec.pdf, PDF, 12 pages, 1.4 MB" (pages and size when known). */

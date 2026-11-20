@@ -95,3 +95,9 @@ export function axisLabel(m: Pick<ActivityMonth, "month" | "partial">): string {
 export function tickLabel(v: number): string {
   return v.toLocaleString("en-US");
 }
+
+/** What a month's count is of, singular for exactly one: "commit"/"commits", "merged PR"/"merged PRs". */
+export function seriesUnit(series: "commits" | "merged", v: number): string {
+  const one = v === 1;
+  return series === "commits" ? (one ? "commit" : "commits") : one ? "merged PR" : "merged PRs";
+}

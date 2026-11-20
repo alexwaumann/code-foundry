@@ -5,7 +5,7 @@ import { ChipFace, PdfTile } from "@/components/compose/attachmentFaces";
 import { TAG_ACCENT, tagClass } from "@/components/compose/tagStyle";
 import { usePrTagInfo, useThreadTagInfo } from "@/components/compose/useTagInfo";
 import { Tip } from "@/components/ui/tooltip";
-import { pageCount, previewLabel } from "@/lib/compose";
+import { ATTACHMENT_GONE, attachmentChipTip, pageCount, previewLabel } from "@/lib/compose";
 import { sentTime } from "@/lib/format";
 import { formatAttachmentSize, kindFromName, middleTruncate, stagedPdfPages, tagLabel } from "@/lib/prompt";
 import { inlineAttachmentPaths, parseUserMessage } from "@/lib/userMessage";
@@ -45,34 +45,39 @@ function SentPreview({ open, onClose, path, name, pdf }: { open: boolean; onClos
 
 /**
  * An image or PDF the message sent, inline as the composer's chip: its mini thumbnail (a
- * PDF's first page) and name, and a PDF's page count (its size in the tooltip); a click
- * previews it. A path the daemon no longer has shows dashed and does nothing.
+ * PDF's first page) and name, and a PDF's page count (its size in the tooltip, with the
+ * full name when the chip cuts it); a click previews it. A path the daemon no longer has
+ * shows dashed, does nothing and says why in its tooltip.
  */
 function AttachmentChip({ name, path, pdf }: { name: string; path: string; pdf: boolean }) {
-  const { url, file } = useAttachment(path);
+  const { url, file, loading } = useAttachment(path);
   const summary = usePdfSummary(pdf ? path : "");
   const [open, setOpen] = useState(false);
   const size = file ? formatAttachmentSize(file.size) : "";
   const count = pdf ? sentPages(path, summary) : null;
   const pages = count === null ? "" : pageCount(count);
+  const gone = !url && !loading;
   return (
     <>
-      <Tip label={pages && size ? size : null}>
-        <button
-          type="button"
-          data-testid="thread-tag"
-          data-tag-kind={pdf ? "pdf" : "image"}
-          data-pages={count ?? undefined}
-          aria-label={pdf ? `PDF ${name}${pages ? `, ${pages}` : ""}` : `Image ${name}`}
-          aria-haspopup="dialog"
-          className={tagClass(false, cn(pdf ? TAG_ACCENT.file : IMAGE_ACCENT, url ? "cursor-pointer" : "border-dashed"))}
-          disabled={!url}
-          onClick={() => {
-            setOpen(true);
-          }}
-        >
-          <ChipFace pdf={pdf} src={pdf ? (summary?.thumb ?? null) : url} name={middleTruncate(name)} detail={pages} />
-        </button>
+      <Tip label={attachmentChipTip(name, [pages && size ? size : "", gone ? ATTACHMENT_GONE : ""])}>
+        {/* A disabled button takes no hover: the span carries the tooltip. */}
+        <span className="inline-flex max-w-full align-middle" data-testid="thread-tag-tip">
+          <button
+            type="button"
+            data-testid="thread-tag"
+            data-tag-kind={pdf ? "pdf" : "image"}
+            data-pages={count ?? undefined}
+            aria-label={pdf ? `PDF ${name}${pages ? `, ${pages}` : ""}` : `Image ${name}`}
+            aria-haspopup="dialog"
+            className={tagClass(false, cn(pdf ? TAG_ACCENT.file : IMAGE_ACCENT, url ? "cursor-pointer" : "border-dashed"))}
+            disabled={!url}
+            onClick={() => {
+              setOpen(true);
+            }}
+          >
+            <ChipFace pdf={pdf} src={pdf ? (summary?.thumb ?? null) : url} name={middleTruncate(name)} detail={pages} />
+          </button>
+        </span>
       </Tip>
       <SentPreview
         open={open}

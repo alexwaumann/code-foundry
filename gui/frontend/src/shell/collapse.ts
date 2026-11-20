@@ -21,7 +21,7 @@ export function isLastOpen(s: Layout, paneId: string): boolean {
 
 /** Why a pane's collapse is unavailable; "" when it can be collapsed. */
 export function whyNoCollapse(s: Layout, paneId: string): string {
-  return isLastOpen(s, paneId) ? "The last open pane of a space cannot be collapsed" : "";
+  return isLastOpen(s, paneId) ? "Can’t collapse the last open pane" : "";
 }
 
 /** The pane's place: in a column it folds to a strip ("col"), anywhere else to a rail ("row"). */

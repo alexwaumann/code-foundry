@@ -10,6 +10,7 @@ import { useSettingsStore } from "@/stores/settings";
 import { seedComposer, settle } from "@/test/composerWorld";
 import { invocationsOf } from "@/test/daemonFakes";
 import { addThreads, CF, thread } from "@/test/projectsWorld";
+import { tooltipText } from "@/test/tooltip";
 import { ThreadComposer } from "./ThreadComposer";
 
 vi.mock("@/api/command", async (orig) => ({ ...(await orig<typeof import("@/api/command")>()), ...(await import("@/test/daemonFakes")).commandFakes }));
@@ -140,6 +141,26 @@ describe("the failed-prompt notice (composer-failed-notice.spec.ts)", () => {
     await settle();
     expect(note()).toBeNull();
     expect(sends().map((s) => s.text)).toEqual(["Run the tests"]);
+  });
+});
+
+describe("the Send button's tooltip", () => {
+  it("none while Send is disabled (it would not say why); \"Send\" once there is something to send", async () => {
+    seedThread({ state: "connected", status: "idle" }, []);
+    render(<ThreadComposer threadId={ID} pending={[]} busy={false} />);
+    await settle();
+    const send = screen.getByTestId("thread-send") as HTMLButtonElement;
+    // The span around the button carries its tooltip (a disabled button takes no hover).
+    const tip = send.parentElement as HTMLElement;
+    tip.tabIndex = 0;
+    expect(send.disabled).toBe(true);
+    expect(tooltipText(tip)).toBeNull();
+    act(() => {
+      updateDraft(threadDraftKey(ID), { text: "Run the tests" });
+    });
+    await settle();
+    expect(send.disabled).toBe(false);
+    expect(tooltipText(tip)).toBe("Send");
   });
 });
 

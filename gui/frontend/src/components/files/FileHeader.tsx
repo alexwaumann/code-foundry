@@ -13,14 +13,32 @@ import { openInEditor, revealInFinder, type FilePlace } from "./fileActions";
  * The File and Diff tabs' header ("header A", docs/notes/file-viewer-3-tabs.md): row one
  * is the file's icon, name and directory (the full path in a tooltip: the row shows it
  * relative, or cut from the left) with the actions at the right; row two, when given, is
- * the tab's mode switches and meta. The library's own file header stays off.
+ * the tab's mode switches and meta. The library's own file header stays off. `whenTruncated`
+ * when `fullPath` is what the row shows (a pull request's repo-relative path): the tooltip
+ * then opens only while the row is cut short.
  */
-export function FileHeader({ icon: Icon, name, dir, fullPath, actions, children }: { icon: LucideIcon; name: string; dir: string; fullPath: string; actions: ReactNode; children?: ReactNode }) {
+export function FileHeader({
+  icon: Icon,
+  name,
+  dir,
+  fullPath,
+  whenTruncated = false,
+  actions,
+  children,
+}: {
+  icon: LucideIcon;
+  name: string;
+  dir: string;
+  fullPath: string;
+  whenTruncated?: boolean;
+  actions: ReactNode;
+  children?: ReactNode;
+}) {
   return (
     <header className="flex shrink-0 flex-col gap-1 border-b border-cf-divider px-3 pt-2 pb-1.5" data-testid="file-header">
       <div className="flex h-7 min-w-0 items-center gap-2">
         <Icon className="size-4 shrink-0 text-cf-text-muted" aria-hidden />
-        <Tip label={fullPath} align="start">
+        <Tip label={fullPath} whenTruncated={whenTruncated} align="start">
           <span className="flex min-w-0 flex-1 items-baseline gap-2" data-testid="file-header-path">
             <span className="max-w-full shrink-0 truncate text-heading" data-testid="file-header-name">
               {name}
@@ -101,13 +119,13 @@ export function FileActions({ place, line, onRefresh, extra, contents, editor = 
   );
 }
 
-/** The wrap toggle at the end of row two (codeView store `wrap`, for every code view). */
+/** The wrap toggle at the end of row two (codeView store `wrap`, for every code view); its pressed state shows on and off. */
 export function WrapToggle() {
   const wrap = useCodeViewStore((s) => s.wrap);
   return (
     <HeaderAction
       icon={WrapText}
-      label={wrap ? "Don't wrap lines" : "Wrap lines"}
+      label="Wrap lines"
       pressed={wrap}
       testId="file-wrap"
       onClick={() => {

@@ -1,7 +1,7 @@
 import { useContext, useEffect, useState } from "react";
 import { NodeViewWrapper, type NodeViewProps } from "@tiptap/react";
 import { Tip } from "@/components/ui/tooltip";
-import { pageCount } from "@/lib/compose";
+import { attachmentChipTip, pageCount } from "@/lib/compose";
 import { formatAttachmentSize, kindFromName, middleTruncate } from "@/lib/prompt";
 import { cn } from "@/lib/utils";
 import { openPreview, useComposeStore } from "@/stores/compose";
@@ -77,8 +77,8 @@ export function AttachmentChip({ id, label, selected, editor }: { id: string; la
   const size = att ? formatAttachmentSize(att.file.size) : "";
   const detail = pdf && att?.pages != null ? pageCount(att.pages) : size;
   const what = pdf ? "PDF" : "Image";
-  // A removed attachment says so in its tooltip; a PDF shows its size there (the chip shows pages).
-  const tip = !att ? `${name} (removed)` : pdf && detail !== size ? size : null;
+  // A removed attachment says so in its tooltip; a cut name shows in full there, and a PDF's size (the chip shows pages).
+  const tip = !att ? `${name} (removed)` : attachmentChipTip(name, [pdf && detail !== size ? size : ""]);
   return (
     <Tip label={tip}>
       <NodeViewWrapper

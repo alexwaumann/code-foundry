@@ -41,7 +41,7 @@ test("many tabs: the controls stay in the pane and the active tab stays in view"
   await expect(active()).toHaveAttribute("data-tab-id", last);
   // More tabs than room: the tabs scroll, the strip does not.
   await expect.poll(() => scroller.evaluate((el) => el.scrollWidth > el.clientWidth)).toBe(true);
-  for (const control of [pane.getByRole("button", { name: "Open a tab" }), pane.getByTestId("shell-collapse"), pane.getByTestId("shell-fullscreen")]) {
+  for (const control of [pane.getByRole("button", { name: "Open tab" }), pane.getByTestId("shell-collapse"), pane.getByTestId("shell-fullscreen")]) {
     await expect.poll(() => within(control, pane)).toBe(true);
   }
   await expect.poll(() => within(active(), scroller)).toBe(true);

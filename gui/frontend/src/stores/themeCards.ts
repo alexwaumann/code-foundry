@@ -32,11 +32,14 @@ export interface ThemeUndoTarget {
   gone?: boolean;
 }
 
-/** The Undo button's state, and its tooltip. */
+/**
+ * The Undo button's state, and its tooltip. Undo of the card's own colours has none: the
+ * button's label says it all, while "Back to <name>" names what comes back.
+ */
 export type ThemeUndoState =
   | { kind: "none" }
   | { kind: "hidden" }
-  | { kind: "undo"; tip: string }
+  | { kind: "undo"; tip: string | null }
   | { kind: "gone"; tip: string }
   | { kind: "undone"; tip: string };
 
@@ -76,7 +79,7 @@ export function themeUndoState(t: ThemeUndoTarget, saved: ThemeFile | null, slot
   if (slot !== t.id || !current || (saved && !samePaint(current, saved))) return { kind: "hidden" };
   const there = !t.gone && (own ? current.version === t.version || look.history(t.id).includes(t.version) : look.theme(t.previous) !== undefined);
   if (!there) return { kind: "gone", tip: own ? `The previous colours of ${name} are no longer kept` : `${previousName} was deleted` };
-  return { kind: "undo", tip: own ? "Undo restores the previous colours" : `Back to ${previousName}` };
+  return { kind: "undo", tip: own ? null : `Back to ${previousName}` };
 }
 
 /** Runs an Undo: the slot back on the previous theme, or the replaced version back. */

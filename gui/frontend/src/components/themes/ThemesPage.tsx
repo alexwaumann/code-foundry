@@ -343,8 +343,8 @@ function EditBar() {
         >
           Save…
         </Button>
-        <Tip label="Close the editor">
-          <Button variant="ghost" size="icon-xs" aria-label="Close the editor" onClick={() => void leaveEditor()} data-testid="themes-edit-done">
+        <Tip label="Close editor">
+          <Button variant="ghost" size="icon-xs" aria-label="Close editor" onClick={() => void leaveEditor()} data-testid="themes-edit-done">
             <X />
           </Button>
         </Tip>
@@ -382,7 +382,7 @@ function ThemeIssues({ issues }: { issues: readonly { file: string; message: str
               {is.file} did not load: {is.message}
             </span>
           </Tip>
-          <Tip label="Delete the file">
+          <Tip label="Delete file">
             <Button
               variant="ghost"
               size="icon-xs"

@@ -83,3 +83,13 @@ export const TagDraftContext = createContext("");
 
 /** The draft has more than one project: a file tag's tooltip names its project. */
 export const TagMultiProjectContext = createContext(false);
+
+/**
+ * A file tag's tooltip text: its path (prefixed with the project's name when the draft has
+ * more than one project) and line; null when that is the tag's own label (a file at the
+ * project's root, `README.md`), which the tooltip would only repeat.
+ */
+export function fileTagTip({ label, project, path, line, multi }: { label: string; project: string; path: string; line: number | undefined; multi: boolean }): string | null {
+  const text = `${multi ? `${project}/${path}` : path}${line === undefined ? "" : `:${String(line)}`}`;
+  return text === label ? null : text;
+}

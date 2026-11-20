@@ -46,6 +46,14 @@ export function checkRunning(c: Pick<CheckView, "startedAtMs" | "completedAtMs" 
   return c.startedAtMs !== null && c.completedAtMs === null && c.status !== "completed";
 }
 
+/**
+ * A check row's tooltip: its name and workflow ("lint · CI") over its description, each
+ * when present. The row cuts the name and workflow and has no room for the description.
+ */
+export function checkTip(c: Pick<CheckView, "name" | "workflow" | "description">): string {
+  return [[c.name, c.workflow].filter(Boolean).join(" · "), c.description].filter(Boolean).join("\n");
+}
+
 /** A check row's right-hand text: "skipped", its duration, or its pending status ("queued"). */
 export function checkMeta(c: Pick<CheckView, "conclusion" | "status" | "startedAtMs" | "completedAtMs">, now: number): string {
   const tone = checkTone(c);

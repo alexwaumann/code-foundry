@@ -21,7 +21,9 @@ function RefreshButton({ projectId }: { projectId: string }) {
   const [busy, setBusy] = useState(false);
   return (
     <Tip label={busy ? "Refreshing…" : "Fetch and refresh"}>
-      <Button
+      {/* A disabled button takes no hover: the span carries the tooltip while it refreshes. */}
+      <span className="inline-flex" data-testid="project-refresh-tip">
+        <Button
         type="button"
         variant="ghost"
         size="icon-xs"
@@ -38,7 +40,8 @@ function RefreshButton({ projectId }: { projectId: string }) {
         }}
       >
         <RefreshCw className={cn("size-3", busy && "animate-spin")} data-busy={busy || undefined} />
-      </Button>
+        </Button>
+      </span>
     </Tip>
   );
 }

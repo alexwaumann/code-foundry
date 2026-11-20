@@ -205,10 +205,11 @@ function useProjectNotes(threadId: string) {
 /**
  * The project row's notes (once the thread header's environment note): "Plugin environment
  * changed" with what changed. Restart Claude is the title menu's
- * (components/thread/ThreadMenuItems). Plugins' flags no longer show here: a flag arrives as a
+ * (components/thread/ThreadMenuItems); a read-only card (a subagent's) has none, so its
+ * note leaves it out. Plugins' flags no longer show here: a flag arrives as a
  * notification naming the thread, on its sidebar row (docs/notes/notifications-4-row-mark.md).
  */
-function ProjectNotes({ envChange }: ReturnType<typeof useProjectNotes>) {
+function ProjectNotes({ envChange, readOnly = false }: ReturnType<typeof useProjectNotes> & { readOnly?: boolean }) {
   return (
     <span
       className={cn(HOVER_CARD, "flex flex-col gap-1.5")}
@@ -223,7 +224,7 @@ function ProjectNotes({ envChange }: ReturnType<typeof useProjectNotes>) {
           <span className="whitespace-pre-line">
             <span className="font-medium">Plugin environment changed</span>
             {"\n"}
-            {envStaleTip(envChange)}
+            {envStaleTip(envChange, !readOnly)}
           </span>
         </span>
       )}
@@ -445,7 +446,7 @@ function ProjectFactRow({ threadId }: { threadId: string }) {
     </Row>
   );
   return noted ? (
-    <Tip label={<ProjectNotes {...notes} />} side="left">
+    <Tip label={<ProjectNotes {...notes} readOnly />} side="left">
       {row}
     </Tip>
   ) : (

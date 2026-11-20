@@ -95,7 +95,7 @@ export function OpenInSplit({ target, compact, testId }: { target: OpenInTarget;
         </button>
       </Tip>
       <DropdownMenu modal={false}>
-        <Tip label="Open in options">
+        <Tip label="Open in…">
           <DropdownMenuTrigger asChild>
             <button ref={moreRef} type="button" tabIndex={-1} className={MORE} aria-label="Open in options" data-split-more="" data-testid={`${testId}-open-in-more`}>
               <Ellipsis aria-hidden />

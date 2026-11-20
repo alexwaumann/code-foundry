@@ -14,7 +14,7 @@ const { NewWorkspaceDialog } = await import("./NewWorkspaceDialog");
 const { ProjectsPage } = await import("./ProjectsPage");
 const { confirmFirst, daemon, invocationsOf, lastInvocation, refuse, resetDaemon } = await import("@/test/daemonFakes");
 const { addThreads, addWorkspace, addWorktrees, menuEntries, panelActive, removeProject, resetPanels, seedWorld, status, texts, thread, updateProject, updateWorkspace, worktree } = await import("@/test/projectsWorld");
-const { tooltipText } = await import("@/test/tooltip");
+const { hoverTooltipText, tooltipText } = await import("@/test/tooltip");
 const { useUiStore, workspacePage } = await import("@/stores/ui");
 const { openNewWorkspaceDialog, resetInstructionsPresses, useNewWorkspaceDialogStore } = await import("@/stores/workspaceActions");
 const { useWorkspaceAddProjectStore } = await import("@/stores/workspaceAddProject");
@@ -306,6 +306,8 @@ describe("the workspace's Projects card", () => {
     updateWorkspace(mono, (w) => ({ ...w, rootMissing: true }));
     expect(by(m, "workspace-root-missing").textContent).toBe("missing");
     expect(by(m, "workspace-root").getAttribute("data-missing")).toBe("true");
+    // Hovering the mark says what to do, in words rather than a CLI verb.
+    expect(await hoverTooltipText(by(m, "workspace-root-missing"))).toMatch(/\/mono is missing \(moved or renamed\?\)\. Set the workspace's root to its new place\.$/);
   });
 
   it("Start here on a project, or on a rooted workspace's folder; the row that starts threads has none", async () => {

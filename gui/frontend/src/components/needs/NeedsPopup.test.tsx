@@ -1,5 +1,6 @@
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { tooltipText } from "@/test/tooltip";
 
 // The thread view inside is the plugin node's (InlineThread, its own tests): a stand-in with a field.
 // `ask` is the one request it docks under the stepper (undefined: every one, as today).
@@ -289,5 +290,12 @@ describe("the stepper over several open requests (docs/notes/needs-you-line-item
     open();
     expect(screen.getAllByTestId("needs-stepper-dot").map((d) => d.getAttribute("aria-label"))).toEqual(["1 of 3: Permission: cmd 1", "2 of 3: Permission: cmd 2", "3 of 3: Question: Which base branch?"]);
     expect(within(screen.getByTestId("needs-stepper")).getByText("switch")).toBeTruthy();
+  });
+
+  it("a dot's tooltip names its request, except the current one's, which the popup shows", () => {
+    open();
+    const [first, second] = screen.getAllByTestId("needs-stepper-dot") as [HTMLElement, HTMLElement];
+    expect(tooltipText(second)).toBe("Permission: cmd 2");
+    expect(tooltipText(first)).toBeNull();
   });
 });

@@ -84,7 +84,7 @@ describe("a collapsed pane in the grid", () => {
       .map((b) => b.getAttribute("data-testid"))
       .filter((t) => t !== "shell-rail-tab");
     expect(buttons).toEqual(["shell-rail-expand", "shell-rail-fullscreen"]);
-    expect(tooltipText(within(rail).getByTestId("shell-rail-expand"))).toBe("Open pane ⇧⌘M");
+    expect(tooltipText(within(rail).getByTestId("shell-rail-expand"))).toBe("Expand pane ⇧⌘M");
   });
 
   it("opens again from its control (pane.collapse --off) and from a click on an icon (that tab takes the focus)", async () => {
@@ -159,7 +159,7 @@ describe("the strip's collapse control", () => {
     if (!p) throw new Error("pane");
     const button = within(p).getByTestId("shell-collapse");
     expect(button.getAttribute("aria-disabled")).toBe("true");
-    expect(tooltipText(button)).toBe("The last open pane of a space cannot be collapsed");
+    expect(tooltipText(button)).toBe("Can’t collapse the last open pane");
     fireEvent.click(button);
     expect(ran).toEqual([]);
   });

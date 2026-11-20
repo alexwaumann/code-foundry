@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { PullRequestCommentView, PullRequestDetailView, PullRequestView, ReviewThreadView } from "@/api/gh";
-import { ago, checkDuration, checkMeta, checkRunning, checkTone, commentCount, conversation, detailAges, resolveLink, reviewerStatus, stateBadge, threadLocation, timeline } from "./model";
+import { ago, checkDuration, checkMeta, checkRunning, checkTip, checkTone, commentCount, conversation, detailAges, resolveLink, reviewerStatus, stateBadge, threadLocation, timeline } from "./model";
 
 const NOW = new Date(2026, 9, 8, 12, 0, 0).getTime();
 const M = 60_000;
@@ -191,5 +191,16 @@ describe("detailAges", () => {
         .map((a) => `${a.label} ${a.value}`)
         .join(" · "),
     ).toBe(want);
+  });
+});
+
+describe("checkTip", () => {
+  it.each([
+    { name: "name, workflow and description", c: { name: "lint", workflow: "CI", description: "3 warnings" }, want: "lint · CI\n3 warnings" },
+    { name: "no description", c: { name: "lint", workflow: "CI", description: "" }, want: "lint · CI" },
+    { name: "no workflow (a status)", c: { name: "deploy/preview", workflow: "", description: "Ready" }, want: "deploy/preview\nReady" },
+    { name: "the name alone", c: { name: "lint", workflow: "", description: "" }, want: "lint" },
+  ])("$name", ({ c, want }) => {
+    expect(checkTip(c)).toBe(want);
   });
 });

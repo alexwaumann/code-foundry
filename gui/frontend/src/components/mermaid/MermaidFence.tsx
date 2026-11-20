@@ -26,7 +26,8 @@ export function MermaidFence({ code }: { code: string }) {
   return (
     <div data-testid="md-mermaid-failed">
       {block}
-      <Tip label={summary === result.message ? null : <span className="whitespace-pre-wrap">{result.message}</span>}>
+      {/* The whole message when the note shows only its first line, or when the line is cut. */}
+      <Tip label={<span className="whitespace-pre-wrap">{result.message}</span>} whenTruncated={summary === result.message}>
         <p className="-mt-1 mb-3 truncate text-caption" data-find-skip data-testid="md-mermaid-note">
           Diagram not drawn: {summary}
         </p>

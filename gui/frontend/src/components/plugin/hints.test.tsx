@@ -80,6 +80,12 @@ describe("a plugin's hint", () => {
     expect(tooltipText(plain)).toBe("Exactly 1,204");
   });
 
+  it("a link shows where it goes, unless its text is that URL", () => {
+    nodes({ key: "t", text: { content: { spans: [{ text: "docs", url: "https://example.com/docs" }, { text: "https://example.com/bare", url: "https://example.com/bare" }] } } });
+    expect(tooltipText(screen.getByRole("link", { name: "docs" }))).toBe("https://example.com/docs");
+    expect(tooltipText(screen.getByRole("link", { name: "https://example.com/bare" }))).toBeNull();
+  });
+
   it("shows on a pill", () => {
     nodes({ key: "s", section: { title: "Runs", pill: { label: "3", hint: "3 waiting for a runner" }, children: [] } });
     const pill = screen.getByTestId("plugin-pill");

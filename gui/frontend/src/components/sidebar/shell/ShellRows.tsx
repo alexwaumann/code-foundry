@@ -516,8 +516,8 @@ export const DraftRowView = memo(function DraftRowView({ row, selected, cursor, 
 });
 
 const SCOPE_LOOK: Readonly<Record<NeedsScope, { icon: typeof Layers; label: string; next: NeedsScope; tip: string }>> = {
-  all: { icon: Layers, label: "All spaces", next: "space", tip: "Show this space's only" },
-  space: { icon: Square, label: "This space", next: "all", tip: "Show every space's" },
+  all: { icon: Layers, label: "All spaces", next: "space", tip: "Show only this space" },
+  space: { icon: Square, label: "This space", next: "all", tip: "Show all spaces" },
 };
 
 /**

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { MonthView } from "@/api/gh";
-import { axisLabel, chartMonths, countScale, countStep, labelledIndex, labelledIndexes, labelledTicks, monthLabelAt, tickLabel } from "./activity";
+import { axisLabel, chartMonths, countScale, countStep, labelledIndex, labelledIndexes, labelledTicks, monthLabelAt, seriesUnit, tickLabel } from "./activity";
 
 // 2026-10-17 noon, local time (the daemon's months are local too).
 const NOW = new Date(2026, 9, 17, 12).getTime();
@@ -115,5 +115,18 @@ describe("axisLabel / tickLabel", () => {
 
   it("groups thousands", () => {
     expect([0, 40, 1500].map(tickLabel)).toEqual(["0", "40", "1,500"]);
+  });
+});
+
+describe("seriesUnit", () => {
+  it.each([
+    { series: "commits", v: 0, want: "commits" },
+    { series: "commits", v: 1, want: "commit" },
+    { series: "commits", v: 210, want: "commits" },
+    { series: "merged", v: 0, want: "merged PRs" },
+    { series: "merged", v: 1, want: "merged PR" },
+    { series: "merged", v: 17, want: "merged PRs" },
+  ] as const)("$v $series: $want", ({ series, v, want }) => {
+    expect(seriesUnit(series, v)).toBe(want);
   });
 });

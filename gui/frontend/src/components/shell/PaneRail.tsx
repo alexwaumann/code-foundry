@@ -108,7 +108,7 @@ function RailTabOf({ tab, paneId, selected, vertical }: { tab: TabEntry; paneId:
  */
 /**
  * A click on the rail's empty area (anywhere but an icon or a button): the pane opens on its
- * selected tab, with the focus. A pane the user collapsed opens as its Open pane button does; a
+ * selected tab, with the focus. A pane the user collapsed opens as its Expand pane button does; a
  * pane folded for lack of room as a click on its selected icon does (that tab takes the focus, so
  * the pane unfolds and another may fold). A click that bubbles here through React from a portal
  * (a tab's context menu) is not on the rail and does nothing; after a tab drag dnd-kit swallows

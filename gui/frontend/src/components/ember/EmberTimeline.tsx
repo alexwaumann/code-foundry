@@ -130,7 +130,7 @@ function unfoldIn(threadId: string): (rows: readonly EmberRow[], itemId: string)
  * timeline's list and rows, with Ember's rows (lib/ember buildEmberRows): the user's
  * messages and Ember's reply show, and every run of work between them is one "Worked for"
  * row, open while "Show work" is on or the user opened it. Its text rows are the thread's
- * (TextRow: Copy answer, code actions, citable), their task links as pointer lines. It is
+ * (TextRow: Copy reply, code actions, citable), their task links as pointer lines. It is
  * its thread's only body (ThreadPane routes Ember's thread here, never to ThreadBody), so
  * it is the one list the cite layer finds for the thread.
  */
@@ -260,35 +260,38 @@ export function TaskPointer({ id, name }: { id: string; name: string }) {
   const waiting = useLinkWaiting(id);
   const title = useLinkTitle(id) || name;
   const branch = useLinkBranch(id);
+  // The row says what it is (a board glyph and the task); a tooltip only shows a cut title or branch.
   return (
-    <Tip label="Open on the board">
-      <button
-        type="button"
-        className="my-1.5 flex max-w-full min-w-0 cursor-pointer items-center gap-1.5 rounded-md text-left text-body-sm text-cf-text-muted outline-none hover:text-cf-text focus-visible:ring-2 focus-visible:ring-cf-focus/50"
-        data-testid="ember-task-link"
-        data-task={id}
-        onClick={() => {
-          openEmberBoard(id);
-        }}
-      >
-        <SquareKanban className="size-3.5 shrink-0 opacity-80" aria-hidden data-testid="ember-task-link-glyph" />
+    <button
+      type="button"
+      className="my-1.5 flex max-w-full min-w-0 cursor-pointer items-center gap-1.5 rounded-md text-left text-body-sm text-cf-text-muted outline-none hover:text-cf-text focus-visible:ring-2 focus-visible:ring-cf-focus/50"
+      data-testid="ember-task-link"
+      data-task={id}
+      onClick={() => {
+        openEmberBoard(id);
+      }}
+    >
+      <SquareKanban className="size-3.5 shrink-0 opacity-80" aria-hidden data-testid="ember-task-link-glyph" />
+      <Tip label={title} whenTruncated>
         <span className="truncate font-medium text-cf-text" data-testid="ember-task-link-title">
           {title}
         </span>
-        {meta && (
-          <span className={cn("shrink-0 truncate", waiting && "text-cf-warning-text")} data-testid="ember-task-link-meta">
-            · {meta}
-          </span>
-        )}
-        {branch && (
-          <span className="flex min-w-0 shrink items-center gap-1" data-testid="ember-task-link-branch">
-            <span aria-hidden>·</span>
-            <GitBranch className="size-3 shrink-0" aria-hidden />
+      </Tip>
+      {meta && (
+        <span className={cn("shrink-0 truncate", waiting && "text-cf-warning-text")} data-testid="ember-task-link-meta">
+          · {meta}
+        </span>
+      )}
+      {branch && (
+        <span className="flex min-w-0 shrink items-center gap-1" data-testid="ember-task-link-branch">
+          <span aria-hidden>·</span>
+          <GitBranch className="size-3 shrink-0" aria-hidden />
+          <Tip label={branch} whenTruncated>
             <span className="truncate font-mono">{branch}</span>
-          </span>
-        )}
-      </button>
-    </Tip>
+          </Tip>
+        </span>
+      )}
+    </button>
   );
 }
 

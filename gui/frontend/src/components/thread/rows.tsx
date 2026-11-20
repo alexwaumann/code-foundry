@@ -386,7 +386,7 @@ function CopyAnswer({ answer }: { answer: string }) {
   const onClick = () => {
     void copy(replyText(threadId, answer));
   };
-  const label = copied ? "Copied" : "Copy answer";
+  const label = copied ? "Copied" : "Copy reply";
   return (
     <Tip label={label}>
       <button type="button" className="tb copy-answer" aria-label={label} data-copied={copied || undefined} data-testid="thread-copy-answer" onClick={onClick}>

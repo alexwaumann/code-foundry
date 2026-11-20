@@ -8,10 +8,9 @@ import type { OwnersState, PublishChoice } from "./usePublishOwners";
 
 const visibilityIcons: Record<Visibility, typeof Globe> = { public: Globe, internal: Users, private: Lock };
 
-const visibilityHints: Record<Visibility, string> = {
-  public: "Anyone on the internet can see it.",
+/** A tooltip only where the label alone does not say who can see it (Public and Private do). */
+const visibilityHints: Partial<Record<Visibility, string>> = {
   internal: "Members of the organization's enterprise can see it.",
-  private: "Only people you give access can see it.",
 };
 
 /**

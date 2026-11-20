@@ -75,7 +75,7 @@ export function UsagePage() {
             </RadioGroupChoice>
           ))}
         </RadioGroup>
-        <Tip label="Close (Esc)">
+        <Tip label="Close">
           <Button variant="ghost" size="icon-xs" aria-label="Close usage" onClick={closeUsage} data-testid="usage-page-close">
             <X />
           </Button>

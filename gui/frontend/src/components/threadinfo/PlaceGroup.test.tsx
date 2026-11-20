@@ -58,4 +58,14 @@ describe("PlaceGroup: the project row's notes", () => {
     setThread({});
     expect(within(screen.getByTestId("ti-project")).queryByTestId("ti-project-mark")).toBeNull();
   });
+
+  it("a subagent's read-only card says what changed but not Restart Claude (it has no thread menu)", () => {
+    render(<PlaceGroup threadId="s-3" readOnly />);
+    setThread({ pluginEnvStale: true, pluginEnvChange: "Hello removed CF_HELLO" });
+    // The read-only row is no button: focusable here only to open its hover card.
+    screen.getByTestId("ti-project").tabIndex = 0;
+    expect(within(notes()).getByTestId("ti-project-env-stale").textContent).toMatch(
+      /^Plugin environment changed\s*Hello removed CF_HELLO\.\s*Claude is still running with the old environment\.$/,
+    );
+  });
 });

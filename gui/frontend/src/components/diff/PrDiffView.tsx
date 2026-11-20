@@ -121,7 +121,7 @@ function PrFile({ file, row, loader, url, onRefresh }: { file: PrDiffFile | unde
   else body = <DiffCode input={code} lines={file.lines} />;
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col" data-testid="pr-diff-file" data-path={row.path}>
-      <FileHeader icon={FileDiff} name={row.name} dir={row.dir} fullPath={row.oldPath ? `${row.path}\nrenamed from ${row.oldPath}` : row.path} actions={actions} />
+      <FileHeader icon={FileDiff} name={row.name} dir={row.dir} fullPath={row.oldPath ? `${row.path}\nrenamed from ${row.oldPath}` : row.path} whenTruncated={!row.oldPath} actions={actions} />
       {body}
     </div>
   );
