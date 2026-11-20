@@ -62,7 +62,7 @@ const fields: SettingFieldView[] = [
   f("threads.default_worktree", "New threads work in", "enum", "general", "threads", { enumValues: ["worktree", "current"], enumLabels: ["A fresh copy of the project", "The project folder itself"], defaultValue: "current" }),
   // Auto-tidy's two rows, as the daemon's schema has them (docs/notes/auto-tidy.md).
   f("threads.auto_save_after", "Save idle threads for later", "enum", "general", "threads", {
-    description: "A thread with no activity for this long (no message to or from Claude) moves to Snoozed with no alarm. Pinned threads, and threads that are working or asking, stay.",
+    description: "A thread with no activity for this long (no message to or from Claude) moves to Snoozed with no alarm. Pinned threads, and threads that are working or waiting on you, stay.",
     enumValues: ["off", "1d", "3d", "1w", "2w", "1mo"],
     enumLabels: ["Off", "After 1 day", "After 3 days", "After 1 week", "After 2 weeks", "After 1 month"],
     defaultValue: "off",
@@ -306,7 +306,7 @@ describe("the settings page", () => {
     spin("appearance.font_size").focus();
     fireEvent.change(spin("appearance.font_size"), { target: { value: "99" } });
     press(spin("appearance.font_size"), "Enter");
-    expect(within(row("appearance.font_size")).getByTestId("setting-error").textContent).toBe("Want 9 to 28");
+    expect(within(row("appearance.font_size")).getByTestId("setting-error").textContent).toBe("Enter a number from 9 to 28.");
     expect(save.fn.mock.calls.some(([v]) => "appearance.font_size" in v)).toBe(false);
 
     spin("appearance.scrollback_lines").focus();
@@ -495,7 +495,7 @@ describe("search", () => {
     open();
     fireEvent.change(search(), { target: { value: "interval" } });
     const results = screen.getByTestId("settings-results");
-    expect(screen.getByTestId("settings-result-count").textContent).toBe("2 results for “interval” in every page");
+    expect(screen.getByTestId("settings-result-count").textContent).toBe("2 results for “interval” across all settings");
     expect(results.querySelectorAll("[data-setting]")).toHaveLength(2);
     expect(within(results).getAllByTestId("setting-crumb").map((c) => c.textContent)).toEqual(["Source control › GitHub", "Source control › Projects"]);
     const key = within(row("github.poll_interval_seconds")).getByTestId("setting-key");

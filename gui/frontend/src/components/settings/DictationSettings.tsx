@@ -164,11 +164,12 @@ function useModelDir(): string {
   return `${tildify(dir)}/dictation`;
 }
 
+/** The page's description above says audio stays on this Mac, so the row does not repeat it. */
 function modelDescription(snap: DictationView | null, dir: string): string {
   const head = "Whisper Large v3 Turbo, English.";
   if (snap?.model.download) return `${head} Downloading. Dictation turns on when it finishes.`;
   if (snap?.model.downloaded) return `${head} Stays loaded while dictation is on, so it starts at once.`;
-  return `${head} Downloaded once, kept in ${dir}. Nothing you say leaves this Mac.`;
+  return `${head} Downloaded once, kept in ${dir}.`;
 }
 
 /** The right side: Download, the download's progress with Cancel, or the size on disk with Remove. */

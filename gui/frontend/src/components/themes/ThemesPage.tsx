@@ -539,11 +539,11 @@ function ControlBar({ slot, slots }: { slot: ThemeSlot; slots: { dark: string; l
           <RadioGroupChoice value="system">
             <Monitor /> System
           </RadioGroupChoice>
-          <RadioGroupChoice value="light">
-            <Sun /> Light
-          </RadioGroupChoice>
           <RadioGroupChoice value="dark">
             <Moon /> Dark
+          </RadioGroupChoice>
+          <RadioGroupChoice value="light">
+            <Sun /> Light
           </RadioGroupChoice>
         </RadioGroup>
       </div>

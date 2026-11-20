@@ -59,12 +59,12 @@ func TestPrivacyMessage(t *testing.T) {
 		{
 			name: "a bare executable is removed and added again; a symlink is judged by where it leads",
 			path: "/Users/me/proj/notes.md", real: "/Users/me/Desktop/notes.md", app: gui,
-			want: `macOS's privacy protection blocked reading /Users/me/proj/notes.md: "Code Foundry" has no access to your Desktop folder. In System Settings → Privacy & Security → Full Disk Access, select "Code Foundry" and click − if it is listed, even if it is on. Then click +, press ⌘⇧G, enter ~/.code-foundry/app/Code Foundry, turn it on, and run Restart Daemon from the command palette.`,
+			want: `macOS's privacy protection blocked reading /Users/me/proj/notes.md: "Code Foundry" has no access to your Desktop folder. In System Settings → Privacy & Security → Full Disk Access, select "Code Foundry" and click − if it is listed, even if it is on. Then click +, press ⇧⌘G, enter ~/.code-foundry/app/Code Foundry, turn it on, and run Restart Daemon from the command palette.`,
 		},
 		{
 			name: "the daemon answering for itself, a file only Full Disk Access opens",
 			path: "/Users/me/.Trash/old.txt", real: "/Users/me/.Trash/old.txt", app: cli,
-			want: `macOS's privacy protection blocked reading /Users/me/.Trash/old.txt: "code-foundry" needs Full Disk Access to read it. In System Settings → Privacy & Security → Full Disk Access, select "code-foundry" and click − if it is listed, even if it is on. Then click +, press ⌘⇧G, enter ~/.code-foundry/app/code-foundry, turn it on, and run Restart Daemon from the command palette.`,
+			want: `macOS's privacy protection blocked reading /Users/me/.Trash/old.txt: "code-foundry" needs Full Disk Access to read it. In System Settings → Privacy & Security → Full Disk Access, select "code-foundry" and click − if it is listed, even if it is on. Then click +, press ⇧⌘G, enter ~/.code-foundry/app/code-foundry, turn it on, and run Restart Daemon from the command palette.`,
 		},
 	}
 	for _, tt := range tests {

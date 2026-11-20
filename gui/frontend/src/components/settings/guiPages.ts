@@ -27,7 +27,7 @@ export const guiPages: readonly GuiPage[] = [
     page: {
       id: "skills",
       title: "Skills",
-      description: "Claude Code plugins and skills from your organisation's marketplace.",
+      description: "Claude Code plugins and skills from your marketplaces.",
       sections: [
         { id: "installed", title: "Installed", description: "What's installed on this Mac. Enable, disable, update, run setup or uninstall." },
         { id: "browse", title: "Browse all", description: "Search the marketplace and install plugins and skills." },

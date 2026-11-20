@@ -42,17 +42,17 @@ export function validateSetting(f: SettingFieldView, raw: string): Validated {
   switch (f.type) {
     case "int": {
       const s = raw.trim();
-      if (!/^-?\d+$/.test(s)) return { ok: false, error: `Want a whole number, got "${raw}"` };
+      if (!/^-?\d+$/.test(s)) return { ok: false, error: "Enter a whole number." };
       const n = Number(s);
-      if (n < f.min || n > f.max) return { ok: false, error: `Want ${String(f.min)} to ${String(f.max)}` };
+      if (n < f.min || n > f.max) return { ok: false, error: `Enter a number from ${String(f.min)} to ${String(f.max)}.` };
       return { ok: true, value: String(n) };
     }
     case "bool":
-      return raw === "true" || raw === "false" ? { ok: true, value: raw } : { ok: false, error: "Want true or false" };
+      return raw === "true" || raw === "false" ? { ok: true, value: raw } : { ok: false, error: "Enter true or false." };
     case "enum":
-      return f.enumValues.includes(raw) ? { ok: true, value: raw } : { ok: false, error: `Want one of ${f.enumValues.join(", ")}` };
+      return f.enumValues.includes(raw) ? { ok: true, value: raw } : { ok: false, error: `Choose one of ${f.enumValues.join(", ")}.` };
     case "path":
-      return raw.startsWith("/") || raw === "~" || raw.startsWith("~/") ? { ok: true, value: raw } : { ok: false, error: "Want an absolute path (or ~/…)" };
+      return raw.startsWith("/") || raw === "~" || raw.startsWith("~/") ? { ok: true, value: raw } : { ok: false, error: "Enter an absolute path (or ~/…)." };
     case "keybinding":
       return validateKeybinding(raw);
     default:

@@ -41,7 +41,7 @@ export function SearchResults({
         <h2 className="text-heading">
           {n} {n === 1 ? "result" : "results"}
         </h2>{" "}
-        <span className="text-caption">for “{query}” in every page</span>
+        <span className="text-caption">for “{query}” across all settings</span>
       </div>
       {n === 0 ? (
         <p className="py-8 text-center text-body text-cf-text-muted">No settings match “{query}”.</p>

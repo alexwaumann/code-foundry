@@ -57,7 +57,7 @@ const holdKey: SettingFieldView = { ...field, key: "dictation.hold_key", title: 
 const microphone: SettingFieldView = { ...field, key: "dictation.microphone", title: "Microphone", type: "string", description: "Follows the input chosen in System Settings.", defaultValue: "", dependsOn: field.key };
 const avoid: SettingFieldView = { ...field, key: "dictation.avoid_bluetooth", title: "Avoid Bluetooth microphones", defaultValue: "true", dependsOn: field.key };
 const sounds: SettingFieldView = { ...field, key: "dictation.sounds", title: "Sounds", defaultValue: "true", dependsOn: field.key };
-const otherAudio: SettingFieldView = { ...field, key: "dictation.other_audio", title: "Other audio", type: "enum", enumValues: ["do_nothing", "lower"], enumLabels: ["Do nothing", "Lower"], defaultValue: "do_nothing", dependsOn: field.key };
+const otherAudio: SettingFieldView = { ...field, key: "dictation.other_audio", title: "Other audio", type: "enum", enumValues: ["do_nothing", "lower"], enumLabels: ["Leave as is", "Lower volume"], defaultValue: "do_nothing", dependsOn: field.key };
 const symbols: SettingFieldView = { ...field, key: "dictation.spoken_symbols", title: "Spoken symbols", dependsOn: field.key };
 const formatting: SettingFieldView = { ...field, key: "dictation.spoken_formatting", title: "Spoken formatting", defaultValue: "true", dependsOn: field.key };
 const section = { id: "dictation", title: "Dictation", description: "Speak into any composer. Transcribed on this Mac with Whisper; audio never leaves it." };
@@ -205,6 +205,7 @@ describe("Settings › Dictation", () => {
     expect(toggle.textContent).toContain("Adds a microphone button to every composer. Needs the model below.");
     expect(within(toggle).queryByTestId("dictation-chip")).toBeNull();
     expect(model.textContent).toContain("Whisper Large v3 Turbo, English. Downloaded once, kept in ~/.code-foundry/dictation.");
+    expect(model.textContent).not.toContain("leaves this Mac");
     expect(within(model).getByTestId("dictation-mac").textContent).toBe("This Mac: Apple M4 Pro · 48 GB");
     expect(within(model).queryByTestId("dictation-m1")).toBeNull();
 

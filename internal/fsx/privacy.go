@@ -61,7 +61,7 @@ func privacyMessage(root, path, real string, access fileAccess, app tcc.App) str
 	}
 	switch {
 	case !app.Bundled:
-		fmt.Fprintf(&b, "In System Settings → Privacy & Security → Full Disk Access, select %q and click − if it is listed, even if it is on. Then click +, press ⌘⇧G, enter %s, turn it on, and %s.",
+		fmt.Fprintf(&b, "In System Settings → Privacy & Security → Full Disk Access, select %q and click − if it is listed, even if it is on. Then click +, press ⇧⌘G, enter %s, turn it on, and %s.",
 			app.Name, homePath(root, app.Path), restartDaemon)
 	case what != "":
 		fmt.Fprintf(&b, "Allow it in System Settings → Privacy & Security → Files and Folders (or Full Disk Access), then %s.", restartDaemon)
