@@ -40,8 +40,9 @@ A bell (the top bar's Bell, a woken snooze's BellRing) swings from its top
 
 - **Plays under Reduce motion.** The user's explicit decision: the tilt says something arrived,
   it is information, not a decorative transition. It is not gated on `prefers-reduced-motion`.
-  The app has no global reduced-motion rule (the working circle and spinners opt out one by one
-  with `motion-reduce:`), so nothing needed exempting; the keyframes' comment says so.
+  The app has no global reduced-motion rule (spinners opt out one by one with `motion-reduce:`;
+  the working circle has since dropped its gate for the same reason, docs/notes/working-circle.md),
+  so nothing needed exempting; the keyframes' comment says so.
 - **An exception to "frequent user actions are instant".** That rule is about the user's own
   actions; an arrival is not one, and this is the agreed exception.
 - Colours unchanged; no dependency.

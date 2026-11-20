@@ -4,8 +4,8 @@ import { openPrBesidePage } from "./shell-pages";
 
 /**
  * The working and waiting circle (components/status/StatusCircle.tsx, docs/notes/working-circle.md):
- * what only a real browser shows, the compiled turn (index.css --animate-status-*) and that
- * prefers-reduced-motion stops it. Which mark goes where is vitest's. SHOTS=<dir> saves the PR's
+ * what only a real browser shows, the compiled turn (index.css --animate-status-*) and that it
+ * keeps turning under prefers-reduced-motion. Which mark goes where is vitest's. SHOTS=<dir> saves the PR's
  * screenshots: the live turn header, the sidebar's working and waiting rows, a running checks card.
  */
 
@@ -46,12 +46,11 @@ test("the working circle turns once in 5s and the waiting one in 11s, forever", 
   await expect.poll(() => turns(waiting)).toEqual([{ name: "cf-status-turn", duration: 11000, iterations: Infinity }]);
 });
 
-test("under prefers-reduced-motion the circle stands still", async ({ page }) => {
+test("under prefers-reduced-motion the circle still turns: it says something is running", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await openStreaming(page);
   const working = page.getByTestId("thread-working").locator('svg[data-status-circle="working"]');
-  await expect(working).toBeVisible();
-  await expect.poll(() => turns(working)).toEqual([]);
+  await expect.poll(() => turns(working)).toEqual([{ name: "cf-status-turn", duration: 5000, iterations: Infinity }]);
 });
 
 async function clipAround(page: Page, target: Locator, name: string, pad = { x: 12, y: 12, width: 420 }): Promise<void> {
