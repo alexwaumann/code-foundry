@@ -51,10 +51,11 @@ func threadRestartCmd(b ThreadBackend, idArg ArgSpec) Command {
 		Description: "Restart a thread's Claude process with the same conversation, so it picks up what changed outside it, " +
 			"such as a plugin's environment. A running turn is interrupted; background agents and shells stop. " +
 			"A thread whose Claude is not running is left as it is: its next message starts Claude afresh.",
-		Category: "Thread",
-		Args:     []ArgSpec{idArg},
-		When:     hasThread,
-		Confirm:  "Restart Claude for {id}? The conversation continues; the current turn is interrupted.",
+		Category:     "Thread",
+		Args:         []ArgSpec{idArg},
+		When:         hasThread,
+		Confirm:      "Restart Claude for {id}? The conversation continues; the current turn is interrupted.",
+		ConfirmLabel: "Restart",
 		ConfirmIf: func(ctx context.Context, _ Context, a Args) bool {
 			return threadRestartConfirm(ctx, b, a) != ""
 		},

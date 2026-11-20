@@ -10,9 +10,12 @@ import (
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 )
 
-// deleteWorkTitle is the title (and confirm button) of the second-stage confirmation a
-// removal asks when it would delete uncommitted work.
-const deleteWorkTitle = "Delete Uncommitted Work"
+// deleteWorkTitle is the title of the second-stage confirmation a removal asks when it
+// would delete uncommitted work; deleteWorkLabel is its confirm button.
+const (
+	deleteWorkTitle = "Delete Uncommitted Work"
+	deleteWorkLabel = "Delete"
+)
 
 // forceArgs is what the re-invoke of a second-stage confirmation adds: --force.
 func forceArgs() map[string]string { return map[string]string{"force": "true"} }
@@ -83,7 +86,7 @@ func deleteWorkConfirm(name string, wts []*v1.Worktree, what string) *ConfirmErr
 		}
 		fmt.Fprintf(&b, "\n\nRemoving %s deletes that work for good. Delete it?", what)
 	}
-	return &ConfirmError{Command: name, Title: deleteWorkTitle, Message: b.String(), Args: forceArgs()}
+	return &ConfirmError{Command: name, Title: deleteWorkTitle, Label: deleteWorkLabel, Message: b.String(), Args: forceArgs()}
 }
 
 // withBranch is what, plus the branches when the command deletes them: the re-run with

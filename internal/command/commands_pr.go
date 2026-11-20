@@ -59,13 +59,14 @@ func RegisterPullRequest(r *Registry, b GhBackend, link PullRequestLinkBackend) 
 	return r.RegisterAll(
 		mergeCommand(b, slug, number),
 		Command{
-			Name:        "pr.revert",
-			NoPalette:   true,
-			Title:       "Revert Pull Request",
-			Description: "Open a pull request that reverses a merged one (GitHub's Revert button). It is linked to the thread that ran it, as thread.pr.link.",
-			Category:    "Pull Request",
-			Args:        []ArgSpec{slug, number},
-			Confirm:     "This opens a new pull request that reverses the changes merged by #{number}.",
+			Name:         "pr.revert",
+			NoPalette:    true,
+			Title:        "Revert Pull Request",
+			Description:  "Open a pull request that reverses a merged one (GitHub's Revert button). It is linked to the thread that ran it, as thread.pr.link.",
+			Category:     "Pull Request",
+			Args:         []ArgSpec{slug, number},
+			Confirm:      "Open a pull request that reverts #{number} in {repo-slug}?",
+			ConfirmLabel: "Revert",
 			Run: func(ctx context.Context, uctx Context, a Args) (Result, error) {
 				if err := checkPullRequestArgs(a); err != nil {
 					return Result{}, err

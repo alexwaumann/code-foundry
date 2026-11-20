@@ -36,9 +36,10 @@ func TestProjectBranchDelete(t *testing.T) {
 			wantMsg: "deleted branch cf/x locally and on origin"},
 		{name: "the context project", ctx: command.Context{ActiveProjectID: "r1"}, args: map[string]string{"branch": "cf/x"}, confirmed: true,
 			wantReq: &v1.DeleteBranchRequest{ProjectId: "r1", Branch: "cf/x"}},
-		{name: "asks first", args: map[string]string{"project": "r1", "branch": "cf/x"}, wantConfirm: "Delete branch cf/x of project r1?"},
+		{name: "asks first, naming the project", args: map[string]string{"project": "r1", "branch": "cf/x"}, wantConfirm: "Delete branch cf/x of project app?"},
 		{name: "asks first about origin", args: map[string]string{"project": "r1", "branch": "cf/x", "remote": "true"},
-			wantConfirm: "Delete branch cf/x of project r1, and on origin?"},
+			wantConfirm: "Delete branch cf/x of project app, and on origin?"},
+		{name: "asks first, by name", args: map[string]string{"project": "app", "branch": "cf/x"}, wantConfirm: "Delete branch cf/x of project app?"},
 		{name: "an unknown project", args: map[string]string{"project": "nope", "branch": "cf/x"}, confirmed: true, wantErr: command.ErrInvalidArgs},
 		{name: "two projects of that name", args: map[string]string{"project": "twin", "branch": "cf/x"}, confirmed: true, wantErr: command.ErrInvalidArgs},
 		{name: "no branch", args: map[string]string{"project": "r1"}, confirmed: true, wantErr: command.ErrInvalidArgs},
@@ -54,8 +55,8 @@ func TestProjectBranchDelete(t *testing.T) {
 			var ce *command.ConfirmError
 			switch {
 			case tt.wantConfirm != "":
-				if !errors.As(err, &ce) || ce.Message != tt.wantConfirm {
-					t.Fatalf("err = %v, want the confirmation %q", err, tt.wantConfirm)
+				if !errors.As(err, &ce) || ce.Message != tt.wantConfirm || ce.Label != "Delete" {
+					t.Fatalf("err = %#v, want the confirmation %q labelled Delete", err, tt.wantConfirm)
 				}
 				return
 			case !errors.Is(err, tt.wantErr):

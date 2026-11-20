@@ -36,7 +36,8 @@ func mergeCommand(b GhBackend, slug, number ArgSpec) Command {
 			{Name: "delete-branch", Type: Bool, Description: "Delete the head branch on GitHub (origin) after the merge; never a fork's, the default or the base branch, nor local branches or worktrees"},
 			{Name: "head-sha", Type: String, Description: "Merge only if the head is still this commit (full SHA): refused when the pull request changed since you looked"},
 		},
-		Confirm: "Merge #{number} in {repo-slug} with {method}?",
+		Confirm:      "Merge #{number} in {repo-slug} with {method}?",
+		ConfirmLabel: "Merge",
 		// A merge is the step the pull request was made for: asked calmly, not as a warning.
 		ConfirmTone: ConfirmToneSuccess,
 		DynamicConfirm: func(ctx context.Context, _ Context, a Args) string {

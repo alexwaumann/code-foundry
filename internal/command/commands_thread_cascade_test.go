@@ -30,8 +30,8 @@ func TestThreadArchiveHiddenChildren(t *testing.T) {
 	stoppedKid := kid("k8", v1.ThreadState_THREAD_STATE_DISCONNECTED, v1.ThreadStatus_THREAD_STATUS_ERROR, "interrupted")
 	idleRoot := &v1.Thread{Name: "lead", State: connected, Status: v1.ThreadStatus_THREAD_STATUS_IDLE, StatusReason: "at prompt"}
 	busyRoot := &v1.Thread{Name: "lead", State: connected, Status: v1.ThreadStatus_THREAD_STATUS_BUSY}
-	const keep1 = "To keep its work, fork it first (code-foundry thread fork --id <id>)."
-	const keepN = "To keep the work of one, fork it first (code-foundry thread fork --id <id>)."
+	const keep1 = "To keep its work, fork it first (Fork Thread)."
+	const keepN = "To keep the work of one, fork it first (Fork Thread)."
 
 	tests := []struct {
 		name    string
@@ -112,9 +112,9 @@ func TestThreadRemoveHiddenChildren(t *testing.T) {
 	askingKid := &v1.Thread{Id: "k2", CreatedBy: "s5", State: connected, Status: v1.ThreadStatus_THREAD_STATUS_NEEDS_ATTENTION, StatusReason: "permission: Bash ls"}
 	idleKid := &v1.Thread{Id: "k3", CreatedBy: "s5", State: connected, Status: v1.ThreadStatus_THREAD_STATUS_IDLE}
 	busyGrand := &v1.Thread{Id: "g1", CreatedBy: "k3", State: connected, Status: busy}
-	const plain = "Remove thread s5? Claude stops if it runs, and the thread is forgotten."
-	const keep1 = "To keep its work, fork it first (code-foundry thread fork --id <id>)."
-	const keepN = "To keep the work of one, fork it first (code-foundry thread fork --id <id>)."
+	const plain = "Remove thread s5? Claude stops if it runs; the thread is deleted with its conversation and terminals."
+	const keep1 = "To keep its work, fork it first (Fork Thread)."
+	const keepN = "To keep the work of one, fork it first (Fork Thread)."
 	tests := []struct {
 		name    string
 		args    map[string]string
@@ -132,7 +132,7 @@ func TestThreadRemoveHiddenChildren(t *testing.T) {
 			wantAsk: plain + " 2 hidden child threads below it are still working, and are removed too. " + keepN},
 		{name: "ids: a listed child is not counted", args: map[string]string{"ids": "s5,k1"},
 			cascade: map[string][]*v1.Thread{"s5": {busyKid, askingKid}},
-			wantAsk: "Remove 2 threads? Claude stops in each that runs, and they are forgotten: s5, k1. " +
+			wantAsk: "Remove 2 threads? Claude stops in each that runs; they are deleted with their conversations and terminals: s5, k1. " +
 				"1 hidden child thread below it is still working, and is removed too. " + keep1},
 	}
 	for _, tt := range tests {

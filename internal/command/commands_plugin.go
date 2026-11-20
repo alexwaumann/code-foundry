@@ -82,10 +82,11 @@ func RegisterPlugin(r *Registry, b PluginBackend) error {
 			Title:     "Enable Plugin",
 			Description: "Enable a plugin: start it and register its commands. The first time, and whenever an update asks " +
 				"for more permissions, it lists what the plugin may do and asks for consent (--yes consents).",
-			Category:    "Plugin",
-			Args:        []ArgSpec{nameArg, consentArg},
-			Confirm:     "Enable plugin {name}?",
-			BindConfirm: consentArg.Name,
+			Category:     "Plugin",
+			Args:         []ArgSpec{nameArg, consentArg},
+			Confirm:      "Enable plugin {name}?",
+			ConfirmLabel: "Enable",
+			BindConfirm:  consentArg.Name,
 			ConfirmIf: func(ctx context.Context, _ Context, a Args) bool {
 				p, ok := pluginByName(ctx, b, a.String("name"))
 				return ok && p.GetNeedsConsent()
@@ -191,8 +192,9 @@ func RegisterPlugin(r *Registry, b PluginBackend) error {
 				followArg,
 				consentArg,
 			},
-			Confirm:     "Link {path} as a dev plugin and enable it?",
-			BindConfirm: consentArg.Name,
+			Confirm:      "Link {path} as a dev plugin and enable it?",
+			ConfirmLabel: "Enable",
+			BindConfirm:  consentArg.Name,
 			ConfirmIf: func(ctx context.Context, _ Context, a Args) bool {
 				res, err := b.Dev(ctx, connect.NewRequest(&v1.DevPluginRequest{Path: a.Path("path"), DryRun: true, Force: a.Bool("force")}))
 				return err == nil && res.Msg.GetNeedsConsent()
@@ -253,13 +255,14 @@ func RegisterPlugin(r *Registry, b PluginBackend) error {
 			},
 		},
 		Command{
-			Name:        "plugin.secrets.delete",
-			NoPalette:   true,
-			Title:       "Delete Plugin Secret",
-			Description: "Delete one of a plugin's secrets from the Keychain.",
-			Category:    "Plugin",
-			Args:        []ArgSpec{nameArg, {Name: "key", Type: String, Required: true, Positional: true, Description: "Secret name (plugin secrets list)"}},
-			Confirm:     "Delete secret {key} of plugin {name} from the Keychain?",
+			Name:         "plugin.secrets.delete",
+			NoPalette:    true,
+			Title:        "Delete Plugin Secret",
+			Description:  "Delete one of a plugin's secrets from the Keychain.",
+			Category:     "Plugin",
+			Args:         []ArgSpec{nameArg, {Name: "key", Type: String, Required: true, Positional: true, Description: "Secret name (plugin secrets list)"}},
+			Confirm:      "Delete secret {key} of plugin {name} from the Keychain?",
+			ConfirmLabel: "Delete",
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
 				if _, err := b.DeleteSecret(ctx, connect.NewRequest(&v1.DeletePluginSecretRequest{Name: a.String("name"), Key: a.String("key")})); err != nil {
 					return Result{}, err

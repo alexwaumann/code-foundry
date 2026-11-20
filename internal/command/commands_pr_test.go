@@ -147,8 +147,8 @@ func TestPullRequestRevertConfirmMessage(t *testing.T) {
 	if !errors.As(err, &ce) {
 		t.Fatalf("err = %v, want a ConfirmError", err)
 	}
-	if want := "This opens a new pull request that reverses the changes merged by #138."; ce.Message != want || ce.Title != "Revert Pull Request" {
-		t.Errorf("confirm = %q (%q), want %q", ce.Message, ce.Title, want)
+	if want := "Open a pull request that reverts #138 in o/r?"; ce.Message != want || ce.Title != "Revert Pull Request" || ce.Label != "Revert" {
+		t.Errorf("confirm = %q (%q, %q), want %q (Revert)", ce.Message, ce.Title, ce.Label, want)
 	}
 }
 

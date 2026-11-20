@@ -235,7 +235,8 @@ func RegisterWorkspace(r *Registry, b WorkspaceBackend) error {
 			Args: []ArgSpec{
 				{Name: "workspace", Type: String, Required: true, Positional: true, Description: "Workspace id or name"},
 			},
-			Confirm: "Remove workspace {workspace}? Its instructions and skills are deleted too (a workspace with a root keeps the root's).",
+			Confirm:      "Remove workspace {workspace}? Its instructions and skills are deleted too (a workspace with a root keeps the root's).",
+			ConfirmLabel: "Remove",
 			// Says which: a synthetic workspace's files go, a rooted one's root stays.
 			DynamicConfirm: func(ctx context.Context, _ Context, a Args) string {
 				return removeWorkspaceConfirm(ctx, b, a.String("workspace"))

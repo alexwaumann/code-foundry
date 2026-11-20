@@ -77,12 +77,15 @@ func RegisterProjectCleanup(r *Registry, d ProjectCleanupDeps) error {
 		When:           func(c Context) bool { return hasProject(c) && !notGit(c) },
 		WhyUnavailable: notGit.whyNotGit,
 		Confirm:        cleanupConfirm,
+		ConfirmLabel:   "Clean up",
+		// Without a dry run's list, the question names the project rather than its id.
 		DynamicConfirm: func(ctx context.Context, _ Context, a Args) string {
-			res, err := cleanup(ctx, a, true)
-			if err != nil {
-				return ""
+			if res, err := cleanup(ctx, a, true); err == nil {
+				if p := cleanupPrompt(res, a.Path("path")); p != "" {
+					return p
+				}
 			}
-			return cleanupPrompt(res, a.Path("path"))
+			return strings.ReplaceAll(cleanupConfirm, "{project}", r.projectNamer(ctx)(a.String("project")))
 		},
 		Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
 			// The dry run resolves the repository (name or id) and fails early for an

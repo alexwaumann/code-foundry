@@ -141,9 +141,10 @@ func RegisterSkill(r *Registry, d SkillDeps) error {
 			Title:     "Disable Skill",
 			Description: "Disable an installed marketplace plugin (claude plugin disable), or move a skill out of ~/.claude/skills " +
 				"into Code Foundry's disabled skills (skill enable brings it back). " + RestartWarning,
-			Category: "Skill",
-			Args:     []ArgSpec{nameArg, kindArg},
-			Confirm:  "Disable {name}? " + RestartWarning,
+			Category:     "Skill",
+			Args:         []ArgSpec{nameArg, kindArg},
+			Confirm:      "Disable {name}? " + RestartWarning,
+			ConfirmLabel: "Disable",
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
 				ch, err := d.Skills.Disable(ctx, a.String("name"), kindOf(a))
 				if err != nil {
@@ -193,9 +194,10 @@ func RegisterSkill(r *Registry, d SkillDeps) error {
 			Title:     "Uninstall Skill",
 			Description: "Uninstall a marketplace plugin (claude plugin uninstall) or delete a skill Code Foundry installed (from " +
 				"~/.claude/skills or the disabled skills) and its record. A local skill is deleted with skill remove. " + RestartWarning,
-			Category: "Skill",
-			Args:     []ArgSpec{nameArg, kindArg},
-			Confirm:  "Uninstall {name}? " + RestartWarning,
+			Category:     "Skill",
+			Args:         []ArgSpec{nameArg, kindArg},
+			Confirm:      "Uninstall {name}? " + RestartWarning,
+			ConfirmLabel: "Uninstall",
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
 				ch, err := d.Skills.Uninstall(ctx, a.String("name"), kindOf(a))
 				if err != nil {
@@ -210,9 +212,10 @@ func RegisterSkill(r *Registry, d SkillDeps) error {
 			Title:     "Remove Local Skill",
 			Description: "Delete a local skill: a directory in ~/.claude/skills Code Foundry did not install (a symlink is removed, " +
 				"not what it points at). " + RestartWarning,
-			Category: "Skill",
-			Args:     []ArgSpec{{Name: "name", Type: String, Required: true, Positional: true, Description: "The local skill's directory name"}},
-			Confirm:  "Remove the local skill {name}? This deletes its directory. " + RestartWarning,
+			Category:     "Skill",
+			Args:         []ArgSpec{{Name: "name", Type: String, Required: true, Positional: true, Description: "The local skill's directory name"}},
+			Confirm:      "Remove the local skill {name}? This deletes its directory. " + RestartWarning,
+			ConfirmLabel: "Remove",
 			DynamicConfirm: func(_ context.Context, _ Context, a Args) string {
 				for _, in := range d.Skills.Snapshot().Installed {
 					if in.Kind == marketplace.KindSkill && in.Local && in.Name == a.String("name") {

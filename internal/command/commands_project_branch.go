@@ -14,7 +14,7 @@ import (
 // a child's work then deleted its branch, and origin's, with raw git.
 
 // branchDeleteCommand is project.branch.delete.
-func branchDeleteCommand(b ProjectBackend, notGit NotGitFunc) Command {
+func branchDeleteCommand(r *Registry, b ProjectBackend, notGit NotGitFunc) Command {
 	return Command{
 		Name:      "project.branch.delete",
 		NoPalette: true,
@@ -32,11 +32,14 @@ func branchDeleteCommand(b ProjectBackend, notGit NotGitFunc) Command {
 		When:           func(c Context) bool { return hasProject(c) && !notGit(c) },
 		WhyUnavailable: notGit.whyNotGit,
 		Confirm:        "Delete branch {branch} of project {project}?",
-		DynamicConfirm: func(_ context.Context, _ Context, a Args) string {
+		ConfirmLabel:   "Delete",
+		// The GUI passes the project's id: the question names it.
+		DynamicConfirm: func(ctx context.Context, _ Context, a Args) string {
+			q := "Delete branch " + a.String("branch") + " of project " + r.projectNamer(ctx)(a.String("project"))
 			if a.Bool("remote") {
-				return "Delete branch " + a.String("branch") + " of project " + a.String("project") + ", and on origin?"
+				return q + ", and on origin?"
 			}
-			return ""
+			return q + "?"
 		},
 		Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
 			id, err := resolveProjectRef(ctx, b, a.String("project"))

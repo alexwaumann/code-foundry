@@ -92,7 +92,7 @@ func TestEmberEnableFromAPage(t *testing.T) {
 	f := newEmberFixture(t)
 	_, err := f.reg.Invoke(context.Background(), page, "ember.enable", nil)
 	var ce *command.ConfirmError
-	if !errors.As(err, &ce) || ce.Command != "ember.enable" || ce.Label != "Turn On" {
+	if !errors.As(err, &ce) || ce.Command != "ember.enable" || ce.Label != "Turn on" {
 		t.Fatalf("err = %#v, want the question", err)
 	}
 	if len(f.settings.updates) != 0 {

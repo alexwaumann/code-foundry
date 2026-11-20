@@ -140,28 +140,36 @@ func TestThreadRemoveIDsConfirm(t *testing.T) {
 	made, noBranch := idle("s-000000000013", ""), idle("s-000000000014", "")
 	made.CreatedWorktree, made.Branch = true, "feat/x"
 	noBranch.CreatedWorktree = true
-	threads = append(threads, made, noBranch)
+	// Named threads are asked about by name; an id the daemon does not list stays an id.
+	named, alsoNamed := idle("s-aaaa11112222", "Fix login"), idle("s-bbbb33334444", "Docs pass")
+	threads = append(threads, made, noBranch, named, alsoNamed)
 	tests := []struct {
 		name    string
 		ctx     command.Context
 		args    map[string]string
 		wantAsk string
 	}{
+		{name: "one named", args: map[string]string{"id": named.Id},
+			wantAsk: "Remove thread Fix login? Claude stops if it runs; the thread is deleted with its conversation and terminals."},
+		{name: "several named, one not", args: map[string]string{"ids": named.Id + "," + ids[0] + "," + alsoNamed.Id},
+			wantAsk: "Remove 3 threads? Claude stops in each that runs; they are deleted with their conversations and terminals: Fix login, s-000000000001, Docs pass."},
+		{name: "an id the daemon does not list", args: map[string]string{"id": "s-ffffffffffff"},
+			wantAsk: "Remove thread s-ffffffffffff? Claude stops if it runs; the thread is deleted with its conversation and terminals."},
 		{name: "one id", args: map[string]string{"id": ids[0]},
-			wantAsk: "Remove thread s-000000000001? Claude stops if it runs, and the thread is forgotten."},
+			wantAsk: "Remove thread s-000000000001? Claude stops if it runs; the thread is deleted with its conversation and terminals."},
 		{name: "one entry in ids, not the context thread", ctx: command.Context{ActiveThreadID: ids[5]}, args: map[string]string{"ids": ids[0]},
-			wantAsk: "Remove thread s-000000000001? Claude stops if it runs, and the thread is forgotten."},
+			wantAsk: "Remove thread s-000000000001? Claude stops if it runs; the thread is deleted with its conversation and terminals."},
 		{name: "three", args: map[string]string{"ids": strings.Join(ids[:3], ",")},
-			wantAsk: "Remove 3 threads? Claude stops in each that runs, and they are forgotten: s-000000000001, s-000000000002, s-000000000003."},
+			wantAsk: "Remove 3 threads? Claude stops in each that runs; they are deleted with their conversations and terminals: s-000000000001, s-000000000002, s-000000000003."},
 		{name: "twelve list ten and the count of the rest", args: map[string]string{"ids": strings.Join(ids, ",")},
-			wantAsk: "Remove 12 threads? Claude stops in each that runs, and they are forgotten: " +
+			wantAsk: "Remove 12 threads? Claude stops in each that runs; they are deleted with their conversations and terminals: " +
 				strings.Join(ids[:10], ", ") + " and 2 more."},
 		{name: "one in a made worktree", args: map[string]string{"id": made.Id},
-			wantAsk: "Remove thread s-000000000013? Claude stops if it runs, and the thread is forgotten. Its clean worktrees are removed; branches stay."},
+			wantAsk: "Remove thread s-000000000013? Claude stops if it runs; the thread is deleted with its conversation and terminals. Its clean worktrees are removed; branches stay."},
 		{name: "created_worktree without a branch says nothing extra", args: map[string]string{"id": noBranch.Id},
-			wantAsk: "Remove thread s-000000000014? Claude stops if it runs, and the thread is forgotten."},
+			wantAsk: "Remove thread s-000000000014? Claude stops if it runs; the thread is deleted with its conversation and terminals."},
 		{name: "several, one in a made worktree", args: map[string]string{"ids": ids[0] + "," + made.Id},
-			wantAsk: "Remove 2 threads? Claude stops in each that runs, and they are forgotten: s-000000000001, s-000000000013. " +
+			wantAsk: "Remove 2 threads? Claude stops in each that runs; they are deleted with their conversations and terminals: s-000000000001, s-000000000013. " +
 				"Their clean worktrees are removed; branches stay."},
 	}
 	for _, tt := range tests {
@@ -174,6 +182,9 @@ func TestThreadRemoveIDsConfirm(t *testing.T) {
 			}
 			if ce.Message != tt.wantAsk {
 				t.Errorf("asked\n%s\nwant\n%s", ce.Message, tt.wantAsk)
+			}
+			if ce.Label != "Remove" {
+				t.Errorf("label = %q, want Remove", ce.Label)
 			}
 			for _, r := range fake.Requests() {
 				if _, ok := r.(*v1.RemoveThreadRequest); ok {

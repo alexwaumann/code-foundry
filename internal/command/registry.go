@@ -204,6 +204,11 @@ func (r *Registry) Invoke(ctx context.Context, uctx Context, name string, raw ma
 			}
 		}
 		ce := &ConfirmError{Command: name, Title: c.Title, Message: msg, Label: c.ConfirmLabel, Tone: c.ConfirmTone}
+		if c.DynamicConfirmLabel != nil {
+			if l := c.DynamicConfirmLabel(ctx, eff, args); l != "" {
+				ce.Label = l
+			}
+		}
 		if c.BindConfirm != "" {
 			bind := ConfirmDigest(msg)
 			if c.ConfirmBind != nil {

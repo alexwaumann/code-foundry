@@ -92,8 +92,13 @@ type Command struct {
 	// daemon?"). It sees the effective context and validated args.
 	DynamicConfirm func(ctx context.Context, uctx Context, args Args) string
 	// ConfirmLabel, when set with Confirm, is the GUI confirm button's words ("Forget
-	// all"); empty, the GUI uses the title without a "Category: " prefix.
+	// all"), in sentence case; empty, the GUI uses the title without a "Category: "
+	// prefix. Every built-in command with Confirm sets it (TestConfirmingCommandsHaveLabels).
 	ConfirmLabel string
+	// DynamicConfirmLabel, when set with ConfirmLabel and returning non-empty, replaces
+	// ConfirmLabel at invoke time, for a command whose action depends on the state
+	// (app.restart with an update downloaded: "Install and restart").
+	DynamicConfirmLabel func(ctx context.Context, uctx Context, args Args) string
 	// ConfirmTone, when set with Confirm, is how the GUI draws the question:
 	// ConfirmToneSuccess for a step forward the user asked for (pr.merge), not a
 	// destructive one; empty, the warning look.
@@ -331,6 +336,9 @@ func (c *Command) validate() error {
 	}
 	if c.ConfirmLabel != "" && c.Confirm == "" {
 		return invalid("ConfirmLabel without Confirm")
+	}
+	if c.DynamicConfirmLabel != nil && c.ConfirmLabel == "" {
+		return invalid("DynamicConfirmLabel without ConfirmLabel")
 	}
 	if c.ConfirmTone != "" && (c.Confirm == "" || !slices.Contains(confirmTones, c.ConfirmTone)) {
 		return invalid("ConfirmTone %q needs Confirm and must be one of %v", c.ConfirmTone, confirmTones)

@@ -178,7 +178,7 @@ func RegisterEmber(r *Registry, d EmberDeps) error {
 			Category:     emberCategory,
 			NoKeybinding: true,
 			Run: func(ctx context.Context, uctx Context, _ Args) (Result, error) {
-				if err := pageAsks(ctx, uctx, "ember.enable", "Ember: Turn On", "Turn On", "Turn on Ember? It starts a thread of its own, which uses tokens."); err != nil {
+				if err := pageAsks(ctx, uctx, "ember.enable", "Ember: Turn On", "Turn on", "Turn on Ember? It starts a thread of its own, which uses tokens."); err != nil {
 					return Result{}, err
 				}
 				return setEnabled(ctx, true)

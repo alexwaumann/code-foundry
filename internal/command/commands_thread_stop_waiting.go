@@ -28,7 +28,7 @@ func stopWaitingConfirm(shells []*v1.BackgroundShell) string {
 	for i, sh := range shells {
 		names[i] = shellName(sh)
 	}
-	return "This stops " + plural(len(shells), "background shell") + ": " + strings.Join(names, ", ") + ". Its other wakes go too; child threads keep working."
+	return "This stops " + plural(len(shells), "background shell") + ": " + strings.Join(names, ", ") + ". Its other waits end too; child threads keep working."
 }
 
 // StopWaitingMessage says what a stop did and what still runs.

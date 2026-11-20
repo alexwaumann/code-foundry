@@ -3,7 +3,6 @@ package command
 import (
 	"context"
 	"fmt"
-	"slices"
 	"strings"
 
 	"connectrpc.com/connect"
@@ -123,25 +122,48 @@ func listSome(items []string) string {
 	return strings.Join(items[:confirmListMax], ", ") + fmt.Sprintf(" and %d more", len(items)-confirmListMax)
 }
 
+// removeOneWhat and removeManyWhat say what thread.remove deletes (Manager.Remove): the
+// thread's record with its conversation (its items cascade) and its terminals.
+const (
+	removeOneWhat  = "Claude stops if it runs; the thread is deleted with its conversation and terminals."
+	removeManyWhat = "Claude stops in each that runs; they are deleted with their conversations and terminals"
+)
+
 // removeConfirm is thread.remove's confirmation: of the one thread, or of several
-// given ids; "" without a target (Run says what is missing). When one of them has
-// worktrees Code Foundry made (madeWorktrees), it says the daemon removes the clean ones
+// given ids, each named (threadNameOrID; an id the daemon does not list stays an id);
+// "" without a target (Run says what is missing). When one of them has worktrees Code
+// Foundry made (madeWorktree), it says the daemon removes the clean ones
 // (docs/notes/remove-cleans-worktrees.md). It names the hidden child threads below the
 // removed ones, which go too (removedAlong), and how many of them are still working.
 func removeConfirm(ctx context.Context, b ThreadBackend, a Args) string {
 	ids, err := targetThreads(a)
-	var ask string
-	switch {
-	case err != nil || len(ids) == 0:
+	if err != nil || len(ids) == 0 {
 		return ""
-	case len(ids) == 1:
-		ask = "Remove thread " + ids[0] + "? Claude stops if it runs, and the thread is forgotten."
-		if madeWorktrees(ctx, b, ids) {
+	}
+	byID := map[string]*v1.Thread{}
+	if res, err := b.List(ctx, connect.NewRequest(&v1.ListThreadsRequest{Filter: &v1.ThreadFilter{All: true}})); err == nil {
+		for _, s := range res.Msg.GetThreads() {
+			byID[s.GetId()] = s
+		}
+	}
+	names := make([]string, len(ids))
+	made := false
+	for i, id := range ids {
+		names[i] = id
+		if s, ok := byID[id]; ok {
+			names[i] = threadNameOrID(s)
+			made = made || madeWorktree(s)
+		}
+	}
+	var ask string
+	if len(ids) == 1 {
+		ask = "Remove thread " + names[0] + "? " + removeOneWhat
+		if made {
 			ask += " Its clean worktrees are removed; branches stay."
 		}
-	default:
-		ask = fmt.Sprintf("Remove %d threads? Claude stops in each that runs, and they are forgotten: %s.", len(ids), listSome(ids))
-		if madeWorktrees(ctx, b, ids) {
+	} else {
+		ask = fmt.Sprintf("Remove %d threads? %s: %s.", len(ids), removeManyWhat, listSome(names))
+		if made {
 			ask += " Their clean worktrees are removed; branches stay."
 		}
 	}
@@ -151,18 +173,11 @@ func removeConfirm(ctx context.Context, b ThreadBackend, a Args) string {
 	return ask
 }
 
-// madeWorktrees reports whether one of ids is a worktree-mode thread (created_worktree
-// on a branch): its worktree-mode worktrees are Code Foundry's, and the daemon removes the
-// clean ones after the removal. A thread in place or in a folder has none. False when the
-// list fails.
-func madeWorktrees(ctx context.Context, b ThreadBackend, ids []string) bool {
-	res, err := b.List(ctx, connect.NewRequest(&v1.ListThreadsRequest{Filter: &v1.ThreadFilter{All: true}}))
-	if err != nil {
-		return false
-	}
-	return slices.ContainsFunc(res.Msg.GetThreads(), func(s *v1.Thread) bool {
-		return s.GetCreatedWorktree() && s.GetBranch() != "" && slices.Contains(ids, s.GetId())
-	})
+// madeWorktree reports whether s is a worktree-mode thread (created_worktree on a
+// branch): its worktree-mode worktrees are Code Foundry's, and the daemon removes the
+// clean ones after the removal. A thread in place or in a folder has none.
+func madeWorktree(s *v1.Thread) bool {
+	return s.GetCreatedWorktree() && s.GetBranch() != ""
 }
 
 // removedAlong counts the hidden threads below ids that removing them takes along

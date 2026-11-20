@@ -149,7 +149,12 @@ func RegisterNewProjects(r *Registry, d NewProjectDeps) error {
 				}
 				return ""
 			},
-			Confirm: "Delete project {project} and its folder on disk? This cannot be undone.",
+			Confirm:      "Delete project {project} and its folder on disk? This cannot be undone.",
+			ConfirmLabel: "Delete",
+			// The GUI passes the id: the question names the project.
+			DynamicConfirm: func(ctx context.Context, _ Context, a Args) string {
+				return "Delete project " + r.projectNamer(ctx)(a.String("project")) + " and its folder on disk? This cannot be undone."
+			},
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
 				id := a.String("project")
 				if _, err := b.Delete(ctx, connect.NewRequest(&v1.DeleteProjectRequest{Id: id})); err != nil {

@@ -77,8 +77,9 @@ func RegisterPluginRegistry(r *Registry, b PluginRegistryBackend, threads Plugin
 					"from a plugin of another source (deleting its secrets, data and consent and removing its threads; enabling asks again)"},
 				refreshArg,
 			},
-			Confirm:   "Install {ref} and enable it?",
-			ConfirmIf: func(_ context.Context, _ Context, a Args) bool { return a.Bool("enable") },
+			Confirm:      "Install {ref} and enable it?",
+			ConfirmLabel: "Install",
+			ConfirmIf:    func(_ context.Context, _ Context, a Args) bool { return a.Bool("enable") },
 			DynamicConfirm: func(ctx context.Context, _ Context, a Args) string {
 				return installConsent(ctx, b, a.String("ref"))
 			},
@@ -129,7 +130,8 @@ func RegisterPluginRegistry(r *Registry, b PluginRegistryBackend, threads Plugin
 				{Name: "name", Type: String, Required: true, Positional: true, Description: "Plugin name (code-foundry plugin list)"},
 				{Name: "purge", Type: Bool, Description: "Also delete its data directory, its secrets in the Keychain, its logs and the consent given"},
 			},
-			Confirm: "Uninstall plugin {name}?",
+			Confirm:      "Uninstall plugin {name}?",
+			ConfirmLabel: "Uninstall",
 			DynamicConfirm: func(ctx context.Context, _ Context, a Args) string {
 				return uninstallConfirm(a.String("name"), a.Bool("purge"), pluginThreadCount(ctx, threads, a.String("name")))
 			},
