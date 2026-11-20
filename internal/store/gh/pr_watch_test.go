@@ -326,7 +326,10 @@ func TestLookupPullRequest(t *testing.T) {
 }
 
 func TestLookupPullRequestRefuses(t *testing.T) {
-	s := startStore(t, testOptions(openTestDB(t), &fakeRunner{}, bus.New()))
+	// The fake answers: a new store polls at once (New makes the first poll due), and the
+	// worker can get to it before the cleanup cancels it.
+	f := (&fakeRunner{}).serve(newFakeGitHub())
+	s := startStore(t, testOptions(openTestDB(t), f, bus.New()))
 	if _, err := s.LookupPullRequest(context.Background(), "nope", 1); err == nil {
 		t.Error("a bad slug was asked about")
 	}
