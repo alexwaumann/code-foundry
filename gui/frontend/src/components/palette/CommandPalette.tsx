@@ -68,7 +68,6 @@ function PaletteBody({ initialQuery, initialCommand, initialContext, close }: Bo
   const [prompt, setPrompt] = useState<ArgPrompt | null>(null);
   const [argError, setArgError] = useState<string | null>(null);
   const [pendingCommand, setPendingCommand] = useState(initialCommand);
-  const [autoRun, setAutoRun] = useState<CommandView | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   // The list is fresh once a List for this palette's context has completed.
   const fresh = useCommandsStore((s) => !s.loading && s.contextKey === contextKey(context));
@@ -118,21 +117,16 @@ function PaletteBody({ initialQuery, initialCommand, initialContext, close }: Bo
   // A keybinding (or the sidebar "+") can open the palette straight into a command's arg
   // prompts. Adjusts state during render once it's listed.
   // With a given context, wait for that context's list (the current one may not have it).
+  // Only a command with args to ask is opened this way (startCommand runs one with none), and
+  // the prompted args do not depend on the context, so there is never one to run from here.
   if (pendingCommand && (!initialContext || fresh)) {
     const c = available.find((x) => x.name === pendingCommand);
     if (c) {
       setPendingCommand(null);
       const p = startPrompt(c);
       if (p.specs.length > 0) enterPrompt(p);
-      else setAutoRun(c);
     }
   }
-
-  // A pre-selected command with nothing to ask runs straight away (outside render).
-  useEffect(() => {
-    if (autoRun) invoke(autoRun, {});
-    // oxlint-disable-next-line react/exhaustive-deps
-  }, [autoRun]);
 
   useEffect(() => {
     if (!pendingEnter.current || !fresh || prompt) return;
