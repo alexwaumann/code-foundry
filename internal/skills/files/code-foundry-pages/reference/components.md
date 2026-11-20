@@ -18,7 +18,7 @@ import { Archive } from "@cf/icons";
 
 - `Button`: `variant` default, secondary, outline, ghost, destructive or link; `size` default, xs, sm, lg, icon, icon-xs, icon-sm or icon-lg; `disabled`, `onClick`; `asChild` renders its child (an `<a>`) as the button.
 - `buttonVariants`: the Button's classes as a function, `buttonVariants({ variant: "outline", size: "sm" })`, for a link that looks like a button.
-- `Badge`: a small label; `variant` default, secondary, outline or destructive; `asChild`.
+- `Badge`: a small label; `variant` default, secondary, outline, destructive, or a status in the theme's tints: success, warning, error; `asChild`.
 - `badgeVariants`: the Badge's classes as a function, like `buttonVariants`.
 - `Kbd`: a key cap (`<Kbd>⌘K</Kbd>`); `variant` default or inherit (on a button: takes its colour); `size` default or sm.
 - `KbdGroup`: a row of `Kbd`s.
@@ -125,7 +125,7 @@ These draw inside the page's card, never over the app: give the page room for a 
 - `Tooltip`: `TooltipTrigger` + `TooltipContent` inside.
 - `TooltipTrigger`: what it describes (`asChild`).
 - `TooltipContent`: the tip, no padding of its own: `className="px-2.5 py-1.5 text-body-sm"`; `side`. Prefer `Tip`, which has it.
-- `Tip`: the one-liner, `<Tip label="Archive"><Button size="icon" …/></Tip>`; `side`; only for what the trigger hides (an icon button).
+- `Tip`: the one-liner, `<Tip label="Archive"><Button size="icon" …/></Tip>`; `side`; only for what the trigger hides (an icon button). A disabled button gets no pointer events: put it in a `<span className="inline-flex">` inside the Tip.
 - `Command`: a filterable list (cmdk): `CommandInput`, then a `CommandList` of `CommandGroup`s of `CommandItem`s.
 - `CommandInput`: the search box; `placeholder`.
 - `CommandList`: the scrolling list.

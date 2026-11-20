@@ -19,7 +19,10 @@
 // own origin and whether it uses the app's theme, so the app reloads it ({ type: "cf:reload" })
 // when one of its files is written, and on a theme change only when it uses the theme; a page
 // in an opaque origin keeps localStorage, sessionStorage and cookies in memory until it
-// reloads (docs/notes/page-frame-states.md). No bridge is needed: a page that never loads
+// reloads (docs/notes/page-frame-states.md). It says where the page is scrolled to
+// ({ type: "cf:scroll" }) and goes back there when the app's ping hands that back, so a page
+// loaded again where it was shown before opens where the reader left it
+// (docs/notes/pages-tab-polish.md). No bridge is needed: a page that never loads
 // /cf/bridge.js gets this too.
 (function () {
   if (window.parent === window || window.__cfFrame) return;
@@ -112,13 +115,18 @@
     return t !== String(window.name || "") && !namedFrame(t);
   }
 
-  ["pointerdown", "keydown"].forEach(function (t) {
+  // The user's own hand in the document: a press or key (a window.open soon after is theirs),
+  // or a wheel or touch too (a scroll the app puts back stops).
+  var touched = false;
+  ["pointerdown", "keydown", "wheel", "touchstart"].forEach(function (t) {
     window.addEventListener(
       t,
       function (e) {
-        if (e.isTrusted) pressedAt = performance.now();
+        if (!e.isTrusted) return;
+        touched = true;
+        if (t === "pointerdown" || t === "keydown") pressedAt = performance.now();
       },
-      true,
+      { capture: true, passive: true },
     );
   });
   function pressed() {
@@ -487,6 +495,88 @@
     }
   }
 
+  // Where the reader is in the page's own document: { type: "cf:scroll", x, y, path } at most
+  // once a frame while it scrolls, so the app can put it back when it loads the page again (a
+  // tab shown again, a card scrolled back to; docs/notes/pages-tab-polish.md). The app hands
+  // it back with its ping after the load ({ scroll: { x, y, path } }), and it goes back only
+  // into the same file, with no fragment (a hash route or an anchor places the page itself),
+  // still at the top (the page did not place itself), and only until the user scrolls,
+  // presses or types, the page scrolls itself, or RESTORE_MS pass: it is tried again as the
+  // document grows (a page drawn after its data came). Only the document's own scroll: a
+  // region that scrolls inside the page is the page's.
+  var RESTORE_MS = 3000;
+  var scrollQueued = false;
+  function px(v) {
+    var n = Math.round(Number(v));
+    return isFinite(n) && n > 0 ? n : 0;
+  }
+  function sendScroll() {
+    scrollQueued = false;
+    post({ type: "cf:scroll", x: px(window.scrollX), y: px(window.scrollY), path: location.pathname });
+  }
+  if (pageTop) {
+    window.addEventListener(
+      "scroll",
+      function () {
+        if (scrollQueued) return;
+        scrollQueued = true;
+        if (typeof window.requestAnimationFrame === "function") window.requestAnimationFrame(sendScroll);
+        else setTimeout(sendScroll, 16);
+      },
+      { passive: true },
+    );
+  }
+  function restoreScroll(want) {
+    var x = px(want.x);
+    var y = px(want.y);
+    if (touched || location.hash || location.pathname !== want.path || (x === 0 && y === 0)) return;
+    if (px(window.scrollX) !== 0 || px(window.scrollY) !== 0) return;
+    var at = { x: 0, y: 0 };
+    var until = performance.now() + RESTORE_MS;
+    var done = false;
+    var ro = null;
+    function stop() {
+      if (done) return;
+      done = true;
+      if (ro) ro.disconnect();
+    }
+    // Moved from where it was put: the page or the user scrolled it.
+    function moved() {
+      return Math.abs(px(window.scrollX) - at.x) > 1 || Math.abs(px(window.scrollY) - at.y) > 1;
+    }
+    function step() {
+      if (done) return;
+      if (touched || moved() || performance.now() > until) {
+        stop();
+        return;
+      }
+      try {
+        window.scrollTo({ left: x, top: y, behavior: "instant" });
+      } catch (_) {
+        window.scrollTo(x, y);
+      }
+      at = { x: px(window.scrollX), y: px(window.scrollY) };
+      if (Math.abs(at.x - x) <= 1 && Math.abs(at.y - y) <= 1) stop();
+    }
+    step();
+    if (done) return;
+    window.addEventListener(
+      "scroll",
+      function () {
+        if (!done && moved()) stop();
+      },
+      { passive: true },
+    );
+    window.addEventListener("resize", step);
+    var Resize = window.ResizeObserver;
+    if (typeof Resize === "function") {
+      ro = new Resize(step);
+      ro.observe(document.documentElement);
+      if (document.body) ro.observe(document.body);
+    }
+    setTimeout(stop, RESTORE_MS);
+  }
+
   // Whether source is the window of one of this document's own frames.
   function child(source) {
     var frames = window.frames;
@@ -509,6 +599,8 @@
       early.splice(0).forEach(function (r) {
         unsupported(r[0], r[1]);
       });
+      var at = m.scroll;
+      if (pageTop && at && typeof at === "object" && typeof at.path === "string") restoreScroll(at);
       return;
     }
     // What a frame inside the page asked of the app, sent on to it from here.

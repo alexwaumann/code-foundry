@@ -10,7 +10,8 @@
 <script type="text/tsx">
   // A role with a colour or weight utility, Badges and Buttons (their text is a colour
   // utility on a role), an indeterminate Checkbox, and strings that read like imports
-  // (docs/notes/page-library-fixes-a.md); e2e/page-library.spec.ts.
+  // (docs/notes/page-library-fixes-a.md), the status Badges (pages-tab-polish.md);
+  // e2e/page-library.spec.ts.
   import { createRoot } from "react-dom/client";
   import { Badge, Button, Card, CardContent, Checkbox, Label } from "@cf/ui";
 
@@ -31,6 +32,11 @@
             <Badge variant="outline">outline</Badge>
           </div>
           <div className="flex items-center gap-2">
+            <Badge data-testid="badge-success" variant="success">success</Badge>
+            <Badge data-testid="badge-warning" variant="warning">warning</Badge>
+            <Badge data-testid="badge-error" variant="error">error</Badge>
+          </div>
+          <div className="flex items-center gap-2">
             <Button data-testid="button">Default</Button>
             <Button variant="destructive">Destructive</Button>
             <Button variant="outline">Outline</Button>
@@ -42,6 +48,10 @@
           <p data-testid="strings" className="text-caption">{'copied from "/tmp/report.txt"'} | {"run: import './setup.js' first"}</p>
           <span data-testid="ref-error" style={{ color: "var(--cf-error-text)" }} />
           <span data-testid="ref-success" style={{ color: "var(--cf-success-text)" }} />
+          <span data-testid="ref-warning" style={{ color: "var(--cf-warning-text)" }} />
+          <span data-testid="ref-success-surface" style={{ backgroundColor: "var(--cf-success-surface)" }} />
+          <span data-testid="ref-warning-surface" style={{ backgroundColor: "var(--cf-warning-surface)" }} />
+          <span data-testid="ref-error-surface" style={{ backgroundColor: "var(--cf-error-surface)" }} />
           <span data-testid="ref-muted" style={{ color: "var(--cf-text-muted)" }} />
           <span data-testid="ref-on-accent" style={{ color: "var(--cf-accent-foreground)" }} />
         </CardContent>

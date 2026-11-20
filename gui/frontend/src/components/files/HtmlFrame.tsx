@@ -11,6 +11,7 @@ import { zoomFactor } from "@/lib/zoom";
 import { fileWatcher } from "@/stores/fileStamps";
 import { openUrl } from "@/stores/gh";
 import { frameReport, grantFiles } from "./frameFiles";
+import { framePath, keepPageScroll, pageScrollNote, pageScrollOf } from "./pageScroll";
 import { isThemeAck, pageFrameNote, pageKey, pageOpenUrl, pageUnsupported, resizeHeight, themedUrl } from "./previewGrant";
 
 /**
@@ -138,6 +139,13 @@ export const LEFT_WAIT_MS = 400;
  * (or anything else the frame cannot show as the page): the frame is covered by "This page
  * went to another site" and Reload, which loads the page again. The answer, not a message
  * the document sends as it starts, because the frame's `load` may come before that.
+ *
+ * Where the reader left the page (`scrollKey`, pageScroll.ts; docs/notes/pages-tab-polish.md):
+ * a page behind another tab or space, or a card scrolled far away, is unloaded and loads afresh
+ * when shown again. The page's own document reports its scroll (`cf:scroll`, frame.js), kept
+ * under `scrollKey` while it is the page's file (not another file the page went on to), and the
+ * first ping of each load of the frame hands it back; frame.js puts it back unless the page or
+ * the user placed it first.
  */
 export function HtmlFrame({
   url,
@@ -155,6 +163,7 @@ export function HtmlFrame({
   onPageErrors,
   onKey,
   scope = null,
+  scrollKey = "",
 }: {
   url: string;
   /** The directory the page's grant serves (none for a one-file grant): the files its document loaded under it are watched. */
@@ -184,6 +193,8 @@ export function HtmlFrame({
   /** Escape pressed in the page and not consumed there (its bridge forwards it). */
   onKey?: (key: "Escape") => void;
   testId: string;
+  /** The place and file the page's scroll is kept under (pageScrollKey); "" keeps none. */
+  scrollKey?: string;
 }) {
   const frameRef = useRef<HTMLIFrameElement>(null);
   const scheme = useActiveTheme().scheme;
@@ -342,9 +353,11 @@ export function HtmlFrame({
   }, [access]);
   const resizeRef = useRef(onResize);
   const keyRef = useRef(onKey);
+  const scrollKeyRef = useRef(scrollKey);
   useEffect(() => {
     resizeRef.current = onResize;
     keyRef.current = onKey;
+    scrollKeyRef.current = scrollKey;
   });
   useEffect(() => {
     const onMessage = (e: MessageEvent) => {
@@ -371,6 +384,12 @@ export function HtmlFrame({
       const cannot = pageUnsupported(e.data, opaque);
       if (cannot !== null) {
         report(addPageError(errors.current, { ...cannot, code: "unavailable", atMs: Date.now() }));
+        return;
+      }
+      const at = pageScrollNote(e.data);
+      if (at) {
+        // The page's own file only: a file it went on to is not where the frame loads it.
+        if (scrollKeyRef.current && at.path === framePath(url)) keepPageScroll(scrollKeyRef.current, at);
         return;
       }
       const doc = frameReport(e.data);
@@ -427,11 +446,16 @@ export function HtmlFrame({
     here.current = { seen: false, ping: 0, answered: 0, going: false };
     clearTimeout(leftTimer.current);
   }, [frameKey]);
+  // The frame load whose ping handed the page its scroll: only the first load of each (a page's
+  // own way back to its file starts at the top, as in a browser).
+  const scrolledFor = useRef<string | null>(null);
   const loaded = () => {
     const seq = here.current.ping + 1;
     here.current.ping = seq;
-    if (target) frameRef.current?.contentWindow?.postMessage({ type: "cf:ping", seq }, target);
     const key = frameKey;
+    const at = scrolledFor.current !== key && scrollKey ? pageScrollOf(scrollKey) : null;
+    scrolledFor.current = key;
+    if (target) frameRef.current?.contentWindow?.postMessage({ type: "cf:ping", seq, ...(at ? { scroll: { ...at, path: framePath(url) } } : {}) }, target);
     clearTimeout(leftTimer.current);
     leftTimer.current = setTimeout(() => {
       const h = here.current;

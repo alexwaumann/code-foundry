@@ -23,6 +23,14 @@ describe("@cf/ui (/cf/ui.js, docs/notes/page-library.md)", () => {
     expect(ui.cn("text-caption", "text-cf-text")).toBe("text-caption text-cf-text");
     expect(typeof ui.toast).toBe("function");
   });
+
+  it("has a Badge per status, in the theme's own tints, so a status page paints with no colours of its own", () => {
+    for (const status of ["success", "warning", "error"] as const) {
+      const classes = ui.badgeVariants({ variant: status }).split(" ");
+      expect(classes).toContain(`bg-cf-${status}-surface`);
+      expect(classes).toContain(`text-cf-${status}-text`);
+    }
+  });
 });
 
 describe("the page theme (src/pagelib/theme.ts)", () => {
