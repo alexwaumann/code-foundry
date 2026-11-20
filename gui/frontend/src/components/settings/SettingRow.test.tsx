@@ -6,7 +6,7 @@ vi.mock("@/lib/notify", () => ({ notify: vi.fn(), notifyProgress: vi.fn(), dismi
 const save = vi.hoisted(() => ({ fn: vi.fn(() => Promise.resolve({ ok: true as const })) }));
 vi.mock("@/stores/settings", async (orig) => ({ ...(await orig<typeof import("@/stores/settings")>()), saveSettings: save.fn }));
 
-const { SettingRow } = await import("./SettingRow");
+const { SettingRow, SettingRowPair } = await import("./SettingRow");
 const { BrowseThemesRow } = await import("./LinkRow");
 const { useSettingsStore } = await import("@/stores/settings");
 const { useViewsStore } = await import("@/stores/views");
@@ -202,5 +202,25 @@ describe("SettingRow editors", () => {
     expect(useViewsStore.getState()).toMatchObject({ themesOpen: true, settingsOpen: false });
     expect(useThemePickerStore.getState()).toMatchObject({ slot: "dark", returnTo: "settings" });
     useViewsStore.setState({ themesOpen: false });
+  });
+});
+
+describe("SettingRowPair", () => {
+  const pair = [
+    { ...theme, key: "ember.model", title: "Model", row: "ember-model", description: "The model Ember runs on." },
+    { ...theme, key: "ember.effort", title: "Effort", row: "ember-model" },
+  ];
+  const cells = () => [...document.querySelectorAll<HTMLElement>("[data-setting]")].map((c) => c.dataset.dimmed ?? "-");
+
+  it.each([
+    ["not dimmed", false, "Not used while Enable Ember is off.", ["-", "-"], false],
+    ["dimmed with a note", true, "Not used while Enable Ember is off.", ["true", "true"], true],
+    ["dimmed without a note", true, undefined, ["true", "true"], false],
+  ])("%s: both cells follow, the note shows only while dimmed", (_name, dimmed, note, want, noted) => {
+    render(<SettingRowPair fields={pair} dimmed={dimmed} note={note} />);
+    expect(cells()).toEqual(want);
+    expect(document.body.textContent.includes("Not used while")).toBe(noted);
+    // The editors stay usable while dimmed.
+    for (const t of screen.getAllByRole("combobox")) expect((t as HTMLButtonElement).disabled).toBe(false);
   });
 });

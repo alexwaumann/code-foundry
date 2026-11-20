@@ -52,7 +52,7 @@ const field: SettingFieldView = {
   dependsOnValue: "",
   row: "",
 };
-const anywhere: SettingFieldView = { ...field, key: "dictation.anywhere", title: "Dictate anywhere" };
+const anywhere: SettingFieldView = { ...field, key: "dictation.anywhere", title: "Dictate anywhere", dependsOn: field.key };
 const holdKey: SettingFieldView = { ...field, key: "dictation.hold_key", title: "Hold key", type: "enum", enumValues: ["left", "right", "either", "both"], enumLabels: ["Left ⌥", "Right ⌥", "Either ⌥", "Both ⌥"], defaultValue: "either", dependsOn: field.key };
 const microphone: SettingFieldView = { ...field, key: "dictation.microphone", title: "Microphone", type: "string", description: "Follows the input chosen in System Settings.", defaultValue: "", dependsOn: field.key };
 const avoid: SettingFieldView = { ...field, key: "dictation.avoid_bluetooth", title: "Avoid Bluetooth microphones", defaultValue: "true", dependsOn: field.key };
@@ -116,15 +116,17 @@ afterEach(() => {
 });
 
 describe("Settings › Dictation", () => {
-  it("off shows Dictate anywhere but not what depends on it; on shows them, above the Model row", async () => {
+  it("off shows the switch alone; on shows what depends on it, Dictate anywhere first, none indented, above the Model row", async () => {
     const { sec } = await mount(dictationSnap({ enabled: false, state: "disabled" }));
     const rows = () => [...sec.querySelectorAll("[data-setting]")].map((r) => r.getAttribute("data-setting"));
-    expect(rows()).toEqual(["dictation.enabled", "dictation.anywhere"]);
+    expect(rows()).toEqual(["dictation.enabled"]);
     await publish(dictationSnap());
     expect(rows()).toEqual(["dictation.enabled", "dictation.anywhere", "dictation.hold_key", "dictation.microphone", "dictation.sounds", "dictation.other_audio"]);
+    // Right under the switch, but never there to dim: no hairline indent, like the rows after it.
+    for (const r of sec.querySelectorAll<HTMLElement>("[data-setting]")) expect(r.className).not.toContain("pl-10");
     expect(sec.querySelector('[data-setting="dictation.other_audio"] ~ [data-testid="dictation-model-row"]')).not.toBeNull();
     await publish(dictationSnap({ enabled: false, state: "disabled" }));
-    expect(rows()).toEqual(["dictation.enabled", "dictation.anywhere"]);
+    expect(rows()).toEqual(["dictation.enabled"]);
   });
 
   it("Advanced is closed under the card, opens a card of its own, and goes while dictation is off", async () => {

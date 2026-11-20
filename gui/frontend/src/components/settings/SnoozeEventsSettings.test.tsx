@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { PluginView } from "@/api/plugin";
 import type { SettingFieldView, SettingsSchemaView } from "@/api/settings";
@@ -129,5 +129,21 @@ describe("Events in “Until event”", () => {
     fireEvent.click(screen.getAllByTestId("snooze-events-row").find((r) => r.dataset.event === "merged")?.querySelector('[role="checkbox"]') as HTMLElement);
     await act(() => Promise.resolve());
     expect(save.fn).toHaveBeenLastCalledWith({ [KEY]: "none" });
+  });
+
+  it("the search finds the setting and edits it as the same checkboxes in its row, not as text", async () => {
+    render(
+      <Dialog open>
+        <SettingsPage />
+      </Dialog>,
+    );
+    fireEvent.change(screen.getByPlaceholderText("Search settings"), { target: { value: "snooze_events" } });
+    const results = screen.getByTestId("settings-results");
+    const editor = within(results).getByTestId("snooze-events-setting");
+    expect(within(results).queryByRole("textbox")).toBeNull();
+    expect(within(editor).getAllByTestId("snooze-events-row").map((r) => r.dataset.event)).toEqual(["checks_done", "review", "merged", "comment", "head_pushed", "closed", "review_requested", "plugin:doc-preview/deploy", "plugin:hello/tick"]);
+    fireEvent.click(within(editor).getAllByTestId("snooze-events-row").find((r) => r.dataset.event === "comment")?.querySelector('[role="checkbox"]') as HTMLElement);
+    await act(() => Promise.resolve());
+    expect(save.fn).toHaveBeenLastCalledWith({ [KEY]: "checks_done review merged comment" });
   });
 });

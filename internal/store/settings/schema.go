@@ -90,8 +90,9 @@ type Field struct {
 	// Unit is the suffix shown inside a number input ("s", "pt", "%", "tokens", "h"); the
 	// settings file's comments spell it out (unitWords).
 	Unit string
-	// DependsOn is the key of a Bool field; while it is false the settings page shows
-	// this field indented and dimmed. With DependsOnValue it is an Enum field's.
+	// DependsOn is the key of a Bool field; while it is false the settings page and its
+	// search show this field dimmed (indented when right under it). With DependsOnValue it
+	// is an Enum field's.
 	DependsOn string
 	// DependsOnValue is the DependsOn value this field is used with: the settings page
 	// shows it only then, and the search finds it dimmed otherwise.
@@ -647,7 +648,7 @@ var staticFields = []Field{
 		bind:        func(s *Settings) any { return &s.Dictation.Enabled },
 	},
 	{
-		Key: KeyDictationAnywhere, Group: GroupDictation, Page: PageDictation, Section: "dictation", Type: Bool, Title: "Dictate anywhere",
+		Key: KeyDictationAnywhere, Group: GroupDictation, Page: PageDictation, Section: "dictation", DependsOn: KeyDictationEnabled, Type: Bool, Title: "Dictate anywhere",
 		Description: "The hold key works in every app and the text is pasted where you're typing. Code Foundry stays in the menu bar when you close its window. Off, the key works only while Code Foundry is in front.",
 		Default:     "false",
 		bind:        func(s *Settings) any { return &s.Dictation.Anywhere },
@@ -788,38 +789,38 @@ var staticFields = []Field{
 		bind:    func(s *Settings) any { return &s.Ember.Enabled },
 	},
 	{
-		Key: KeyEmberModel, Group: GroupEmber, Page: PageEmber, Section: "models", Row: "ember-model", Type: Enum, Title: "Model",
+		Key: KeyEmberModel, Group: GroupEmber, Page: PageEmber, Section: "models", Row: "ember-model", DependsOn: KeyEmberEnabled, Type: Enum, Title: "Model",
 		Description: "The model Ember runs on. Changes apply at once.",
 		Enum:        command.ThreadModels, EnumLabels: model.Labels(), Default: model.EmberDefault,
 		bind: func(s *Settings) any { return &s.Ember.Model },
 	},
 	{
-		Key: KeyEmberEffort, Group: GroupEmber, Page: PageEmber, Section: "models", Row: "ember-model", Type: Enum, Title: "Effort",
+		Key: KeyEmberEffort, Group: GroupEmber, Page: PageEmber, Section: "models", Row: "ember-model", DependsOn: KeyEmberEnabled, Type: Enum, Title: "Effort",
 		Description: "Ember's effort level.",
 		Enum:        emberEfforts, EnumLabels: effortLabels(emberEfforts), Default: "high",
 		bind: func(s *Settings) any { return &s.Ember.Effort },
 	},
 	{
-		Key: KeyEmberWorkerModels, Group: GroupEmber, Page: PageEmber, Section: "models", Type: String, Title: "Worker threads",
+		Key: KeyEmberWorkerModels, Group: GroupEmber, Page: PageEmber, Section: "models", DependsOn: KeyEmberEnabled, Type: String, Title: "Worker threads",
 		Description: "Models for Ember's worker threads. With several, new workers take turns.",
 		Default:     model.EmberWorkersDefault, Placeholder: model.EmberWorkersDefault,
 		check: checkModelList,
 		bind:  func(s *Settings) any { return &s.Ember.WorkerModels },
 	},
 	{
-		Key: KeyEmberWorkerEffort, Group: GroupEmber, Page: PageEmber, Section: "models", Type: Enum, Title: "Worker effort",
+		Key: KeyEmberWorkerEffort, Group: GroupEmber, Page: PageEmber, Section: "models", DependsOn: KeyEmberEnabled, Type: Enum, Title: "Worker effort",
 		Description: "Effort for Ember's worker threads.",
 		Enum:        command.ThreadEfforts, EnumLabels: effortLabels(command.ThreadEfforts), Default: "high",
 		bind: func(s *Settings) any { return &s.Ember.WorkerEffort },
 	},
 	{
-		Key: KeyEmberEpochTokens, Group: GroupEmber, Page: PageEmber, Section: "sessions", Unit: "tokens", Type: Int, Title: "Context limit",
+		Key: KeyEmberEpochTokens, Group: GroupEmber, Page: PageEmber, Section: "sessions", DependsOn: KeyEmberEnabled, Unit: "tokens", Type: Int, Title: "Context limit",
 		Description: "Start a fresh session once Ember's context passes this many tokens. A fresh session starts near 25K.",
 		Default:     strconv.Itoa(defaultEmberEpochTokens), Min: 50000, Max: 1000000,
 		bind: func(s *Settings) any { return &s.Ember.EpochContextTokens },
 	},
 	{
-		Key: KeyEmberEpochHours, Group: GroupEmber, Page: PageEmber, Section: "sessions", Unit: "h", Type: Int, Title: "Session age limit",
+		Key: KeyEmberEpochHours, Group: GroupEmber, Page: PageEmber, Section: "sessions", DependsOn: KeyEmberEnabled, Unit: "h", Type: Int, Title: "Session age limit",
 		Description: "Start a fresh session once the current one is this many hours old.",
 		Default:     strconv.Itoa(defaultEmberEpochHours), Min: 1, Max: 720,
 		bind: func(s *Settings) any { return &s.Ember.EpochMaxHours },

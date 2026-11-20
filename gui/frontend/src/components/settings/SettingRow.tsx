@@ -5,7 +5,7 @@ import type { SettingFieldView } from "@/api/settings";
 import { Tip } from "@/components/ui/tooltip";
 import { MatchedOptions, PickedOption } from "./EnumOptions";
 import { Highlight } from "./Highlight";
-import { keyDescriptions, keyDescriptionTails, keyEditors, keyHeld, keyTitleChips, ownDescriptionKeys, tallKeyEditors } from "./keyEditors";
+import { keyDescriptions, keyDescriptionTails, keyEditors, keyHeld, keyTitleChips, tallKeyEditors } from "./keyEditors";
 import { displayValue, explainedOptions } from "./model";
 import { useSettingField } from "./useSettingField";
 
@@ -102,7 +102,7 @@ export function SettingRow({ field, className, crumb, words, indent = false, dim
   const DescriptionTail = keyDescriptionTails[field.key];
   const Description = words ? undefined : keyDescriptions[field.key];
   // Outside the search, the row says what the picked option does in place of the field's description.
-  const picked = words || ownDescriptionKeys.has(field.key) ? undefined : explainedOptions(field).find((o) => o.value === state.value);
+  const picked = words ? undefined : explainedOptions(field).find((o) => o.value === state.value);
   return (
     <div
       className={cn(
@@ -150,33 +150,37 @@ export function SettingRow({ field, className, crumb, words, indent = false, dim
 }
 
 /** One of a pair's fields: its title above its editor. */
-function PairCell({ field }: { field: SettingFieldView }) {
+function PairCell({ field, dimmed }: { field: SettingFieldView; dimmed: boolean }) {
   const state = useSettingField(field);
   return (
-    <div className="min-w-0" data-setting={field.key} data-modified={state.modified || undefined}>
-      <div className="mb-1.5 flex flex-wrap items-center gap-2">
+    <div className="min-w-0" data-setting={field.key} data-modified={state.modified || undefined} data-dimmed={dimmed || undefined}>
+      <div className={cn("mb-1.5 flex flex-wrap items-center gap-2", dimmed && "opacity-45")}>
         <span className="text-label">{field.title}</span>
         <RestartChip field={field} restartPending={state.restartPending} />
       </div>
-      <EditorCell field={field} state={state} />
+      <div className={cn(dimmed && "opacity-45 focus-within:opacity-100 hover:opacity-100")}>
+        <EditorCell field={field} state={state} />
+      </div>
     </div>
   );
 }
 
 /**
  * Fields sharing a row (threads.default_model and default_effort): side by side, each
- * title above its editor, and the first field's description under the pair.
+ * title above its editor, and the first field's description under the pair. `dimmed` and
+ * `note` are SettingRow's, for the pair as one.
  */
-export function SettingRowPair({ fields, className }: { fields: readonly SettingFieldView[]; className?: string }) {
+export function SettingRowPair({ fields, className, dimmed = false, note }: { fields: readonly SettingFieldView[]; className?: string; dimmed?: boolean; note?: string | undefined }) {
   const description = fields[0]?.description;
   return (
     <div className={cn("px-4 py-3", className)} data-setting-row={fields[0]?.row}>
       <div className="grid grid-flow-col auto-cols-fr gap-x-6">
         {fields.map((f) => (
-          <PairCell key={f.key} field={f} />
+          <PairCell key={f.key} field={f} dimmed={dimmed} />
         ))}
       </div>
-      {description && <p className="mt-2 text-caption">{description}</p>}
+      {description && <p className={cn("mt-2 text-caption", dimmed && "opacity-45")}>{description}</p>}
+      {dimmed && note && <p className="mt-0.5 text-caption-sm">{note}</p>}
     </div>
   );
 }
