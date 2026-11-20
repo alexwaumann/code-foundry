@@ -1,5 +1,5 @@
 import { act, cleanup, renderHook } from "@testing-library/react";
-import { createRef } from "react";
+import { createRef, useLayoutEffect } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/api/thread", async (orig) => ({ ...(await orig<typeof import("@/api/thread")>()), ...(await import("@/test/composerFakes")).promptFakes }));
@@ -46,5 +46,25 @@ describe("the prompt picker across a draft key change", () => {
     expect(result.current.card.open).toBe(true);
     rerender({ draft: "thread:s-2" });
     expect(result.current.card.open).toBe(false);
+  });
+
+  it("closes in the render that changes it: the other composer never commits with the card open", () => {
+    const committed: boolean[] = [];
+    const { result, rerender } = renderHook(
+      ({ draft }: { draft: string }) => {
+        const picker = usePicker(draft);
+        useLayoutEffect(() => {
+          committed.push(picker.card.open);
+        });
+        return picker;
+      },
+      { initialProps: { draft: "thread:s-1" } },
+    );
+    act(() => {
+      result.current.onKeyDown(up, true);
+    });
+    committed.length = 0;
+    rerender({ draft: "thread:s-2" });
+    expect(committed).toEqual([false]);
   });
 });
