@@ -152,7 +152,7 @@ func RegisterDictation(r *Registry, d DictationDeps) error {
 			When:        usable,
 			WhyUnavailable: func(Context) string {
 				if !status().GetEnabled() {
-					return "dictation is off (Settings → General → Dictation)"
+					return "dictation is off (Settings → Dictation)"
 				}
 				return "the dictation model is not downloaded (dictation.download)"
 			},
@@ -198,7 +198,7 @@ func RegisterDictation(r *Registry, d DictationDeps) error {
 				s := status()
 				switch {
 				case !s.GetEnabled():
-					return "dictation is off (Settings → General → Dictation)"
+					return "dictation is off (Settings → Dictation)"
 				case s.GetAccessibility() == nil:
 					return "the app is not open"
 				}

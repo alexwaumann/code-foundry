@@ -31,7 +31,7 @@ const base: Omit<SettingFieldView, "key" | "title" | "type"> = {
   min: 0,
   max: 0,
   placeholder: "",
-  page: "appearance",
+  page: "layout",
   section: "panes",
   unit: "",
   dependsOn: "",

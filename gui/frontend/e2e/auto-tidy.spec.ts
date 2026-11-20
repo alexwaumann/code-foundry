@@ -14,10 +14,10 @@ test.beforeEach(async () => {
 
 const SCHEMES = ["dark", "light"] as const;
 
-/** The settings page's General › Threads section, cut to it. */
+/** The settings page's General › Snooze section, cut to it. */
 async function shootSettings(page: Page, shots: string, name: string) {
   await page.keyboard.press("Meta+Comma");
-  const section = page.getByTestId("settings-section").first();
+  const section = page.locator('[data-section="snooze"]');
   await expect(section.locator("[data-setting]").first()).toBeVisible();
   for (const scheme of SCHEMES) {
     await page.emulateMedia({ colorScheme: scheme });

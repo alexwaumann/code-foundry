@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { SettingFieldView, SettingPageView, SettingsSchemaView } from "@/api/settings";
 import { sectionAdvanced } from "./advancedFields";
-import { bucketKeybindings, explainedOptions, fieldRows, highlightParts, isBound, matchedOptions, matchField, pageSections, queryWords, searchGuiPages, searchSettings } from "./model";
+import { bucketKeybindings, explainedOptions, fieldRows, highlightParts, isBound, matchedOptions, matchField, pageSections, queryWords, searchGuiPages, searchSettings, settingsPages } from "./model";
 
 const base: Omit<SettingFieldView, "key" | "title" | "type" | "page" | "section"> = {
   description: "",
@@ -176,6 +176,22 @@ describe("keybindings", () => {
   });
 });
 
+describe("settingsPages", () => {
+  const page = (id: string): SettingPageView => ({ id, title: id, description: "", sections: [] });
+  const gui = ["plugins", "skills", "memory"].map(page);
+  it.each([
+    ["the GUI's own after Plugins, Advanced last", ["general", "keybindings", "plugins", "ember", "advanced"], ["general", "keybindings", "plugins", "skills", "memory", "ember", "advanced"]],
+    ["without a Plugins schema page, at the end", ["general", "advanced"], ["general", "advanced", "plugins", "skills", "memory"]],
+    ["no schema pages", [], ["plugins", "skills", "memory"]],
+  ])("%s", (_, schema, want) => {
+    expect(settingsPages(schema.map(page), gui).map((p) => p.id)).toEqual(want);
+  });
+  it("keeps the schema's page where the GUI also has one", () => {
+    const schemaPlugins = { ...page("plugins"), title: "Schema" };
+    expect(settingsPages([schemaPlugins, page("advanced")], gui).find((p) => p.id === "plugins")).toBe(schemaPlugins);
+  });
+});
+
 describe("searchGuiPages", () => {
   const skills: SettingPageView = {
     id: "skills",
@@ -220,9 +236,9 @@ describe("searchGuiPages", () => {
 
   it("finds a field behind a section's Advanced disclosure, unless it is hidden", () => {
     const key = "dictation.spoken_symbols";
-    const field = { key, title: "Spoken symbols", description: "“underscore”", page: "general", section: "dictation", enumDescriptions: [] as string[] } as SettingFieldView;
-    const s: SettingsSchemaView = { groups: [], fields: [field], pages: [{ id: "general", title: "General", description: "", sections: [{ id: "dictation", title: "Dictation", description: "" }] }] };
-    expect(sectionAdvanced["general/dictation"]?.has(key)).toBe(true);
+    const field = { key, title: "Spoken symbols", description: "“underscore”", page: "dictation", section: "dictation", enumDescriptions: [] as string[] } as SettingFieldView;
+    const s: SettingsSchemaView = { groups: [], fields: [field], pages: [{ id: "dictation", title: "Dictation", description: "", sections: [{ id: "dictation", title: "", description: "" }] }] };
+    expect(sectionAdvanced["dictation/dictation"]?.has(key)).toBe(true);
     expect(searchSettings(s, ["underscore"]).hits.map((h) => h.field.key)).toEqual([key]);
     expect(searchSettings(s, ["underscore"], new Set([key])).hits).toEqual([]);
   });

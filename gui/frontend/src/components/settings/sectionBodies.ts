@@ -13,5 +13,5 @@ import { SnoozeEventsSection } from "./SnoozeEventsSettings";
 export const sectionBodies: Readonly<Partial<Record<string, ComponentType<{ section: SectionFields }>>>> = {
   "general/files": IncludeIgnoredSection,
   // threads.snooze_events as checkboxes (docs/notes/snooze-until-event.md).
-  "general/snooze": SnoozeEventsSection,
+  "general/until-event": SnoozeEventsSection,
 };

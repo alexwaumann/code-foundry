@@ -495,8 +495,8 @@ func TestCacheTTLField(t *testing.T) {
 	if got := Defaults(); got.Threads.CacheTTLSeconds != 3600 || got.CacheTTL() != time.Hour {
 		t.Errorf("Defaults() cache TTL = %d (%v)", got.Threads.CacheTTLSeconds, got.CacheTTL())
 	}
-	if i := slices.IndexFunc(staticFields, func(f Field) bool { return f.Key == KeyUtilityModel }); staticFields[i+1].Key != KeyCacheTTL {
-		t.Errorf("field after %s = %s", KeyUtilityModel, staticFields[i+1].Key)
+	if f.Page != PageAdvanced || f.Section != "threads" {
+		t.Errorf("shown on %s/%s, want Advanced › Threads", f.Page, f.Section)
 	}
 	tests := []struct {
 		in string
@@ -569,7 +569,7 @@ func TestDictationFields(t *testing.T) {
 	for _, tt := range tests {
 		f := field(t, tt.key)
 		// All live: the snapshot carries them to the host.
-		if f.Group != GroupDictation || f.Page != PageGeneral || f.Section != "dictation" || f.Type != tt.typ ||
+		if f.Group != GroupDictation || f.Page != PageDictation || f.Section != "dictation" || f.Type != tt.typ ||
 			f.Default != tt.def || f.DependsOn != tt.dependsOn || f.Restart {
 			t.Errorf("%s = %+v", tt.key, f)
 		}
@@ -793,7 +793,7 @@ func TestIncludeIgnoredField(t *testing.T) {
 // threads.snooze_events: the Until event menu's events (docs/notes/snooze-until-event.md).
 func TestSnoozeEventsField(t *testing.T) {
 	f := field(t, KeySnoozeEvents)
-	if f.Page != PageGeneral || f.Section != "snooze" || f.Default != "checks_done review merged" || f.Type != String {
+	if f.Page != PageGeneral || f.Section != "until-event" || f.Default != "checks_done review merged" || f.Type != String {
 		t.Errorf("field = %+v", f)
 	}
 	for _, tt := range []struct {
@@ -805,6 +805,85 @@ func TestSnoozeEventsField(t *testing.T) {
 	} {
 		if _, err := f.parse(tt.in); (err == nil) != tt.ok {
 			t.Errorf("parse(%q) err = %v, want ok %v", tt.in, err, tt.ok)
+		}
+	}
+}
+
+// TestPageLayout pins where the settings page shows things (docs/notes/settings-pages-sections.md):
+// the pages in nav order with Advanced last, each page's sections and each section's fields.
+// Display only: no key moves with them.
+func TestPageLayout(t *testing.T) {
+	var ids []string
+	for _, p := range Pages {
+		ids = append(ids, p.ID)
+	}
+	if want := []string{PageGeneral, PageAppearance, PageLayout, PageNotifications, PageDictation, PageSource,
+		PageKeybindings, PagePlugins, PageEmber, PageAdvanced}; !slices.Equal(ids, want) {
+		t.Errorf("pages = %v, want %v", ids, want)
+	}
+	tests := []struct {
+		page, section, title string
+		keys                 []string
+	}{
+		{PageGeneral, "threads", "Threads", []string{KeyDefaultModel, KeyDefaultEffort, KeyDefaultWorktree, KeyAutoName}},
+		{PageGeneral, "textgen", "Text generation", []string{KeyUtilityModel}},
+		{PageGeneral, "snooze", "Snooze", []string{KeyDefaultSnooze, KeyAutoSaveAfter, KeyAutoArchiveAfter}},
+		{PageGeneral, "until-event", "Events in “Until event”", []string{KeySnoozeEvents}},
+		{PageGeneral, "files", "Files", []string{KeyIncludeIgnored}},
+		{PageGeneral, "updates", "Updates", []string{KeyUpdateChannel}},
+		{PageAppearance, "theme", "Theme", []string{KeyTheme, KeyThemeDark, KeyThemeLight}},
+		{PageAppearance, "window", "Window", []string{KeyZoom, KeyDensity, KeyThreadWidth, KeyBackdrop, KeyBackdropFile}},
+		{PageAppearance, "terminal", "Terminal", []string{KeyFontFamily, KeyFontSize, KeyScrollback}},
+		// Threads open as first, Smart swap right below it: the switch it forces on.
+		{PageLayout, "panes", "", []string{KeyThreadsOpenAs, KeySmartSwap, KeySmartPlacement, KeyThreadInfo, KeyNeedsScope}},
+		{PageDictation, "dictation", "", []string{KeyDictationEnabled, KeyDictationAnywhere, KeyDictationHoldKey, KeyDictationMicrophone,
+			KeyDictationSounds, KeyDictationOtherAudio, KeyDictationAvoidBluetooth, KeyDictationSpokenSymbols, KeyDictationSpokenFormatting}},
+		{PageEmber, "experiment", "Experiment", []string{KeyEmberEnabled}},
+		{PageEmber, "models", "Models", []string{KeyEmberModel, KeyEmberEffort, KeyEmberWorkerModels, KeyEmberWorkerEffort}},
+		{PageEmber, "sessions", "Fresh sessions", []string{KeyEmberEpochTokens, KeyEmberEpochHours}},
+		{PageAdvanced, "executables", "Executables", []string{KeyClaudePath, KeyGhPath}},
+		{PageAdvanced, "threads", "Threads", []string{KeyCacheTTL, KeyCloseGrace}},
+		{PageAdvanced, "logging", "Logging", []string{KeyLogLevel}},
+	}
+	secs := map[string][]string{}
+	for _, tt := range tests {
+		secs[tt.page] = append(secs[tt.page], tt.section)
+		p := Pages[slices.IndexFunc(Pages, func(p Page) bool { return p.ID == tt.page })]
+		i := slices.IndexFunc(p.Sections, func(s Section) bool { return s.ID == tt.section })
+		if i < 0 || p.Sections[i].Title != tt.title {
+			t.Errorf("%s/%s: missing or not titled %q", tt.page, tt.section, tt.title)
+		}
+		var got []string
+		for _, f := range staticFields {
+			if f.Page == tt.page && f.Section == tt.section {
+				got = append(got, f.Key)
+			}
+		}
+		if !slices.Equal(got, tt.keys) {
+			t.Errorf("%s/%s = %v, want %v", tt.page, tt.section, got, tt.keys)
+		}
+	}
+	for _, p := range Pages {
+		want, ok := secs[p.ID]
+		if !ok {
+			continue
+		}
+		var got []string
+		for _, s := range p.Sections {
+			got = append(got, s.ID)
+		}
+		if !slices.Equal(got, want) {
+			t.Errorf("%s sections = %v, want %v", p.ID, got, want)
+		}
+	}
+	// The pages' order is the fields' order: staticFields runs page by page.
+	at := map[string]int{}
+	for i, p := range Pages {
+		at[p.ID] = i
+	}
+	for i := 1; i < len(staticFields); i++ {
+		if a, b := staticFields[i-1], staticFields[i]; at[a.Page] > at[b.Page] {
+			t.Errorf("%s (%s) comes after %s (%s)", b.Key, b.Page, a.Key, a.Page)
 		}
 	}
 }

@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-// Auto-tidy's two settings (docs/notes/auto-tidy.md): off by default, on General › Threads
+// Auto-tidy's two settings (docs/notes/auto-tidy.md): off by default, on General › Snooze
 // right after Default snooze, every value one TidyAfter reads.
 func TestAutoTidySettings(t *testing.T) {
 	d := Defaults()
@@ -20,8 +20,8 @@ func TestAutoTidySettings(t *testing.T) {
 	}
 	for _, key := range []string{KeyAutoSaveAfter, KeyAutoArchiveAfter} {
 		f := field(t, key)
-		if f.Page != PageGeneral || f.Section != "threads" || f.Type != Enum || f.Default != TidyOff || len(f.EnumLabels) != len(f.Enum) || f.EnumLabels[0] != "Off" {
-			t.Errorf("%s = %+v; want a General › Threads dropdown, Off by default, every value labelled", key, f)
+		if f.Page != PageGeneral || f.Section != "snooze" || f.Type != Enum || f.Default != TidyOff || len(f.EnumLabels) != len(f.Enum) || f.EnumLabels[0] != "Off" {
+			t.Errorf("%s = %+v; want a General › Snooze dropdown, Off by default, every value labelled", key, f)
 		}
 		if strings.Contains(strings.ToLower(f.Description), "opened") {
 			t.Errorf("%s says opened: the app does not know when a thread was looked at", key)

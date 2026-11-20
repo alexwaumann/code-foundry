@@ -139,7 +139,7 @@ func TestThreadsOpenAsNotice(t *testing.T) {
 		t.Errorf("title %q", p.Title)
 	}
 	const body = "A thread pane shows one thread with its diff, files and terminals beside it. Clicking another thread swaps them, " +
-		"so there are no thread tabs to manage. You are still on tabs: switch in Settings › Panes and sidebar › Threads open as."
+		"so there are no thread tabs to manage. You are still on tabs: switch in Settings › Layout › Threads open as."
 	if p.Body != body {
 		t.Errorf("body %q", p.Body)
 	}

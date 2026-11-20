@@ -23,6 +23,7 @@ const { TooltipProvider } = await import("@/components/ui/tooltip");
 const { useSettingsStore } = await import("@/stores/settings");
 const { useSettingsPrefsStore } = await import("@/stores/settingsPrefs");
 const { useViewsStore } = await import("@/stores/views");
+const { sectionRowSearch } = await import("./sectionLinks");
 
 const base: Omit<SettingFieldView, "key" | "title" | "type" | "page" | "section"> = {
   description: "",
@@ -47,8 +48,11 @@ const pages: SettingPageView[] = [
   { id: "general", title: "General", description: "", sections: [sec("threads", "Threads"), sec("textgen", "Text generation"), sec("lifecycle", "Lifecycle")] },
   { id: "appearance", title: "Appearance", description: "", sections: [sec("terminal", "Terminal"), sec("window", "Window")] },
   { id: "notifications", title: "Notifications", description: "", sections: [sec("alerts", "Alerts")] },
+  // A page whose single section is untitled, with a row the GUI adds (sectionRowSearch).
+  { id: "dictation", title: "Dictation", description: "", sections: [sec("dictation", "")] },
   { id: "source", title: "Source control", description: "", sections: [sec("github", "GitHub"), sec("projects", "Projects")] },
   { id: "keybindings", title: "Keybindings", description: "", sections: [sec("thread", "Thread"), sec("terminal", "Terminal"), sec("project", "Project")] },
+  { id: "plugins", title: "Plugins", description: "", sections: [sec("registries", "Registries")] },
   { id: "advanced", title: "Advanced", description: "", sections: [sec("logging", "Logging")] },
 ];
 const models = { enumValues: ["claude-opus-5-5[1m]", "claude-sonnet-5[1m]"], enumLabels: ["Opus 5.5", "Sonnet 5"] };
@@ -166,10 +170,10 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe("the settings page", () => {
-  it("lists the schema's pages, then the app's own; General first, one page's sections at a time", async () => {
+  it("lists the schema's pages with the app's own after Plugins, Advanced last; General first, one page's sections at a time", async () => {
     open();
     const navEl = screen.getByRole("navigation", { name: "Settings pages" });
-    expect(within(navEl).getAllByRole("button").map((b) => b.textContent)).toEqual(["General", "Appearance", "Notifications", "Source control", "Keybindings", "Advanced", "Plugins", "Skills", "Memory"]);
+    expect(within(navEl).getAllByRole("button").map((b) => b.textContent)).toEqual(["General", "Appearance", "Notifications", "Dictation", "Source control", "Keybindings", "Plugins", "Skills", "Memory", "Advanced"]);
     expect(nav("general").getAttribute("aria-current")).toBe("page");
     expect(screen.getByRole("heading", { name: "General", level: 2 })).toBeTruthy();
     expect(within(body()).getAllByTestId("settings-section").map((s) => s.querySelector("h3")?.textContent)).toEqual(["Threads", "Text generation", "Lifecycle"]);
@@ -543,6 +547,13 @@ describe("search", () => {
     fireEvent.click(screen.getByTestId("settings-section-hit"));
     expect(body().dataset.page).toBe("skills");
     expect(screen.getByTestId("skill-registries")).toBeTruthy();
+  });
+
+  it("a row of a page's untitled section is found by the page's name and named by it alone", () => {
+    open();
+    fireEvent.change(search(), { target: { value: "dictation whisper" } });
+    expect(screen.getAllByTestId("settings-section-hit").map((h) => h.textContent)).toEqual([`Dictation${sectionRowSearch["dictation/dictation"]?.description ?? ""}`]);
+    expect(within(nav("dictation")).getByTestId("settings-nav-count").textContent).toBe("1");
   });
 
   it.each(["remembered", "forget", "preferences", "standing"])("“%s” finds Memory › Remembered, which opens the page", (word) => {

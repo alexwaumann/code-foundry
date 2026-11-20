@@ -71,7 +71,7 @@ export function SearchResults({
           {sections.map(({ page, section }, i) => (
             <LinkRow
               key={`${page.id}/${section.id}`}
-              label={`${page.title} › ${section.title}`}
+              label={section.title ? `${page.title} › ${section.title}` : page.title}
               description={section.description}
               className={result.hits.length + i > 0 ? "border-t border-cf-border" : undefined}
               testId="settings-section-hit"

@@ -49,7 +49,7 @@ test.describe("settings section", () => {
     await expect(page.getByTestId("settings-results").locator('[data-setting="dictation.enabled"]')).toBeVisible();
     await search.fill("whisper");
     const hit = page.getByTestId("settings-section-hit");
-    await expect(hit).toContainText("General › Dictation");
+    await expect(hit).toHaveText(/^Dictation(?! ›)/);
     await hit.click();
     await expect(page.getByTestId("dictation-model-row")).toBeInViewport();
   });
@@ -163,6 +163,7 @@ test.describe("shots", () => {
       await mockPost("dictation?state=ready&access=granted&mic=avoiding");
       await openApp(page);
       await page.keyboard.press("Meta+Comma");
+      await page.getByTestId("settings-nav-dictation").click();
       const section = page.locator('[data-section="dictation"]');
       const row = section.locator('[data-setting="dictation.microphone"]');
       await section.scrollIntoViewIfNeeded();
@@ -193,6 +194,7 @@ test.describe("shots", () => {
       await mockPost("dictation?state=ready&access=granted");
       await openApp(page);
       await page.keyboard.press("Meta+Comma");
+      await page.getByTestId("settings-nav-dictation").click();
       const section = page.locator('[data-section="dictation"]');
       await section.scrollIntoViewIfNeeded();
       await page.waitForTimeout(500); // the settings sheet's fade
@@ -209,6 +211,7 @@ test.describe("shots", () => {
       await mockPost("dictation?state=ready&access=missing");
       await openApp(page);
       await page.keyboard.press("Meta+Comma");
+      await page.getByTestId("settings-nav-dictation").click();
       const section = page.locator('[data-section="dictation"]');
       const row = page.getByTestId("dictation-access-row");
       await expect(row).toHaveAttribute("data-state", "ask");

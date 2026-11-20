@@ -1,5 +1,5 @@
 /**
- * Settings › General › Dictation (docs/notes/dictation-4-gui.md): the dictation.enabled
+ * Settings › Dictation (docs/notes/dictation-4-gui.md): the dictation.enabled
  * row's switch, state chip and "Needs the model below.", and the Model row at the end of
  * the section (state from DictationService.Watch, actions through the dictation.*
  * commands). The rows between them are plain settings (hiddenFields.ts hides two of them
@@ -326,7 +326,7 @@ export function DictationAccessRow({ className }: { className?: string | undefin
   );
 }
 
-/** What General › Dictation shows after its fields. */
+/** What Settings › Dictation shows after its fields. */
 export function DictationSectionEnd({ className }: { className?: string | undefined }) {
   return (
     <>
@@ -336,7 +336,7 @@ export function DictationSectionEnd({ className }: { className?: string | undefi
   );
 }
 
-/** General › Dictation's Model row, after the switch: the one Whisper model, this Mac, and on an M1 the speed warning. */
+/** Settings › Dictation's Model row, after the switch: the one Whisper model, this Mac, and on an M1 the speed warning. */
 export function DictationModelRow({ className }: { className?: string | undefined }) {
   const snap = useSnapshot();
   const dir = useModelDir();

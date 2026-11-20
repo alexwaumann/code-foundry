@@ -207,7 +207,7 @@ export interface ThreadView {
   snoozeEndedBy?: string;
   /**
    * Set (ms) while the thread is saved for later because the daemon saved it on its own
-   * (auto-tidy, Settings › General › Threads): how long it had been without activity by that
+   * (auto-tidy, Settings › General › Snooze): how long it had been without activity by that
    * setting then. Null (or absent) when the user saved it, or it is not saved. docs/notes/auto-tidy.md.
    */
   autoSavedAfterMs?: number | null;

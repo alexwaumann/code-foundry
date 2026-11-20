@@ -61,7 +61,7 @@ const row = (page: Page, id: string) => page.locator(`[data-row-key="s:${id}"]`)
 async function openSettingsAt(page: Page, key: string): Promise<void> {
   await page.keyboard.press("Meta+Comma");
   await expect(page.getByTestId("settings-page")).toBeVisible();
-  await page.getByTestId("settings-page").getByText("Appearance", { exact: true }).first().click();
+  await page.getByTestId("settings-nav-layout").click();
   const r = page.locator(`[data-setting="${key}"]`);
   await r.scrollIntoViewIfNeeded();
   await expect(r).toBeVisible();

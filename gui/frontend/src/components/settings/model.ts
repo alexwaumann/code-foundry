@@ -7,6 +7,22 @@ import { formatChord } from "@/keys/chord";
 import { enumOptionLabel } from "@/lib/models";
 import { OWNED_KEYS } from "./ownedKeys";
 
+/**
+ * The settings nav's pages: the schema's in its order, with each of the GUI's own pages that the
+ * schema lacks placed right after the GUI page before it, so Skills and Memory follow Plugins and
+ * the schema's later pages (Ember, Advanced) stay after them. A GUI page that is also a schema page
+ * (Plugins) is the schema's. Like the daemon's view.settings --page list (SettingsGUIPages).
+ */
+export function settingsPages(schemaPages: readonly SettingPageView[], guiPages: readonly SettingPageView[]): SettingPageView[] {
+  const out = [...schemaPages];
+  guiPages.forEach((g, i) => {
+    if (out.some((p) => p.id === g.id)) return;
+    const prev = i > 0 ? out.findIndex((p) => p.id === guiPages[i - 1]?.id) : -1;
+    out.splice(prev >= 0 ? prev + 1 : out.length, 0, g);
+  });
+  return out;
+}
+
 /** An enum value's name: the schema's label (the model registry's "Opus 4.8"), else the value; "" is "no preference". */
 export function enumLabel(f: SettingFieldView, v: string): string {
   return v === "" ? "Default" : enumOptionLabel(f, v);
@@ -186,7 +202,8 @@ export function searchSectionRows(
     for (const section of page.sections) {
       const row = rows[`${page.id}/${section.id}`];
       if (!row || fieldHits.some((h) => h.page.id === page.id && h.section?.id === section.id)) continue;
-      const hay = `${section.title} ${section.description} ${row.description} ${row.keywords.join(" ")}`.toLowerCase();
+      // A page's single untitled section (Dictation) goes by the page's name.
+      const hay = `${page.title} ${section.title} ${section.description} ${row.description} ${row.keywords.join(" ")}`.toLowerCase();
       if (!words.every((w) => hay.includes(w))) continue;
       hits.push({ page, section: { ...section, description: row.description } });
       counts[page.id] = (counts[page.id] ?? 0) + 1;
