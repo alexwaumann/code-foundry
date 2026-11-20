@@ -6,11 +6,13 @@ import { LinkRow } from "./LinkRow";
 import type { PageSectionHit, SearchResult } from "./model";
 import { SettingRow } from "./SettingRow";
 
-/** A hit's row. One used with a value its parent does not have now dims and says so; it stays editable, ready for that value. */
+/**
+ * A hit's row. One its parent leaves unused now (a switch that is off, another value) dims and
+ * says why, as the hit is away from its parent; it stays editable, ready for when it is used.
+ */
 function HitRow({ parent, ...row }: ComponentProps<typeof SettingRow> & { parent: SettingFieldView | undefined }) {
   const { unused, reason } = useFieldUnused(row.field, parent);
-  const off = unused && row.field.dependsOnValue !== "";
-  return <SettingRow {...row} dimmed={off} note={off ? reason : undefined} />;
+  return <SettingRow {...row} dimmed={unused} note={reason} />;
 }
 
 /**

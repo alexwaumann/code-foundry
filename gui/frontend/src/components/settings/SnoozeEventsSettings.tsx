@@ -48,13 +48,11 @@ function usePluginSources(): { target: string; title: string; pluginName: string
 }
 
 /**
- * Settings › General › Events in “Until event” (docs/notes/snooze-until-event.md), drawn as the
- * setting's own section (sectionBodies): threads.snooze_events as checkboxes, the pull request
- * events (Checks finish, Reviewed and Merged on by default), then each installed plugin's wake
- * sources (off by default). What is checked is what a Snooze menu's Until event offers; the rest
- * stay under More events. Each change saves the whole list at once.
+ * threads.snooze_events as checkboxes (docs/notes/snooze-until-event.md): what is checked, the
+ * installed plugins' wake sources, and a change saving the whole list at once. One save at a
+ * time (`busy`); a refused one leaves its message.
  */
-export function SnoozeEventsSection({ section }: { section: SectionFields }) {
+function useSnoozeEvents() {
   const value = useSettingValue(SNOOZE_EVENTS_KEY);
   const checked = useMemo(() => parseSnoozeEventsSetting(value), [value]);
   const sources = usePluginSources();
@@ -70,52 +68,95 @@ export function SnoozeEventsSection({ section }: { section: SectionFields }) {
       setError(res.ok ? null : (res.issues[SNOOZE_EVENTS_KEY] ?? res.error));
     });
   };
+  return { checked, sources, busy, error, set };
+}
+
+type Events = ReturnType<typeof useSnoozeEvents>;
+
+/**
+ * The pull request events (Checks finish, Reviewed and Merged on by default), then each
+ * installed plugin's wake sources (off by default), each under its heading.
+ */
+function EventRows({ events }: { events: Events }) {
+  const { checked, sources, busy, set } = events;
+  return (
+    <>
+      <div className="flex items-center gap-1.5 px-3 pt-2.5 pb-1 text-caption text-cf-text-muted">
+        <SnoozeEventIcon kind="pull_request" className="size-3.5 shrink-0" />
+        Pull requests
+      </div>
+      {PR_EVENTS.map((e) => (
+        <EventCheck
+          key={e.condition}
+          word={e.condition}
+          label={e.label}
+          checked={checked.has(e.condition)}
+          busy={busy}
+          onChange={(on) => {
+            set(e.condition, on);
+          }}
+        />
+      ))}
+      {sources.length > 0 && (
+        <div className="flex items-center gap-1.5 border-t border-cf-border px-3 pt-2.5 pb-1 text-caption text-cf-text-muted">
+          <SnoozeEventIcon kind="plugin" className="size-3.5 shrink-0" />
+          Plugins
+        </div>
+      )}
+      {sources.map((s) => (
+        <EventCheck
+          key={s.target}
+          word={pluginEventKey(s.target)}
+          label={s.title}
+          hint={s.pluginName}
+          checked={checked.has(pluginEventKey(s.target))}
+          busy={busy}
+          onChange={(on) => {
+            set(pluginEventKey(s.target), on);
+          }}
+        />
+      ))}
+    </>
+  );
+}
+
+function EventsError({ message, className }: { message: string | null; className?: string }) {
+  if (!message) return null;
+  return (
+    <p className={cn("text-caption text-cf-error-text", className)} data-testid="snooze-events-error">
+      {message}
+    </p>
+  );
+}
+
+/**
+ * Settings › General › Events in “Until event”, drawn as the setting's own section
+ * (sectionBodies): the checkboxes in the section's card. What is checked is what a Snooze
+ * menu's Until event offers; the rest stay under More events.
+ */
+export function SnoozeEventsSection({ section }: { section: SectionFields }) {
+  const events = useSnoozeEvents();
   return (
     <>
       <SectionCard id={section.section.id} heading={section.section.title} description={section.section.description}>
         <div data-setting={SNOOZE_EVENTS_KEY} data-testid="snooze-events-setting">
-          <div className="flex items-center gap-1.5 px-3 pt-2.5 pb-1 text-caption text-cf-text-muted">
-            <SnoozeEventIcon kind="pull_request" className="size-3.5 shrink-0" />
-            Pull requests
-          </div>
-          {PR_EVENTS.map((e) => (
-            <EventCheck
-              key={e.condition}
-              word={e.condition}
-              label={e.label}
-              checked={checked.has(e.condition)}
-              busy={busy}
-              onChange={(on) => {
-                set(e.condition, on);
-              }}
-            />
-          ))}
-          {sources.length > 0 && (
-            <div className="flex items-center gap-1.5 border-t border-cf-border px-3 pt-2.5 pb-1 text-caption text-cf-text-muted">
-              <SnoozeEventIcon kind="plugin" className="size-3.5 shrink-0" />
-              Plugins
-            </div>
-          )}
-          {sources.map((s) => (
-            <EventCheck
-              key={s.target}
-              word={pluginEventKey(s.target)}
-              label={s.title}
-              hint={s.pluginName}
-              checked={checked.has(pluginEventKey(s.target))}
-              busy={busy}
-              onChange={(on) => {
-                set(pluginEventKey(s.target), on);
-              }}
-            />
-          ))}
+          <EventRows events={events} />
         </div>
       </SectionCard>
-      {error && (
-        <p className="mt-1.5 ml-0.5 text-caption text-cf-error-text" data-testid="snooze-events-error">
-          {error}
-        </p>
-      )}
+      <EventsError message={events.error} className="mt-1.5 ml-0.5" />
     </>
+  );
+}
+
+/** The same checkboxes as the setting's editor in a search result's row (keyEditors), in a box of their own. */
+export function SnoozeEventsEditor() {
+  const events = useSnoozeEvents();
+  return (
+    <div className="flex flex-col gap-1.5" data-testid="snooze-events-setting">
+      <div className="overflow-hidden rounded-md border border-cf-border">
+        <EventRows events={events} />
+      </div>
+      <EventsError message={events.error} />
+    </div>
   );
 }

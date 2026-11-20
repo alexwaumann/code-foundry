@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ComponentType } from "react";
 import { Bell, GitBranch, Keyboard, Mic, Palette, PanelsTopLeft, Search, Settings2, SlidersHorizontal, TriangleAlert, Wrench, X, type LucideIcon } from "lucide-react";
 import { FinderIcon } from "@/components/icons/AppIcon";
-import type { SettingFieldView, SettingPageView, SettingsSchemaView } from "@/api/settings";
+import type { SettingPageView, SettingsSchemaView } from "@/api/settings";
 import { FlameNavIcon } from "@/components/ember/Flame";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,14 +15,11 @@ import { loadSettingsSchema, useSettingsStore } from "@/stores/settings";
 import { closeSettings, setSettingsPage, useViewsStore } from "@/stores/views";
 import { guiPages } from "./guiPages";
 import { KeybindingsPage } from "./KeybindingsPage";
-import { useHiddenFields } from "./hiddenFields";
 import { pageSections, queryWords, searchGuiPages, searchSectionRows, searchSettings, settingsPages, type SearchResult } from "./model";
 import { PageHead } from "./PageHead";
 import { SearchResults } from "./SearchResults";
 import { SettingsSection } from "./SectionCard";
 import { sectionRowSearch } from "./sectionLinks";
-
-const NO_FIELDS: readonly SettingFieldView[] = [];
 
 /** The nav's icon per page id; a page without one gets a generic gear. Ember's is its flame. */
 const pageIcons: Readonly<Partial<Record<string, LucideIcon | ComponentType<{ className?: string }>>>> = {
@@ -146,8 +143,7 @@ export function SettingsPage() {
 
   const words = useMemo(() => queryWords(query), [query]);
   const searching = words.length > 0;
-  const hidden = useHiddenFields(schema?.fields ?? NO_FIELDS, "search");
-  const result = useMemo(() => (schema && searching ? searchSettings(schema, words, hidden) : null), [schema, searching, words, hidden]);
+  const result = useMemo(() => (schema && searching ? searchSettings(schema, words) : null), [schema, searching, words]);
   // A GUI page may also be a schema page (Plugins: its settings section): the schema's wins, drawn by the GUI's component.
   const pages = useMemo(() => (schema ? settingsPages(schema.pages, guiPages.map((g) => g.page)) : []), [schema]);
   const page = pages.find((p) => p.id === pageId) ?? pages[0];

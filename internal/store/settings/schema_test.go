@@ -557,7 +557,7 @@ func TestDictationFields(t *testing.T) {
 		typ                 Type
 	}{
 		{KeyDictationEnabled, "false", "", Bool},
-		{KeyDictationAnywhere, "false", "", Bool},
+		{KeyDictationAnywhere, "false", KeyDictationEnabled, Bool},
 		{KeyDictationHoldKey, HoldKeyBoth, KeyDictationEnabled, Enum},
 		{KeyDictationSounds, "true", KeyDictationEnabled, Bool},
 		{KeyDictationMicrophone, "", KeyDictationEnabled, String},
@@ -588,6 +588,19 @@ func TestDictationFields(t *testing.T) {
 		if f.Group == GroupDictation && strings.Contains(strings.ToLower(f.Title+" "+f.Description+strings.Join(f.EnumLabels, " ")), "alt") {
 			t.Errorf("%s says Alt", f.Key)
 		}
+	}
+}
+
+// Ember's settings do nothing while Ember is off: each depends on ember.enabled, so the
+// settings page dims them and the search says why.
+func TestEmberFieldsDependOnEnabled(t *testing.T) {
+	for _, key := range []string{KeyEmberModel, KeyEmberEffort, KeyEmberWorkerModels, KeyEmberWorkerEffort, KeyEmberEpochTokens, KeyEmberEpochHours} {
+		if f := field(t, key); f.DependsOn != KeyEmberEnabled || f.DependsOnValue != "" {
+			t.Errorf("%s depends on %q = %q, want %s", key, f.DependsOn, f.DependsOnValue, KeyEmberEnabled)
+		}
+	}
+	if f := field(t, KeyEmberEnabled); f.DependsOn != "" {
+		t.Errorf("ember.enabled depends on %q", f.DependsOn)
 	}
 }
 

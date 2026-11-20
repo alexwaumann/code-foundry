@@ -2,7 +2,7 @@
  * Settings › Dictation (docs/notes/dictation-4-gui.md): the dictation.enabled
  * row's switch, state chip and "Needs the model below.", and the Model row at the end of
  * the section (state from DictationService.Watch, actions through the dictation.*
- * commands). The rows between them are plain settings (hiddenFields.ts hides two of them
+ * commands). The rows between them are plain settings (hiddenFields.ts hides them
  * while dictation is off). Before the Model row, the hold key's permission (DictationAccessRow;
  * docs/notes/dictate-anywhere.md).
  */

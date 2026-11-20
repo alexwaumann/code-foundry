@@ -566,3 +566,80 @@ describe("search", () => {
     expect(body().dataset.page).toBe("memory");
   });
 });
+
+// The pages whose settings follow a switch (docs/notes/settings-dependencies.md): Ember's dim
+// under Enable Ember, quietly; Dictation's leave the page while it is off; the search finds both,
+// dimmed, saying why.
+describe("settings that follow a switch", () => {
+  const emberPage: SettingPageView = { id: "ember", title: "Ember", description: "", sections: [sec("experiment", "Experiment"), sec("models", "Models"), sec("sessions", "Fresh sessions")] };
+  const effort = { enumValues: ["low", "medium", "high"], defaultValue: "high" };
+  const on = { dependsOn: "ember.enabled" };
+  const dictationOn = { dependsOn: "dictation.enabled" };
+  const switched: SettingsSchemaView = {
+    groups: [],
+    pages: [...pages.filter((p) => p.id !== "advanced"), emberPage, ...pages.filter((p) => p.id === "advanced")],
+    fields: [
+      ...fields,
+      f("dictation.enabled", "Dictation", "bool", "dictation", "dictation", { defaultValue: "false" }),
+      f("dictation.anywhere", "Dictate anywhere", "bool", "dictation", "dictation", { defaultValue: "false", ...dictationOn }),
+      f("dictation.spoken_symbols", "Spoken symbols", "bool", "dictation", "dictation", { defaultValue: "false", ...dictationOn }),
+      f("ember.enabled", "Enable Ember", "bool", "ember", "experiment", { defaultValue: "false" }),
+      f("ember.model", "Model", "enum", "ember", "models", { ...models, defaultValue: "claude-opus-5-5[1m]", row: "ember-model", description: "The model Ember runs on.", ...on }),
+      f("ember.effort", "Effort", "enum", "ember", "models", { ...effort, row: "ember-model", ...on }),
+      f("ember.worker_effort", "Worker effort", "enum", "ember", "models", { ...effort, description: "Effort for Ember's worker threads.", ...on }),
+      f("ember.epoch_max_hours", "Session age limit", "int", "ember", "sessions", { defaultValue: "24", unit: "h", min: 1, max: 720, ...on }),
+    ],
+  };
+  const emberRows = ["ember.model", "ember.effort", "ember.worker_effort", "ember.epoch_max_hours"];
+  beforeEach(() => {
+    schemaRef.current = switched;
+    useSettingsStore.setState({ schema: switched });
+  });
+
+  it("Ember off dims its settings, the model pair too, with no note on the page; on, none dim", () => {
+    open("ember");
+    for (const key of emberRows) expect(row(key).dataset.dimmed).toBe("true");
+    expect(row("ember.enabled").dataset.dimmed).toBeUndefined();
+    expect(body().textContent).not.toContain("Not used while");
+    // Not indented: the pair and the rows keep their place in their own sections.
+    expect(row("ember.worker_effort").className).not.toContain("pl-10");
+    // Still editable while dimmed.
+    expect((trigger("ember.model") as HTMLButtonElement).disabled).toBe(false);
+
+    fireEvent.click(within(row("ember.enabled")).getByRole("switch"));
+    for (const key of emberRows) expect(row(key).dataset.dimmed).toBeUndefined();
+  });
+
+  it.each([
+    ["session age", "ember.epoch_max_hours", "Not used while Enable Ember is off."],
+    ["worker effort", "ember.worker_effort", "Not used while Enable Ember is off."],
+    ["spoken symbols", "dictation.spoken_symbols", "Not used while Dictation is off."],
+    ["anywhere", "dictation.anywhere", "Not used while Dictation is off."],
+  ])("“%s” finds %s while its switch is off, dimmed and saying why", (query, key, note) => {
+    open();
+    fireEvent.change(search(), { target: { value: query } });
+    const hit = within(screen.getByTestId("settings-results")).getByText((_, el) => el?.getAttribute("data-setting") === key);
+    expect(hit.dataset.dimmed).toBe("true");
+    expect(hit.textContent).toContain(note);
+  });
+
+  it("with its switch on, a hit is an ordinary row", () => {
+    setValues({ "dictation.enabled": "true", "ember.enabled": "true" });
+    open();
+    for (const [query, key] of [
+      ["spoken symbols", "dictation.spoken_symbols"],
+      ["session age", "ember.epoch_max_hours"],
+    ] as const) {
+      fireEvent.change(search(), { target: { value: query } });
+      expect(row(key).dataset.dimmed).toBeUndefined();
+      expect(row(key).textContent).not.toContain("Not used while");
+    }
+  });
+
+  it("Dictation off leaves only its switch on the page", () => {
+    open("dictation");
+    expect(has("dictation.enabled")).toBe(true);
+    expect(has("dictation.anywhere")).toBe(false);
+    expect(has("dictation.spoken_symbols")).toBe(false);
+  });
+});

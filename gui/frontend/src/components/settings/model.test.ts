@@ -111,8 +111,6 @@ describe("page layout", () => {
     };
     expect(pageSections(s, appearance).map((x) => x.fields.map((f) => f.key))).toEqual([["appearance.backdrop"]]);
     expect(searchSettings(s, ["backdrop"]).hits.map((h) => h.field.key)).toEqual(["appearance.backdrop"]);
-    // A row hidden now is not found either (hiddenFields.ts).
-    expect(searchSettings(s, ["backdrop"], new Set(["appearance.backdrop"])).counts).toEqual({ appearance: 0 });
     expect(searchSettings(s, ["image"]).counts).toEqual({ appearance: 0 });
   });
 
@@ -234,13 +232,12 @@ describe("searchGuiPages", () => {
     expect(searchGuiPages([memory, skills], new Set(), ["forget"]).counts).toEqual({ memory: 1, skills: 0 });
   });
 
-  it("finds a field behind a section's Advanced disclosure, unless it is hidden", () => {
+  it("finds a field behind a section's Advanced disclosure", () => {
     const key = "dictation.spoken_symbols";
     const field = { key, title: "Spoken symbols", description: "“underscore”", page: "dictation", section: "dictation", enumDescriptions: [] as string[] } as SettingFieldView;
     const s: SettingsSchemaView = { groups: [], fields: [field], pages: [{ id: "dictation", title: "Dictation", description: "", sections: [{ id: "dictation", title: "", description: "" }] }] };
     expect(sectionAdvanced["dictation/dictation"]?.has(key)).toBe(true);
     expect(searchSettings(s, ["underscore"]).hits.map((h) => h.field.key)).toEqual([key]);
-    expect(searchSettings(s, ["underscore"], new Set([key])).hits).toEqual([]);
   });
 });
 

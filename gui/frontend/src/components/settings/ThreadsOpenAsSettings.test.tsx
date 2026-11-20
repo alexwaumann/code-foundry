@@ -89,17 +89,30 @@ function pick(name: RegExp): void {
 }
 
 describe("Threads open as", () => {
-  it("lists the three options, each with its description; the trigger shows the title alone; the row says what Panes and Single share", () => {
+  it("lists the three options, each with its description; the trigger shows the title alone; the row says what the picked one does", () => {
     render(<SettingRow field={openAs} />);
     const trigger = screen.getByRole("combobox", { name: "Threads open as" });
     expect(trigger.textContent.startsWith("Tabs")).toBe(true);
-    expect(words(openAs.key)).toBe(openAs.description);
+    // The picked option's words alone, in place of the setting's own (the CLI's and the guide's).
+    expect(words(openAs.key)).toBe(openAs.enumDescriptions[0]);
     fireEvent.keyDown(trigger, { key: "Enter" });
     expect(screen.getAllByRole("option").map((o) => o.textContent)).toEqual([
       "TabsEach thread you open adds a tab. You close tabs yourself.",
       `Panes (default)${openAs.enumDescriptions[1] ?? ""}`,
       `Single${openAs.enumDescriptions[2] ?? ""}`,
     ]);
+  });
+
+  it.each([
+    ["panes", 1],
+    ["single", 2],
+  ])("with %s picked the row says what it does, once, and not the setting's own words", (value, i) => {
+    setValues({ [openAs.key]: value, [swap.key]: "false" });
+    render(<SettingRow field={openAs} />);
+    const row = document.querySelector(`[data-setting="${openAs.key}"]`);
+    expect(words(openAs.key)).toBe(openAs.enumDescriptions[i]);
+    expect(row?.querySelectorAll("p")).toHaveLength(1);
+    expect(row?.textContent).not.toContain(openAs.description);
   });
 
   // The marker is the schema's default, whatever it is: Panes since part 3, Tabs before it.

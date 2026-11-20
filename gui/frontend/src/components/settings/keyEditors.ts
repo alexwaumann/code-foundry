@@ -5,6 +5,7 @@ import { BranchNamingOff } from "./BranchNamingOff";
 import { DictationMicrophoneDescription, DictationMicrophoneEditor, DictationNeedsModel, DictationStateChip, DictationToggleEditor } from "./DictationSettings";
 import type { SettingEditor } from "./editor";
 import { IncludeIgnoredEditor } from "./IncludeIgnoredSettings";
+import { SnoozeEventsEditor } from "./SnoozeEventsSettings";
 import { ThemeDarkEditor, ThemeLightEditor } from "./ThemeSlotEditor";
 import { SmartSwapEditor, SmartSwapForcedNote, ThreadsOpenAsEditor } from "./ThreadsOpenAsSettings";
 import { useSmartSwapForced } from "./threadsOpenAsSwitch";
@@ -25,8 +26,9 @@ export const keyEditors: Readonly<Partial<Record<string, SettingEditor>>> = {
   "dictation.microphone": DictationMicrophoneEditor,
   "layout.threads_open_as": ThreadsOpenAsEditor,
   "layout.smart_swap": SmartSwapEditor,
-  // On its page the section draws the list (sectionBodies); this is its search result's editor.
+  // On their page the section draws the list (sectionBodies); these are their search results' editors.
   "files.include_ignored": IncludeIgnoredEditor,
+  "threads.snooze_events": SnoozeEventsEditor,
 };
 
 /**
@@ -50,13 +52,6 @@ export const keyDescriptions: Readonly<Partial<Record<string, ComponentType<{ fa
 };
 
 /**
- * Explained enums whose row keeps the setting's own description rather than the picked option's
- * (each option's words are in its dropdown): layout.threads_open_as says what all of its
- * non-default options share.
- */
-export const ownDescriptionKeys: ReadonlySet<string> = new Set(["layout.threads_open_as"]);
-
-/**
  * Settings another setting holds at a value for now, by key: a hook that says whether it does.
  * Their row hides the reset arrow while held (the editor shows the held value, disabled), and the
  * stored value is kept for when it is not (layout.smart_swap under Threads open as Panes or Single).
@@ -69,4 +64,4 @@ export const keyHeld: Readonly<Partial<Record<string, () => boolean>>> = {
  * Key editors taller than one control (the backdrop's gallery): their row aligns to the
  * top, so the title sits beside the editor's first control and the reset arrow beside it.
  */
-export const tallKeyEditors: ReadonlySet<string> = new Set(["appearance.backdrop", "ember.worker_models", "files.include_ignored"]);
+export const tallKeyEditors: ReadonlySet<string> = new Set(["appearance.backdrop", "ember.worker_models", "files.include_ignored", "threads.snooze_events"]);
