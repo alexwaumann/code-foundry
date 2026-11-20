@@ -170,7 +170,7 @@ var Pages = []Page{
 		{ID: "textgen", Title: "Text generation", Description: "Models for small jobs like naming a thread."},
 		{ID: "snooze", Title: "Snooze"},
 		{ID: "until-event", Title: "Events in “Until event”", Description: "What a snooze menu's Until event offers, when the thread can wait on it. The rest stay under More events."},
-		{ID: "files", Title: "Files", Description: "What Go to File, @ completion and text search find."},
+		{ID: "files", Title: "Files", Description: "What Go to File, @ in the prompt and text search find."},
 		{ID: "updates", Title: "Updates"},
 	}},
 	{ID: PageAppearance, Title: "Appearance", Description: "Applied live in every window.", Sections: []Section{
@@ -190,9 +190,9 @@ var Pages = []Page{
 		{ID: "projects", Title: "Projects", Description: "Fetching, branches and worktrees."},
 	}},
 	{ID: PageKeybindings, Title: "Keybindings",
-		Description: `Change or remove a command's shortcut. App shortcuts like cmd+k, cmd+b and cmd+1..9 are reserved.`},
+		Description: `Change or remove a command's shortcut. App shortcuts like ⌘K, ⌘B and ⌘1–9 are reserved.`},
 	{ID: PagePlugins, Title: "Plugins", Description: "Programs that add commands, panels and thread options to Code Foundry.",
-		Sections: []Section{{ID: "registries", Title: "Registries", Description: "Where Browse finds plugins to install."}}},
+		Sections: []Section{{ID: "registries", Title: "Registries", Description: "Where Browse all finds plugins to install."}}},
 	{ID: PageEmber, Title: "Ember", Description: "A resident agent that plans work, runs worker threads and reports back in its own chat.", Sections: []Section{
 		{ID: "experiment", Title: "Experiment"},
 		{ID: "models", Title: "Models"},
@@ -211,7 +211,7 @@ var Groups = []Group{
 	{GroupModels, "Models", "The models Code Foundry uses for its own jobs."},
 	{GroupGitHub, "GitHub", "Pull requests and checks, read with your gh login."},
 	{GroupProjects, "Projects", "Background fetching, fast-forwarding checkouts on the default branch, and new worktrees' branches: how they are named and whether they start from origin."},
-	{GroupFiles, "Files", "What Go to File, @ completion and text search find."},
+	{GroupFiles, "Files", "What Go to File, @ in the prompt and text search find."},
 	{GroupGitOps, "Git operations", "How worktrees are handed to other apps."},
 	{GroupAppearance, "Appearance", "Scheme, themes, terminal font, density and backdrop. Applied live in every window."},
 	{GroupNotify, "Notifications", "How the Dock tells you a thread needs you. macOS banners aren't available to this app."},
@@ -436,7 +436,7 @@ var staticFields = []Field{
 	// General › Text generation.
 	{
 		Key: KeyUtilityModel, Group: GroupModels, Page: PageGeneral, Section: "textgen", Type: Enum, Title: "Utility model",
-		Description: "The model Code Foundry uses for its own small jobs. Always runs at low effort.",
+		Description: "The model for Code Foundry's own small jobs, like naming threads and branches. Always runs at low effort.",
 		Enum:        command.ThreadModels, EnumLabels: model.Labels(), Default: model.UtilityDefault,
 		bind: func(s *Settings) any { return &s.Models.Utility },
 	},
@@ -455,7 +455,7 @@ var staticFields = []Field{
 		// Auto-tidy's first step (internal/daemon/auto_tidy.go, docs/notes/auto-tidy.md): the
 		// clock is the thread's last activity, which a look at it does not move.
 		Key: KeyAutoSaveAfter, Group: GroupThreads, Page: PageGeneral, Section: "snooze", Type: Enum, Title: "Save idle threads for later",
-		Description: "A thread with no activity for this long (no message to or from Claude) moves to Snoozed with no alarm. Pinned threads, and threads that are working or asking, stay.",
+		Description: "A thread with no activity for this long (no message to or from Claude) moves to Snoozed with no alarm. Pinned threads, and threads that are working or waiting on you, stay.",
 		Enum:        AutoSaveAfterValues, EnumLabels: []string{"Off", "After 1 day", "After 3 days", "After 1 week", "After 2 weeks", "After 1 month"},
 		Default: TidyOff,
 		bind:    func(s *Settings) any { return &s.Threads.AutoSaveAfter },
@@ -473,7 +473,7 @@ var staticFields = []Field{
 	{
 		// The GUI's Until event submenu (docs/notes/snooze-until-event.md): the pull request
 		// events and plugin wake sources it offers; the GUI draws the section as checkboxes.
-		Key: KeySnoozeEvents, Group: GroupThreads, Page: PageGeneral, Section: "until-event", Type: String, Title: "Events in Until event",
+		Key: KeySnoozeEvents, Group: GroupThreads, Page: PageGeneral, Section: "until-event", Type: String, Title: "Events in “Until event”",
 		Description: "The events a snooze menu's Until event offers, separated by spaces: pull request events (" + strings.Join(SnoozePullRequestEvents, ", ") +
 			") and plugin wake sources as plugin:<plugin>/<source>. none for none.",
 		Default: DefaultSnoozeEvents, Placeholder: DefaultSnoozeEvents,
@@ -483,7 +483,7 @@ var staticFields = []Field{
 	// General › Files.
 	{
 		Key: KeyIncludeIgnored, Group: GroupFiles, Page: PageGeneral, Section: "files", Type: String, Title: "Ignored files to include",
-		Description: "Git-ignored files that Go to File, @ and text search still find, in every project, as .gitignore-style patterns separated by commas. " +
+		Description: "Git-ignored files that Go to File, @ in the prompt and text search still find, in every project, as .gitignore-style patterns separated by commas. " +
 			"A pattern without a slash matches a name at any depth (.env*), one with a slash a path from the project's folder (docs/scratch/), " +
 			"and a trailing slash only folders. A name never reaches inside an ignored folder that does not match itself, so .env* skips node_modules. " +
 			"A project can add its own patterns. none for no patterns.",
@@ -507,9 +507,9 @@ var staticFields = []Field{
 		Enum:        []string{"system", "dark", "light"}, EnumLabels: []string{"System", "Dark", "Light"}, Default: "system",
 		bind: func(s *Settings) any { return &s.Appearance.Theme },
 	},
-	themeField(KeyThemeDark, theme.SchemeDark, "Dark theme", "Colours used when the scheme is dark.",
+	themeField(KeyThemeDark, theme.SchemeDark, "Dark theme", "Colors used when the scheme is dark.",
 		func(s *Settings) any { return &s.Appearance.ThemeDark }),
-	themeField(KeyThemeLight, theme.SchemeLight, "Light theme", "Colours used when the scheme is light.",
+	themeField(KeyThemeLight, theme.SchemeLight, "Light theme", "Colors used when the scheme is light.",
 		func(s *Settings) any { return &s.Appearance.ThemeLight }),
 	// Appearance › Window.
 	{
@@ -591,13 +591,13 @@ var staticFields = []Field{
 	},
 	{
 		Key: KeySmartPlacement, Group: GroupLayout, Page: PageLayout, Section: "panes", Type: Bool, Title: "Smart placement",
-		Description: "A thread you open or start goes to the focused pane only if it already has a thread open, otherwise to the nearest pane that has one. Another tab goes to a pane that already shows tabs of its kind (a terminal only to its own thread's terminals). Choosing a pane yourself still wins.",
+		Description: "A thread opens in the focused pane if it already shows a thread, otherwise in the nearest pane that does. Other tabs open in a pane that already shows their kind (a terminal only with its own thread's terminals). Choosing a pane yourself still wins.",
 		Default:     "true",
 		bind:        func(s *Settings) any { return &s.Layout.SmartPlacement },
 	},
 	{
 		Key: KeyThreadInfo, Group: GroupLayout, Page: PageLayout, Section: "panes", Type: Bool, Title: "Thread info by default",
-		Description: "Show the thread info card beside a thread's conversation when its pane is wide enough, for every thread you have not toggled it on. The header's button and ⌘⇧I show or hide it for one thread, and that thread keeps its choice.",
+		Description: "Show the thread info card beside the conversation when the pane is wide enough. The header's button and ⇧⌘I show or hide it for one thread, and that thread keeps its choice.",
 		Default:     "true",
 		bind:        func(s *Settings) any { return &s.Layout.ThreadInfo },
 	},
@@ -674,9 +674,9 @@ var staticFields = []Field{
 	},
 	{
 		Key: KeyDictationOtherAudio, Group: GroupDictation, Page: PageDictation, Section: "dictation", DependsOn: KeyDictationEnabled, Type: Enum, Title: "Other audio",
-		Description: "What audio from this Mac does while you dictate.",
+		Description: "What happens to other audio from this Mac while you dictate.",
 		Enum:        []string{OtherAudioDoNothing, OtherAudioLower},
-		EnumLabels:  []string{"Do nothing", "Lower"},
+		EnumLabels:  []string{"Leave as is", "Lower volume"},
 		Default:     OtherAudioDoNothing,
 		bind:        func(s *Settings) any { return &s.Dictation.OtherAudio },
 	},
@@ -759,9 +759,8 @@ var staticFields = []Field{
 	{
 		// Read at every new worktree (project.CreateWorktreeOptions.BaseFromOrigin), live.
 		Key: KeyBaseFromOrigin, Group: GroupProjects, Page: PageSource, Section: "projects", Type: Bool, Title: "Branch from origin unless local is ahead",
-		Description: "Start a new worktree's branch from origin's copy of its base branch (the default branch when none is given), fetched first, " +
-			"unless the local branch is ahead of it or has diverged: then from the local branch. " +
-			"Off always starts from the local branch, and new branches are not fetched from origin; checking out a branch only origin has still fetches it. A remote branch, tag or commit given as the base is always used as is.",
+		Description: "Start a new worktree's branch from origin's copy of its base branch, fetched first, unless the local branch is ahead or has diverged. " +
+			"Off always starts from the local branch without fetching. A remote branch, tag or commit given as the base is always used as is.",
 		Default: "true",
 		bind:    func(s *Settings) any { return &s.Projects.BaseFromOrigin },
 	},
@@ -774,7 +773,7 @@ var staticFields = []Field{
 	// Plugins › Registries.
 	{
 		Key: KeyPluginRegistries, Group: GroupPlugins, Page: PagePlugins, Section: "registries", Type: String, Title: "Plugin registries",
-		Description: "Where Browse and plugin install look for plugins, in order; the first registry listing a name wins. Each is a GitHub repository URL (private ones work through your gh login) or an https URL of an index.json, separated by commas. Empty means no registry: Browse lists nothing and install needs a release or a folder.",
+		Description: "Where Browse all and installs look for plugins, in order; the first registry listing a name wins. Each is a GitHub repository URL (private ones work through your gh login) or an https URL of an index.json, separated by commas. Empty means no registry: Browse all lists nothing and an install needs a release or a folder.",
 		Default:     "", Placeholder: "https://github.com/<owner>/<repo>", UserOnly: true,
 		check: checkRegistries,
 		bind:  func(s *Settings) any { return &s.Plugins.Registries },
@@ -783,7 +782,7 @@ var staticFields = []Field{
 	// live.
 	{
 		Key: KeyEmberEnabled, Group: GroupEmber, Page: PageEmber, Section: "experiment", Type: Bool, Title: "Enable Ember",
-		Description: "Experimental. A resident agent pinned above your threads: tell it what you want done and it plans the work, runs worker threads and reports back in its own chat. " +
+		Description: "Experimental. Pins Ember above your threads. " +
 			"Its memory and task board live under ~/.code-foundry/residents/ember. Nothing else changes while it is off.",
 		Default: "false",
 		bind:    func(s *Settings) any { return &s.Ember.Enabled },
@@ -846,7 +845,7 @@ var staticFields = []Field{
 		bind: func(s *Settings) any { return &s.Threads.CacheTTLSeconds },
 	},
 	{
-		Key: KeyCloseGrace, Group: GroupThreads, Page: PageAdvanced, Section: "threads", Unit: "s", Type: Int, Title: "Close grace",
+		Key: KeyCloseGrace, Group: GroupThreads, Page: PageAdvanced, Section: "threads", Unit: "s", Type: Int, Title: "Close grace period",
 		Description: "How long a closing thread waits for Claude to exit before it is force-quit.",
 		Default:     strconv.Itoa(defaultCloseGrace), Min: 1, Max: 120, Restart: true,
 		bind: func(s *Settings) any { return &s.Threads.CloseGraceSeconds },

@@ -28,7 +28,7 @@ const { useViewsStore } = await import("@/stores/views");
 
 const field: SettingFieldView = {
   key: KEY,
-  title: "Events in Until event",
+  title: "Events in “Until event”",
   description: "The events a snooze menu's Until event offers.",
   group: "threads",
   type: "string",

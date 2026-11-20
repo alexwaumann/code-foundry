@@ -10,14 +10,14 @@ describe("validateSetting", () => {
   it.each([
     ["empty resets", field({ type: "int", min: 1, max: 5 }), "", { ok: true, value: "" }],
     ["int in range", field({ type: "int", min: 9, max: 28 }), " 14 ", { ok: true, value: "14" }],
-    ["int too big", field({ type: "int", min: 9, max: 28 }), "99", { ok: false, error: "Want 9 to 28" }],
-    ["int not a number", field({ type: "int", min: 9, max: 28 }), "13.5", { ok: false, error: 'Want a whole number, got "13.5"' }],
+    ["int too big", field({ type: "int", min: 9, max: 28 }), "99", { ok: false, error: "Enter a number from 9 to 28." }],
+    ["int not a number", field({ type: "int", min: 9, max: 28 }), "13.5", { ok: false, error: "Enter a whole number." }],
     ["enum", field({ type: "enum", enumValues: ["", "opus"] }), "opus", { ok: true, value: "opus" }],
-    ["enum unknown", field({ type: "enum", enumValues: ["dark", "light"] }), "blue", { ok: false, error: "Want one of dark, light" }],
+    ["enum unknown", field({ type: "enum", enumValues: ["dark", "light"] }), "blue", { ok: false, error: "Choose one of dark, light." }],
     ["bool", field({ type: "bool" }), "false", { ok: true, value: "false" }],
     ["path absolute", field({ type: "path" }), "/opt/bin/claude", { ok: true, value: "/opt/bin/claude" }],
     ["path tilde", field({ type: "path" }), "~/wt/{project}", { ok: true, value: "~/wt/{project}" }],
-    ["path relative", field({ type: "path" }), "bin/claude", { ok: false, error: "Want an absolute path (or ~/…)" }],
+    ["path relative", field({ type: "path" }), "bin/claude", { ok: false, error: "Enter an absolute path (or ~/…)." }],
     ["string verbatim", field({}), "  Iosevka ", { ok: true, value: "  Iosevka " }],
   ])("%s", (_name, f, raw, want) => {
     expect(validateSetting(f, raw)).toEqual(want);

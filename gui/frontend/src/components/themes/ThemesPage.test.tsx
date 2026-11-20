@@ -445,6 +445,8 @@ describe("the list", { timeout: 30_000 }, () => {
 
   it("the scheme control saves appearance.theme", async () => {
     open();
+    // Dark before Light, as in Settings and the slot chips beside it.
+    expect(within(screen.getByTestId("themes-scheme")).getAllByRole("radio").map((r) => r.textContent.trim())).toEqual(["System", "Dark", "Light"]);
     fireEvent.click(within(screen.getByTestId("themes-scheme")).getByRole("radio", { name: "Light" }));
     await waitFor(() => {
       expect(updateSettings).toHaveBeenCalledWith({ "appearance.theme": "light" });

@@ -580,7 +580,7 @@ func TestDictationFields(t *testing.T) {
 		t.Errorf("hold key = %v %v", f.Enum, f.EnumLabels)
 	}
 	f = field(t, KeyDictationOtherAudio)
-	if !slices.Equal(f.Enum, []string{"do_nothing", "lower"}) || !slices.Equal(f.EnumLabels, []string{"Do nothing", "Lower"}) {
+	if !slices.Equal(f.Enum, []string{"do_nothing", "lower"}) || !slices.Equal(f.EnumLabels, []string{"Leave as is", "Lower volume"}) {
 		t.Errorf("other audio = %v %v", f.Enum, f.EnumLabels)
 	}
 	// Option, never the PC name for the key.
