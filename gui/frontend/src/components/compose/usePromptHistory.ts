@@ -181,13 +181,12 @@ export function usePromptPicker(opts: {
   const close = () => {
     setState((s) => (s.open ? { ...s, open: false } : s));
   };
-  // Another draft (the composer now shows another thread): closed.
-  useEffect(
-    () => () => {
-      setState((s) => (s.open ? { ...s, open: false } : s));
-    },
-    [resetKey],
-  );
+  // Another draft (the composer now shows another thread): closed, in the render that shows it.
+  const [seenReset, setSeenReset] = useState(resetKey);
+  if (seenReset !== resetKey) {
+    setSeenReset(resetKey);
+    setState((s) => (s.open ? { ...s, open: false } : s));
+  }
   if (blocked && state.open) setState((s) => ({ ...s, open: false }));
 
   const prompt =(i: number) => latest.current.list.prompts[i];
