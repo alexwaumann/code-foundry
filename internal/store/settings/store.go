@@ -181,7 +181,12 @@ func Open(ctx context.Context, opts Options) (*Store, error) {
 	return s, nil
 }
 
-// Close stops the watcher.
+// Close stops the watcher. It returns once fsnotify's reader goroutine has ended:
+// fsnotify's kqueue Close (v1.10.1) closes every watch's fd while that reader can be
+// dropping the watch of a file a save just renamed, and the reader then closes the same
+// fd number again after Close returned. By then the number can be a file the caller
+// opened since (a test's TempDir cleanup failed with "fdopendir: bad file descriptor").
+// The reader closes Events as it ends, after its last close of a watch.
 func (s *Store) Close() error {
 	select {
 	case <-s.stop:
@@ -192,6 +197,8 @@ func (s *Store) Close() error {
 	var err error
 	if s.watcher != nil {
 		err = s.watcher.Close()
+		for range s.watcher.Events { // drained until the reader ends
+		}
 	}
 	s.wg.Wait()
 	return err

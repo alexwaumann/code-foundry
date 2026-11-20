@@ -247,3 +247,94 @@ after rates. What they add to the rounds above:
   "re-arm wakes: connection closed" (`TestServeInitErrorEndsServe`, the sweep at 4da2b53b2; not
   reproduced locally in 3000 runs). Init reports before the connection can close, so the helper
   now reads that report when the re-arm fails and returns as it does for a failed Init.
+
+# Round 4: three sweep failures on main (2026-11-20)
+
+Three Go tests failed in post-merge sweeps on main within one night, each on a commit that did not
+touch it. One was a test's fake, one a test helper, and one a race in the product (the settings
+store's Close, through fsnotify). Stress runs used the `-race` test binary with 12 to 36 processes
+at once on 12 cores.
+
+## TestLookupPullRequestRefuses (internal/store/gh)
+
+CI (runs 44493930150 and 44669332917, attempt 1): a nil pointer panic in `fakeRunner.GraphQL`
+(store_test.go:48) on the store's worker goroutine, called from `runPoll`. The panic was off the
+test's goroutine, so the log names no test.
+
+Cause, in the test: it started a store with `&fakeRunner{}` and no handler, because the refusals
+it checks never reach GitHub. But `New` makes the first poll due at once, so `Run` polls as soon
+as it starts. Usually the test's cleanup cancelled the store first; when the worker got there
+first, the fake called its nil handler. The only other `startStore` users install a handler first.
+
+Fix: the fake serves an empty `fakeGitHub`, so the poll gets an answer.
+
+Verified: before, 17 of 24 processes (500 runs each, so at least 17 of 12,000 runs) panicked with
+the sweep's stack. After, 0 of 24 processes (12,000 runs).
+
+## TestThemeSaveCardFailureWarns (internal/command)
+
+CI (run 44669332917, attempt 2): the assertions passed, then `TempDir RemoveAll cleanup:
+readdirnames .../001/themes: fdopendir themes: bad file descriptor`.
+
+Cause, in the product: the settings store's fsnotify watcher (kqueue on macOS) watches the
+directory that holds the settings file, which is the test's home and holds `themes`. In fsnotify
+v1.10.1 (the latest release), `Watcher.Close` closes every watch's fd itself (#740). The reader
+goroutine can be dropping the watch of a renamed or removed file at that moment: it has looked the
+watch up and closes its fd too, after Close closed it. That second close can come after Close
+returned, by which time the number can be a file someone else opened. `theme.save --apply` saves the settings
+file (a rename into the watched directory) just before the test ends, so the store's Close in
+the cleanup could race the reader. The late close hit the fd `RemoveAll` had just opened on
+`themes`, between its dup and `fdopendir`. In the daemon the store closes only at shutdown, but
+the same late close can land on any fd opened in that window.
+
+Fix: `settings.Store.Close` waits for fsnotify's reader to end. It drains `Events` until it
+closes, which the reader does as it exits, after its last close of a watch. The fd can still be
+closed twice inside Close, but now nothing the caller opens after Close can be hit. A real fix
+belongs in fsnotify (Close and the reader's remove need one lock). memory, usertheme and the
+thread transcript tail also use fsnotify watchers and close them the same way. No failure in their
+tests points to them yet, and they are left as they are.
+
+Verified. The test itself did not fail locally (0 of 7,200 runs with 24 processes at once): the
+window is a few instructions. Two probes show the mechanism:
+
+- A raw fsnotify watcher on a directory, three renames, Close, then 32 fds opened and checked once
+  the reader ended: 4 fds were closed under the caller in 22,000 rounds (11 processes of 2,000 at
+  once). The twelfth process hung inside `Close` itself, in `close(2)` of a watch fd, which is
+  kqueue's own problem and not chased here.
+- Through `settings.Store` (Open, three Updates, Close, 32 fds opened, checked 20 ms later),
+  built against a copy of fsnotify with a 20 ms sleep in the reader's `remove` before its
+  `unix.Close` (only for the probe): before the fix, 764 of 1,000 rounds had an fd closed after
+  `Close` returned; after, 0 of 12,000 (12 processes at once). Without the sleep, 0 of 12,000
+  before and after.
+
+`TestCloseWaitsForTheWatcher` (close_test.go) checks that `Events` is closed when Close returns:
+0 of 300 runs fail with the fix, and 14 of 50 failed without it. Both theme card tests after the fix:
+0 of 3,600 runs each (24 processes at once).
+
+## TestMoveLiveIntoWorkspace (internal/store/thread)
+
+CI (runs 44630990935 and 44690663310, attempt 1): `WARNING: DATA RACE`, a write of `st.proc`
+in `respawn` (effort.go) against a read in `runner.pid` from the test helper `env.pid`, and
+`restart cwd = .../home, want .../repo`.
+
+Cause, in the test: two races in the same place.
+
+- `env.pid` read `rec.run.pid()`, which reads `st.proc` without `connMu`. In the product only the
+  run goroutine calls `runner.pid` (onTick, onShellTask), and that goroutine is the one that
+  replaces `st.proc` in a restart. Off the goroutine, `Manager.claudePID` reads it under
+  `connMu`. The helper was the only reader that broke that rule, so the product has no race.
+- The test waited for the restart's argv (`waitArgv` reads the latest spawn record), then for
+  `StateConnected`, then read the spawn record of the thread's current process. The fake writes
+  its spawn record as it starts, which can be before `respawn` stores the new process, and the
+  thread is connected throughout. So the test could read the old process's record, whose cwd is
+  home.
+
+Fix: `env.pid` reads `st.proc` under `connMu`, as `claudePID` does. The test waits with
+`env.waitSpec` until the thread's current process is the restart (its argv has the new member as
+`--add-dir`) and checks that process's cwd.
+
+Verified: with no change, 0 of 480 runs (24 processes at once) and 0 of 720 at `GOMAXPROCS=1`
+failed. The window is between `claudestream.Start` returning and `connMu.Lock`. With a 50 ms sleep
+put there (only for the check), the old test failed 40 of 40 with the sweep's message and race
+stacks. The fixed test failed 0 of 240 runs with the sleep (12 processes) and 0 of 480 without it
+(24 processes).

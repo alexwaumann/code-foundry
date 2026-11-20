@@ -213,16 +213,42 @@ func (e *env) connected(o CreateOptions) Thread {
 	return e.waitFor(s.ID, "connected", func(s Thread) bool { return s.State == StateConnected && s.Status != StatusUnknown })
 }
 
-// pid is the process id of the thread's running claude.
+// pid is the process id of the thread's running claude. The test is off the run
+// goroutine, so it reads the process under connMu, as Manager.claudePID does: a restart
+// (effort.go) replaces it.
 func (e *env) pid(id string) int {
 	e.t.Helper()
 	e.m.mu.Lock()
-	defer e.m.mu.Unlock()
 	rec, ok := e.m.recs[id]
-	if !ok || rec.run == nil {
+	var r *runner
+	if ok {
+		r = rec.run
+	}
+	e.m.mu.Unlock()
+	if r == nil {
 		e.t.Fatalf("thread %s has no process", id)
 	}
-	return rec.run.pid()
+	r.st.connMu.Lock()
+	defer r.st.connMu.Unlock()
+	return r.st.proc.Pid()
+}
+
+// waitSpec waits until the thread's running claude is one whose spawn record meets
+// cond. A restarted claude records its spawn before the runner takes it on, so the
+// latest argv (waitArgv) can be the new process's while the thread's is still the old.
+func (e *env) waitSpec(id, what string, cond func(fakeSpawn) bool) fakeSpawn {
+	e.t.Helper()
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		sp := e.spec(id)
+		if cond(sp) {
+			return sp
+		}
+		if time.Now().After(deadline) {
+			e.t.Fatalf("timed out waiting for %s; argv %q", what, sp.Argv)
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
 }
 
 // spec is what the thread's running claude recorded about itself: argv, cwd, env.

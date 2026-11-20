@@ -234,7 +234,8 @@ func TestMoveLiveIntoWorkspace(t *testing.T) {
 		t.Errorf("restart argv %q", argv)
 	}
 	e.waitFor(s.ID, "connected again", func(s Thread) bool { return s.State == StateConnected })
-	if spec := e.spec(s.ID); !samePath(spec.Cwd, e.wt) {
+	spec := e.waitSpec(s.ID, "the restarted process", func(sp fakeSpawn) bool { return slices.Contains(addDirs(sp.Argv), e.wt2) })
+	if !samePath(spec.Cwd, e.wt) {
 		t.Errorf("restart cwd = %s, want %s", spec.Cwd, e.wt)
 	}
 	e.waitItems(s.ID, "the move note", hasNote("Moved this thread to workspace login ("+e.wt+")."))
