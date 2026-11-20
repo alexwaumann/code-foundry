@@ -43,8 +43,9 @@ func threadArchive(b ThreadBackend, idArg ArgSpec) Command {
 			descendantsArg("archive the threads below it (not it, unless include-root)"),
 			includeRootArg,
 		},
-		When:    hasThreadOrCLI,
-		Confirm: "Archive thread {id}? Claude is still working; archiving ends the turn.",
+		When:         hasThreadOrCLI,
+		Confirm:      "Archive thread {id}? Claude is still working; archiving ends the turn.",
+		ConfirmLabel: "Archive",
 		ConfirmIf: func(ctx context.Context, c Context, a Args) bool {
 			return notSelf(c, a, "archiving") == nil && archiveConfirm(ctx, b, c, a) != ""
 		},

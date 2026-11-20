@@ -95,8 +95,9 @@ func threadProjectRemove(b ThreadBackend, idArg ArgSpec) Command {
 			idArg,
 			{Name: "project", Type: String, Required: true, Positional: true, Description: "Project id or name"},
 		},
-		When:    hasThread,
-		Confirm: "Remove {project} from the thread?",
+		When:         hasThread,
+		Confirm:      "Remove {project} from the thread?",
+		ConfirmLabel: "Remove",
 		ConfirmIf: func(ctx context.Context, _ Context, a Args) bool {
 			return dirtyMember(ctx, b, a.String("id"), a.String("project")) != nil
 		},

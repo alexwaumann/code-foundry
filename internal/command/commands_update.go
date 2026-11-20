@@ -363,7 +363,14 @@ func RegisterUpdate(r *Registry, d UpdateDeps) error {
 				}
 				return ""
 			},
-			Confirm: restartConfirm("Restart Code Foundry", RestartCost{}),
+			Confirm:      restartConfirm("Restart Code Foundry", RestartCost{}),
+			ConfirmLabel: "Restart",
+			DynamicConfirmLabel: func(ctx context.Context, _ Context, _ Args) string {
+				if downloadedTarget(updateStatus(ctx, d.Update)) != "" {
+					return "Install and restart"
+				}
+				return ""
+			},
 			DynamicConfirm: func(ctx context.Context, _ Context, _ Args) string {
 				return restartConfirm(restartWhat(updateStatus(ctx, d.Update)), restartCost(ctx, d.Thread))
 			},
@@ -408,8 +415,9 @@ func RegisterUpdate(r *Registry, d UpdateDeps) error {
 			Title: "Restart Daemon",
 			Description: "Restart the daemon, so it runs the installed version. " +
 				"Threads keep their history and a message starts each again; a turn or background work running is cut off.",
-			Category: "Daemon",
-			Confirm:  restartConfirm("Restart the daemon", RestartCost{}),
+			Category:     "Daemon",
+			Confirm:      restartConfirm("Restart the daemon", RestartCost{}),
+			ConfirmLabel: "Restart",
 			DynamicConfirm: func(ctx context.Context, _ Context, _ Args) string {
 				return restartConfirm("Restart the daemon", restartCost(ctx, d.Thread))
 			},

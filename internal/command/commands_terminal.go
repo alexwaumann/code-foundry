@@ -267,14 +267,18 @@ func RegisterTerminal(r *Registry, d TerminalDeps) error {
 			},
 		},
 		Command{
-			Name:        "terminal.kill",
-			Page:        PageState,
-			Title:       "Kill Terminal",
-			Description: "Terminate the terminal's process (SIGHUP, then SIGKILL after a grace period).",
-			Category:    "Terminal",
-			Args:        []ArgSpec{positional(idArg)},
-			When:        hasTerminal,
-			Confirm:     "Kill terminal {id}? Its process is terminated.",
+			Name:         "terminal.kill",
+			Page:         PageState,
+			Title:        "Kill Terminal",
+			Description:  "Terminate the terminal's process (SIGHUP, then SIGKILL after a grace period).",
+			Category:     "Terminal",
+			Args:         []ArgSpec{positional(idArg)},
+			When:         hasTerminal,
+			Confirm:      "Kill terminal {id}? Its process is terminated.",
+			ConfirmLabel: "Kill",
+			DynamicConfirm: func(ctx context.Context, _ Context, a Args) string {
+				return "Kill terminal " + killTerminalName(ctx, d.Terminal, a.String("id")) + "? Its process is terminated."
+			},
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
 				id := a.String("id")
 				if _, err := d.Terminal.Kill(ctx, connect.NewRequest(&v1.KillTerminalRequest{Id: id})); err != nil {
@@ -504,4 +508,24 @@ func defaultShell() []string {
 		sh = "/bin/zsh"
 	}
 	return []string{sh, "-l"}
+}
+
+// killTerminalName is how terminal.kill's question names terminal id: its title label (a
+// plugin's), its action's name, or the job running in it, quoted; else the id (unknown,
+// idle with none of those, or the list failed). The tab's manual name is the GUI's only.
+func killTerminalName(ctx context.Context, b TerminalBackend, id string) string {
+	res, err := b.List(ctx, connect.NewRequest(&v1.ListTerminalsRequest{}))
+	if err != nil {
+		return id
+	}
+	for _, t := range res.Msg.GetTerminals() {
+		if t.GetId() != id {
+			continue
+		}
+		l := t.GetLabels()
+		if name := cmp.Or(strings.TrimSpace(l[termlabel.Title]), strings.TrimSpace(l[termlabel.ActionName]), strings.TrimSpace(t.GetForeground())); name != "" {
+			return "“" + name + "”"
+		}
+	}
+	return id
 }

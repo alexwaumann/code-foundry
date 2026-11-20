@@ -64,6 +64,12 @@ func (f NotGitFunc) whyNotGit(c Context) string {
 	return ""
 }
 
+// unregisterConfirm is project.unregister's question about the project named name.
+func unregisterConfirm(name string) string {
+	return "Remove project " + name + " from Code Foundry? Nothing else on disk is deleted: only clean worktrees Code Foundry " +
+		"made that no thread uses (branches stay). Its threads lose their worktree."
+}
+
 // RegisterProject registers project.list, project.unregister, project.worktree.new, project.worktree.remove,
 // project.branch.delete, project.refresh, project.git.init, project.rename and
 // project.files.include. Adding a project is project.add
@@ -112,14 +118,19 @@ func RegisterProject(r *Registry, b ProjectBackend, notGit NotGitFunc) error {
 			},
 		},
 		Command{
-			Name:        "project.unregister",
-			Page:        PageState,
-			Title:       "Remove Project",
-			Description: "Stop tracking a project. The worktrees Code Foundry made for it that no thread uses and that are clean are removed (never a branch); nothing else on disk is touched.",
-			Category:    "Project",
-			Args:        []ArgSpec{projectArg},
-			When:        hasProject,
-			Confirm:     "Stop tracking project {project}? Its threads lose their worktree; clean worktrees Code Foundry made that no thread uses are removed (branches stay).",
+			Name:         "project.unregister",
+			Page:         PageState,
+			Title:        "Remove Project",
+			Description:  "Stop tracking a project. The worktrees Code Foundry made for it that no thread uses and that are clean are removed (never a branch); nothing else on disk is touched.",
+			Category:     "Project",
+			Args:         []ArgSpec{projectArg},
+			When:         hasProject,
+			Confirm:      unregisterConfirm("{project}"),
+			ConfirmLabel: "Remove",
+			// The GUI passes the id: the question names the project.
+			DynamicConfirm: func(ctx context.Context, _ Context, a Args) string {
+				return unregisterConfirm(r.projectNamer(ctx)(a.String("project")))
+			},
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
 				id := a.String("project")
 				if _, err := b.Unregister(ctx, connect.NewRequest(&v1.UnregisterProjectRequest{Id: id})); err != nil {
@@ -179,6 +190,7 @@ func RegisterProject(r *Registry, b ProjectBackend, notGit NotGitFunc) error {
 			When:           func(c Context) bool { return hasActiveWorktree(c) && !notGit(c) },
 			WhyUnavailable: whyNoWorktree(notGit),
 			Confirm:        "Remove worktree {path}? This deletes files on disk.",
+			ConfirmLabel:   "Remove",
 			DynamicConfirm: func(_ context.Context, _ Context, a Args) string {
 				if !a.Bool("delete-branch") || a.Bool("force") {
 					return ""
@@ -227,7 +239,7 @@ func RegisterProject(r *Registry, b ProjectBackend, notGit NotGitFunc) error {
 			},
 		},
 		gitInitCommand(b, projectArg, notGit),
-		branchDeleteCommand(b, notGit),
+		branchDeleteCommand(r, b, notGit),
 		renameCommand(b, projectArg),
 		includeCommand(b, projectArg),
 	)

@@ -16,8 +16,11 @@ import (
 // is still working, thread.remove names them (commands_thread_bulk.go).
 
 // forkToKeep is how the user keeps a hidden child's work before its creator takes it
-// along: fork it, the fork is the user's.
-const forkToKeep = "fork it first (code-foundry thread fork --id <id>)."
+// along: fork it, the fork is the user's. Fork Thread names the command, not its CLI
+// verb: the GUI asks this too, and a hidden child is open there from its creator's
+// lineage group, worker card or the palette, where the thread menu's Fork and the
+// palette's Fork Thread run thread.fork on it.
+const forkToKeep = "fork it first (Fork Thread)."
 
 // hiddenWorking are the threads archiving each of ids takes with it
 // (ThreadFilter.archive_cascade_of) that are mid-turn (midTurn: starting, working, or

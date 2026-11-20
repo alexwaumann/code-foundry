@@ -389,14 +389,15 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter, opts ...Th
 			},
 		},
 		Command{
-			Name:        "thread.remove",
-			Page:        PageState,
-			Title:       "Remove Thread",
-			Description: "Forget a thread, stopping Claude first if it runs.",
-			Category:    "Thread",
-			Args:        []ArgSpec{positional(optionalID(idArg)), threadIDsArg},
-			When:        hasThreadOrCLI,
-			Confirm:     "Remove thread {id}? Claude stops if it runs, and the thread is forgotten.",
+			Name:         "thread.remove",
+			Page:         PageState,
+			Title:        "Remove Thread",
+			Description:  "Forget a thread, stopping Claude first if it runs.",
+			Category:     "Thread",
+			Args:         []ArgSpec{positional(optionalID(idArg)), threadIDsArg},
+			When:         hasThreadOrCLI,
+			Confirm:      "Remove thread {id}? " + removeOneWhat,
+			ConfirmLabel: "Remove",
 			// Without a thread Run says what is missing; with ids the message counts them.
 			ConfirmIf: func(_ context.Context, c Context, a Args) bool {
 				_, err := targetThreads(a)

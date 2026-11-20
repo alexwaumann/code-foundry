@@ -148,8 +148,9 @@ func RegisterPluginSurface(r *Registry, b PluginSurfaceBackend) error {
 			),
 			// The confirmation is the pressed command's own (its ConfirmError comes back from
 			// Run); listing plugin.act as confirming gives the CLI its --yes to pass on.
-			Confirm:   "Run the command of {key}?",
-			ConfirmIf: func(context.Context, Context, Args) bool { return false },
+			Confirm:      "Run the command of {key}?",
+			ConfirmLabel: "Run",
+			ConfirmIf:    func(context.Context, Context, Args) bool { return false },
 			Run: func(ctx context.Context, uctx Context, a Args) (Result, error) {
 				return pluginAct(ctx, r, b, uctx, a)
 			},
