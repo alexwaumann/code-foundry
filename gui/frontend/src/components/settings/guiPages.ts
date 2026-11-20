@@ -1,5 +1,5 @@
 /**
- * Settings pages the GUI draws on its own, after the daemon's schema pages: they show
+ * Settings pages the GUI draws on its own, in the nav after Plugins (model.ts settingsPages): they show
  * state rather than settings-file fields, so the schema has no page for them. A page that
  * is the GUI's only lists its sections, so the settings search finds them (model.ts
  * searchGuiPages); one that is also a schema page (Plugins) is found by its fields.

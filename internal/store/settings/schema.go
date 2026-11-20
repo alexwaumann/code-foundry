@@ -149,7 +149,9 @@ const (
 const (
 	PageGeneral       = "general"
 	PageAppearance    = "appearance"
+	PageLayout        = "layout"
 	PageNotifications = "notifications"
+	PageDictation     = "dictation"
 	PageSource        = "source"
 	PageKeybindings   = "keybindings"
 	PageEmber         = "ember"
@@ -160,43 +162,47 @@ const (
 )
 
 // Pages in display order. The keybindings page's sections are the command categories
-// (see Store.Pages); here it has none.
+// (see Store.Pages); here it has none. The GUI's own pages (Skills, Memory) follow
+// Plugins, so Advanced stays last (SettingsGUIPages, the GUI's settingsPages).
 var Pages = []Page{
 	{ID: PageGeneral, Title: "General", Sections: []Section{
 		{ID: "threads", Title: "Threads"},
 		{ID: "textgen", Title: "Text generation", Description: "Models for small jobs like naming a thread."},
-		{ID: "lifecycle", Title: "Lifecycle"},
-		{ID: "snooze", Title: "Events in “Until event”", Description: "What a snooze menu's Until event offers, when the thread can wait on it. The rest stay under More events."},
+		{ID: "snooze", Title: "Snooze"},
+		{ID: "until-event", Title: "Events in “Until event”", Description: "What a snooze menu's Until event offers, when the thread can wait on it. The rest stay under More events."},
 		{ID: "files", Title: "Files", Description: "What Go to File, @ completion and text search find."},
-		{ID: "dictation", Title: "Dictation", Description: "Speak into any composer. Transcribed on this Mac with Whisper; audio never leaves it."},
 		{ID: "updates", Title: "Updates"},
 	}},
 	{ID: PageAppearance, Title: "Appearance", Description: "Applied live in every window.", Sections: []Section{
 		{ID: "theme", Title: "Theme"},
 		{ID: "window", Title: "Window"},
-		{ID: "panes", Title: "Panes and sidebar"},
 		{ID: "terminal", Title: "Terminal"},
 	}},
+	{ID: PageLayout, Title: "Layout", Description: "How threads open, what panes show beside them and what the sidebar lists.",
+		Sections: []Section{{ID: "panes"}}},
 	{ID: PageNotifications, Title: "Notifications",
 		Description: "How the Dock tells you a thread needs you. macOS banners aren't available to this app.",
 		Sections:    []Section{{ID: "alerts"}}},
+	{ID: PageDictation, Title: "Dictation", Description: "Speak into any composer. Transcribed on this Mac with Whisper; audio never leaves it.",
+		Sections: []Section{{ID: "dictation"}}},
 	{ID: PageSource, Title: "Source control", Sections: []Section{
 		{ID: "github", Title: "GitHub", Description: "Pull requests and checks, read with your gh login."},
 		{ID: "projects", Title: "Projects", Description: "Fetching, branches and worktrees."},
 	}},
+	{ID: PageKeybindings, Title: "Keybindings",
+		Description: `Change or remove a command's shortcut. App shortcuts like cmd+k, cmd+b and cmd+1..9 are reserved.`},
+	{ID: PagePlugins, Title: "Plugins", Description: "Programs that add commands, panels and thread options to Code Foundry.",
+		Sections: []Section{{ID: "registries", Title: "Registries", Description: "Where Browse finds plugins to install."}}},
 	{ID: PageEmber, Title: "Ember", Description: "A resident agent that plans work, runs worker threads and reports back in its own chat.", Sections: []Section{
 		{ID: "experiment", Title: "Experiment"},
 		{ID: "models", Title: "Models"},
-		{ID: "epochs", Title: "Epochs", Description: "When Ember starts a fresh session, seeded with its memory, task board and recent messages. Checked after each turn."},
+		{ID: "sessions", Title: "Fresh sessions", Description: "When Ember starts a fresh session, seeded with its memory, task board and recent messages. Checked after each turn."},
 	}},
-	{ID: PageKeybindings, Title: "Keybindings",
-		Description: `Change or remove a command's shortcut. App shortcuts like cmd+k, cmd+b and cmd+1..9 are reserved.`},
 	{ID: PageAdvanced, Title: "Advanced", Sections: []Section{
 		{ID: "executables", Title: "Executables"},
+		{ID: "threads", Title: "Threads"},
 		{ID: "logging", Title: "Logging"},
 	}},
-	{ID: PagePlugins, Title: "Plugins", Description: "Programs that add commands, panels and thread options to Code Foundry.",
-		Sections: []Section{{ID: "registries", Title: "Registries", Description: "Where Browse finds plugins to install."}}},
 }
 
 // Groups are the file's tables, in file order. The settings page follows Pages.
@@ -422,9 +428,23 @@ var staticFields = []Field{
 		bind:        func(s *Settings) any { return &s.Threads.DefaultWorktree },
 	},
 	{
+		Key: KeyAutoName, Group: GroupThreads, Page: PageGeneral, Section: "threads", Type: Bool, Title: "Name threads automatically",
+		Description: "Give each new thread a name based on its first message.",
+		Default:     "true",
+		bind:        func(s *Settings) any { return &s.Threads.AutoName },
+	},
+	// General › Text generation.
+	{
+		Key: KeyUtilityModel, Group: GroupModels, Page: PageGeneral, Section: "textgen", Type: Enum, Title: "Utility model",
+		Description: "The model Code Foundry uses for its own small jobs. Always runs at low effort.",
+		Enum:        command.ThreadModels, EnumLabels: model.Labels(), Default: model.UtilityDefault,
+		bind: func(s *Settings) any { return &s.Models.Utility },
+	},
+	// General › Snooze.
+	{
 		// thread.snooze.default's preset (cmd+shift+s), passed as its to arg's default
 		// (daemon registryOverrides); the GUI's snooze menus mark it (docs/notes/put-away-chords.md).
-		Key: KeyDefaultSnooze, Group: GroupThreads, Page: PageGeneral, Section: "threads", Type: Enum, Title: "Default snooze",
+		Key: KeyDefaultSnooze, Group: GroupThreads, Page: PageGeneral, Section: "snooze", Type: Enum, Title: "Default snooze",
 		Description: "Where Snooze to Default (⇧⌘S) puts the thread you're looking at. The snooze menus mark it.",
 		Enum:        command.SnoozeDefaults,
 		EnumLabels:  []string{"1 hour", "3 hours", "Tomorrow, 9:00 AM", "Next week, Monday 9:00 AM", "Save for later"},
@@ -434,7 +454,7 @@ var staticFields = []Field{
 	{
 		// Auto-tidy's first step (internal/daemon/auto_tidy.go, docs/notes/auto-tidy.md): the
 		// clock is the thread's last activity, which a look at it does not move.
-		Key: KeyAutoSaveAfter, Group: GroupThreads, Page: PageGeneral, Section: "threads", Type: Enum, Title: "Save idle threads for later",
+		Key: KeyAutoSaveAfter, Group: GroupThreads, Page: PageGeneral, Section: "snooze", Type: Enum, Title: "Save idle threads for later",
 		Description: "A thread with no activity for this long (no message to or from Claude) moves to Snoozed with no alarm. Pinned threads, and threads that are working or asking, stay.",
 		Enum:        AutoSaveAfterValues, EnumLabels: []string{"Off", "After 1 day", "After 3 days", "After 1 week", "After 2 weeks", "After 1 month"},
 		Default: TidyOff,
@@ -443,50 +463,23 @@ var staticFields = []Field{
 	{
 		// Auto-tidy's second step: counted from when the thread was saved, by the user or the
 		// first step.
-		Key: KeyAutoArchiveAfter, Group: GroupThreads, Page: PageGeneral, Section: "threads", Type: Enum, Title: "Archive saved threads",
+		Key: KeyAutoArchiveAfter, Group: GroupThreads, Page: PageGeneral, Section: "snooze", Type: Enum, Title: "Archive saved threads",
 		Description: "A thread that has sat in Snoozed with no alarm or event for this long is archived. Its work is kept.",
 		Enum:        AutoArchiveAfterValues, EnumLabels: []string{"Off", "After 1 week", "After 2 weeks", "After 1 month", "After 3 months"},
 		Default: TidyOff,
 		bind:    func(s *Settings) any { return &s.Threads.AutoArchiveAfter },
 	},
-	{
-		Key: KeyAutoName, Group: GroupThreads, Page: PageGeneral, Section: "threads", Type: Bool, Title: "Name threads automatically",
-		Description: "Give each new thread a name based on its first message.",
-		Default:     "true",
-		bind:        func(s *Settings) any { return &s.Threads.AutoName },
-	},
-	{
-		Key: KeyUtilityModel, Group: GroupModels, Page: PageGeneral, Section: "textgen", Type: Enum, Title: "Utility model",
-		Description: "The model Code Foundry uses for its own small jobs. Always runs at low effort.",
-		Enum:        command.ThreadModels, EnumLabels: model.Labels(), Default: model.UtilityDefault,
-		bind: func(s *Settings) any { return &s.Models.Utility },
-	},
-	// General › Lifecycle.
-	{
-		Key: KeyCacheTTL, Group: GroupThreads, Page: PageGeneral, Section: "lifecycle", Unit: "s", Type: Int, Title: "Prompt cache lifetime",
-		Description: "How long the Claude API keeps a conversation's prompt cache (1 hour on Bedrock and the Anthropic API). Code Foundry uses this to tell when a thread's cache has expired. It doesn't change the API.",
-		Default:     strconv.Itoa(defaultCacheTTL), Min: 60, Max: 86400,
-		bind: func(s *Settings) any { return &s.Threads.CacheTTLSeconds },
-	},
-	{
-		Key: KeyCloseGrace, Group: GroupThreads, Page: PageGeneral, Section: "lifecycle", Unit: "s", Type: Int, Title: "Close grace",
-		Description: "How long a closing thread waits for Claude to exit before it is force-quit.",
-		Default:     strconv.Itoa(defaultCloseGrace), Min: 1, Max: 120, Restart: true,
-		bind: func(s *Settings) any { return &s.Threads.CloseGraceSeconds },
-	},
+	// General › Events in “Until event”.
 	{
 		// The GUI's Until event submenu (docs/notes/snooze-until-event.md): the pull request
 		// events and plugin wake sources it offers; the GUI draws the section as checkboxes.
-		Key: KeySnoozeEvents, Group: GroupThreads, Page: PageGeneral, Section: "snooze", Type: String, Title: "Events in Until event",
+		Key: KeySnoozeEvents, Group: GroupThreads, Page: PageGeneral, Section: "until-event", Type: String, Title: "Events in Until event",
 		Description: "The events a snooze menu's Until event offers, separated by spaces: pull request events (" + strings.Join(SnoozePullRequestEvents, ", ") +
 			") and plugin wake sources as plugin:<plugin>/<source>. none for none.",
 		Default: DefaultSnoozeEvents, Placeholder: DefaultSnoozeEvents,
 		check: checkSnoozeEvents,
 		bind:  func(s *Settings) any { return &s.Threads.SnoozeEvents },
 	},
-	// General › Text generation.
-	// General › Dictation. The rest of the section is the dictation store's state
-	// (DictationService.Watch): the model, its download, this Mac.
 	// General › Files.
 	{
 		Key: KeyIncludeIgnored, Group: GroupFiles, Page: PageGeneral, Section: "files", Type: String, Title: "Ignored files to include",
@@ -497,65 +490,6 @@ var staticFields = []Field{
 		Default: DefaultIncludeIgnored, Placeholder: ".env*, docs/scratch/",
 		check: fsx.CheckIncludeSetting,
 		bind:  func(s *Settings) any { return &s.Files.IncludeIgnored },
-	},
-	{
-		Key: KeyDictationEnabled, Group: GroupDictation, Page: PageGeneral, Section: "dictation", Type: Bool, Title: "Dictation",
-		Description: "Adds a microphone button to every composer.",
-		Default:     "false",
-		bind:        func(s *Settings) any { return &s.Dictation.Enabled },
-	},
-	{
-		Key: KeyDictationAnywhere, Group: GroupDictation, Page: PageGeneral, Section: "dictation", Type: Bool, Title: "Dictate anywhere",
-		Description: "The hold key works in every app and the text is pasted where you're typing. Code Foundry stays in the menu bar when you close its window. Off, the key works only while Code Foundry is in front.",
-		Default:     "false",
-		bind:        func(s *Settings) any { return &s.Dictation.Anywhere },
-	},
-	{
-		Key: KeyDictationHoldKey, Group: GroupDictation, Page: PageGeneral, Section: "dictation", DependsOn: KeyDictationEnabled, Type: Enum, Title: "Hold key",
-		Description: "Hold to dictate, release to finish. Both means either Option key works.",
-		Enum:        []string{HoldKeyLeft, HoldKeyRight, HoldKeyBoth},
-		EnumLabels:  []string{"Left ⌥", "Right ⌥", "Both ⌥"},
-		Default:     HoldKeyBoth,
-		bind:        func(s *Settings) any { return &s.Dictation.HoldKey },
-	},
-	{
-		Key: KeyDictationMicrophone, Group: GroupDictation, Page: PageGeneral, Section: "dictation", DependsOn: KeyDictationEnabled, Type: String, Title: "Microphone",
-		Description: "Follows the input chosen in System Settings.",
-		Default:     "",
-		bind:        func(s *Settings) any { return &s.Dictation.Microphone },
-	},
-	{
-		Key: KeyDictationSounds, Group: GroupDictation, Page: PageGeneral, Section: "dictation", DependsOn: KeyDictationEnabled, Type: Bool, Title: "Sounds",
-		Description: "Plays a sound as dictation starts and stops, at the alert volume.",
-		Default:     "true",
-		bind:        func(s *Settings) any { return &s.Dictation.Sounds },
-	},
-	{
-		Key: KeyDictationOtherAudio, Group: GroupDictation, Page: PageGeneral, Section: "dictation", DependsOn: KeyDictationEnabled, Type: Enum, Title: "Other audio",
-		Description: "What audio from this Mac does while you dictate.",
-		Enum:        []string{OtherAudioDoNothing, OtherAudioLower},
-		EnumLabels:  []string{"Do nothing", "Lower"},
-		Default:     OtherAudioDoNothing,
-		bind:        func(s *Settings) any { return &s.Dictation.OtherAudio },
-	},
-	// Behind the section's Advanced disclosure (the GUI's advancedFields.ts).
-	{
-		Key: KeyDictationAvoidBluetooth, Group: GroupDictation, Page: PageGeneral, Section: "dictation", DependsOn: KeyDictationEnabled, Type: Bool, Title: "Avoid Bluetooth microphones",
-		Description: "When the system default is Bluetooth, use the Mac’s microphone, so headphones stay out of low-quality call audio.",
-		Default:     "true",
-		bind:        func(s *Settings) any { return &s.Dictation.AvoidBluetooth },
-	},
-	{
-		Key: KeyDictationSpokenSymbols, Group: GroupDictation, Page: PageGeneral, Section: "dictation", DependsOn: KeyDictationEnabled, Type: Bool, Title: "Spoken symbols",
-		Description: "Words like “underscore”, “hashtag” and “comma” become the symbol: “my underscore variable” is my_variable.",
-		Default:     "false",
-		bind:        func(s *Settings) any { return &s.Dictation.SpokenSymbols },
-	},
-	{
-		Key: KeyDictationSpokenFormatting, Group: GroupDictation, Page: PageGeneral, Section: "dictation", DependsOn: KeyDictationEnabled, Type: Bool, Title: "Spoken formatting",
-		Description: "“New line”, “new paragraph”, “open quote” and “close quote” become line breaks and quotation marks.",
-		Default:     "true",
-		bind:        func(s *Settings) any { return &s.Dictation.SpokenFormatting },
 	},
 	// General › Updates.
 	{
@@ -610,48 +544,6 @@ var staticFields = []Field{
 		check:       checkBackdropFile,
 		bind:        func(s *Settings) any { return &s.Appearance.BackdropFile },
 	},
-	// Appearance › Panes and sidebar.
-	{
-		Key: KeySmartSwap, Group: GroupLayout, Page: PageAppearance, Section: "panes", Type: Bool, Title: "Smart swap",
-		Description: "When a thread's tab gains focus, panes showing another thread's diff, pull request or terminal switch to this thread's, if it is already open there. Nothing opens or closes.",
-		Default:     "true",
-		bind:        func(s *Settings) any { return &s.Layout.SmartSwap },
-	},
-	{
-		Key: KeySmartPlacement, Group: GroupLayout, Page: PageAppearance, Section: "panes", Type: Bool, Title: "Smart placement",
-		Description: "A thread you open or start goes to the focused pane only if it already has a thread open, otherwise to the nearest pane that has one. Another tab goes to a pane that already shows tabs of its kind (a terminal only to its own thread's terminals). Choosing a pane yourself still wins.",
-		Default:     "true",
-		bind:        func(s *Settings) any { return &s.Layout.SmartPlacement },
-	},
-	{
-		// The GUI's row shows this description, not the picked option's (gui/frontend keyEditors),
-		// and asks before a switch that closes tabs (layout.threads-open-as.preview).
-		Key: KeyThreadsOpenAs, Group: GroupLayout, Page: PageAppearance, Section: "panes", Type: Enum, Title: "Threads open as",
-		Description: "With Panes or Single, linked panes always follow the focused thread (smart swap is on).",
-		Enum:        []string{ThreadsOpenAsTabs, ThreadsOpenAsPanes, ThreadsOpenAsSingle}, EnumLabels: []string{"Tabs", "Panes", "Single"},
-		EnumDescriptions: []string{
-			"Each thread you open adds a tab. You close tabs yourself.",
-			"A thread pane shows one thread. Opening another thread swaps it in, and the diff, files and terminals beside it switch with it. " +
-				"Split when you want two threads side by side.",
-			"As Panes, with one thread pane per space. Every thread opens there.",
-		},
-		EnumExamples: []string{"", "", ""},
-		// Tabs until 2026-11-19: a home from before keeps it (defaultchange.go).
-		Default: ThreadsOpenAsPanes,
-		bind:    func(s *Settings) any { return &s.Layout.ThreadsOpenAs },
-	},
-	{
-		Key: KeyThreadInfo, Group: GroupLayout, Page: PageAppearance, Section: "panes", Type: Bool, Title: "Thread info by default",
-		Description: "Show the thread info card beside a thread's conversation when its pane is wide enough, for every thread you have not toggled it on. The header's button and ⌘⇧I show or hide it for one thread, and that thread keeps its choice.",
-		Default:     "true",
-		bind:        func(s *Settings) any { return &s.Layout.ThreadInfo },
-	},
-	{
-		Key: KeyNeedsScope, Group: GroupSidebar, Page: PageAppearance, Section: "panes", Type: Enum, Title: "Needs you lists",
-		Description: "Which threads the sidebar's Needs you section lists: those of every space, or only the current space's. Its header's button switches it too.",
-		Enum:        []string{NeedsScopeAll, NeedsScopeSpace}, EnumLabels: []string{"All spaces", "This space"}, Default: NeedsScopeAll,
-		bind: func(s *Settings) any { return &s.Sidebar.NeedsScope },
-	},
 	// Appearance › Terminal.
 	{
 		// The GUI bundles JetBrainsMono Nerd Font Mono (gui/frontend/public/fonts). Its own
@@ -672,6 +564,48 @@ var staticFields = []Field{
 		Description: "Rows of history each terminal keeps. A long line takes several, more when the terminal is narrow.",
 		Default:     strconv.Itoa(defaultScrollback), Min: 1000, Max: 100000, Restart: true,
 		bind: func(s *Settings) any { return &s.Appearance.ScrollbackLines },
+	},
+	// Layout.
+	{
+		// The GUI's row shows this description, not the picked option's (gui/frontend keyEditors),
+		// and asks before a switch that closes tabs (layout.threads-open-as.preview).
+		Key: KeyThreadsOpenAs, Group: GroupLayout, Page: PageLayout, Section: "panes", Type: Enum, Title: "Threads open as",
+		Description: "With Panes or Single, linked panes always follow the focused thread (smart swap is on).",
+		Enum:        []string{ThreadsOpenAsTabs, ThreadsOpenAsPanes, ThreadsOpenAsSingle}, EnumLabels: []string{"Tabs", "Panes", "Single"},
+		EnumDescriptions: []string{
+			"Each thread you open adds a tab. You close tabs yourself.",
+			"A thread pane shows one thread. Opening another thread swaps it in, and the diff, files and terminals beside it switch with it. " +
+				"Split when you want two threads side by side.",
+			"As Panes, with one thread pane per space. Every thread opens there.",
+		},
+		EnumExamples: []string{"", "", ""},
+		// Tabs until 2026-11-19: a home from before keeps it (defaultchange.go).
+		Default: ThreadsOpenAsPanes,
+		bind:    func(s *Settings) any { return &s.Layout.ThreadsOpenAs },
+	},
+	{
+		Key: KeySmartSwap, Group: GroupLayout, Page: PageLayout, Section: "panes", Type: Bool, Title: "Smart swap",
+		Description: "When a thread's tab gains focus, panes showing another thread's diff, pull request or terminal switch to this thread's, if it is already open there. Nothing opens or closes.",
+		Default:     "true",
+		bind:        func(s *Settings) any { return &s.Layout.SmartSwap },
+	},
+	{
+		Key: KeySmartPlacement, Group: GroupLayout, Page: PageLayout, Section: "panes", Type: Bool, Title: "Smart placement",
+		Description: "A thread you open or start goes to the focused pane only if it already has a thread open, otherwise to the nearest pane that has one. Another tab goes to a pane that already shows tabs of its kind (a terminal only to its own thread's terminals). Choosing a pane yourself still wins.",
+		Default:     "true",
+		bind:        func(s *Settings) any { return &s.Layout.SmartPlacement },
+	},
+	{
+		Key: KeyThreadInfo, Group: GroupLayout, Page: PageLayout, Section: "panes", Type: Bool, Title: "Thread info by default",
+		Description: "Show the thread info card beside a thread's conversation when its pane is wide enough, for every thread you have not toggled it on. The header's button and ⌘⇧I show or hide it for one thread, and that thread keeps its choice.",
+		Default:     "true",
+		bind:        func(s *Settings) any { return &s.Layout.ThreadInfo },
+	},
+	{
+		Key: KeyNeedsScope, Group: GroupSidebar, Page: PageLayout, Section: "panes", Type: Enum, Title: "Needs you lists",
+		Description: "Which threads the sidebar's Needs you section lists: those of every space, or only the current space's. Its header's button switches it too.",
+		Enum:        []string{NeedsScopeAll, NeedsScopeSpace}, EnumLabels: []string{"All spaces", "This space"}, Default: NeedsScopeAll,
+		bind: func(s *Settings) any { return &s.Sidebar.NeedsScope },
 	},
 	// Notifications.
 	{
@@ -703,6 +637,67 @@ var staticFields = []Field{
 		Description: "Shortest gap between bounces and sounds. The badge always updates. 0 alerts every time.",
 		Default:     strconv.Itoa(defaultAlertCooldown), Min: 0, Max: 3600,
 		bind: func(s *Settings) any { return &s.Notifications.CooldownSeconds },
+	},
+	// Dictation. The rest of the page is the dictation store's state
+	// (DictationService.Watch): the model, its download, this Mac.
+	{
+		Key: KeyDictationEnabled, Group: GroupDictation, Page: PageDictation, Section: "dictation", Type: Bool, Title: "Dictation",
+		Description: "Adds a microphone button to every composer.",
+		Default:     "false",
+		bind:        func(s *Settings) any { return &s.Dictation.Enabled },
+	},
+	{
+		Key: KeyDictationAnywhere, Group: GroupDictation, Page: PageDictation, Section: "dictation", Type: Bool, Title: "Dictate anywhere",
+		Description: "The hold key works in every app and the text is pasted where you're typing. Code Foundry stays in the menu bar when you close its window. Off, the key works only while Code Foundry is in front.",
+		Default:     "false",
+		bind:        func(s *Settings) any { return &s.Dictation.Anywhere },
+	},
+	{
+		Key: KeyDictationHoldKey, Group: GroupDictation, Page: PageDictation, Section: "dictation", DependsOn: KeyDictationEnabled, Type: Enum, Title: "Hold key",
+		Description: "Hold to dictate, release to finish. Both means either Option key works.",
+		Enum:        []string{HoldKeyLeft, HoldKeyRight, HoldKeyBoth},
+		EnumLabels:  []string{"Left ⌥", "Right ⌥", "Both ⌥"},
+		Default:     HoldKeyBoth,
+		bind:        func(s *Settings) any { return &s.Dictation.HoldKey },
+	},
+	{
+		Key: KeyDictationMicrophone, Group: GroupDictation, Page: PageDictation, Section: "dictation", DependsOn: KeyDictationEnabled, Type: String, Title: "Microphone",
+		Description: "Follows the input chosen in System Settings.",
+		Default:     "",
+		bind:        func(s *Settings) any { return &s.Dictation.Microphone },
+	},
+	{
+		Key: KeyDictationSounds, Group: GroupDictation, Page: PageDictation, Section: "dictation", DependsOn: KeyDictationEnabled, Type: Bool, Title: "Sounds",
+		Description: "Plays a sound as dictation starts and stops, at the alert volume.",
+		Default:     "true",
+		bind:        func(s *Settings) any { return &s.Dictation.Sounds },
+	},
+	{
+		Key: KeyDictationOtherAudio, Group: GroupDictation, Page: PageDictation, Section: "dictation", DependsOn: KeyDictationEnabled, Type: Enum, Title: "Other audio",
+		Description: "What audio from this Mac does while you dictate.",
+		Enum:        []string{OtherAudioDoNothing, OtherAudioLower},
+		EnumLabels:  []string{"Do nothing", "Lower"},
+		Default:     OtherAudioDoNothing,
+		bind:        func(s *Settings) any { return &s.Dictation.OtherAudio },
+	},
+	// Behind the section's Advanced disclosure (the GUI's advancedFields.ts).
+	{
+		Key: KeyDictationAvoidBluetooth, Group: GroupDictation, Page: PageDictation, Section: "dictation", DependsOn: KeyDictationEnabled, Type: Bool, Title: "Avoid Bluetooth microphones",
+		Description: "When the system default is Bluetooth, use the Mac’s microphone, so headphones stay out of low-quality call audio.",
+		Default:     "true",
+		bind:        func(s *Settings) any { return &s.Dictation.AvoidBluetooth },
+	},
+	{
+		Key: KeyDictationSpokenSymbols, Group: GroupDictation, Page: PageDictation, Section: "dictation", DependsOn: KeyDictationEnabled, Type: Bool, Title: "Spoken symbols",
+		Description: "Words like “underscore”, “hashtag” and “comma” become the symbol: “my underscore variable” is my_variable.",
+		Default:     "false",
+		bind:        func(s *Settings) any { return &s.Dictation.SpokenSymbols },
+	},
+	{
+		Key: KeyDictationSpokenFormatting, Group: GroupDictation, Page: PageDictation, Section: "dictation", DependsOn: KeyDictationEnabled, Type: Bool, Title: "Spoken formatting",
+		Description: "“New line”, “new paragraph”, “open quote” and “close quote” become line breaks and quotation marks.",
+		Default:     "true",
+		bind:        func(s *Settings) any { return &s.Dictation.SpokenFormatting },
 	},
 	// Source control › GitHub.
 	{
@@ -776,6 +771,14 @@ var staticFields = []Field{
 		Placeholder: "auto-detect", UserOnly: true,
 		bind: func(s *Settings) any { return &s.GitOps.EditorCommand },
 	},
+	// Plugins › Registries.
+	{
+		Key: KeyPluginRegistries, Group: GroupPlugins, Page: PagePlugins, Section: "registries", Type: String, Title: "Plugin registries",
+		Description: "Where Browse and plugin install look for plugins, in order; the first registry listing a name wins. Each is a GitHub repository URL (private ones work through your gh login) or an https URL of an index.json, separated by commas. Empty means no registry: Browse lists nothing and install needs a release or a folder.",
+		Default:     "", Placeholder: "https://github.com/<owner>/<repo>", UserOnly: true,
+		check: checkRegistries,
+		bind:  func(s *Settings) any { return &s.Plugins.Registries },
+	},
 	// Ember (docs/notes/ember-2-store.md): read by the Ember store (internal/store/ember),
 	// live.
 	{
@@ -811,18 +814,18 @@ var staticFields = []Field{
 		bind: func(s *Settings) any { return &s.Ember.WorkerEffort },
 	},
 	{
-		Key: KeyEmberEpochTokens, Group: GroupEmber, Page: PageEmber, Section: "epochs", Unit: "tokens", Type: Int, Title: "Context limit",
+		Key: KeyEmberEpochTokens, Group: GroupEmber, Page: PageEmber, Section: "sessions", Unit: "tokens", Type: Int, Title: "Context limit",
 		Description: "Start a fresh session once Ember's context passes this many tokens. A fresh session starts near 25K.",
 		Default:     strconv.Itoa(defaultEmberEpochTokens), Min: 50000, Max: 1000000,
 		bind: func(s *Settings) any { return &s.Ember.EpochContextTokens },
 	},
 	{
-		Key: KeyEmberEpochHours, Group: GroupEmber, Page: PageEmber, Section: "epochs", Unit: "h", Type: Int, Title: "Session age limit",
+		Key: KeyEmberEpochHours, Group: GroupEmber, Page: PageEmber, Section: "sessions", Unit: "h", Type: Int, Title: "Session age limit",
 		Description: "Start a fresh session once the current one is this many hours old.",
 		Default:     strconv.Itoa(defaultEmberEpochHours), Min: 1, Max: 720,
 		bind: func(s *Settings) any { return &s.Ember.EpochMaxHours },
 	},
-	// Advanced.
+	// Advanced › Executables.
 	{
 		Key: KeyClaudePath, Group: GroupAdvanced, Page: PageAdvanced, Section: "executables", Type: Path, Title: "claude executable",
 		Description: "Path to claude. Empty finds it on PATH.",
@@ -835,19 +838,25 @@ var staticFields = []Field{
 		Placeholder: "gh (from PATH)", Restart: true, UserOnly: true, check: checkExecutable,
 		bind: func(s *Settings) any { return &s.Advanced.GhPath },
 	},
+	// Advanced › Threads.
+	{
+		Key: KeyCacheTTL, Group: GroupThreads, Page: PageAdvanced, Section: "threads", Unit: "s", Type: Int, Title: "Prompt cache lifetime",
+		Description: "How long the Claude API keeps a conversation's prompt cache (1 hour on Bedrock and the Anthropic API). Code Foundry uses this to tell when a thread's cache has expired. It doesn't change the API.",
+		Default:     strconv.Itoa(defaultCacheTTL), Min: 60, Max: 86400,
+		bind: func(s *Settings) any { return &s.Threads.CacheTTLSeconds },
+	},
+	{
+		Key: KeyCloseGrace, Group: GroupThreads, Page: PageAdvanced, Section: "threads", Unit: "s", Type: Int, Title: "Close grace",
+		Description: "How long a closing thread waits for Claude to exit before it is force-quit.",
+		Default:     strconv.Itoa(defaultCloseGrace), Min: 1, Max: 120, Restart: true,
+		bind: func(s *Settings) any { return &s.Threads.CloseGraceSeconds },
+	},
+	// Advanced › Logging.
 	{
 		Key: KeyLogLevel, Group: GroupAdvanced, Page: PageAdvanced, Section: "logging", Type: Enum, Title: "Log level",
 		Description: "Lowest level written to logs/daemon.log.",
 		Enum:        []string{"debug", "info", "warn", "error"}, EnumLabels: []string{"Debug", "Info", "Warn", "Error"}, Default: "info",
 		bind: func(s *Settings) any { return &s.Advanced.LogLevel },
-	},
-	// Plugins › Registries.
-	{
-		Key: KeyPluginRegistries, Group: GroupPlugins, Page: PagePlugins, Section: "registries", Type: String, Title: "Plugin registries",
-		Description: "Where Browse and plugin install look for plugins, in order; the first registry listing a name wins. Each is a GitHub repository URL (private ones work through your gh login) or an https URL of an index.json, separated by commas. Empty means no registry: Browse lists nothing and install needs a release or a folder.",
-		Default:     "", Placeholder: "https://github.com/<owner>/<repo>", UserOnly: true,
-		check: checkRegistries,
-		bind:  func(s *Settings) any { return &s.Plugins.Registries },
 	},
 }
 

@@ -42,7 +42,7 @@ const field: SettingFieldView = {
   max: 0,
   placeholder: "",
   page: "general",
-  section: "snooze",
+  section: "until-event",
   unit: "",
   dependsOn: "",
   dependsOnValue: "",
@@ -51,7 +51,7 @@ const field: SettingFieldView = {
 const schema: SettingsSchemaView = {
   groups: [],
   fields: [field],
-  pages: [{ id: "general", title: "General", description: "", sections: [{ id: "snooze", title: "Events in “Until event”", description: "What a snooze menu's Until event offers." }] }],
+  pages: [{ id: "general", title: "General", description: "", sections: [{ id: "until-event", title: "Events in “Until event”", description: "What a snooze menu's Until event offers." }] }],
 };
 
 function plugin(name: string, displayName: string, wakes: { name: string; title: string }[]): PluginView {

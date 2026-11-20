@@ -1074,7 +1074,7 @@ export class World {
       source: APP_SOURCE,
       key: "threads-open-as-panes",
       title: "Threads can now open as panes",
-      body: "A thread pane shows one thread with its diff, files and terminals beside it. Clicking another thread swaps them, so there are no thread tabs to manage. You are still on tabs: switch in Settings › Panes and sidebar › Threads open as.",
+      body: "A thread pane shows one thread with its diff, files and terminals beside it. Clicking another thread swaps them, so there are no thread tabs to manage. You are still on tabs: switch in Settings › Layout › Threads open as.",
       actions: [{ label: "Open settings", kind: "command", arg: "view.settings", args: { setting: "layout.threads_open_as" }, resolves: false }],
     });
     return { wrote: true, noticeId: n.id };

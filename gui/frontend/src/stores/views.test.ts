@@ -39,8 +39,8 @@ describe("showView", () => {
     const scrolled = vi.fn();
     try {
       useViewsStore.setState({ settingsOpen: false, usageOpen: false, themesOpen: false, helpOpen: false });
-      expect(showView("settings.appearance", { setting: "layout.threads_open_as" })).toBe(true);
-      expect(useViewsStore.getState()).toMatchObject({ settingsOpen: true, settingsPage: "appearance" });
+      expect(showView("settings.layout", { setting: "layout.threads_open_as" })).toBe(true);
+      expect(useViewsStore.getState()).toMatchObject({ settingsOpen: true, settingsPage: "layout" });
       // The page has not drawn the row yet: it tries again on the next frame.
       frames.shift()?.(0);
       expect(frames).toHaveLength(1);

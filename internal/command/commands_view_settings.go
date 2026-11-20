@@ -15,13 +15,15 @@ import (
 // the page it shows, General the first time.
 const ViewSettingsPagePrefix = ViewSettings + "."
 
-// SettingsGUIPages are the settings pages the GUI draws on its own, after the schema's
-// pages (gui/frontend/src/components/settings/guiPages.ts; a test keeps the two in step).
-// One may be a schema page too (plugins).
+// SettingsGUIPages are the settings pages the GUI draws on its own
+// (gui/frontend/src/components/settings/guiPages.ts; a test keeps the two in step). One may
+// be a schema page too (plugins); the rest follow the one before them, so they sit after
+// Plugins and before the schema's later pages (Ember, Advanced).
 var SettingsGUIPages = []string{"plugins", "skills", "memory"}
 
-// settingsPageIDs are the ids view.settings --page takes: the schema's pages in display
-// order, then the GUI's own. Without a schema reader, the GUI's own only.
+// settingsPageIDs are the ids view.settings --page takes, in the settings nav's order: the
+// schema's pages, with each of the GUI's own that the schema lacks right after the GUI page
+// before it (the GUI's settingsPages). Without a schema reader, the GUI's own only.
 func (d ViewDeps) settingsPageIDs(ctx context.Context) ([]string, error) {
 	var ids []string
 	if d.Settings != nil {
@@ -33,10 +35,17 @@ func (d ViewDeps) settingsPageIDs(ctx context.Context) ([]string, error) {
 			ids = append(ids, p.GetId())
 		}
 	}
-	for _, id := range SettingsGUIPages {
-		if !slices.Contains(ids, id) {
-			ids = append(ids, id)
+	for i, id := range SettingsGUIPages {
+		if slices.Contains(ids, id) {
+			continue
 		}
+		at := len(ids)
+		if i > 0 {
+			if j := slices.Index(ids, SettingsGUIPages[i-1]); j >= 0 {
+				at = j + 1
+			}
+		}
+		ids = slices.Insert(ids, at, id)
 	}
 	return ids, nil
 }

@@ -61,7 +61,9 @@ for (const scheme of ["dark", "light"] as const) {
     await expect(menu).toHaveCount(0);
     await page.keyboard.press("Meta+Comma");
     const settings = page.getByTestId("settings-page");
-    await expect(settings.locator('[data-setting="threads.default_model"]')).toBeVisible();
-    await shot(page, `settings-threads-${scheme}`);
+    const snooze = settings.locator('[data-setting="threads.default_snooze"]');
+    await snooze.scrollIntoViewIfNeeded();
+    await expect(snooze).toBeVisible();
+    await shot(page, `settings-snooze-${scheme}`);
   });
 }

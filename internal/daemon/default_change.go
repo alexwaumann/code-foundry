@@ -55,7 +55,7 @@ var defaultNotices = map[string]notification.Post{
 		Level:  notification.LevelInfo,
 		Title:  "Threads can now open as panes",
 		Body: "A thread pane shows one thread with its diff, files and terminals beside it. Clicking another thread swaps them, " +
-			"so there are no thread tabs to manage. You are still on tabs: switch in Settings › Panes and sidebar › Threads open as.",
+			"so there are no thread tabs to manage. You are still on tabs: switch in Settings › Layout › Threads open as.",
 		Actions: []notification.ActionSpec{{Action: notification.Action{
 			Label: "Open settings", Kind: notification.KindCommand, Command: "view.settings",
 			Args: map[string]string{"setting": settings.KeyThreadsOpenAs},

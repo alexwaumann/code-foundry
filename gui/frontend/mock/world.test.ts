@@ -57,7 +57,7 @@ describe("the mock world", () => {
       const emit = vi.spyOn(w, "emit");
       const out = await run(w, "notification.act", { activeView: "thread" }, { id: first.noticeId });
       expect(out).not.toContain("resolved");
-      expect(emit.mock.calls.at(-1)?.[0]).toEqual({ intent: { case: "showView", value: { name: "settings.appearance", params: { setting: "layout.threads_open_as" } } } });
+      expect(emit.mock.calls.at(-1)?.[0]).toEqual({ intent: { case: "showView", value: { name: "settings.layout", params: { setting: "layout.threads_open_as" } } } });
     });
 
     it.each(["tabs", "panes", "single"])("an existing home whose settings set %s is left alone", (v) => {

@@ -29,7 +29,7 @@ const { SettingsSection } = await import("./SectionCard");
 const { ALLOW_ADVICE_MS } = await import("./DictationSettings");
 const { ConfirmDialog } = await import("@/components/confirm/ConfirmDialog");
 
-// The daemon's schema for General › Dictation (internal/store/settings/schema.go).
+// The daemon's schema for Settings › Dictation (internal/store/settings/schema.go).
 const field: SettingFieldView = {
   key: "dictation.enabled",
   title: "Dictation",
@@ -45,7 +45,7 @@ const field: SettingFieldView = {
   min: 0,
   max: 0,
   placeholder: "",
-  page: "general",
+  page: "dictation",
   section: "dictation",
   unit: "",
   dependsOn: "",
@@ -61,7 +61,7 @@ const otherAudio: SettingFieldView = { ...field, key: "dictation.other_audio", t
 const symbols: SettingFieldView = { ...field, key: "dictation.spoken_symbols", title: "Spoken symbols", dependsOn: field.key };
 const formatting: SettingFieldView = { ...field, key: "dictation.spoken_formatting", title: "Spoken formatting", defaultValue: "true", dependsOn: field.key };
 const section = { id: "dictation", title: "Dictation", description: "Speak into any composer. Transcribed on this Mac with Whisper; audio never leaves it." };
-const schema: SettingsSchemaView = { groups: [], fields: [field, anywhere, holdKey, microphone, sounds, otherAudio, avoid, symbols, formatting], pages: [{ id: "general", title: "General", description: "", sections: [section] }] };
+const schema: SettingsSchemaView = { groups: [], fields: [field, anywhere, holdKey, microphone, sounds, otherAudio, avoid, symbols, formatting], pages: [{ id: "dictation", title: "Dictation", description: "", sections: [section] }] };
 
 const M1 = { chip: "Apple M1 Pro", memoryBytes: 16 * 2 ** 30, m1Family: true };
 const NO_MODEL = { downloaded: false, sizeBytes: 874_188_075 };
@@ -86,7 +86,7 @@ async function mount(s: ReturnType<typeof dictationSnap>) {
   fakeDictation.publish(s);
   render(
     <>
-      <SettingsSection schema={schema} pageId="general" section={{ section, fields: schema.fields }} />
+      <SettingsSection schema={schema} pageId="dictation" section={{ section, fields: schema.fields }} />
       <ConfirmDialog />
     </>,
   );
