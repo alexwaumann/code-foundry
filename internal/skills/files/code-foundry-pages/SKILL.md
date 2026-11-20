@@ -112,8 +112,7 @@ click or while nothing is hovered; a button acts on the id its row was drawn wit
 chose across restarts, one per page file, shared by its card and tabs; 256 KiB in all, any value
 size within that (1 KiB caps a key's name). Draw from it in a `draw()` called after each `set`
 and passed to `s.onChange(draw)` (now, and on another copy's change). A hidden page (another tab
-or space in front) is unloaded and loads afresh when shown: keep there what should survive (a
-draft, the chosen tab). Fetched data: store the last good result and its time, show it at once and
+or space in front) is unloaded and loads afresh when shown: keep there what should survive. Fetched data: store the last good result and its time, show it at once and
 refetch. Raw `localStorage` is cleared when the app quits; an API token goes in a password
 field, then `cf.storage`. A moved or renamed file starts empty; removing this thread deletes its
 pages and their storage (archiving keeps both).
@@ -122,7 +121,7 @@ pages and their storage (archiving keeps both).
 
 Run `code-foundry view.inline <path> --title "<what it is>"` once per file and fix warnings
 in place: the card reloads on each edit, so never show it again, not even for "show me"
-(`--panel` opens it beside the thread). Then run
-`code-foundry page.check <path> --shot out.png` after each edit until it is clean. Reply in 2-3 sentences: what it shows, what each
+(`--panel`: beside the thread). Then run
+`code-foundry page.check <path> --shot "$CODE_FOUNDRY_PAGES/shot.png"` after each edit until clean; look at the shot. Reply in 2-3 sentences: what it shows, what each
 button does, that the app asks before merging or archiving; for "track" or "watch", that it
-updates only while shown (offer a wake). The check clicks nothing: never say a button works.
+updates only when shown (offer a wake). The check clicks nothing: never say a button works.
