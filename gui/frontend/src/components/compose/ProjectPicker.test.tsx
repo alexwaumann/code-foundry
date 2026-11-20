@@ -146,8 +146,16 @@ describe("ProjectPicker", () => {
     search("zzz-no-such-project");
     expect(listed()).toEqual([]);
     expect(items().map((r) => r.dataset.testid)).toEqual(["picker-add-project"]);
-    expect(screen.getByText("No matching projects.")).toBeTruthy();
+    // Workspaces are searched too, so the empty text names both.
+    expect(screen.getByText("No matching workspaces or projects.")).toBeTruthy();
     expect(highlighted()).toBe("picker-add-project");
+  });
+
+  it("without workspaces the empty text names only projects", () => {
+    useWorkspacesStore.setState({ byId: {}, order: [], loaded: true });
+    render(<ProjectPicker close={() => undefined} />);
+    search("zzz-no-such-project");
+    expect(screen.getByText("No matching projects.")).toBeTruthy();
   });
 
   it("with no projects yet: No project listed, Add a project pinned and highlighted", () => {
@@ -196,7 +204,7 @@ describe("ProjectPicker over the mock's projects (compose.spec.ts)", () => {
     expect(listed()).toEqual(["picker-no-project", "w-1", "repo-cf", "repo-dot", "repo-gp", "repo-sk", "repo-wr"]);
     expect(shortcutOf(projects[0])).toBe("⌘3");
     expect(shortcutOf(projects[2])).toBe("⌘5");
-    expect(screen.getByTestId("picker-hints").textContent).toBe("↑↓NavigateEnterSelectBackspaceBackEscClose");
+    expect(screen.getByTestId("picker-hints").textContent).toBe("↑↓ move⏎ select⌫ backesc close");
   });
 
   it("a query: code-foundry's own name above the workspace that has it, Add a project still pinned", () => {

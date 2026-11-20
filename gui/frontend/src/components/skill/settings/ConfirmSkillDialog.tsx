@@ -6,11 +6,13 @@ import { runConfirmedSkill } from "@/stores/skillConfirm";
 import { confirmCopy, type ConfirmAction } from "./model";
 
 /**
- * Asks before Uninstall or Remove with the restart warning (the brief's words), then runs
- * the command without the daemon asking again (stores/skillConfirm.ts).
+ * Asks before Uninstall or Delete with the restart warning (the brief's words), then runs
+ * the command without the daemon asking again (stores/skillConfirm.ts). Uninstall has focus
+ * (it can be installed again); Delete erases a skill the user wrote, so Cancel has it.
  */
 export function ConfirmSkillDialog({ action, row, onClose }: { action: ConfirmAction; row: InstalledSkillView; onClose: () => void }) {
   const copy = confirmCopy(action, row);
+  const permanent = action === "remove";
   return (
     <Dialog
       open
@@ -27,13 +29,13 @@ export function ConfirmSkillDialog({ action, row, onClose }: { action: ConfirmAc
           </div>
         </div>
         <div className="mt-5 flex justify-end gap-2">
-          <Button variant="ghost" size="sm" onClick={onClose} data-testid="skill-confirm-cancel">
+          <Button variant="ghost" size="sm" autoFocus={permanent} onClick={onClose} data-testid="skill-confirm-cancel">
             Cancel
           </Button>
           <Button
             variant="outline"
             size="sm"
-            autoFocus
+            autoFocus={!permanent}
             className="border-cf-error/40 bg-transparent text-cf-error-text hover:bg-cf-error-surface hover:text-cf-error-text dark:border-cf-error/40 dark:bg-transparent"
             onClick={() => {
               onClose();

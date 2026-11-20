@@ -219,12 +219,12 @@ export function PromptHistoryCard({ picker, above = false }: { picker: PromptPic
         </div>
       )}
       <div className="flex shrink-0 items-center gap-3 border-t px-3 py-1.5 text-caption-sm group-data-[short]/completion:hidden" data-testid="prompt-history-hints">
-        <Hint keys={["↵"]}>Use</Hint>
-        <Hint keys={["⌘↵"]}>Show in thread</Hint>
-        <Hint keys={["⌘C"]}>Copy</Hint>
-        <Hint keys={["⌘S"]}>Scope</Hint>
+        <Hint keys={["⏎"]}>use</Hint>
+        <Hint keys={["⌘", "⏎"]}>show in thread</Hint>
+        <Hint keys={["⌘", "C"]}>copy</Hint>
+        <Hint keys={["⌘", "S"]}>scope</Hint>
         <span className="ml-auto">
-          <Hint keys={["esc"]}>Close</Hint>
+          <Hint keys={["esc"]}>close</Hint>
         </span>
       </div>
     </div>

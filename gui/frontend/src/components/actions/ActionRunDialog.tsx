@@ -118,7 +118,7 @@ export function ActionRunDialog() {
       }}
     >
       <DialogContent className="max-w-2xl p-4" data-testid="action-run-dialog">
-        <DialogTitle>Setup action {name} failed</DialogTitle>
+        <DialogTitle>Setup action “{name}” failed</DialogTitle>
         {runId !== null && <RunOutput key={seq} runId={runId} />}
         <DialogClose
           className="absolute top-2.5 right-2.5 flex size-8 items-center justify-center rounded-md text-cf-text-muted outline-none hover:bg-cf-control-hover hover:text-cf-text focus-visible:ring-[3px] focus-visible:ring-cf-focus/50"

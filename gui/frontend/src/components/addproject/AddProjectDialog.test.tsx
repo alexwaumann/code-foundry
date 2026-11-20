@@ -678,7 +678,7 @@ describe("the New tab", () => {
     expect(dialog()).toBeTruthy();
     expect(screen.getByTestId("publish-picker")).toBeTruthy();
     expect(screen.getByTestId("add-project-new").getAttribute("data-created")).toBe("repo-taken");
-    expect(screen.getByTestId("add-project-new-created").textContent).toContain("Created taken");
+    expect(screen.getByTestId("add-project-new-created").textContent).toBe("Created taken. Closing this dialog without publishing deletes it. Keep it local keeps it.");
     expect(name().disabled).toBe(true);
     expect(create().textContent).toBe("Publish");
 

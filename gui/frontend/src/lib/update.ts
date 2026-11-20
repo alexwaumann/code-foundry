@@ -64,7 +64,7 @@ export function predatesTunnel(daemon: string): boolean {
 /**
  * The first release whose daemon has the window layout (LayoutService and its event source, with
  * the first-load import). The window shell cannot draw without it and has no fallback, so a window
- * on anything older gets the update dialog with Restart Now, as on a daemon from before the tunnel
+ * on anything older gets the update dialog with Restart now, as on a daemon from before the tunnel
  * (docs/notes/shell-20-cutover.md). The shell reaches `main` as one `feat!` merge, the first minor
  * after v0.21; if another `feat` reaches `main` first, the merge (plan PR 25) sets this to the tip
  * tag `scripts/next-version.sh --tip` prints for it.
@@ -231,7 +231,7 @@ export function cutOffLabel(kind: CutOff, agents: number, shells: number): strin
 }
 
 /**
- * Restart Now already ran. `install` is the downloaded version app.restart installs
+ * Restart now already ran. `install` is the downloaded version app.restart installs
  * before restarting ("" when nothing was downloaded: a plain restart).
  */
 export interface Restarting {
@@ -271,7 +271,7 @@ function readyBusyRest(busy: number, install: boolean): string {
 
 /**
  * Picks the update dialog's variant and copy from the daemon's updater status, the
- * window's own version, the busy thread count, whether Restart Now already ran, and whether
+ * window's own version, the busy thread count, whether Restart now already ran, and whether
  * the daemon is one this window cannot follow (predatesTunnel).
  */
 export function updateView(status: UpdateStatusView, guiVersion: string | null, t: ThreadActivity, restarting: Restarting | null = null, oldDaemon = false): UpdateView {
@@ -307,7 +307,7 @@ export function updateView(status: UpdateStatusView, guiVersion: string | null, 
       version: m.version,
       title: `Code Foundry ${displayVersion(m.version)} is partly applied`,
       body: `${where}; ${stranded ? "nothing updates live" : "some things won’t work"} until you restart.${t.busy > 0 ? ` ${cutOff(t.busy)}` : ""}`,
-      primary: "Restart Now",
+      primary: "Restart now",
       later: laterFor(t),
       showBusy: t.busy > 0,
       mismatch: m,
@@ -321,7 +321,7 @@ export function updateView(status: UpdateStatusView, guiVersion: string | null, 
         version: status.currentVersion,
         title: status.checking ? "Checking for updates…" : "You’re up to date",
         body: olderStable(status) ? sentence(`stable ${displayVersion(status.latestVersion)} is older than this build; the next stable release will move you`) : `Code Foundry ${current} is the latest version.`,
-        primary: "Check Again",
+        primary: "Check again",
         later: null,
         close: true,
       };
@@ -342,7 +342,7 @@ export function updateView(status: UpdateStatusView, guiVersion: string | null, 
         later: "Hide",
       };
     case "failed":
-      return { ...base, variant: "failed", title: `Couldn’t update to ${target}`, body: `Nothing changed. You’re still on ${current}.`, primary: "Try Again", later: "Not now" };
+      return { ...base, variant: "failed", title: `Couldn’t update to ${target}`, body: `Nothing changed. You’re still on ${current}.`, primary: "Try again", later: "Not now" };
     case "downloaded":
     case "installed":
     case "restartRequired": {
@@ -350,7 +350,7 @@ export function updateView(status: UpdateStatusView, guiVersion: string | null, 
       // on disk is already newer (the installer ran by hand, or a restart did not follow).
       const install = status.state === "downloaded";
       const title = `Code Foundry ${target} is ready`;
-      const primary = install ? "Install and Restart Now" : "Restart Now";
+      const primary = install ? "Install and restart now" : "Restart now";
       if (t.busy > 0) {
         return { ...base, variant: "readyBusy", title, body: `${cutOff(t.busy)} ${readyBusyRest(t.busy, install)}`, primary, later: laterFor(t), showBusy: true };
       }

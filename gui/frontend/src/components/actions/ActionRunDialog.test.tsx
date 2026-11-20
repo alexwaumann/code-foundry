@@ -102,7 +102,7 @@ describe("a failed worktree-create run", () => {
     await settle();
     expect(useUiStore.getState().selection).toEqual({ kind: "thread", id: "s-1" });
     const out = screen.getByTestId("action-run-dialog");
-    expect(within(out).getByRole("heading").textContent).toBe("Setup action Install deps failed");
+    expect(within(out).getByRole("heading").textContent).toBe("Setup action “Install deps” failed");
     const meta = within(out).getByTestId("action-run-meta");
     expect(meta.textContent).toContain("Exited with code 1");
     expect(meta.textContent).toContain("1.2s");

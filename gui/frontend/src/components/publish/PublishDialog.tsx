@@ -56,7 +56,7 @@ function PublishBody({ projectId }: { projectId: string }) {
       }}
     >
       <p className="text-caption">
-        Creates the repository on GitHub with gh, adds it as <span className="font-mono">origin</span> and pushes.
+        Creates the repository on GitHub, adds it as <span className="font-mono">origin</span> and pushes.
       </p>
       <PublishPicker owners={owners} value={choice} onChange={setChoice} disabled={busy} error={error} />
       <div className="flex flex-wrap items-center gap-2">

@@ -905,7 +905,7 @@ describe("bridge host: a page no thread owns", () => {
     invokeCommand.mockRejectedValueOnce(archiveConfirm);
     h.receive(run("a", "thread.archive", { id: "t-1" }));
     await vi.waitFor(() => {
-      expect(useConfirmStore.getState().pending).toMatchObject({ guarded: true, caller: "a page", callerDetail: 'Page "page.html" at ~/p/page.html, in no thread' });
+      expect(useConfirmStore.getState().pending).toMatchObject({ guarded: true, caller: "a page", callerDetail: 'Page "page.html" at ~/p/page.html' });
     });
   });
 

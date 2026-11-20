@@ -40,7 +40,7 @@ export function AddProjectDialog() {
           if (addProjectEscapeBack()) e.preventDefault();
         }}
       >
-        <DialogTitle>Add Project</DialogTitle>
+        <DialogTitle>Add project</DialogTitle>
         <DialogDescription className="sr-only">Start a new project, add a folder on this Mac, or clone a repository from GitHub.</DialogDescription>
         <DialogClose asChild>
           <Button type="button" variant="ghost" size="icon-sm" className="absolute top-2.5 right-2.5" aria-label="Close" disabled={busy} data-testid="add-project-close">

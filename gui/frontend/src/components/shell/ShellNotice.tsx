@@ -11,7 +11,7 @@ import { restartOldDaemon, useLayoutServiceStore } from "@/shell/layoutService";
  * not sent a layout in a while (a daemon from before the shell gets the update dialog's Restart
  * Now over this; lib/update.ts SHELL_SINCE). Once the daemon has said it has no layout service at
  * all (shell/layoutService.ts: whatever its version says), the waiting text gives way to what
- * is wrong and Restart Now. Drawn as one pane, like the empty space.
+ * is wrong and Restart now. Drawn as one pane, like the empty space.
  */
 export function ShellNotice({ kind }: { kind: "import-failed" | "no-layout" }) {
   const error = useLegacyImportStore((s) => s.error);
@@ -65,7 +65,7 @@ function NoLayout() {
       )}
       <div className="flex gap-2">
         <Button size="sm" disabled={restarting} onClick={() => void restartOldDaemon()} data-testid="shell-old-daemon-restart">
-          {restarting ? "Restarting…" : "Restart Now"}
+          {restarting ? "Restarting…" : "Restart now"}
         </Button>
       </div>
     </div>

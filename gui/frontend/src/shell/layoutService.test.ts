@@ -55,7 +55,7 @@ describe("asking a waiting daemon for the layout", () => {
   });
 });
 
-describe("Restart Now on the notice", () => {
+describe("Restart now on the notice", () => {
   it("runs app.restart through its confirmation and then shows that it restarts", async () => {
     answers.set("app.restart", { message: "restarting Code Foundry" });
     await restartOldDaemon();

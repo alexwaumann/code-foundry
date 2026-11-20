@@ -549,8 +549,10 @@ describe("Worktrees without threads", () => {
     // Dirty: the warning, the first three files and how many more; Show diff closes it.
     fireEvent.click(inEl(leftover(COPY), "leftover-remove") as HTMLElement);
     expect((await screen.findByTestId("remove-worktree-title")).textContent).toBe("Remove the worktree on cf/old-copy?");
-    expect(screen.getByTestId("remove-worktree-body").textContent).toBe("~/.code-foundry/worktrees/alexwaumann/code-foundry/cf-old-copy goes. The branch cf/old-copy stays.");
+    expect(screen.getByTestId("remove-worktree-body").textContent).toBe("~/.code-foundry/worktrees/alexwaumann/code-foundry/cf-old-copy is deleted. The branch cf/old-copy stays.");
     expect(screen.getByTestId("remove-worktree-loss-count").textContent).toBe("4 uncommitted files are lost.");
+    // Work to lose: Cancel has focus, so Enter never deletes it.
+    expect(document.activeElement).toBe(screen.getByTestId("remove-worktree-cancel"));
     await settle();
     expect(screen.getByTestId("remove-worktree-loss-files").textContent).toBe("gui/frontend/src/lib/tree.ts, docs/notes/sidebar.md, scratch.txt and 1 more · Show diff");
     fireEvent.click(screen.getByTestId("remove-worktree-show-diff"));
@@ -565,6 +567,8 @@ describe("Worktrees without threads", () => {
     fireEvent.click(inEl(leftover(SPIKE), "leftover-remove") as HTMLElement);
     await screen.findByTestId("remove-worktree-dialog");
     expect(screen.queryByTestId("remove-worktree-loss")).toBeNull();
+    // Nothing to lose: Remove has focus.
+    expect(document.activeElement).toBe(screen.getByTestId("remove-worktree-ok"));
     fireEvent.click(screen.getByTestId("remove-worktree-cancel"));
     await settle();
     expect(screen.queryByTestId("remove-worktree-dialog")).toBeNull();

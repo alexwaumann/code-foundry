@@ -99,9 +99,9 @@ export function confirmCopy(action: ConfirmAction, r: Pick<InstalledSkillView, "
       };
     case "remove":
       return {
-        title: `Remove ${r.name}?`,
+        title: `Delete ${r.name}?`,
         body: `This deletes ${r.dir || "its directory"}, a skill you wrote: no marketplace has it, so it cannot be installed again. ${RESTART_WARNING}`,
-        label: "Remove",
+        label: "Delete",
       };
   }
 }
@@ -195,7 +195,7 @@ export function rowMain(
   updatedTo: string | undefined,
 ): RowMain {
   if (busy === "uninstall") return { kind: "working", words: "Uninstalling…" };
-  if (busy === "remove") return { kind: "working", words: "Removing…" };
+  if (busy === "remove") return { kind: "working", words: "Deleting…" };
   if (r.state === "local") return null;
   if (r.state === "missing") return { kind: "reinstall" };
   if (busy === "update") return { kind: "updating" };
@@ -232,7 +232,7 @@ export function skillMenu(
   if (items.length > 0) items.push("separator");
   const action = r.state === "local" ? "remove" : "uninstall";
   items.push({
-    label: action === "remove" ? "Remove" : "Uninstall",
+    label: action === "remove" ? "Delete" : "Uninstall",
     onSelect: () => {
       o.onConfirm(action);
     },

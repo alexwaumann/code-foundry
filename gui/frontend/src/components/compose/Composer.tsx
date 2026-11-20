@@ -175,7 +175,7 @@ async function removeWithConfirm(key: string, a: DraftAttachment, refocus: () =>
     const yes = await requestConfirm({
       title: `Remove ${a.file.name} from the message?`,
       message: "It is referenced in your text; removing it also removes every reference.",
-      confirmLabel: "Confirm",
+      confirmLabel: "Remove",
       centered: true,
     });
     if (!yes) return;

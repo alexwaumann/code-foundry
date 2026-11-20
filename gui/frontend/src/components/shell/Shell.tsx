@@ -21,10 +21,10 @@ export const LAYOUT_WAIT_MS = 5000;
  * arrived and the first-load import has run (shell/legacyImport.ts: once per daemon, before the
  * first draw, from the classic window's stored panels). A failed import shows what happened with
  * Try again and "Open without them" (ShellNotice). A daemon without a layout (one from before the
- * shell) never sends it: the update dialog asks for Restart Now (lib/update.ts SHELL_SINCE), and
+ * shell) never sends it: the update dialog asks for Restart now (lib/update.ts SHELL_SINCE), and
  * after a wait the pane area says it is waiting and asks the daemon for the layout itself, every
  * wait, until one arrives: a daemon without the layout service (a locally built one reports "dev",
- * which no version check catches) gets a notice with Restart Now in place of the waiting text
+ * which no version check catches) gets a notice with Restart now in place of the waiting text
  * (shell/layoutService.ts). There is no classic fallback (plan 2.12).
  * While it draws, the selection bridge runs: select() opens tabs and the selection follows the
  * focused tab. Tabs, panes and the sidebar's thread rows drag inside ShellDnd (App.tsx).

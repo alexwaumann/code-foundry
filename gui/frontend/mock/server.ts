@@ -194,7 +194,7 @@
  *   POST /__mock/update/latest?version=v0.2.0[&stepMs=250]   (what the next check finds; stepMs paces
  *                                                 its download, a long one holds it in Downloading)
  *   POST /__mock/update/fail?reason=…             (the next download fails)
- *        app.restart (Restart Now) and daemon.restart come back as the installed version;
+ *        app.restart (Restart now) and daemon.restart come back as the installed version;
  *        GET /__mock/update counts app.restart runs (restarts)
  *   POST /__mock/gh/inbox-zero                (empties the review queue, leaving the reviews that wait on their authors)
  *   POST /__mock/gh/many-prs?count=150        (every list of the Pull Requests page that many long)

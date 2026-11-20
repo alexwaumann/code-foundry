@@ -50,8 +50,9 @@ function Loss({ projectId, path, count }: { projectId: string; path: string; cou
 
 /**
  * project.worktree.remove's confirm (stores/removeWorktree.ts): "Remove the worktree on
- * <branch>?", "<path> goes. The branch <branch> stays.", and while it has uncommitted entries
- * a warning naming them. Remove has focus, so Enter removes and Escape cancels.
+ * <branch>?", "<path> is deleted. The branch <branch> stays.", and while it has uncommitted
+ * entries a warning naming them. Remove has focus, so Enter removes and Escape cancels; with
+ * uncommitted files to lose Cancel has it, so Enter never deletes work.
  */
 export function RemoveWorktreeDialog() {
   const pending = useRemoveWorktreeStore((s) => s.pending);
@@ -74,7 +75,7 @@ export function RemoveWorktreeDialog() {
         <div className="min-w-0 space-y-3">
           <DialogTitle data-testid="remove-worktree-title">{branch ? `Remove the worktree on ${branch}?` : `Remove the worktree ${name}?`}</DialogTitle>
           <DialogDescription className="break-words" data-testid="remove-worktree-body">
-            {tildify(path)} goes.
+            {tildify(path)} is deleted.
             {branch && (
               <>
                 {" "}
@@ -88,6 +89,7 @@ export function RemoveWorktreeDialog() {
           <Button
             variant="ghost"
             size="sm"
+            autoFocus={count > 0}
             data-testid="remove-worktree-cancel"
             onClick={() => {
               answerRemoveWorktree(false);
@@ -98,7 +100,7 @@ export function RemoveWorktreeDialog() {
           <Button
             variant="destructive"
             size="sm"
-            autoFocus
+            autoFocus={count === 0}
             data-testid="remove-worktree-ok"
             onClick={() => {
               answerRemoveWorktree(true);

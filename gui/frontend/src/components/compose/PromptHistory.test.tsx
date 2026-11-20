@@ -108,7 +108,7 @@ describe("the thread composer's picker (prompt-history-picker.spec.ts)", () => {
     expect(threadNames()).toEqual([]);
     expect(items()[0]?.getAttribute("aria-selected")).toBe("true");
     expect(screen.getByTestId("prompt-history-heading").textContent).toBe("Previous prompts");
-    expect(screen.getByTestId("prompt-history-hints").textContent).toContain("Show in thread");
+    expect(screen.getByTestId("prompt-history-hints").textContent).toContain("show in thread");
     // The composer is now the filter.
     expect(placeholder()).toBe("Type to filter previous prompts");
 
@@ -225,7 +225,7 @@ describe("composer.history's palette page (prompt-history-picker.spec.ts)", () =
     const input = within(palette).getByPlaceholderText("Search previous prompts…");
     expect(scopeTab(palette, "thread").getAttribute("data-state")).toBe("active");
     expect(items()).toHaveLength(2);
-    expect(screen.getByTestId("prompt-history-hints").textContent).toContain("Insert into composer");
+    expect(screen.getByTestId("prompt-history-hints").textContent).toContain("insert into composer");
     const cycle = async () => {
       act(() => {
         fireEvent.keyDown(input, { key: "s", metaKey: true });

@@ -1,7 +1,7 @@
 /**
  * The Skills page's confirms (docs/notes/skills-page-redesign.md). skill.disable,
  * skill.uninstall and skill.remove confirm in the daemon (Confirm, --yes on the CLI). From
- * Settings → Skills that call is not asked twice: Uninstall and Remove have asked in the
+ * Settings → Skills that call is not asked twice: Uninstall and Delete have asked in the
  * page's dialog with the restart warning, and a switch flips at once with the warning in a
  * toast (setSkillEnabled). From the palette they get the generic confirm with the daemon's
  * words. The plugin page does the same for plugin.uninstall (stores/pluginRegistry.ts).

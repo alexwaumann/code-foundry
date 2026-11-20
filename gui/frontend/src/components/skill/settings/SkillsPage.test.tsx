@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { InstalledSkillView, SkillEntryView, SkillRegistryView } from "@/api/skill";
 import { skillItemKey } from "@/api/skill";
@@ -379,6 +379,8 @@ describe("a row's menu", () => {
     const dialog = await screen.findByTestId("skill-confirm");
     expect(dialog.dataset.action).toBe("uninstall");
     expect(dialog.textContent).toContain(RESTART);
+    // It can be installed again: Uninstall has focus.
+    expect(document.activeElement).toBe(within(dialog).getByTestId("skill-confirm-ok"));
     fireEvent.click(within(dialog).getByTestId("skill-confirm-ok"));
     await act(async () => {
       await Promise.resolve();
@@ -398,11 +400,17 @@ describe("a row's menu", () => {
     expect((await screen.findByTestId("skill-menu-uninstall")).getAttribute("data-disabled")).not.toBeNull();
   });
 
-  it("a local skill's Remove says it deletes the folder", async () => {
+  it("a local skill's Delete says it deletes the folder, with Cancel focused", async () => {
     show();
     openMenu(within(installedRow("my-notes")).getByTestId("skill-row-menu"));
-    fireEvent.click(await screen.findByTestId("skill-menu-remove"));
-    expect((await screen.findByTestId("skill-confirm")).textContent).toContain("/Users/dev/.claude/skills/my-notes");
+    const item = await screen.findByTestId("skill-menu-remove");
+    expect(item.textContent).toBe("Delete");
+    fireEvent.click(item);
+    const dialog = await screen.findByTestId("skill-confirm");
+    expect(dialog.textContent).toContain("/Users/dev/.claude/skills/my-notes");
+    expect(within(dialog).getByText("Delete my-notes?")).toBeTruthy();
+    expect(within(dialog).getByTestId("skill-confirm-ok").textContent).toBe("Delete");
+    expect(document.activeElement).toBe(within(dialog).getByTestId("skill-confirm-cancel"));
   });
 
   it("right-click opens the same menu", async () => {
@@ -713,6 +721,12 @@ describe("the page menu", () => {
     fireEvent.click(await screen.findByTestId("skill-registries-open"));
     const dialog = await screen.findByTestId("skill-registries");
     expect(within(dialog).getByTestId("skill-registry-line").textContent).toContain("3 plugins · 1,237 skills");
+    // The dialog itself has focus, not the ×; the × closes it.
+    expect(document.activeElement).toBe(dialog);
+    fireEvent.click(within(dialog).getByRole("button", { name: "Close" }));
+    await waitFor(() => {
+      expect(screen.queryByTestId("skill-registries")).toBeNull();
+    });
   });
 
   it.each([

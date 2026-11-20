@@ -115,7 +115,7 @@ export function addableProjects(members: readonly string[], projects: { order: r
 export function workspaceNameError(name: string, others: readonly string[] = []): string {
   const n = name.trim();
   if (!n) return "Name it.";
-  if (new TextEncoder().encode(n).length > 100) return "At most 100 bytes.";
+  if (new TextEncoder().encode(n).length > 100) return "That name is too long.";
   if (n.toLowerCase() === WORKSPACE_PRIMARY) return "“workspace” is reserved.";
   if (others.some((o) => o.toLowerCase() === n.toLowerCase())) return `A workspace named “${n}” exists.`;
   return "";

@@ -238,7 +238,7 @@ export function editorDirty(s: Pick<ThemeEditorState, "draft" | "saved"> = useTh
  * Leaves edit mode: at once when nothing changed, else after the confirm dialog. Resolves
  * whether the editor is closed now. `why` replaces the question's second sentence.
  */
-export async function leaveEditor(why = "Leave the editor and drop them?"): Promise<boolean> {
+export async function leaveEditor(why = "Leave the editor and discard them?"): Promise<boolean> {
   const s = useThemeEditorStore.getState();
   if (s.id === null) return true;
   if (editorDirty(s)) {

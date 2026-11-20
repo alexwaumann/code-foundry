@@ -22,7 +22,7 @@ interface Primary {
   outline?: boolean;
 }
 
-// Restart Now / Install and Restart Now: app.restart installs a download itself.
+// Restart now / Install and restart now: app.restart installs a download itself.
 const restart: Primary = { action: "restart", icon: RefreshCw };
 
 /** The one full-width button per variant (none while downloading, restarting, or disabled). */
@@ -229,7 +229,7 @@ function Body({ st, v }: { st: UpdateStatusView; v: UpdateView }) {
 
 /**
  * Software update, centred on the app icon: one primary action per state (Download,
- * Install and Restart Now, Restart Now, Try Again, Check Again), a muted link that
+ * Install and restart now, Restart now, Try again, Check again), a muted link that
  * closes, and a meta line.
  * Only "up to date" (and "updates are off") has a ×; every other state closes through
  * its Later / Hide / Not now link. Variants and copy: lib/update.ts updateView.

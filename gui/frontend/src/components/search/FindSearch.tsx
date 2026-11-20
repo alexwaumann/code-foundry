@@ -49,8 +49,8 @@ function Hints({ row, enter, modes }: { row: SearchRow | undefined; enter?: stri
       </span>
       {modes && (
         <span className="flex items-center gap-1.5">
-          <Kbd size="sm">Tab</Kbd>
-          Agent search
+          <Kbd size="sm">tab</Kbd>
+          agent search
         </span>
       )}
     </div>

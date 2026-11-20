@@ -212,7 +212,7 @@ describe("a daemon from before the tunnel", () => {
 });
 
 // The window shell has no fallback (docs/notes/shell-20-cutover.md): a daemon with the tunnel but
-// without the layout gets the same dialog, with Restart Now. The classic window (?shell=0) can
+// without the layout gets the same dialog, with Restart now. The classic window (?shell=0) can
 // still follow it.
 describe("a daemon from before the window layout", () => {
   const old = { state: "available", currentVersion: "v0.21.5" } as UpdateStatusView;

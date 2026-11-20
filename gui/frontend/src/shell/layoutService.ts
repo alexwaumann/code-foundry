@@ -8,7 +8,7 @@
  * So while the window waits, it asks for the layout itself (LayoutService.Get). A daemon without
  * the service answers Unimplemented (the tunnel hands the call to the daemon's mux, whose 404 for
  * an unknown service connect-web reads as Unimplemented: api/errors.ts isOutdatedDaemon), and the
- * waiting text becomes a notice that the daemon predates this window, with Restart Now: app.restart
+ * waiting text becomes a notice that the daemon predates this window, with Restart now: app.restart
  * stops the daemon and the window host relaunches the app, whose connect starts the daemon binary
  * it ships with. A daemon that has the service answers with the layout, which is applied as the
  * snapshot it is.
@@ -26,9 +26,9 @@ import { applyImportedLayout } from "@/stores/layout";
 interface LayoutServiceState {
   /** The daemon answered that it has no LayoutService: it predates the window shell. */
   missing: boolean;
-  /** Restart Now was confirmed and sent; the app goes away and comes back. */
+  /** Restart now was confirmed and sent; the app goes away and comes back. */
   restarting: boolean;
-  /** Why Restart Now failed; "" otherwise. */
+  /** Why Restart now failed; "" otherwise. */
   error: string;
 }
 
@@ -57,7 +57,7 @@ export function resetLayoutService(): void {
 }
 
 /**
- * Restart Now on the notice: app.restart, after the daemon's own confirmation (it names what a
+ * Restart now on the notice: app.restart, after the daemon's own confirmation (it names what a
  * restart cuts off). A daemon older than app.restart gets daemon.restart and the host's Relaunch,
  * as the update dialog does (stores/update.ts restartApp). Declining changes nothing.
  */

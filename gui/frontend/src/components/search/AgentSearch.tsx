@@ -136,7 +136,7 @@ function Results({
 function AskHint() {
   return (
     <p className="px-5 pt-5 pb-2 text-body-sm text-cf-text-muted" data-testid="agent-hint">
-      Ask in your own words: “the thread where we picked the update dialog copy”, “why did we drop the ledger?”
+      Ask in your own words: “the thread where we fixed the login redirect”, “why did we drop the cache?”
     </p>
   );
 }
@@ -354,7 +354,7 @@ export function AgentSearch({ query: raw, header, dialog, loaders }: SearchModeP
           <Hint k="⏎">{sameQuestion && searchEnded(entry) ? "search again" : "search"}</Hint>
         )}
         <DictateHint canDictate={canDictate} />
-        {running && sameQuestion ? <Hint k="esc">close · keeps running</Hint> : dialog.modeCount > 1 && <Hint k="Tab">Find</Hint>}
+        {running && sameQuestion ? <Hint k="esc">close · keeps running</Hint> : dialog.modeCount > 1 && <Hint k="tab">find</Hint>}
         <span className="ml-auto" data-testid="search-model">
           {model}
         </span>
