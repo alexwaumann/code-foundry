@@ -307,3 +307,26 @@ describe("a quote no draft has", () => {
     expect(invocationsOf("thread.send")).toEqual([]);
   });
 });
+
+describe("onSent", () => {
+  it("is called once a send went through, and not for a refused one", async () => {
+    const onSent = vi.fn();
+    updateDraft(KEY, { text: "first" });
+    render(<ThreadComposer threadId="s-r1" pending={[]} busy={false} onSent={onSent} />);
+    fireEvent.click(screen.getByTestId("thread-send"));
+    await waitFor(() => {
+      expect(onSent).toHaveBeenCalledTimes(1);
+    });
+    expect(draftText()).toBe("");
+
+    daemon.handlers.set("thread.send", () => {
+      throw refuse("The thread is gone.");
+    });
+    act(() => {
+      updateDraft(KEY, { text: "second" });
+    });
+    fireEvent.click(screen.getByTestId("thread-send"));
+    expect((await screen.findByTestId("thread-composer-error")).textContent).toBe("The thread is gone.");
+    expect(onSent).toHaveBeenCalledTimes(1);
+  });
+});

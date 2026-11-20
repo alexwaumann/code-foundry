@@ -4,7 +4,7 @@
  * Diff button (warmPullRequestDiff). Keyed like the detail (pullRequestKey). The daemon serves its cached
  * diff when it was fetched for the head the cached detail has, so the tab reads it only
  * after the detail loaded; when the detail's head moves (a push the poll saw, a
- * pull_request_detail_updated re-read), the tab invalidates it (syncPullRequestDiff).
+ * pull_request_detail_updated re-read), a watched diff is read again (syncPullRequestDiffs).
  */
 import { notify } from "@/lib/notify";
 import { create } from "zustand";
@@ -88,16 +88,28 @@ export async function refreshPullRequestDiff(slug: string, number: number): Prom
 const asked = new Map<string, string>();
 
 /**
- * Called when the detail's head or the diff changes: re-reads the diff once per new head
- * when the diff was computed for another one. A diff without a head (the daemon had no
- * detail cached) is read again once the detail has one.
+ * Re-reads a diff once per new head when it was computed for another one. A diff without a
+ * head (the daemon had no detail cached) is read again once the detail has one.
  */
-export function syncPullRequestDiff(key: string, detailHead: string, diff: PullRequestDiffView | null): void {
+function syncPullRequestDiff(key: string, detailHead: string, diff: PullRequestDiffView | null): void {
   if (!detailHead || !diff || diff.headSha === detailHead) return;
   if (asked.get(key) === detailHead) return;
   asked.set(key, detailHead);
   pullRequestDiffResource.invalidate(key);
 }
+
+/**
+ * Runs on every change to the details or the diffs: each diff someone watches (the diff tab,
+ * or the pull request's page warming it) follows its detail's head. A diff nobody watches is
+ * left alone, and keeps no re-read asked for: its next watch reads it anyway.
+ */
+function syncPullRequestDiffs(): void {
+  const details = pullRequestDetailResource.store.getState().entries;
+  const diffs = pullRequestDiffResource.store.getState().entries;
+  for (const key of pullRequestDiffResource.watched()) syncPullRequestDiff(key, details[key]?.data?.pullRequest.headSha ?? "", diffs[key]?.data ?? null);
+}
+pullRequestDetailResource.store.subscribe(syncPullRequestDiffs);
+pullRequestDiffResource.store.subscribe(syncPullRequestDiffs);
 
 /** loadDiffFiles' read, through the daemon (cached there by repository, commit and path). */
 export const readPullRequestFile = (repoSlug: string, ref: string, path: string) => getPullRequestFile(repoSlug, ref, path);

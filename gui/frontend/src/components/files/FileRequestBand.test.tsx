@@ -37,8 +37,19 @@ vi.mock("@/stores/commands", async (orig) => ({
   refreshCommands: () => Promise.resolve(),
 }));
 // The editor is the library's; here a text box the test types in.
-const draft = vi.hoisted(() => ({ text: null as string | null }));
-vi.mock("@/lib/codeEditor", () => ({ loadCodeEditor: () => Promise.resolve(), draftText: () => draft.text, forgetDraft: () => undefined, createCodeEditor: () => undefined }));
+// The library's editor tells the draft's readers of each change (lib/codeEditor.ts subscribeDraft).
+const draft = vi.hoisted(() => ({ text: null as string | null, readers: new Set<() => void>() }));
+vi.mock("@/lib/codeEditor", () => ({
+  loadCodeEditor: () => Promise.resolve(),
+  draftText: () => draft.text,
+  draftSnapshot: () => draft.text,
+  subscribeDraft: (_key: string, onChange: () => void) => {
+    draft.readers.add(onChange);
+    return () => draft.readers.delete(onChange);
+  },
+  forgetDraft: () => undefined,
+  createCodeEditor: () => undefined,
+}));
 vi.mock("@/components/code/CodeFile", () => ({
   CodeFile: ({ contents, selectedLines, edit }: { contents: string; selectedLines?: { start: number } | null; edit?: CodeFileEdit }) => (
     <>
@@ -50,6 +61,7 @@ vi.mock("@/components/code/CodeFile", () => ({
           data-testid="draft"
           onChange={(e) => {
             edit.onChange(e.target.value);
+            for (const r of draft.readers) r();
           }}
         />
       )}

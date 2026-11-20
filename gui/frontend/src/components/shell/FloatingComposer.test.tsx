@@ -6,7 +6,7 @@ import { useSettingsStore } from "@/stores/settings";
 import { useThreadStore } from "@/stores/thread";
 import { threadDraftKey } from "@/stores/threadActions";
 import { seedComposer, settle } from "@/test/composerWorld";
-import { invocationsOf } from "@/test/daemonFakes";
+import { daemon, invocationsOf, refuse } from "@/test/daemonFakes";
 import { addThreads, CF, thread } from "@/test/projectsWorld";
 import { layoutOf, pane, row, seedLayout, space, tab } from "@/test/shellLayout";
 
@@ -146,6 +146,25 @@ describe("the floating composer", () => {
     expect(getDraft(threadDraftKey(ID)).text).toBe("");
     expect(useShellViewStore.getState().floating.expanded).toBe(false);
     expect(screen.getByTestId("floating-composer-pill")).toBeTruthy();
+  });
+
+  it("a send the daemon refuses stays expanded with its draft and the error", async () => {
+    daemon.handlers.set("thread.send", () => {
+      throw refuse("The thread is gone.");
+    });
+    await fullscreenDiff();
+    fireEvent.click(screen.getByTestId("floating-composer-pill"));
+    await settle();
+    act(() => {
+      updateDraft(threadDraftKey(ID), { text: "Keep the rest of the hunk" });
+    });
+    act(() => {
+      fireEvent.click(screen.getByTestId("thread-send"));
+    });
+    await settle(20);
+    expect(sends()).toHaveLength(1);
+    expect(getDraft(threadDraftKey(ID))).toMatchObject({ text: "Keep the rest of the hunk", error: "The thread is gone.", phase: "idle" });
+    expect(useShellViewStore.getState().floating.expanded).toBe(true);
   });
 
   it("Escape in it collapses it and stays in full screen", async () => {

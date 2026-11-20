@@ -10,7 +10,7 @@ import { Tip } from "@/components/ui/tooltip";
 import { useHeight, useWidth } from "@/lib/useWidth";
 import { setTabParams } from "@/shell/host";
 import { openUrl, pullRequestDetailResource, pullRequestKey } from "@/stores/gh";
-import { pullRequestDiffResource, pullRequestFileLoader, refreshPullRequestDiff, syncPullRequestDiff } from "@/stores/prDiff";
+import { pullRequestDiffResource, pullRequestFileLoader, refreshPullRequestDiff } from "@/stores/prDiff";
 import { pullRequestUrl } from "@/stores/prPanel";
 import { useResource } from "@/stores/resource";
 import { prDiffTab, type PrDiffTarget } from "@/surfaces/prDiffTarget";
@@ -130,7 +130,7 @@ function PrFile({ file, row, loader, url, onRefresh }: { file: PrDiffFile | unde
 /**
  * The diff once the pull request's detail has loaded, so the daemon's diff cache (keyed by the
  * cached detail's head) answers the first read: read while the tab shows, again when the head
- * moves (syncPullRequestDiff), and by Refresh.
+ * moves (stores/prDiff.ts follows it), and by Refresh.
  */
 function Loaded({ tabId, target, rail, height, base, head, url, review }: { tabId: string; target: PrDiffTarget; rail: boolean; height: number; base: string; head: string; url: string; review?: ReactNode }) {
   const key = pullRequestKey(target.slug, target.number);
@@ -138,9 +138,6 @@ function Loaded({ tabId, target, rail, height, base, head, url, review }: { tabI
   const detailHead = pullRequestDetailResource.store((s) => s.entries[key]?.data?.pullRequest.headSha ?? "");
   const headRepo = pullRequestDetailResource.store((s) => s.entries[key]?.data?.pullRequest.headRepoSlug ?? "");
   const data = entry?.data ?? null;
-  useEffect(() => {
-    syncPullRequestDiff(key, detailHead, data);
-  }, [key, detailHead, data]);
   const model = useMemo<PrDiffModel | null>(() => (data ? parsePrDiff(data.diff, data.headSha) : null), [data]);
   const sha = data?.headSha || detailHead;
   const loader = useMemo(() => pullRequestFileLoader(target.slug, headRepo, sha), [target.slug, headRepo, sha]);

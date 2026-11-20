@@ -103,6 +103,7 @@ export function ThreadComposer({
   busyPlaceholder,
   focusRequests = true,
   askStrip = null,
+  onSent,
 }: {
   threadId: string;
   pending: readonly ThreadPendingView[];
@@ -115,6 +116,8 @@ export function ThreadComposer({
   focusRequests?: boolean;
   /** A shell pane too short for the full ask (shell/askStrip.ts): that pane's id, and the ask docks as one line (AskStrip). */
   askStrip?: string | null;
+  /** A send went through: the message is on its way and the draft is cleared (the floating composer collapses on it). */
+  onSent?: (() => void) | undefined;
 }) {
   const draftKey = threadDraftKey(threadId);
   // Writing to a preview tab's thread keeps its tab (shell/preview.ts).
@@ -271,13 +274,17 @@ export function ThreadComposer({
     editorRef.current?.focus();
   }, [sending]);
 
+  const sendNow = () =>
+    sendThreadDraft(threadId).then((sent) => {
+      if (sent) onSent?.();
+    });
   const send = () => {
     // Dictating: stop, let the last phrase land, then send what the prompt holds.
     if (dictation.phase) {
-      if (!inputOff && !setupBlocks) void dictation.flush().then(() => sendThreadDraft(threadId));
+      if (!inputOff && !setupBlocks) void dictation.flush().then(sendNow);
       return;
     }
-    if (canSend) void sendThreadDraft(threadId);
+    if (canSend) void sendNow();
   };
   const attach = (files: File[]) => {
     if (transcriptMissing) return;

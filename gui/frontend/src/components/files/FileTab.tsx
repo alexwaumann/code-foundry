@@ -11,7 +11,7 @@ import { dirPart, fileName, relativeTo, resolvePath } from "@/lib/filePath";
 import { tildify } from "@/lib/path";
 import { setPreviewMode, useCodeViewStore } from "@/stores/codeView";
 import { discardDraft, editClock, editorDetached, editorOpening, editPath, fileEditKey, focusEditor, focusNextEditor, noteDraft, noteEditor, noteRead, observeRead, reloadDraft, saveFile, startEdit, stopEdit, useFileEdit } from "@/stores/fileEdit";
-import { noteFileKeyboard, readerPlaceOf, setFileFindDraft, useFileFindOpen } from "@/stores/fileFind";
+import { noteFileKeyboard, readerPlaceOf, useFileFindOpen } from "@/stores/fileFind";
 import { canTell, dismissAsk, fileFacts, saveAndTell } from "@/stores/fileRequest";
 import { fileTab, type FileTarget } from "@/surfaces/fileTarget";
 import { CodeBody } from "./CodeBody";
@@ -187,7 +187,6 @@ export function FileTab({ target }: { target: FileTarget }) {
   const seedLines = useMemo(() => lineCount(seed), [seed]);
   const onDraft = useCallback((t: string) => {
     noteDraft(editKey, t);
-    setFileFindDraft(editKey, t);
   }, [editKey]);
   const onOpening = useCallback((stateKey: string) => {
     editorOpening(editKey, stateKey);

@@ -130,6 +130,14 @@ test("in the editor cmd+f is the tab's bar, not the library's panel; the bar and
   const key = await page.evaluate(`__cfModule("/src/stores/fileEdit.ts").then((m) => Object.values(m.useFileEditStore.getState().sessions)[0]?.stateKey ?? "")`);
   const draft = await page.evaluate(`__cfModule("/src/lib/codeEditor.ts").then((m) => m.draftText(${JSON.stringify(key)}))`);
   expect(String(draft).split("\n")[Number(line) - 1]).toMatch(/^const Z\d* = /);
+
+  // The bar opening again counts the unsaved text, and follows the editor as it changes.
+  await page.keyboard.press("Meta+f");
+  await page.keyboard.type("value3");
+  await expect(count(page)).toHaveText(/ of 8$/);
+  await editor.click();
+  await page.keyboard.type(" value3");
+  await expect(count(page)).toHaveText(/ of 9$/);
 });
 
 test("cmd+f in the thread's prompt stays the thread's find with a File tab open", async ({ page }) => {

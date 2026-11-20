@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { Kbd } from "@/components/ui/kbd";
 import { useThreadActivity } from "@/components/thread/activity";
 import { ThreadContext } from "@/components/thread/context";
@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 import { zoomFactor } from "@/lib/zoom";
 import { clampFloat } from "@/shell/fullscreen";
 import { useThreadName } from "@/shell/useThreadName";
-import { useDraft } from "@/stores/compose";
+import { getDraft } from "@/stores/compose";
 import { requestPaneFocus, setFloating, useShellViewStore } from "@/stores/shellView";
 import { startThreadWatch } from "@/stores/thread";
 import { threadDraftKey } from "@/stores/threadActions";
@@ -80,11 +80,16 @@ function FloatingCard({ threadId }: { threadId: string }) {
   const cwd = useThreadsStore((s) => s.byId[threadId]?.worktreePath ?? "");
   const ctx = useMemo(() => ({ threadId, cwd }), [threadId, cwd]);
   const { open, busy } = useThreadActivity(threadId);
+  // A send that went through (the draft emptied, no error) collapses to the pill.
+  const onSent = useCallback(() => {
+    const d = getDraft(threadDraftKey(threadId));
+    if (d.text.trim() === "" && !d.error) setFloating({ expanded: false });
+  }, [threadId]);
   return (
     <ThreadContext.Provider value={ctx}>
       {/* Opaque and lifted: it floats over a busy surface (a diff), not the thread's own gradient. */}
       <div className="cf-thread w-full [&_.ccard]:bg-cf-surface-raised! [&_.ccard]:shadow-lg!">
-        <ThreadComposer threadId={threadId} pending={open} busy={busy} focusRequests={false} />
+        <ThreadComposer threadId={threadId} pending={open} busy={busy} focusRequests={false} onSent={onSent} />
       </div>
     </ThreadContext.Provider>
   );
@@ -107,10 +112,6 @@ export function FloatingComposer({ threadId, paneId }: { threadId: string; paneI
   // A press that turned into a drag: its click does not toggle.
   const dragged = useRef(false);
   const [dragging, setDragging] = useState(false);
-  const draftKey = threadDraftKey(threadId);
-  const phase = useDraft(draftKey, "phase");
-  const text = useDraft(draftKey, "text");
-  const error = useDraft(draftKey, "error");
 
   const expand = () => {
     setFloating({ expanded: true });
@@ -120,18 +121,6 @@ export function FloatingComposer({ threadId, paneId }: { threadId: string; paneI
     setFloating({ expanded: false });
     requestPaneFocus(paneId);
   };
-
-  // A send that went through (the draft back to idle, emptied, no error) collapses to the pill.
-  const wasSending = useRef(false);
-  useEffect(() => {
-    if (phase !== "idle") {
-      wasSending.current = true;
-      return;
-    }
-    if (!wasSending.current) return;
-    wasSending.current = false;
-    if (text.trim() === "" && !error) setFloating({ expanded: false });
-  }, [phase, text, error]);
 
   // ⌘L: expand, or put the keyboard back in the prompt. Ahead of a focused terminal (capture).
   useEffect(() => {

@@ -25,8 +25,6 @@ interface FindSession {
   index: number;
   total: number;
   capped: boolean;
-  /** The editor's document while it edits, as it changes (the tab passes its seed otherwise). */
-  draft: string | null;
 }
 
 interface FileFindState {
@@ -35,7 +33,7 @@ interface FileFindState {
 
 export const useFileFindStore = create<FileFindState>(() => ({ byTab: {} }));
 
-const EMPTY: FindSession = { query: "", focusSeq: 0, focusedSeq: 0, current: null, revealSeq: 0, index: -1, total: 0, capped: false, draft: null };
+const EMPTY: FindSession = { query: "", focusSeq: 0, focusedSeq: 0, current: null, revealSeq: 0, index: -1, total: 0, capped: false };
 
 function update(key: string, change: (s: FindSession | undefined) => FindSession | undefined): void {
   useFileFindStore.setState((st) => {
@@ -83,11 +81,6 @@ export function setFileFindCurrent(key: string, current: FileMatchKey | null, re
     if (same && !reveal) return s;
     return { ...s, current, revealSeq: reveal ? s.revealSeq + 1 : s.revealSeq };
   });
-}
-
-/** The editor's document changed: only kept while the tab's bar is open. */
-export function setFileFindDraft(key: string, draft: string | null): void {
-  update(key, (s) => (s && s.draft !== draft ? { ...s, draft } : s));
 }
 
 /** The bar acted on focus requests up to `seq`. */
@@ -233,10 +226,6 @@ export function useFileFindCurrent(key: string): FileMatchKey | null {
 
 export function useFileFindRevealSeq(key: string): number {
   return useFileFindStore((s) => s.byTab[key]?.revealSeq ?? 0);
-}
-
-export function useFileFindDraft(key: string): string | null {
-  return useFileFindStore((s) => s.byTab[key]?.draft ?? null);
 }
 
 /** The count the bar shows. */
