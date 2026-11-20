@@ -150,7 +150,7 @@ beforeEach(() => {
       useProjectsStore.setState((s) => ({ byId: { ...s.byId, [p.id]: p }, order: [...s.order, p.id] }));
     });
   };
-  useAddProjectStore.setState({ open: false, created: null, busy: false, stay: false });
+  useAddProjectStore.setState({ open: false, created: null, busy: null, stay: false });
 });
 afterEach(() => {
   cleanup();
@@ -737,6 +737,94 @@ describe("the New tab", () => {
     await settle();
     expect(screen.queryByTestId("add-project-dialog")).toBeNull();
     expect(invocationsOf("project.delete")).toHaveLength(1);
+  });
+
+  /** Opens New with the publish step, creates "taken" and lets its publish be refused (the project exists, not kept yet). */
+  async function refusedPublish() {
+    await openNew();
+    fireEvent.change(name(), { target: { value: "taken" } });
+    fireEvent.click(publishBox());
+    await settle();
+    fireEvent.click(create());
+    await settle();
+    expect(screen.getByTestId("add-project-new").getAttribute("data-created")).toBe("repo-taken");
+  }
+
+  // Closing the dialog any way but a cancel keeps the created project; the next opening
+  // starts fresh, so cancelling that one deletes nothing (docs/notes/store-owned-state.md).
+  it.each([
+    [
+      "Keep it local",
+      async () => {
+        fireEvent.click(screen.getByTestId("add-project-keep-local"));
+        await settle();
+      },
+    ],
+    [
+      "a folder added on the Local folder tab",
+      async () => {
+        fireEvent.mouseDown(screen.getByTestId("add-project-tab-local"));
+        await settle();
+        await nextFrame();
+        await typePath("src/new-app");
+        enter(localInput());
+        await settle();
+      },
+    ],
+  ])("after %s, the dialog closes keeping the project; a fresh New tab cancelled deletes nothing", async (_how, close) => {
+    await refusedPublish();
+    await close();
+    expect(screen.queryByTestId("add-project-dialog")).toBeNull();
+    act(() => {
+      openAddProject("new");
+    });
+    await settle();
+    expect(screen.getByTestId("add-project-new").getAttribute("data-created")).toBe("");
+    expect(screen.queryByTestId("add-project-new-created")).toBeNull();
+    expect(useAddProjectStore.getState().created).toBeNull();
+    fireEvent.keyDown(document.activeElement as HTMLElement, { key: "Escape" });
+    await settle();
+    expect(screen.queryByTestId("add-project-dialog")).toBeNull();
+    expect(invocationsOf("project.delete")).toEqual([]);
+    expect(useProjectsStore.getState().byId["repo-taken"]).toBeTruthy();
+  });
+
+  it("reopened while a create runs, the new dialog starts fresh and closable; the earlier create's answer does not reach it", async () => {
+    const created = daemon.handlers.get("project.create");
+    let answer!: () => void;
+    daemon.handlers.set(
+      "project.create",
+      (inv) =>
+        new Promise((resolve) => {
+          answer = () => {
+            resolve(created?.(inv) as never);
+          };
+        }),
+    );
+    await openNew();
+    fireEvent.change(name(), { target: { value: "taken" } });
+    fireEvent.click(publishBox());
+    await settle();
+    fireEvent.click(create());
+    await settle();
+    expect(create().textContent).toBe("Creating…");
+    expect(screen.getByTestId<HTMLButtonElement>("add-project-close").disabled).toBe(true);
+
+    act(() => {
+      openAddProject("new");
+    });
+    await settle();
+    expect(create().textContent).toBe("Create project");
+    expect(screen.getByTestId<HTMLButtonElement>("add-project-close").disabled).toBe(false);
+
+    // The earlier tab's create answers, and its publish is refused: none of it shows here.
+    answer();
+    await settle();
+    expect(invocationsOf("project.github.publish")).toHaveLength(1);
+    expect(screen.getByTestId("add-project-new").getAttribute("data-created")).toBe("");
+    expect(screen.queryByTestId("add-project-new-created")).toBeNull();
+    expect(useAddProjectStore.getState()).toMatchObject({ created: null, busy: null });
+    expect(screen.getByTestId<HTMLButtonElement>("add-project-close").disabled).toBe(false);
   });
 });
 

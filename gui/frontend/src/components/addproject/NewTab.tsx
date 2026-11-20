@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { tildify } from "@/lib/path";
 import { projectNameError, projectsDirFrom, type PublishOwnerView } from "@/lib/publish";
-import { finishAddProject, noticeAdded, selectAddedProject, setAddProjectBusy, setCreatedProject } from "@/stores/addProject";
+import { finishAddProject, noticeAdded, selectAddedProject, setNewProjectStep, useAddProjectStore } from "@/stores/addProject";
 import { createProject, publishProject, type CreatedProject } from "@/stores/publish";
 import { useSettingsStore } from "@/stores/settings";
 
@@ -27,8 +27,9 @@ export function NewTab({ active }: { active: boolean }) {
   const [publish, setPublish] = useState(false);
   const publishId = useId();
   const [choice, setChoice] = useState<PublishChoice>({ owner: "", visibility: null });
-  const [created, setCreated] = useState<CreatedProject | null>(null);
-  const [busy, setBusy] = useState<"create" | "publish" | null>(null);
+  // Kept by the dialog's store, which reads them when the dialog is cancelled.
+  const created = useAddProjectStore((s) => s.created);
+  const busy = useAddProjectStore((s) => s.busy);
   const [createError, setCreateError] = useState<string | null>(null);
   const [publishError, setPublishError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -52,15 +53,6 @@ export function NewTab({ active }: { active: boolean }) {
     };
   }, [active]);
 
-  // The dialog refuses to close while creating or publishing, and deletes a created
-  // project that was neither kept nor published when it is cancelled.
-  useEffect(() => {
-    setAddProjectBusy(busy !== null);
-  }, [busy]);
-  useEffect(() => {
-    setCreatedProject(created);
-  }, [created]);
-
   const nameError = projectNameError(name);
   const destination = `${tildify(projectsDir)}/${name || "<name>"}`;
   const canPublish = !publish || (choice.owner !== "" && choice.visibility !== null);
@@ -74,16 +66,18 @@ export function NewTab({ active }: { active: boolean }) {
   const submit = async () => {
     setTouched(true);
     if (busy || (!created && nameError) || !canPublish) return;
+    // Written for this opening only: one that follows starts its own (setNewProjectStep).
+    const seq = useAddProjectStore.getState().seq;
     let project = created;
     if (!project) {
-      setBusy("create");
+      setNewProjectStep(seq, { busy: "create" });
       setCreateError(null);
       try {
         project = await createProject(name);
-        setCreated(project);
+        setNewProjectStep(seq, { created: project });
       } catch (err) {
         setCreateError(errorMessage(err));
-        setBusy(null);
+        setNewProjectStep(seq, { busy: null });
         return;
       }
     }
@@ -91,14 +85,14 @@ export function NewTab({ active }: { active: boolean }) {
       finish(project);
       return;
     }
-    setBusy("publish");
+    setNewProjectStep(seq, { busy: "publish" });
     setPublishError(null);
     try {
       await publishProject({ projectId: project.id, owner: choice.owner, name: project.name, visibility: choice.visibility });
       finish(project, `Published to ${choice.owner}/${project.name}.`);
     } catch (err) {
       setPublishError(errorMessage(err));
-      setBusy(null);
+      setNewProjectStep(seq, { busy: null });
     }
   };
 

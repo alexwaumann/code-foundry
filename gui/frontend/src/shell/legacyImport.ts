@@ -15,6 +15,7 @@ import { create } from "zustand";
 import { importLegacy } from "@/api/layout";
 import { errorMessage } from "@/api/stream";
 import { applyImportedLayout, useLayoutStore } from "@/stores/layout";
+import { setShellMode } from "@/stores/shellView";
 
 /**
  * The classic window's persisted side panels and bottom panels, read as raw strings: their stores
@@ -86,6 +87,19 @@ export function skipLegacyImport(): void {
 export function importSettled(loaded: boolean, imported: boolean, phase: LegacyImportPhase): boolean {
   return loaded && (imported || phase === "done" || phase === "skipped");
 }
+
+/**
+ * The shell draws (stores/shellView.ts `mode`) from the moment both stores say it may, set here
+ * where their state changes rather than from a view's effect, so keys and commands reading
+ * shellDrawn() see it in the same tick. It is a latch: a later snapshot without the mark (a daemon
+ * whose import has not run) does not take the drawn shell away while this window imports into it.
+ */
+function drawWhenSettled(): void {
+  const l = useLayoutStore.getState();
+  if (importSettled(l.loaded, l.legacyImported, useLegacyImportStore.getState().phase)) setShellMode("shell");
+}
+useLayoutStore.subscribe(drawWhenSettled);
+useLegacyImportStore.subscribe(drawWhenSettled);
 
 /** Back to a new window's state (tests). */
 export function resetLegacyImport(): void {
