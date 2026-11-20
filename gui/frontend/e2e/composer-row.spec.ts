@@ -7,7 +7,7 @@ import { openRowThread } from "./shell-threads";
  * mock's scripted thread s-r1. Which segments show, what they say and what each menu item runs
  * are src/components/thread/ComposerRow.test.tsx's and WaitingPanel.test.tsx's, the shortening
  * rule src/lib/composerPill.test.ts's; this keeps what needs a browser: nothing moves when the
- * pill comes and goes, the panel opens over the conversation, the list arrives over the
+ * pill comes and goes (the row 36px either way, the pill 8px above the composer card), the panel opens over the conversation, the list arrives over the
  * thread's stream, and all four segments fit a 480px pane. Set SHOTS=<dir> to save
  * screenshots (WebKit, dark and light).
  */
@@ -66,6 +66,16 @@ async function settled(page: Page) {
   }
 }
 
+/** The row's height and, with a pill, the gap between the pill's bottom and the composer card's top. */
+function rowGap(page: Page) {
+  return page.evaluate(() => {
+    const r = document.querySelector('[data-testid="composer-row"]')?.getBoundingClientRect();
+    const p = document.querySelector('[data-testid="composer-pill"]')?.getBoundingClientRect();
+    const c = document.querySelector('[data-testid="thread-composer"]')?.getBoundingClientRect();
+    return { row: r?.height ?? null, gap: p && c ? c.top - p.bottom : null };
+  });
+}
+
 /** The pill fits its row: nothing in it is cut off. */
 function fits(page: Page) {
   return page.evaluate(() => {
@@ -88,9 +98,12 @@ test("the pill coming and going moves neither the conversation nor the composer"
   await expect(page.getByTestId("composer-row")).toBeVisible();
   await expect(pill(page)).toHaveCount(0);
   const empty = await settled(page);
+  expect(await rowGap(page)).toEqual({ row: 36, gap: null });
   await mockPost("thread/wakes?id=s-r1");
   await expect(page.getByTestId("pill-waiting")).toBeVisible();
   expect(await layout(page)).toEqual(empty);
+  // The pill sits at the row's top, 8px above the composer card; the row keeps its 36px.
+  expect(await rowGap(page)).toEqual({ row: 36, gap: 8 });
   for (const sub of ["sub-t1", "sub-t2", "sub-pr", "sub-timer"]) await mockPost(`thread/wake-fire?sub=${sub}`);
   await expect(pill(page)).toHaveCount(0);
   expect(await layout(page)).toEqual(empty);
@@ -194,6 +207,15 @@ for (const scheme of ["dark", "light"] as const) {
       await row(page, "s:s-r1").click();
       await expect(page.getByTestId("pill-working")).toBeVisible();
       await shot(page, "working");
+    });
+
+    test("working, scrolled up", async ({ page }) => {
+      await mockPost("thread?state=streaming");
+      await openApp(page);
+      await row(page, "s:s-r1").click();
+      await expect(page.getByTestId("pill-working")).toBeVisible();
+      await scrollUp(page);
+      await shot(page, "working-jump");
     });
 
     test("working and waiting", async ({ page }) => {
