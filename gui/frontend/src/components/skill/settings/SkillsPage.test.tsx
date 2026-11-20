@@ -379,6 +379,7 @@ describe("a row's menu", () => {
     const dialog = await screen.findByTestId("skill-confirm");
     expect(dialog.dataset.action).toBe("uninstall");
     expect(dialog.textContent).toContain(RESTART);
+    expect(within(dialog).getByTestId("skill-confirm-ok").getAttribute("data-variant")).toBe("destructive");
     // It can be installed again: Uninstall has focus.
     expect(document.activeElement).toBe(within(dialog).getByTestId("skill-confirm-ok"));
     fireEvent.click(within(dialog).getByTestId("skill-confirm-ok"));
@@ -410,6 +411,7 @@ describe("a row's menu", () => {
     expect(dialog.textContent).toContain("/Users/dev/.claude/skills/my-notes");
     expect(within(dialog).getByText("Delete my-notes?")).toBeTruthy();
     expect(within(dialog).getByTestId("skill-confirm-ok").textContent).toBe("Delete");
+    expect(within(dialog).getByTestId("skill-confirm-ok").getAttribute("data-variant")).toBe("destructive");
     expect(document.activeElement).toBe(within(dialog).getByTestId("skill-confirm-cancel"));
   });
 

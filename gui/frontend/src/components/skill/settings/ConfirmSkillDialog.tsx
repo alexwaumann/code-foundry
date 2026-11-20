@@ -33,10 +33,9 @@ export function ConfirmSkillDialog({ action, row, onClose }: { action: ConfirmAc
             Cancel
           </Button>
           <Button
-            variant="outline"
+            variant="destructive"
             size="sm"
             autoFocus={!permanent}
-            className="border-cf-error/40 bg-transparent text-cf-error-text hover:bg-cf-error-surface hover:text-cf-error-text dark:border-cf-error/40 dark:bg-transparent"
             onClick={() => {
               onClose();
               void runConfirmedSkill(action, row);

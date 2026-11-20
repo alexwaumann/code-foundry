@@ -738,6 +738,7 @@ describe("Settings → Plugins: the uninstall dialog", () => {
     expect(text()).not.toContain("thread");
     expect(text()).toContain("It stops and its package is removed from ~/.code-foundry/plugins.");
     expect(text()).toContain("Its data (~/.code-foundry/plugin-data/test-watcher), secrets and the consent you gave stay for a reinstall.");
+    expect(dialog().getByTestId("uninstall-confirm").getAttribute("data-variant")).toBe("destructive");
     fireEvent.click(dialog().getByTestId("uninstall-purge"));
     expect(text()).not.toContain("stay for a reinstall");
     fireEvent.click(dialog().getByTestId("uninstall-confirm"));
