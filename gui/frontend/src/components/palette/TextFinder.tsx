@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, type ReactNode } from "react";
 import { CaseSensitive, Regex, SearchIcon, WholeWord } from "lucide-react";
 import type { FinderSourceView } from "@/api/filesystem";
 import type { TextQueryView } from "@/api/textSearch";
@@ -6,7 +6,8 @@ import { Kbd } from "@/components/ui/kbd";
 import { Toggle } from "@/components/ui/toggle";
 import { Tip } from "@/components/ui/tooltip";
 import { imeKeyDown } from "@/lib/ime";
-import { findBarQuery, firstMatch, isMatch, moveMatch, queryReady, queryRegExp, smartCaseSensitive, statusText, TEXT_MIN_QUERY, textRows, type MatchRow } from "@/lib/textSearch";
+import { findBarQuery, isMatch, keepMatch, moveMatch, queryReady, queryRegExp, smartCaseSensitive, statusText, TEXT_MIN_QUERY, textRows, type MatchRow } from "@/lib/textSearch";
+import { useListSelection } from "@/lib/useListSelection";
 import { cn } from "@/lib/utils";
 import { openTextMatch, tagFoundFile } from "@/stores/fileFinder";
 import { FinderModeSwitch } from "./FinderModeSwitch";
@@ -141,13 +142,8 @@ export function TextFinder({
   const rows = useMemo(() => textRows(state.files, names, multi), [state.files, names, multi]);
 
   // The selection: the first match of each new answer, else where the keys or the pointer put it.
-  const [selected, setSelected] = useState("");
-  const shownAnswer = useRef<string | null>(null);
-  useEffect(() => {
-    const same = shownAnswer.current === state.answered;
-    shownAnswer.current = state.answered;
-    setSelected((cur) => (same && rows.some((r) => r.key === cur && isMatch(r)) ? cur : firstMatch(rows)));
-  }, [rows, state.answered]);
+  // Worked out during render, so a new answer never shows the old match selected for a frame.
+  const [selected, setSelected] = useListSelection(state.answered, (cur: string, same) => keepMatch(rows, cur, same), "");
   const row = rows.find((r): r is MatchRow => r.key === selected && isMatch(r));
 
   // The answer's case: the daemon's word once it ends, the same rule before.
@@ -197,7 +193,7 @@ export function TextFinder({
     }
     if (e.key === "ArrowDown" || e.key === "ArrowUp" || (e.ctrlKey && (e.key === "n" || e.key === "p"))) {
       e.preventDefault();
-      setSelected((cur) => moveMatch(rows, cur, e.key === "ArrowDown" || e.key === "n" ? 1 : -1));
+      setSelected(moveMatch(rows, selected, e.key === "ArrowDown" || e.key === "n" ? 1 : -1));
       return;
     }
     if (e.key === "Enter") {

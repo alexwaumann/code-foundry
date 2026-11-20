@@ -138,6 +138,51 @@ export function restoreSelection(rows: readonly ResultRow[], openedN: number | n
   return next?.n ?? null;
 }
 
+/** Where a restored search puts its selection: the row selected and the hit opened when it was last shown. */
+export interface SelectionRestore {
+  selectedN: number | null;
+  openedN: number | null;
+}
+
+/** Whether a restored selection is the user's: one that was reported, or a hit opened. */
+export function restoredPick(r: SelectionRestore): boolean {
+  return r.selectedN !== null || r.openedN !== null;
+}
+
+/**
+ * The Agent search's selection, kept per search shown. `picked`: the row is one the user
+ * chose (a key, the pointer, a marker, or restored), which a run's end leaves alone.
+ */
+export interface AgentSelection {
+  entryId: string | null;
+  /** The restore last applied (by identity); null before any. */
+  restored: SelectionRestore | null;
+  n: number | null;
+  picked: boolean;
+}
+
+/** The selection a mode opens with: the restore's row, picked when the restore is the user's. Applied once rows arrive (settleSelection). */
+export function startSelection(entryId: string | null, restore: SelectionRestore | null): AgentSelection {
+  return { entryId, restored: null, n: restore?.selectedN ?? null, picked: restore ? restoredPick(restore) : false };
+}
+
+/**
+ * The selection for the rows on screen, worked out during render
+ * (docs/notes/derived-list-selection.md); the same object when nothing changes. Another
+ * search shown drops the pick (and the row, unless a restore comes with it). While there
+ * are no rows nothing else moves. A restore not yet applied puts the selection where
+ * restoreSelection says; after it, defaultSelection: the first hit as it arrives, then the
+ * Answer row when the run ends unless the user picked a row.
+ */
+export function settleSelection(s: AgentSelection, entryId: string | null, restore: SelectionRestore | null, rows: readonly ResultRow[]): AgentSelection {
+  let out = s;
+  if (out.entryId !== entryId) out = { ...out, entryId, picked: false, n: restore ? out.n : null };
+  if (rows.length === 0) return out;
+  if (restore && out.restored !== restore) return { ...out, restored: restore, picked: restoredPick(restore), n: restoreSelection(rows, restore.openedN, restore.selectedN) };
+  const n = defaultSelection(rows, out.n, out.picked);
+  return n === out.n ? out : { ...out, n };
+}
+
 /**
  * The selection a search opens on when no earlier selection of it is kept (Recent, the
  * unseen cue, the sidebar's search row): its first row, the Answer row when it has one. A

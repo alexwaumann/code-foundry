@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { TextFileView, TextLineView, TextSummaryView } from "@/api/textSearch";
-import { countLabel, findBarQuery, firstMatch, lineRuns, matchPosition, matchRanges, moreLabel, moveMatch, queryReady, queryRegExp, searchKey, smartCaseSensitive, statusText, textRows, type MatchRow } from "./textSearch";
+import { countLabel, findBarQuery, firstMatch, keepMatch, lineRuns, matchPosition, matchRanges, moreLabel, moveMatch, queryReady, queryRegExp, searchKey, smartCaseSensitive, statusText, textRows, type MatchRow } from "./textSearch";
 
 function line(n: number, text: string, ranges: [number, number][] = [], cut: { start?: boolean; end?: boolean } = {}): TextLineView {
   return { line: n, text, ranges: ranges.map(([start, end]) => ({ start, end })), cutStart: cut.start ?? false, cutEnd: cut.end ?? false };
@@ -137,6 +137,16 @@ describe("selection", () => {
     expect(moveMatch(rows, keys[0] ?? "", -1)).toBe(keys[2]);
     expect(moveMatch(rows, "", -1)).toBe(keys[2]);
     expect(moveMatch([], "", 1)).toBe("");
+  });
+
+  it.each([
+    { name: "the same answer keeps a match still listed", key: 1, same: true, want: 1 },
+    { name: "a new answer starts at the first match", key: 1, same: false, want: 0 },
+    { name: "a match that left gives way to the first", key: -1, same: true, want: 0 },
+    { name: "a file row is no match: the first", key: -2, same: true, want: 0 },
+  ])("keepMatch: $name", ({ key, same, want }) => {
+    const k = key === -1 ? "gone" : key === -2 ? (rows.find((r) => r.kind !== "match")?.key ?? "") : (keys[key] ?? "");
+    expect(keepMatch(rows, k, same)).toBe(keys[want]);
   });
 
   it("says where the match is in its file", () => {

@@ -17,6 +17,8 @@ import {
   RESTORE_MS,
   restoreSelection,
   resultRows,
+  settleSelection,
+  startSelection,
   sessionToRestore,
   summaryLine,
   unseenCue,
@@ -307,5 +309,52 @@ describe("texts", () => {
   it("footerModel names the utility model at low effort", () => {
     expect(footerModel("claude-sonnet-5-5[1m]", () => "Sonnet 5.5")).toBe("Utility model · Sonnet 5.5 · low");
     expect(footerModel("", () => "x")).toBe("Utility model · low");
+  });
+});
+
+describe("settleSelection", () => {
+  const rows = (...ns: number[]) => ns.map((n) => ({ n, opened: false }));
+  const restore = { selectedN: 2, openedN: null };
+
+  it("waits for rows to apply a restore, then applies it once, picked", () => {
+    let s = startSelection("e1", restore);
+    expect(settleSelection(s, "e1", restore, [])).toBe(s);
+    s = settleSelection(s, "e1", restore, rows(1, 2, 3));
+    expect(s).toMatchObject({ n: 2, picked: true, restored: restore });
+    // Settled: settling again changes nothing (the same object, so no render loops).
+    expect(settleSelection(s, "e1", restore, rows(1, 2, 3))).toBe(s);
+  });
+
+  it("an opened hit restores to the next unopened one", () => {
+    const r = { selectedN: 1, openedN: 1 };
+    expect(settleSelection(startSelection("e1", r), "e1", r, [{ n: 1, opened: true }, { n: 2, opened: false }])).toMatchObject({ n: 2, picked: true });
+  });
+
+  it("without a restore: the first hit as it arrives, the Answer row at the end", () => {
+    let s = settleSelection(startSelection("e1", null), "e1", null, rows(1));
+    expect(s).toMatchObject({ n: 1, picked: false });
+    s = settleSelection(s, "e1", null, rows(1, 2));
+    expect(s.n).toBe(1);
+    expect(settleSelection(s, "e1", null, rows(ANSWER_ROW, 1, 2)).n).toBe(ANSWER_ROW);
+  });
+
+  it("a picked hit stays when the run ends", () => {
+    const s = { ...settleSelection(startSelection("e1", null), "e1", null, rows(1, 2)), n: 2, picked: true };
+    expect(settleSelection(s, "e1", null, rows(ANSWER_ROW, 1, 2)).n).toBe(2);
+  });
+
+  it("another search drops the pick and the row, unless a restore comes with it", () => {
+    const s = { ...startSelection("e1", null), n: 2, picked: true };
+    expect(settleSelection(s, "e2", null, [])).toMatchObject({ entryId: "e2", n: null, picked: false });
+    const r = { selectedN: 3, openedN: null };
+    expect(settleSelection(s, "e2", r, [])).toMatchObject({ entryId: "e2", n: 2, picked: false });
+    expect(settleSelection(s, "e2", r, rows(1, 3))).toMatchObject({ n: 3, picked: true, restored: r });
+  });
+
+  it("a new restore for the same search applies again", () => {
+    const r1 = { selectedN: 1, openedN: null };
+    const s = settleSelection(startSelection("e1", r1), "e1", r1, rows(1, 2));
+    const r2 = { selectedN: null, openedN: null };
+    expect(settleSelection(s, "e1", r2, rows(ANSWER_ROW, 1, 2))).toMatchObject({ n: ANSWER_ROW, picked: false, restored: r2 });
   });
 });
