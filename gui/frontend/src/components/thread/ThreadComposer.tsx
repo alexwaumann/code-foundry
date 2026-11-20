@@ -22,6 +22,7 @@ import { Tip } from "@/components/ui/tooltip";
 import { choiceLabel, EFFORT_CHOICES, PERMISSION_CHOICES, type ComposePermission } from "@/lib/compose";
 import { skillSources, skillSourcesKey, type TriggerChar } from "@/lib/completion";
 import { LISTENING_PLACEHOLDER } from "@/lib/dictation";
+import { heldByModal } from "@/lib/modalFocus";
 import { setupUnfinished, setupWaitedFor } from "@/lib/threadSetup";
 
 const PLACEHOLDER = "Reply or ask anything. @ files and threads, / skills and commands";
@@ -225,6 +226,9 @@ export function ThreadComposer({
       // double-click on the sidebar row starts): leave it there.
       const now = document.activeElement;
       if (now !== before && now !== null && now !== document.body && !inRoot(now)) return true;
+      // A sheet or dialog over this pane has the keyboard, the request's own `before`
+      // included (the palette ran a command that opened it, then asked the content): it stays there.
+      if (heldByModal(now, rootRef.current)) return true;
       editorRef.current?.focus();
       return inRoot(document.activeElement);
     };

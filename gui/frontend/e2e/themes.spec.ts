@@ -83,6 +83,30 @@ test("opened from the palette the list has the keyboard: real arrows preview and
   await expect(page.getByRole("searchbox", { name: "Search themes" })).toBeFocused();
 });
 
+// The palette's close asks the content for the keyboard. When that request lands after the
+// sheet took it (a race in the app; here it is sent once the list is focused), the keyboard
+// stays in the sheet, not in the prompt behind it (docs/notes/sheet-keeps-keyboard.md).
+test("a content focus request under the open page leaves the keyboard in its list", async ({ page }) => {
+  await openApp(page);
+  await page.getByTestId("composer-input").first().click();
+  await page.keyboard.press("Meta+k");
+  const palette = page.getByTestId("palette");
+  await palette.locator('[data-command="theme.pick"]').click();
+  await expect(page.getByTestId("themes-list")).toBeFocused();
+  await page.evaluate(() =>
+    (window as unknown as { __cfModule: (p: string) => Promise<{ useUiStore: { setState: (f: (s: { contentFocusSeq: number }) => unknown) => void } }> })
+      .__cfModule("/src/stores/ui.ts")
+      .then((m) => {
+        m.useUiStore.setState((s) => ({ contentFocusSeq: s.contentFocusSeq + 1 }));
+      }),
+  );
+  // Two frames: the composer serves a request at once or on the next frame.
+  await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+  await expect(page.getByTestId("themes-list")).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(page$(page)).toHaveCount(0);
+});
+
 test("a light preview inside the dark window renders with the light rules", async ({ page }) => {
   await openFromSettings(page, "light");
   await option(page, "Solarized Light").click();
