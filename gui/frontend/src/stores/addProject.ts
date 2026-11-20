@@ -17,13 +17,14 @@ interface AddProjectState {
   /** Incremented on every open, so the dialog's body starts fresh. */
   seq: number;
   /**
-   * A project the New tab created that is not kept or published yet (its publish was
-   * refused). Closing the dialog any other way than Keep it local or a successful
-   * publish deletes it again.
+   * The project the New tab created this opening (its publish may have been refused).
+   * Cancelling the dialog deletes it again; Keep it local or a successful publish closes the
+   * dialog keeping it. The New tab shows it from here, the one place it is kept: reset on
+   * each opening, left as it was on close so the closing dialog still shows it.
    */
   created: CreatedProject | null;
-  /** The New tab is creating or publishing: the dialog cannot be closed meanwhile. */
-  busy: boolean;
+  /** What the New tab is doing; while it creates or publishes, the dialog cannot be closed. */
+  busy: NewProjectBusy;
   /**
    * The dialog was opened by project.add's intent (a page in a thread, or the CLI): what it
    * adds is not shown on the Projects page, so the window stays where it is. Kept until the
@@ -32,7 +33,10 @@ interface AddProjectState {
   stay: boolean;
 }
 
-export const useAddProjectStore = create<AddProjectState>()(() => ({ open: false, tab: "local", seq: 0, created: null, busy: false, stay: false }));
+/** The New tab's call in flight: project.create, project.github.publish, or none. */
+export type NewProjectBusy = "create" | "publish" | null;
+
+export const useAddProjectStore = create<AddProjectState>()(() => ({ open: false, tab: "local", seq: 0, created: null, busy: null, stay: false }));
 
 export interface OpenAddProjectOptions {
   /** Do not move the window to what gets added (see AddProjectState.stay). */
@@ -46,7 +50,7 @@ export interface OpenAddProjectOptions {
  */
 export function openAddProject(tab: AddProjectTab = "local", { stay = false }: OpenAddProjectOptions = {}): void {
   queueMicrotask(() => {
-    useAddProjectStore.setState((s) => ({ open: true, tab, seq: s.seq + 1, created: null, busy: false, stay }));
+    useAddProjectStore.setState((s) => ({ open: true, tab, seq: s.seq + 1, created: null, busy: null, stay }));
   });
 }
 
@@ -57,14 +61,14 @@ export function openAddProject(tab: AddProjectTab = "local", { stay = false }: O
  */
 export function closeAddProject(): void {
   const s = useAddProjectStore.getState();
-  if (!s.open || s.busy) return;
-  useAddProjectStore.setState({ open: false, created: null });
+  if (!s.open || s.busy !== null) return;
+  useAddProjectStore.setState({ open: false });
   if (s.created) void discardCreated(s.created);
 }
 
 /** Closes the dialog keeping what it made (a project added, created, kept or published). */
 export function finishAddProject(): void {
-  useAddProjectStore.setState({ open: false, created: null, busy: false });
+  useAddProjectStore.setState({ open: false });
 }
 
 /**
@@ -76,13 +80,13 @@ export function noticeAdded(n: { title: string; description?: string }): void {
   if (useAddProjectStore.getState().stay) notify({ level: "success", ...n });
 }
 
-/** The New tab's project awaiting Keep it local or a publish (null once decided). */
-export function setCreatedProject(created: CreatedProject | null): void {
-  useAddProjectStore.setState({ created });
-}
-
-export function setAddProjectBusy(busy: boolean): void {
-  useAddProjectStore.setState({ busy });
+/**
+ * The New tab's step (what it created, what it is doing) for the opening it started in
+ * (`seq`): an answer that arrives after the dialog was opened again changes nothing, as the
+ * tab it belonged to is gone.
+ */
+export function setNewProjectStep(seq: number, step: Partial<Pick<AddProjectState, "created" | "busy">>): void {
+  if (useAddProjectStore.getState().seq === seq) useAddProjectStore.setState(step);
 }
 
 async function discardCreated(p: CreatedProject): Promise<void> {

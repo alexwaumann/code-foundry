@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
 import { startComposerDrafts } from "@/shell/composerDrafts";
-import { importSettled, runLegacyImport, useLegacyImportStore } from "@/shell/legacyImport";
+import { runLegacyImport, useLegacyImportStore } from "@/shell/legacyImport";
 import { probeLayoutService, useLayoutServiceStore } from "@/shell/layoutService";
 import { startSelectionBridge } from "@/stores/selectionBridge";
 import { startFocusHistory } from "@/stores/focusHistory";
 import { startFileRequests } from "@/stores/fileRequestArrivals";
 import { useLayoutStore } from "@/stores/layout";
-import { setShellMode, useShellViewStore } from "@/stores/shellView";
+import { useShellViewStore } from "@/stores/shellView";
 import { escapeLeaves, fullscreenOn, leaveFullscreen, promptEscapeLeaves } from "@/shell/fullscreen";
 import { NeedsPopup } from "@/components/needs/NeedsPopup";
 import { PaneGrid } from "./PaneGrid";
@@ -34,16 +34,13 @@ export function Shell() {
   const loaded = useLayoutStore((s) => s.loaded);
   const imported = useLayoutStore((s) => s.legacyImported);
   const phase = useLegacyImportStore((s) => s.phase);
+  // Set by the stores once the layout arrived and the import settled (shell/legacyImport.ts).
   const mode = useShellViewStore((s) => s.mode);
-  const ready = importSettled(loaded, imported, phase);
   const [slow, setSlow] = useState(false);
   // Before the first draw: the import, once, when the daemon's layout says it has not run.
   useEffect(() => {
     if (loaded && !imported && phase === "idle") void runLegacyImport();
   }, [loaded, imported, phase]);
-  useEffect(() => {
-    if (ready) setShellMode("shell");
-  }, [ready]);
   useEffect(() => {
     if (loaded) return;
     const timer = setTimeout(() => {

@@ -18,7 +18,7 @@ const added = (id: string) => {
 
 describe("what the Add Project dialog shows once a project is added", () => {
   beforeEach(() => {
-    useAddProjectStore.setState({ open: false, tab: "local", seq: 0, created: null, busy: false, stay: false });
+    useAddProjectStore.setState({ open: false, tab: "local", seq: 0, created: null, busy: null, stay: false });
     useProjectsStore.setState({ byId: {}, order: [] });
   });
   afterEach(() => {

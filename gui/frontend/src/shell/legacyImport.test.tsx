@@ -18,7 +18,7 @@ vi.mock("@/components/shell/PaneGrid", () => ({ PaneGrid: () => <div data-testid
 vi.mock("@/components/needs/NeedsPopup", () => ({ NeedsPopup: () => null }));
 
 const { Shell } = await import("@/components/shell/Shell");
-const { LEGACY_BOTTOM_KEY, LEGACY_PANEL_KEY, importSettled, readLegacyStores, resetLegacyImport, runLegacyImport, useLegacyImportStore } = await import("./legacyImport");
+const { LEGACY_BOTTOM_KEY, LEGACY_PANEL_KEY, importSettled, readLegacyStores, resetLegacyImport, runLegacyImport, skipLegacyImport, useLegacyImportStore } = await import("./legacyImport");
 const { applyLayoutEvent, resetLayout, useLayoutStore } = await import("@/stores/layout");
 const { resetShellView, useShellViewStore } = await import("@/stores/shellView");
 
@@ -127,6 +127,33 @@ describe("the first-load import", () => {
     expect(useLayoutStore.getState().legacyImported).toBe(false);
     expect(useLegacyImportStore.getState().phase).toBe("skipped");
     expect(calls).toHaveLength(1);
+  });
+});
+
+describe("when the shell draws, without a view", () => {
+  const mode = () => useShellViewStore.getState().mode;
+
+  const fail = () => {
+    answer = () => Promise.reject(new Error("boom"));
+  };
+  it.each([
+    ["the layout arrives with the mark", [() => { snapshot({ ...before, legacyImported: true }); }], "shell"],
+    ["the layout arrives without the mark", [() => { snapshot(before); }], "waiting"],
+    ["the import runs and answers", [() => { snapshot(before); }, runLegacyImport], "shell"],
+    ["the import fails", [fail, () => { snapshot(before); }, runLegacyImport], "waiting"],
+    ["it fails and is skipped", [fail, () => { snapshot(before); }, runLegacyImport, skipLegacyImport], "shell"],
+  ] as const)("%s: %s", async (_when, steps, want) => {
+    expect(mode()).toBe("waiting");
+    for (const step of steps) await step();
+    expect(mode()).toBe(want);
+  });
+
+  it("stays drawn when a later snapshot comes without the mark (a daemon whose import has not run)", () => {
+    snapshot({ ...before, legacyImported: true });
+    expect(mode()).toBe("shell");
+    snapshot({ ...before, rev: 7 });
+    expect(useLayoutStore.getState().legacyImported).toBe(false);
+    expect(mode()).toBe("shell");
   });
 });
 

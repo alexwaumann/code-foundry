@@ -23,7 +23,7 @@ export function AddProjectDialog() {
   const open = useAddProjectStore((s) => s.open);
   const tab = useAddProjectStore((s) => s.tab);
   const seq = useAddProjectStore((s) => s.seq);
-  const busy = useAddProjectStore((s) => s.busy);
+  const busy = useAddProjectStore((s) => s.busy !== null);
   return (
     <Dialog
       open={open}

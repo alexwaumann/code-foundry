@@ -4,6 +4,7 @@
  * the focused pane) is the daemon's (stores/layout.ts).
  *
  * - `mode`: this window waits for the daemon's layout (and the first-load import), or draws it.
+ *   Latched to "shell" by shell/legacyImport.ts when the layout and import stores settle.
  * - `frame`: the pane grid as last drawn (rectangles in layout px): the direction keys find
  *   neighbours on it (shell/keyPresenters.ts), as the spec says they do on the rendered frame.
  * - `focusRequest`: asks a pane to take the keyboard into its active tab (a key or a command
