@@ -79,7 +79,7 @@ func (m *Manager) finishSetup(j *setupJob) error {
 	defer close(j.done)
 	defer j.cancel()
 	defer j.stopWatch()
-	defer m.clearSetup(j.id)
+	defer m.clearSetup(j)
 	report, err := m.runSetup(j)
 	if err == nil {
 		if j.o.Report != nil && !j.o.BackgroundSetup {
@@ -130,11 +130,13 @@ func (m *Manager) failWaitedSetup(j *setupJob, err error, stopping bool) error {
 	return err
 }
 
-// clearSetup forgets thread id's setup stage: it has ended.
-func (m *Manager) clearSetup(id string) {
+// clearSetup forgets j as its thread's setup stage: it has ended. A stage that failed or
+// was cancelled is forgotten already, with the commit that said so (failSetup,
+// endCancelled), and a retry may have registered the next one since: that one stays.
+func (m *Manager) clearSetup(j *setupJob) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if rec, ok := m.recs[id]; ok {
+	if rec, ok := m.recs[j.id]; ok && rec.setup == j {
 		rec.setup = nil
 	}
 }
@@ -149,13 +151,16 @@ func (m *Manager) releaseSetup(id string) {
 }
 
 // failSetup ends thread id's setup with err: its message's turn never ran, so it ends
-// here, and the thread settles with the reason.
+// here, and the thread settles with the reason. The stage is forgotten in the same commit:
+// whoever sees the failure may retry or discard it at once, where a stage forgotten only as
+// its goroutine returned refused them for a moment ("still being set up").
 func (m *Manager) failSetup(id string, err error) {
 	why := setupWhy(id, err)
 	m.closeSetupTurn(id)
 	now := m.opts.Now()
 	m.update(id, true, func(r *record) {
 		r.release()
+		r.setup = nil
 		r.first = nil
 		r.s.failSetup(now, why)
 	})

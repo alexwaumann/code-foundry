@@ -414,6 +414,7 @@ func (m *Manager) endCancelled(j *setupJob) {
 	now := m.opts.Now()
 	m.update(j.id, true, func(r *record) {
 		r.release()
+		r.setup = nil // with the commit that says so, as failSetup
 		r.first = nil
 		if j.w != nil || r.s.CreatedWorktree {
 			r.s.unplace()

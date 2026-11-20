@@ -974,6 +974,57 @@ func branchesOfWorktrees(rr *recordingProjects) func(context.Context, string, st
 	}
 }
 
+// A setup that says it failed or was cancelled is no longer the thread's stage, in the same
+// commit: whoever sees it may discard or retry at once. The stage used to be forgotten only
+// as its goroutine returned, which refused them for a moment after the phase showed (and
+// failed TestCleanupKeepsAWorktreeAnotherThreadHolds/discard on a loaded machine).
+func TestSetupThatEndedIsForgottenWithItsPhase(t *testing.T) {
+	ends := []struct {
+		name string
+		end  func(e *env, j *setupJob)
+	}{
+		{"failed", func(e *env, j *setupJob) { e.m.failSetup(j.id, errors.New("boom")) }},
+		{"cancelled", func(e *env, j *setupJob) { e.m.endCancelled(j) }},
+	}
+	for _, tt := range ends {
+		t.Run(tt.name, func(t *testing.T) {
+			e, _ := newWorktreeEnv(t, nil, func(o *Options) {
+				o.Projects = &heldProjects{recordingProjects: o.Projects.(*recordingProjects), holding: "r1"}
+			})
+			a, err := e.m.Create(e.ctx(), CreateOptions{ProjectID: "r1", InitialPrompt: "do x", NewWorktree: &NewWorktree{Branch: "fix/held"}, BackgroundSetup: true})
+			if err != nil {
+				t.Fatal(err)
+			}
+			job := func() *setupJob {
+				e.m.mu.Lock()
+				defer e.m.mu.Unlock()
+				return e.m.recs[a.ID].setup
+			}
+			j := job()
+			if j == nil {
+				t.Fatal("no stage is registered")
+			}
+			// The stage's goroutine is still held in CreateWorktree: only the commit can forget it.
+			tt.end(e, j)
+			if job() != nil {
+				t.Fatal("the stage outlived the commit that ended it")
+			}
+			// The next stage is not the ended one's to forget as its goroutine returns.
+			next := &setupJob{id: a.ID}
+			e.m.mu.Lock()
+			e.m.recs[a.ID].setup = next
+			e.m.mu.Unlock()
+			e.m.clearSetup(j)
+			if job() != next {
+				t.Error("an ended stage forgot the one after it")
+			}
+			e.m.clearSetup(next)
+			j.cancel()
+			<-j.done
+		})
+	}
+}
+
 // finish ends a held setup with a failure.
 func finish(t *testing.T, e *env, id string) {
 	t.Helper()
