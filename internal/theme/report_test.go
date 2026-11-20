@@ -36,7 +36,7 @@ func TestReportCheck(t *testing.T) {
 		{"ratio under 1", with(func(r *Report) { r.Issues[0].Ratio = 0.5 }), "contrast ratios"},
 		{"required over 21", with(func(r *Report) { r.Issues[0].Required = 30 }), "contrast ratios"},
 		{"stale not a slot", with(func(r *Report) { r.Stale[0].Slot = "--cf-x" }), "is not a slot"},
-		{"stale bad colour", with(func(r *Report) { r.Stale[0].Derived = "red" }), "colours are"},
+		{"stale bad colour", with(func(r *Report) { r.Stale[0].Derived = "red" }), "colors are"},
 		{"too many issues", with(func(r *Report) { r.Issues = make([]ContrastIssue, MaxReportIssues+1) }), "issues (at most"},
 		{"too many stale", with(func(r *Report) { r.Stale = make([]StalePin, MaxReportStale+1) }), "stale pins (at most"},
 	}

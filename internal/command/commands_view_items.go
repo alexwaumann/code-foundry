@@ -75,7 +75,7 @@ func (d ViewDeps) itemCommands() []Command {
 			NoPalette: true,
 			Title:     "Open File Tab",
 			Description: "Open a file in a File tab " + openLead +
-				"text with syntax colours and an optional line marked, markdown rendered, images, PDFs, and HTML pages run interactively. " +
+				"text with syntax colors and an optional line marked, markdown rendered, images, PDFs, and HTML pages run interactively. " +
 				"With --edit the user edits it instead: for a secret, or a file you cannot read, never ask for the value in chat or try to read the file; " +
 				"run this with --line and a --note saying what to put where, then end your turn: a message tells you when it is saved, and you continue without reading its values. " +
 				"A missing file starts empty and is made on save, in a directory that must exist. Refused for what the tab cannot edit: tell the user.",

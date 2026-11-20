@@ -21,7 +21,7 @@ func TestThreadSetupCommands(t *testing.T) {
 		wantMsg              []string
 	}{
 		{name: "retry", verb: "thread.setup.retry", wantCall: "RetrySetup s1", wantMsg: []string{"trying the setup of thread"}},
-		{name: "cancel", verb: "thread.setup.cancel", wantCall: "CancelSetup s1", wantMsg: []string{"cancelled the setup of thread"}},
+		{name: "cancel", verb: "thread.setup.cancel", wantCall: "CancelSetup s1", wantMsg: []string{"canceled the setup of thread"}},
 		{name: "cancel keeping work", verb: "thread.setup.cancel", wantCall: "CancelSetup s1",
 			prep:    func(f *threadtest.Fake) { f.KeptWorktrees = []string{"/w/a"} },
 			wantMsg: []string{"kept for the work in them: /w/a"}},

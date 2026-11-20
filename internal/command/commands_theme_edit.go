@@ -25,7 +25,7 @@ func RegisterThemeEdit(r *Registry, e Emitter, themes ThemeBackend) error {
 		Name:  "theme.edit",
 		Page:  PageState,
 		Title: "Edit Theme…",
-		Description: "Open one of your themes in the Themes page's editor: change its base colours or pin single slots, with the gallery previewing " +
+		Description: "Open one of your themes in the Themes page's editor: change its base colors or pin single slots, with the gallery previewing " +
 			"every change and the contrast checked as you go; Save writes the file. A curated theme is copied first (theme duplicate <id>).",
 		Category: "Settings",
 		Args: []ArgSpec{{Name: "theme", Type: Enum, EnumFunc: userThemeIDs(themes), Required: true, Positional: true,

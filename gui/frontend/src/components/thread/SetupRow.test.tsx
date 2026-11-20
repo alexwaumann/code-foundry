@@ -154,7 +154,7 @@ describe("SetupRow", () => {
   it("cancelled: one quiet line, no rows", () => {
     seed(setup("cancelled", [step("name", "done", { branch: "cf/x", startedAtMs: NOW - 4000, endedAtMs: NOW - 3000 }), step("worktree", "pending")], { startedAtMs: NOW - 4200, endedAtMs: NOW }));
     render(<View />);
-    expect(screen.getByTestId("thread-setup").textContent).toBe("Setup cancelled after 4s");
+    expect(screen.getByTestId("thread-setup").textContent).toBe("Setup canceled after 4s");
     expect(lines()).toEqual([]);
   });
 

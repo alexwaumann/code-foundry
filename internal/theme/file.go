@@ -106,7 +106,7 @@ func ParseFile(data []byte) (File, error) {
 // retiredSlots are slots the app no longer has (docs/notes/theme-slots-3-hardening.md),
 // with what to pin instead. ParseFile refuses them with that hint; ParseStored drops them.
 var retiredSlots = map[string]string{
-	"--cf-icon":               "icons take their label's colour, or pin --cf-icon-muted",
+	"--cf-icon":               "icons take their label's color, or pin --cf-icon-muted",
 	"--cf-sidebar-row-active": "pin --cf-sidebar-row-selected",
 }
 
@@ -284,7 +284,7 @@ func (f File) Validate() error {
 		}
 	}
 	if len(b.Terminal.ANSI) != 16 {
-		return bad("base.terminal.ansi: want 16 colours, got %d", len(b.Terminal.ANSI))
+		return bad("base.terminal.ansi: want 16 colors, got %d", len(b.Terminal.ANSI))
 	}
 	for i, c := range b.Terminal.ANSI {
 		if err := opaque(fmt.Sprintf("base.terminal.ansi[%d]", i), c, true); err != nil {

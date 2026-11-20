@@ -126,9 +126,9 @@ describe("setupView", () => {
   });
 
   const cancels: [string, number, string][] = [
-    ["whole seconds", 4300, "Setup cancelled after 4s"],
-    ["inside the first second", 400, "Setup cancelled after 0.4s"],
-    ["a minute in", 65_000, "Setup cancelled after 1m 5s"],
+    ["whole seconds", 4300, "Setup canceled after 4s"],
+    ["inside the first second", 400, "Setup canceled after 0.4s"],
+    ["a minute in", 65_000, "Setup canceled after 1m 5s"],
   ];
   it.each(cancels)("cancelled: one line, %s", (_, took, label) => {
     const s = setup("cancelled", [pending("fetch"), pending("start")], { startedAtMs: NOW - took, endedAtMs: NOW });
@@ -136,7 +136,7 @@ describe("setupView", () => {
   });
 
   it("cancelled without its times says so plainly", () => {
-    expect(setupView(setup("cancelled", [], { startedAtMs: null }), NOW)).toEqual({ kind: "cancelled", label: "Setup cancelled" });
+    expect(setupView(setup("cancelled", [], { startedAtMs: null }), NOW)).toEqual({ kind: "cancelled", label: "Setup canceled" });
   });
 
   it("done: the fold line with how long it took, and every step behind it", () => {
@@ -423,7 +423,7 @@ describe("setupNoteLine", () => {
   it.each<[string, ThreadSetupView | null, string | null]>([
     ["failed", setup("failed", [step("worktree", "failed")]), "Could not create the worktree, so your message was not sent."],
     ["failed with nothing to say why", setup("failed", []), "Setup failed, so your message was not sent."],
-    ["cancelled", setup("cancelled", []), "Setup cancelled, so your message was not sent."],
+    ["cancelled", setup("cancelled", []), "Setup canceled, so your message was not sent."],
     ["running", setup("running", []), null],
     ["done", setup("done", []), null],
     ["no setup", null, null],

@@ -17,7 +17,7 @@ const delin = (c: number) => (c <= 0.0031308 ? 12.92 * c : 1.055 * c ** (1 / 2.4
 export function parseHex(hex: string): { rgb: Rgb; alpha: number } {
   let h = hex.trim().replace(/^#/, "").toLowerCase();
   if (h.length === 3) h = h.replace(/./g, (c) => c + c);
-  if (!/^[0-9a-f]{6}([0-9a-f]{2})?$/.test(h)) throw new Error(`not a hex colour: ${hex}`);
+  if (!/^[0-9a-f]{6}([0-9a-f]{2})?$/.test(h)) throw new Error(`not a hex color: ${hex}`);
   const n = (i: number) => parseInt(h.slice(i, i + 2), 16) / 255;
   return { rgb: [n(0), n(2), n(4)], alpha: h.length === 8 ? n(6) : 1 };
 }

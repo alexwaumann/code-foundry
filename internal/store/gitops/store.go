@@ -301,7 +301,7 @@ func (m *Manager) execute(op *Op, refresh bool, b body) Op {
 		case ctx.Err() == context.DeadlineExceeded:
 			summary = fmt.Sprintf("timed out after %s", m.timeout(op.Kind))
 		case m.ctx.Err() != nil:
-			summary = "cancelled: daemon is shutting down"
+			summary = "canceled: daemon is shutting down"
 		default:
 			summary = err.Error()
 		}

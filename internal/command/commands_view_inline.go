@@ -52,7 +52,7 @@ const (
 	// itself (docs/notes/page-library.md).
 	WarnNoThemeCSS = "page does not link /cf/theme.css, so it will not follow the user's theme; add " +
 		`<link rel="stylesheet" href="/cf/theme.css"> and use --cf-* variables (--cf-surface, --cf-text, ` +
-		"--cf-text-muted, --cf-accent, --cf-border, …), not fixed colours or prefers-color-scheme"
+		"--cf-text-muted, --cf-accent, --cf-border, …), not fixed colors or prefers-color-scheme"
 	// WarnNoResize points at the bridge, not a hand-posted cf:resize: models that read the
 	// old wording wrote the pre-bridge workaround (docs/notes/page-library-fixes-b.md).
 	WarnNoResize = "page does not load /cf/bridge.js, so its card keeps the default height; add " +

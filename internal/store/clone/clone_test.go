@@ -242,7 +242,7 @@ func TestCloneBusyAndCancel(t *testing.T) {
 		t.Fatalf("second clone: err = %v, want ErrBusy", err)
 	}
 	cancel()
-	if err := <-done; !errors.Is(err, context.Canceled) || !strings.Contains(err.Error(), "clone cancelled") {
+	if err := <-done; !errors.Is(err, context.Canceled) || !strings.Contains(err.Error(), "clone canceled") {
 		t.Fatalf("cancelled clone: err = %v", err)
 	}
 	if exists(filepath.Join(root, "octo", "slow")) {

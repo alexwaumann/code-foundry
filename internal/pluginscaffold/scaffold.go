@@ -124,7 +124,7 @@ func Scaffold(ctx context.Context, req Request) (Result, error) {
 		return Result{}, fmt.Errorf("%w: %q is not an absolute path", ErrInvalid, req.Parent)
 	}
 	if req.Owner != "" && !ownerOK(req.Owner) {
-		return Result{}, fmt.Errorf("%w: owner %q is not a GitHub user or organisation name", ErrInvalid, req.Owner)
+		return Result{}, fmt.Errorf("%w: owner %q is not a GitHub user or organization name", ErrInvalid, req.Owner)
 	}
 	dir := filepath.Join(filepath.Clean(req.Parent), DirPrefix+req.Name)
 	real, err := resolve(dir)

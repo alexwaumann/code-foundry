@@ -98,7 +98,7 @@ func shellWindowTerminalCommands(d TerminalDeps, idArg ArgSpec, quick *sync.Mute
 			Title: "Reset Terminal",
 			Description: "Replace a shell with a fresh one in its owner's folder. " +
 				"That is the thread's checkout, the worktree, or the home directory for a free shell; the old shell is closed. The new shell keeps the old one's labels (a quick terminal stays the " +
-				"thread's quick terminal) and is labelled replaces=<old id>, so a tab showing the old one can follow it.",
+				"thread's quick terminal) and is labeled replaces=<old id>, so a tab showing the old one can follow it.",
 			Category:       "Terminal",
 			Args:           []ArgSpec{positional(idArg)},
 			When:           isShell,

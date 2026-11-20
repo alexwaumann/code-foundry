@@ -241,7 +241,7 @@ func RegisterTheme(r *Registry, d ThemeDeps) error {
 			NoPalette:    true,
 			ReadOnly:     true,
 			Title:        "List Themes",
-			Description:  "Print every colour theme by scheme, yours first, marking the ones in use. Yours show the theme each was copied from.",
+			Description:  "Print every color theme by scheme, yours first, marking the ones in use. Yours show the theme each was copied from.",
 			Category:     "Settings",
 			NoKeybinding: true,
 			Run: func(ctx context.Context, _ Context, _ Args) (Result, error) {
@@ -413,9 +413,9 @@ func RegisterTheme(r *Registry, d ThemeDeps) error {
 			Name:      "theme.restore",
 			Page:      PageState,
 			NoPalette: true,
-			Title:     "Restore Theme Colours",
+			Title:     "Restore Theme Colors",
 			Description: "Put back an earlier version of one of your themes: each save keeps the version it replaces (the last 10). " +
-				"A theme card's Undo runs it when the save changed the colours of the theme in use.",
+				"A theme card's Undo runs it when the save changed the colors of the theme in use.",
 			Category:     "Settings",
 			NoKeybinding: true,
 			Args: []ArgSpec{

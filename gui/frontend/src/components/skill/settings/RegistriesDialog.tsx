@@ -90,7 +90,7 @@ export function RegistriesDialog({ onClose }: { onClose: () => void }) {
           {!loaded && !error && <p className="px-3 py-2.5 text-caption">Loading…</p>}
           {loaded && names.length === 0 && (
             <p className="px-3 py-2.5 text-caption" data-testid="skill-registries-none">
-              No marketplace is configured. Add your organisation&apos;s with <code className="text-code">claude plugin marketplace add &lt;owner/repo&gt;</code> (for example {expected}) and Refresh.
+              No marketplace is configured. Add your organization&apos;s with <code className="text-code">claude plugin marketplace add &lt;owner/repo&gt;</code> (for example {expected}) and Refresh.
             </p>
           )}
           {names.map((n, i) => (

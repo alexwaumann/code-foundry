@@ -96,7 +96,7 @@ export function workerWords(th: Pick<WorkerLike, "state" | "status" | "statusRea
     case "setupFailed":
       return { text: "Setup failed", tone: "red" };
     case "setupCancelled":
-      return { text: "Cancelled", tone: "muted" };
+      return { text: "Canceled", tone: "muted" };
     case "place":
       return { text: "Idle", tone: "muted" };
   }
@@ -124,7 +124,7 @@ const stateWords: Readonly<Record<EmberTaskStateView, string>> = {
   doing: "in progress",
   blocked: "blocked",
   done: "done",
-  cancelled: "cancelled",
+  cancelled: "canceled",
 };
 
 /** A task's state in a task link's words (where it sits on the board). */
@@ -133,7 +133,7 @@ const linkWords: Readonly<Record<EmberTaskStateView, string>> = {
   doing: "in progress",
   blocked: "blocked",
   done: "done",
-  cancelled: "cancelled",
+  cancelled: "canceled",
 };
 
 /** A task's dot: sky doing, amber blocked, emerald done, a muted ring for todo and cancelled. */

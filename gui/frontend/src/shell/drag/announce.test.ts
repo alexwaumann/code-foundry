@@ -30,7 +30,7 @@ describe("drag announcements", () => {
   it("say what the drop did, or that it was cancelled", () => {
     expect(droppedText(tab, { kind: "edge", pane: "p-2", edge: "right" }, names)).toBe("Tab Fix login was dropped on the right edge of the pane of Diff.");
     expect(droppedText(tab, null, names)).toBe("Tab Fix login was put back.");
-    expect(cancelledText(pane, names)).toBe("Moving the pane of Fix login (3 tabs) was cancelled.");
+    expect(cancelledText(pane, names)).toBe("Moving the pane of Fix login (3 tabs) was canceled.");
   });
 
   it("name a thread dragged from the sidebar, which joins a strip as a new tab", () => {

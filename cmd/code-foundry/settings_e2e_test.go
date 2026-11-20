@@ -85,7 +85,7 @@ func TestCLIConfirm(t *testing.T) {
 		{"no terminal needs --yes", []string{"terminal", "kill", "--id", "t1"}, "", false, errUsage,
 			"Kill terminal t1? Its process is terminated.\nRe-run with --yes to confirm."},
 		{"prompt answered no", []string{"terminal", "kill", "--id", "t1"}, "n\n", true, errCancelled, "Kill terminal t1? Its process is terminated. [y/N] "},
-		{"prompt answered with enter", []string{"terminal", "kill", "--id", "t1"}, "\n", true, errCancelled, "cancelled"},
+		{"prompt answered with enter", []string{"terminal", "kill", "--id", "t1"}, "\n", true, errCancelled, "canceled"},
 		// Confirmed, the command runs and reaches the store, which has no terminal t1.
 		{"prompt answered yes", []string{"terminal", "kill", "--id", "t1"}, "y\n", true, errUsage, "terminal not found: t1"},
 		{"--yes skips the prompt", []string{"terminal", "kill", "--id", "t1", "--yes"}, "", true, errUsage, "terminal not found: t1"},

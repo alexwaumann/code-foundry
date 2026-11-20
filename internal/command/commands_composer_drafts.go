@@ -85,7 +85,7 @@ func (l layout) composerCommands() []Command {
 			Description: "Set a draft's label (one line, at most 80 characters).",
 			Args:        []ArgSpec{draftArg(), positional(ArgSpec{Name: "label", Type: String, Rest: true, Description: "The label"})},
 			NoPalette:   true, NoIndex: true, NoKeybinding: true,
-			Run: l.draftOp("labelled draft", func(a Args) core.Op { return &core.LabelDraft{Draft: a.String("draft"), Label: a.String("label")} }),
+			Run: l.draftOp("labeled draft", func(a Args) core.Op { return &core.LabelDraft{Draft: a.String("draft"), Label: a.String("label")} }),
 		},
 		{
 			Name: "composer.draft.clear", Title: "Clear Draft", Category: layoutCategory, Page: PageState,

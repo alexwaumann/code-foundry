@@ -39,10 +39,10 @@ var renderings = []Rendering{
 	{"html", "An .html or .htm file opens rendered and interactive in the File tab (scripts on, sandboxed, served " +
 		"by the daemon's preview), through its path chip or view.open.file; a toggle shows the source. A page that links " +
 		"<link rel=\"stylesheet\" href=\"/cf/theme.css\"> gets the user's theme: --cf-* variables (surfaces, text, accent, " +
-		"status colours, sidebar, diff, charts), the shadcn names (--background, --card…), radii and type-role classes " +
+		"status colors, sidebar, diff, charts), the shadcn names (--background, --card…), radii and type-role classes " +
 		"(.text-body…); /cf/theme.json has the same for scripts, and the frame is posted {type: \"cf:theme\", id, scheme, vars} " +
 		"on load and on every theme change; a page that applies it replies {type: \"cf:theme:ack\"} and keeps its state, any other " +
-		"reloads 300 ms later. The frame's prefers-color-scheme is the app's scheme, but paint with the variables, not fixed colours " +
+		"reloads 300 ms later. The frame's prefers-color-scheme is the app's scheme, but paint with the variables, not fixed colors " +
 		"or prefers-color-scheme blocks. view.inline shows a page inline in the conversation instead, in the same frame; " +
 		"it may post {type: \"cf:resize\", height} (measure document.body, not the document, so it can shrink), or load the bridge, which does it."},
 	{"bridge", "A page shown with view.inline can call Code Foundry: <script src=\"/cf/bridge.js\"></script> gives window.cf. " +
@@ -99,8 +99,8 @@ func pageLibrary() []Rendering {
 
 var renderingsAfter = []Rendering{
 	{"themes", "theme save run from your thread adds a theme card to your conversation: the theme's swatches, its contrast check, " +
-		"Undo (back to what the slot showed just before: another theme, or the colours the save replaced) and Edit (the Themes page's editor). When the save changes what a slot shows (--apply onto " +
-		"another theme, or new colours for the theme in use) the user also gets a toast with Undo and Edit. A later save of the same theme adds a new card. " +
+		"Undo (back to what the slot showed just before: another theme, or the colors the save replaced) and Edit (the Themes page's editor). When the save changes what a slot shows (--apply onto " +
+		"another theme, or new colors for the theme in use) the user also gets a toast with Undo and Edit. A later save of the same theme adds a new card. " +
 		"The save prints the app's contrast check of the file (failing pairs, stale pins) while the app is open; theme check <id> prints it again."},
 	{"edits", "Edit, MultiEdit, Write and NotebookEdit calls show as diffs in the timeline."},
 	{"file tab", "Opened by a path chip the user clicks, or by view.open.file (view.open.diff for a changed file's diff). " +

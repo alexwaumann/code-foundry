@@ -118,8 +118,8 @@ function SaveBody() {
                         {fix?.kind === "none" && (
                           <span className="block text-caption-sm" data-testid="theme-save-unfixable">
                             {fix.reason === "unreachable"
-                              ? `No colour on ${shortName(fix.against)} reaches ${String(fix.required)}:1; change the surface or the base colour.`
-                              : "Fixing it here makes more pairs fail (colours derived from it move too); change the base colour instead."}
+                              ? `No color on ${shortName(fix.against)} reaches ${String(fix.required)}:1; change the surface or the base color.`
+                              : "Fixing it here makes more pairs fail (colors derived from it move too); change the base color instead."}
                           </span>
                         )}
                       </span>

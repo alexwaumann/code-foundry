@@ -178,7 +178,7 @@ const codeGuard = (c: RuleContext, color: string) => ensureContrast(color, [c.ge
 
 const ansi = (c: RuleContext, n: number) => {
   const v = c.base.terminal.ansi[n];
-  if (v === undefined) throw new Error(`no ANSI colour ${String(n)}`);
+  if (v === undefined) throw new Error(`no ANSI color ${String(n)}`);
   return v;
 };
 
@@ -193,7 +193,7 @@ export const SLOTS: readonly Slot[] = [
   { name: "--cf-surface", group: "surfaces", rule: "base.surface", derive: (c) => c.base.surface },
   { name: "--cf-text", group: "text", rule: "base.text, lightness stepped away from the surface until 7:1 on it", derive: (c) => ensureContrast(c.base.text, [c.get("--cf-surface")], 7, away(c)) },
   { name: "--cf-chrome", group: "surfaces", rule: "canvas (the title band and the sidebar sit on the sheet)", derive: (c) => c.get("--cf-canvas") },
-  { name: "--cf-surface-raised", group: "surfaces", rule: "surface (cards and the composer are the pane's colour)", derive: (c) => c.get("--cf-surface") },
+  { name: "--cf-surface-raised", group: "surfaces", rule: "surface (cards and the composer are the pane's color)", derive: (c) => c.get("--cf-surface") },
   { name: "--cf-surface-overlay", group: "surfaces", rule: "surface, OKLCH L +0.03 dark / +0.02 light (menus, popovers, dialogs)", derive: (c) => shiftL(c.get("--cf-surface"), by(c, 0.03, 0.02)) },
   { name: "--cf-surface-sunken", group: "surfaces", rule: "surface mixed 8% dark / 4% light toward the text (wells, light code blocks)", derive: (c) => mix(c.get("--cf-surface"), c.get("--cf-text"), by(c, 0.08, 0.04)) },
   { name: "--cf-border", group: "surfaces", rule: "text at 11% dark / 10% light over the surface", derive: (c) => over(c.get("--cf-text"), by(c, 0.11, 0.1), c.get("--cf-surface")) },
@@ -234,7 +234,7 @@ export const SLOTS: readonly Slot[] = [
   {
     name: "--cf-accent",
     group: "interactive",
-    rule: "base.accent; if neither the surface nor the text reaches 4.5:1 on it, its lightness steps away from the better one until it does (so a curated accent keeps a theme-coloured label)",
+    rule: "base.accent; if neither the surface nor the text reaches 4.5:1 on it, its lightness steps away from the better one until it does (so a curated accent keeps a theme-colored label)",
     derive: (c) => {
       const accent = c.base.accent;
       const surface = c.get("--cf-surface");
@@ -357,9 +357,9 @@ export const SLOTS: readonly Slot[] = [
 
   // Diff: text colours from the status text, line tints as @pierre/diffs mixed them.
   { name: "--cf-diff-addition", group: "diff", rule: "success-text (+N, the A of a file's status, added bars)", derive: (c) => c.get("--cf-success-text") },
-  { name: "--cf-diff-addition-surface", group: "diff", rule: "diff-addition: the colour the diff view builds added lines from (their 20% dark / 12% light tint, the bar, the + marker), opaque", derive: (c) => c.get("--cf-diff-addition") },
+  { name: "--cf-diff-addition-surface", group: "diff", rule: "diff-addition: the color the diff view builds added lines from (their 20% dark / 12% light tint, the bar, the + marker), opaque", derive: (c) => c.get("--cf-diff-addition") },
   { name: "--cf-diff-deletion", group: "diff", rule: "error-text (−N, the D of a file's status, deleted bars)", derive: (c) => c.get("--cf-error-text") },
-  { name: "--cf-diff-deletion-surface", group: "diff", rule: "diff-deletion: the colour the diff view builds deleted lines from (tint, striped marker, − marker), opaque", derive: (c) => c.get("--cf-diff-deletion") },
+  { name: "--cf-diff-deletion-surface", group: "diff", rule: "diff-deletion: the color the diff view builds deleted lines from (tint, striped marker, − marker), opaque", derive: (c) => c.get("--cf-diff-deletion") },
   { name: "--cf-diff-modified", group: "diff", rule: "warning-text (the M of a file's status)", derive: (c) => c.get("--cf-warning-text") },
 
   // Charts: six categorical colours from the status fills, then cyan.
@@ -509,7 +509,7 @@ export function schemeProblem(scheme: ThemeScheme, surface: string): string | nu
 const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
 
 function opaque(v: unknown, where: string): string {
-  if (typeof v !== "string") throw new Error(`${where}: not a colour`);
+  if (typeof v !== "string") throw new Error(`${where}: not a color`);
   const hex = v.trim().toLowerCase();
   if (!OPAQUE.test(hex)) throw new Error(`${where}: ${v} is not #rrggbb`);
   return hex;
@@ -522,7 +522,7 @@ const TERMINAL_KEYS = new Set(["foreground", "cursor", "cursorText", "selection"
 
 /** Slots the app had and removed (theme-slots-3-hardening.md), with what to pin instead (internal/theme/file.go retiredSlots). */
 export const RETIRED_SLOTS: Readonly<Record<string, string>> = {
-  "--cf-icon": "icons take their label's colour, or pin --cf-icon-muted",
+  "--cf-icon": "icons take their label's color, or pin --cf-icon-muted",
   "--cf-sidebar-row-active": "pin --cf-sidebar-row-selected",
 };
 
@@ -578,7 +578,7 @@ export function parseThemeFile(json: unknown, opts: { user?: boolean } = {}): Pa
   const t = b.terminal;
   if (!isRecord(t)) throw new Error(`${id}: no base.terminal`);
   onlyKeys(t, TERMINAL_KEYS, `${id}: base.terminal`);
-  if (!Array.isArray(t.ansi) || t.ansi.length !== 16) throw new Error(`${id}: base.terminal.ansi needs 16 colours`);
+  if (!Array.isArray(t.ansi) || t.ansi.length !== 16) throw new Error(`${id}: base.terminal.ansi needs 16 colors`);
   const optional = (v: unknown, where: string) => (v === undefined ? undefined : opaque(v, where));
   const colours = Object.fromEntries(BASE_COLOURS.map((k) => [k, opaque(b[k], `${id}: base.${k}`)])) as Record<(typeof BASE_COLOURS)[number], string>;
   const link = optional(b.link, `${id}: base.link`);

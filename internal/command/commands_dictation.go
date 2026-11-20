@@ -305,7 +305,7 @@ func RegisterDictation(r *Registry, d DictationDeps) error {
 				if err != nil {
 					return Result{}, err
 				}
-				return Result{Message: "download cancelled", JSON: res.Msg.GetSnapshot()}, nil
+				return Result{Message: "download canceled", JSON: res.Msg.GetSnapshot()}, nil
 			},
 		},
 		Command{

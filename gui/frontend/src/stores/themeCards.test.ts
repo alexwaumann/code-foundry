@@ -43,9 +43,9 @@ describe("themeUndoState", () => {
     { name: "the previous colours, kept", t: own, slot: "ocean", look: lookup({ ocean: { file: saved, version: "v2" } }, { ocean: ["v1"] }),
       want: { kind: "undo", tip: null } },
     { name: "the previous colours, no longer kept", t: own, slot: "ocean", look: lookup({ ocean: { file: saved, version: "v2" } }),
-      want: { kind: "gone", tip: "The previous colours of Ocean are no longer kept" } },
+      want: { kind: "gone", tip: "The previous colors of Ocean are no longer kept" } },
     { name: "the previous colours are back", t: own, slot: "ocean", look: lookup({ ocean: { file: warmer, version: "v1" } }, { ocean: ["v2"] }),
-      want: { kind: "undone", tip: "Ocean has its previous colours again" } },
+      want: { kind: "undone", tip: "Ocean has its previous colors again" } },
     { name: "nothing to undo", t: { ...other, previous: "" }, slot: "ocean", look: lookup({}), want: { kind: "none" } },
   ])("$name", ({ t, slot, look, want }) => {
     expect(themeUndoState(t, saved, slot, look)).toEqual(want);

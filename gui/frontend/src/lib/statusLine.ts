@@ -26,7 +26,7 @@ import { hasSetupWork, setupCurrentStep, setupFailure } from "./threadSetup";
  * - "settingUp": "Setting up" (sky), the step it is on as its detail: a thread's setup runs,
  *   with more to do than start Claude (lib/threadSetup; only that reads as "working").
  * - "setupFailed": "Setup failed" (red), why in a line as its detail; "setupCancelled":
- *   "Cancelled" (muted): the user stopped it, so it wants nothing of them.
+ *   "Canceled" (muted): the user stopped it, so it wants nothing of them.
  */
 export type StatusLineKind =
   | "place"
@@ -144,7 +144,7 @@ const words: Readonly<Record<StatusLineKind, string>> = {
   transcriptDeleted: "Transcript deleted",
   settingUp: "Setting up",
   setupFailed: "Setup failed",
-  setupCancelled: "Cancelled",
+  setupCancelled: "Canceled",
 };
 
 /** The status text before the place: "" for "place". `now` only matters when `at` is set. */

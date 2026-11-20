@@ -372,7 +372,7 @@ func setupRefusal(t Thread, doing string) error {
 		return fmt.Errorf("%w: thread %s is still being set up; it cannot be %s yet", ErrFailedPrecondition, t.ID, doing)
 	case t.setupUnfinished():
 		return fmt.Errorf("%w: thread %s did not finish its setup, so it cannot be %s: %s; try its setup again first",
-			ErrFailedPrecondition, t.ID, doing, cmp.Or(t.Setup.Error, "it was cancelled"))
+			ErrFailedPrecondition, t.ID, doing, cmp.Or(t.Setup.Error, "it was canceled"))
 	}
 	return nil
 }

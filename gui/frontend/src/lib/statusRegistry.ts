@@ -85,7 +85,7 @@ export const statusRegistry: Readonly<Record<StatusLineKind, StatusEntry>> = {
   working: { icon: WorkingCircle, word: "Working", tone: "info", timeMode: "status" },
   settingUp: { icon: WorkingCircle, word: "Setting up", tone: "info", timeMode: "status" },
   setupFailed: { icon: CircleAlert, word: "Setup failed", tone: "error", timeMode: "none" },
-  setupCancelled: { icon: Ban, word: "Cancelled", tone: "muted", timeMode: "none" },
+  setupCancelled: { icon: Ban, word: "Canceled", tone: "muted", timeMode: "none" },
   waiting: { icon: WaitingCircle, word: "Waiting", tone: "muted", timeMode: "status" },
   place: { icon: null, word: "", tone: "muted", timeMode: "activity" },
 };

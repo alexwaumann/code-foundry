@@ -2976,7 +2976,7 @@ export class World {
   /** thread.setup.discard: the thread goes, and what it kept comes back. No tombstone, as the daemon leaves none. */
   discardSetup(id: string): string {
     const s = this.thread(id);
-    if (!isSetupStopped(s.setup?.phase)) throw new CommandError("unavailable", `only a failed or cancelled setup can be discarded; thread ${id} has none`);
+    if (!isSetupStopped(s.setup?.phase)) throw new CommandError("unavailable", `only a failed or canceled setup can be discarded; thread ${id} has none`);
     const hold = s.setupHold;
     const out = { draftJson: hold?.draftJson ?? "", error: s.setup?.error ?? "", first: hold?.first ?? { text: SETUP_PROMPT, composerText: "", attachments: [] }, queued: hold?.queued ?? [], keptWorktrees: [] };
     this.removeOne(s);
@@ -4853,7 +4853,7 @@ export class World {
       ...(
         [
           ["thread.setup.retry", "Try Setup Again", (id: string) => { this.retrySetup(id); return { message: `trying the setup of thread ${id} again`, resultJson: "{}" }; }],
-          ["thread.setup.cancel", "Cancel Setup", (id: string) => { this.cancelSetup(id); return { message: `cancelled the setup of thread ${id}`, resultJson: "{}" }; }],
+          ["thread.setup.cancel", "Cancel Setup", (id: string) => { this.cancelSetup(id); return { message: `canceled the setup of thread ${id}`, resultJson: "{}" }; }],
           ["thread.setup.discard", "Discard Thread", (id: string) => ({ message: `discarded thread ${id}`, resultJson: this.discardSetup(id) })],
         ] as const
       ).map(([name, title, act]) => ({
@@ -6166,7 +6166,7 @@ export class World {
       },
       // Like internal/command/commands_theme.go.
       {
-        cmd: { name: "theme.list", noPalette: true, title: "List Themes", category: "Settings", description: "Print every colour theme by scheme, marking the dark and light themes in use.", keybindings: [], args: [] },
+        cmd: { name: "theme.list", noPalette: true, title: "List Themes", category: "Settings", description: "Print every color theme by scheme, marking the dark and light themes in use.", keybindings: [], args: [] },
         when: always,
         run: () => {
           const v = this.settings.values();
@@ -6218,7 +6218,7 @@ export class World {
           name: "theme.ask",
           title: "Ask the Model for a Theme…",
           category: "Settings",
-          description: "Start a thread that makes the colour theme you describe: the model saves and applies it, and the thread shows it as a card with Undo and Edit.",
+          description: "Start a thread that makes the color theme you describe: the model saves and applies it, and the thread shows it as a card with Undo and Edit.",
           keybindings: [],
           args: [
             { name: "description", type: ArgType.STRING, required: false, positional: true, description: "The theme, in your words" },

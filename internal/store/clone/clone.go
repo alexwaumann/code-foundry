@@ -212,7 +212,7 @@ func (c *Cloner) checkRoot() error {
 func (c *Cloner) classify(ctx, runCtx context.Context, err error) error {
 	switch {
 	case ctx.Err() != nil:
-		return fmt.Errorf("clone cancelled: %w", ctx.Err())
+		return fmt.Errorf("clone canceled: %w", ctx.Err())
 	case errors.Is(runCtx.Err(), context.DeadlineExceeded):
 		return fmt.Errorf("clone took longer than %s: %w", c.opts.Timeout, context.DeadlineExceeded)
 	}

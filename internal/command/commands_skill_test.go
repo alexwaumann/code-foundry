@@ -227,7 +227,7 @@ func TestSkillCommandsWithoutStore(t *testing.T) {
 		t.Error("install without a store succeeded")
 	}
 	res, err := r.Invoke(context.Background(), command.Context{}, "skill.browse", nil)
-	if err != nil || !strings.Contains(res.Message, "Claude Code has no plugin marketplace; add your organisation's with: claude plugin marketplace add <owner>/<repo> (for example the ai-marketplace repository)") {
+	if err != nil || !strings.Contains(res.Message, "Claude Code has no plugin marketplace; add your organization's with: claude plugin marketplace add <owner>/<repo> (for example the ai-marketplace repository)") {
 		t.Errorf("browse = %q, %v", res.Message, err)
 	}
 }

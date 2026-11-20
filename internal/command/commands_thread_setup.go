@@ -27,7 +27,7 @@ func threadSetupRetry(b ThreadBackend, idArg ArgSpec) Command {
 	return Command{
 		Name:         "thread.setup.retry",
 		Title:        "Try Setup Again",
-		Description:  "Run a failed or cancelled setup again, in the background: from the step that failed, or from the start after a cancel.",
+		Description:  "Run a failed or canceled setup again, in the background: from the step that failed, or from the start after a cancel.",
 		Category:     "Thread",
 		NoPalette:    true,
 		NoKeybinding: true,
@@ -63,7 +63,7 @@ func threadSetupCancel(b ThreadBackend, idArg ArgSpec) Command {
 			if err != nil {
 				return Result{}, err
 			}
-			msg := "cancelled the setup of thread " + threadLabel(res.Msg.GetThread()) + keptClause(res.Msg.GetKeptWorktrees())
+			msg := "canceled the setup of thread " + threadLabel(res.Msg.GetThread()) + keptClause(res.Msg.GetKeptWorktrees())
 			return Result{Message: msg, JSON: res.Msg}, nil
 		},
 	}
@@ -74,7 +74,7 @@ func threadSetupDiscard(b ThreadBackend, idArg ArgSpec) Command {
 		Name:         "thread.setup.discard",
 		Page:         PageState,
 		Title:        "Discard Thread",
-		Description:  "Forget a thread whose setup failed or was cancelled, and what it made, as if it had never been sent. Gives back its draft and messages.",
+		Description:  "Forget a thread whose setup failed or was canceled, and what it made, as if it had never been sent. Gives back its draft and messages.",
 		Category:     "Thread",
 		NoPalette:    true,
 		NoKeybinding: true,

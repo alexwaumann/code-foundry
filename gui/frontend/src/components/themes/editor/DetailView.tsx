@@ -56,7 +56,7 @@ function PairList({ slots, slot }: { slots: Readonly<Record<string, string>>; sl
   return (
     <div className="space-y-1" data-testid="editor-pairs">
       <p className="text-overline">Contrast</p>
-      {rows.length === 0 && <p className="text-caption">No contrast pair checks this colour.</p>}
+      {rows.length === 0 && <p className="text-caption">No contrast pair checks this color.</p>}
       {rows.map((r) => {
         const words = r.slot === slot ? `on ${shortName(r.against)}${r.over ? ` over ${shortName(r.over)}` : ""}` : `${shortName(r.slot)} on it`;
         return (
@@ -110,7 +110,7 @@ export function SlotView({ name }: { name: string }) {
           {pinned ? (
             <Compare label="Yours" value={value} theme={analysis.theme} slot={name} chosen testId="slot-view-yours" />
           ) : (
-            <p className="flex min-w-0 flex-1 items-center rounded-lg border border-dashed border-cf-divider p-2 text-caption">Change the colour below to pin it.</p>
+            <p className="flex min-w-0 flex-1 items-center rounded-lg border border-dashed border-cf-divider p-2 text-caption">Change the color below to pin it.</p>
           )}
         </div>
         <ColourPicker

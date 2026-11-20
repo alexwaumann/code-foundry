@@ -68,7 +68,7 @@ func TestParseFile(t *testing.T) {
 		{name: "short base colour", edit: func(m map[string]any) { base(m)["accent"] = "#12" }, want: `base.accent: "#12" is not #rrggbb`},
 		{name: "alpha in base", edit: func(m map[string]any) { base(m)["surface"] = "#11223344" }, want: "base.surface"},
 		{name: "bad optional colour", edit: func(m map[string]any) { terminal(m)["cursor"] = "red" }, want: "base.terminal.cursor"},
-		{name: "15 ansi", edit: func(m map[string]any) { a := terminal(m)["ansi"].([]any); terminal(m)["ansi"] = a[:15] }, want: "want 16 colours, got 15"},
+		{name: "15 ansi", edit: func(m map[string]any) { a := terminal(m)["ansi"].([]any); terminal(m)["ansi"] = a[:15] }, want: "want 16 colors, got 15"},
 		{name: "bad ansi", edit: func(m map[string]any) { terminal(m)["ansi"].([]any)[3] = "#zzzzzz" }, want: "ansi[3]"},
 		{name: "ansi of numbers", edit: func(m map[string]any) { terminal(m)["ansi"] = []int{1} }, want: "base.terminal.ansi: want a string"},
 		{name: "override not a slot name", edit: func(m map[string]any) { m["overrides"] = map[string]any{"--card": "#000000"} }, want: `"--card" is not a slot name`},
