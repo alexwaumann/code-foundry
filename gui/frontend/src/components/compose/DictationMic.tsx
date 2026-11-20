@@ -108,26 +108,29 @@ export function DictationMic({ dictation, disabled = false, className, stop = fa
     );
   }
   if (phase) {
+    // The pill shows only the level and the time: its tooltip says what a click does.
     return (
-      <button
-        type="button"
-        className={cn(PILL_CLASS, phase === "stopping" && "opacity-70", className)}
-        aria-label="Stop dictating"
-        data-testid="dictation-pill"
-        data-phase={phase}
-        // The caret stays in the prompt (typing while listening goes on there).
-        onMouseDown={(e) => {
-          e.preventDefault();
-        }}
-        onClick={() => {
-          stopDictationIn(clientId);
-        }}
-        {...stopAttrs}
-      >
-        <span className="cf-dict-dot" aria-hidden />
-        <LevelBars />
-        <Elapsed since={startedAt} />
-      </button>
+      <Tip label="Stop dictating">
+        <button
+          type="button"
+          className={cn(PILL_CLASS, phase === "stopping" && "opacity-70", className)}
+          aria-label="Stop dictating"
+          data-testid="dictation-pill"
+          data-phase={phase}
+          // The caret stays in the prompt (typing while listening goes on there).
+          onMouseDown={(e) => {
+            e.preventDefault();
+          }}
+          onClick={() => {
+            stopDictationIn(clientId);
+          }}
+          {...stopAttrs}
+        >
+          <span className="cf-dict-dot" aria-hidden />
+          <LevelBars />
+          <Elapsed since={startedAt} />
+        </button>
+      </Tip>
     );
   }
   const failed = availability === "error";

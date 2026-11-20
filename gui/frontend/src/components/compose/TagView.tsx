@@ -10,7 +10,7 @@ import { useProjectsStore } from "@/stores/projects";
 import { useSkillDescription } from "@/stores/skills";
 import { AttachmentChip } from "./AttachmentChip";
 import { QuoteGlyph } from "./QuoteGlyph";
-import { TagDraftContext, TagMultiProjectContext, tagOf } from "./tagContext";
+import { fileTagTip, TagDraftContext, TagMultiProjectContext, tagOf } from "./tagContext";
 import { TAG_ACCENT, tagClass } from "./tagStyle";
 import { usePrTagInfo, useThreadTagInfo } from "./useTagInfo";
 
@@ -22,7 +22,8 @@ function useProjectName(projectId: string): string {
 /**
  * A text-only tag (a skill, a file, a thread, a pull request) with a hover tooltip: one
  * line saying what it is, an optional muted second line. The app root's TooltipProvider
- * sets the delays. `accent` overrides the kind's (a pull request's state).
+ * sets the delays. `accent` overrides the kind's (a pull request's state). A null `tip`
+ * shows none (the content is left out, so the trigger stays as it is).
  */
 function TextTag({
   kind,
@@ -39,7 +40,7 @@ function TextTag({
   label: string;
   selected: boolean;
   ariaLabel: string;
-  tip: ReactNode;
+  tip: ReactNode | null;
   detail: string;
   data: Record<string, string | undefined>;
 }) {
@@ -50,10 +51,12 @@ function TextTag({
           <span className="truncate">{label}</span>
         </NodeViewWrapper>
       </TooltipTrigger>
-      <TooltipContent side="top" className="max-w-80 px-2.5 py-1.5 text-body-sm" data-testid="prompt-tag-tooltip">
-        <p>{tip}</p>
-        {detail && <p className="mt-0.5 text-cf-text-muted">{detail}</p>}
-      </TooltipContent>
+      {tip !== null && (
+        <TooltipContent side="top" className="max-w-80 px-2.5 py-1.5 text-body-sm" data-testid="prompt-tag-tooltip">
+          <p>{tip}</p>
+          {detail && <p className="mt-0.5 text-cf-text-muted">{detail}</p>}
+        </TooltipContent>
+      )}
     </Tooltip>
   );
 }
@@ -79,19 +82,20 @@ function SkillTag({ name, projectId, selected }: { name: string; projectId: stri
  * A file or directory: the tooltip is its path (a directory's ends with "/"), prefixed
  * with the project's name when the draft has more than one project
  * (`api/internal/api/thread.go`). A file at a line reads `name:24`, its path `path:24`.
+ * None when the path is the label (a file at the project's root).
  */
 function FileTag({ projectId, path, line, selected }: { projectId: string; path: string; line: number | undefined; selected: boolean }) {
   const project = useProjectName(projectId);
   const multi = useContext(TagMultiProjectContext);
   const label = tagLabel({ tagKind: "file", projectId, path, ...(line === undefined ? {} : { line }) });
-  const at = line === undefined ? "" : `:${String(line)}`;
+  const tip = fileTagTip({ label, project, path, line, multi });
   return (
     <TextTag
       kind="file"
       label={label}
       selected={selected}
       ariaLabel={`${path.endsWith("/") ? "Folder" : "File"} ${path}${line === undefined ? "" : ` line ${String(line)}`} in ${project}`}
-      tip={<span className="font-mono">{`${multi ? `${project}/${path}` : path}${at}`}</span>}
+      tip={tip === null ? null : <span className="font-mono">{tip}</span>}
       detail=""
       data={{ "data-path": path, "data-project": projectId, "data-line": line === undefined ? undefined : String(line) }}
     />

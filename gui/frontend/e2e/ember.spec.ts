@@ -83,7 +83,7 @@ test("work folds into Worked for rows; one opens in place after a wheel up; Show
   await expect.poll(async () => (await expanded()).some(Boolean)).toBe(false);
 });
 
-// Only a turn's last text being the reply (Copy answer, its task links), text between tool calls folding
+// Only a turn's last text being the reply (Copy reply, its task links), text between tool calls folding
 // into the run and opening with it: src/components/ember/EmberTimeline.test.tsx; the rule: src/lib/ember.test.ts.
 
 test("Ember's reply can be cited; Go to source opens the run a folded text is in", async ({ page }) => {

@@ -6,14 +6,14 @@ import { useNow } from "@/lib/clock";
 import { slotColorVars, SWATCH_BG } from "@/lib/usage";
 import { useWidth } from "@/lib/useWidth";
 import { cn } from "@/lib/utils";
-import { axisLabel, chartMonths, countScale, labelledIndexes, labelledTicks, tickLabel, type ActivityMonth } from "./activity";
+import { axisLabel, chartMonths, countScale, labelledIndexes, labelledTicks, seriesUnit, tickLabel, type ActivityMonth } from "./activity";
 import { monthName } from "./format";
 
 type SeriesKey = "merged" | "commits";
 
-const SERIES: Record<SeriesKey, { label: string; unit: string; style: CSSProperties }> = {
-  commits: { label: "Commits", unit: "commits", style: slotColorVars(1) as CSSProperties },
-  merged: { label: "Merged PRs", unit: "merged prs", style: slotColorVars(2) as CSSProperties },
+const SERIES: Record<SeriesKey, { label: string; style: CSSProperties }> = {
+  commits: { label: "Commits", style: slotColorVars(1) as CSSProperties },
+  merged: { label: "Merged PRs", style: slotColorVars(2) as CSSProperties },
 };
 
 /** The tooltip lists both series, in this order, whichever card it is in. */
@@ -208,7 +208,7 @@ function ActivityCard({
               <div key={k} className="flex items-center gap-2 leading-relaxed" data-series={k}>
                 <LineKey series={k} className="w-3" />
                 <span className="min-w-7 font-semibold tabular-nums">{tickLabel(hovered[k])}</span>
-                <span className="text-cf-text-muted">{SERIES[k].unit}</span>
+                <span className="text-cf-text-muted">{seriesUnit(k, hovered[k])}</span>
               </div>
             ))}
           </ChartTooltip>

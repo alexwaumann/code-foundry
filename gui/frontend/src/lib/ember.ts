@@ -800,7 +800,7 @@ export function buildEmberRows(items: readonly TimelineItem[], opts: EmberRowOpt
     }
     flush(false, it.kind === "text");
     if (it.kind === "user") rows.push({ type: "user", key: it.id, id: it.id });
-    // The reply is the thread's own text row (its Copy answer copies this text alone).
+    // The reply is the thread's own text row (its Copy reply copies this text alone).
     else if (it.kind === "text") rows.push({ type: "text", key: it.id, id: it.id, final: true, answer: it.id });
     else rows.push(...workNodes([it], children, permissions));
   }

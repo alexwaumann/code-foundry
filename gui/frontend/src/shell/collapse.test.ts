@@ -57,7 +57,7 @@ describe("collapse in the window", () => {
     const s = useLayoutStore.getState();
     expect(isLastOpen(s, "p-a")).toBe(true);
     expect(isLastOpen(s, "p-b")).toBe(false);
-    expect(whyNoCollapse(s, "p-a")).toBe("The last open pane of a space cannot be collapsed");
+    expect(whyNoCollapse(s, "p-a")).toBe("Can’t collapse the last open pane");
     expect(whyNoCollapse(s, "p-b")).toBe("");
   });
 

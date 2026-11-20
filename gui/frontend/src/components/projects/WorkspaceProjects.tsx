@@ -82,18 +82,21 @@ function FolderRow({ workspaceId }: { workspaceId: string }) {
       <span className="shrink-0 font-medium">Workspace folder</span>
       {isDefault && <StartsHere />}
       {root ? (
-        <Tip label={rootMissing ? `${root} is missing (moved or renamed?): workspace set-root points the workspace at its new place` : root} whenTruncated={!rootMissing}>
-          <span className="min-w-0 truncate text-caption text-cf-text-muted" data-testid="workspace-root" data-missing={rootMissing || undefined}>
-            {tildify(root)}
+        // The "missing" mark is inside the trigger: hovering it says what to do.
+        <Tip label={rootMissing ? `${root} is missing (moved or renamed?). Set the workspace's root to its new place.` : root} whenTruncated={!rootMissing}>
+          <span className="flex min-w-0 items-center gap-2.5" data-testid="workspace-root-tip">
+            <span className="min-w-0 truncate text-caption text-cf-text-muted" data-testid="workspace-root" data-missing={rootMissing || undefined}>
+              {tildify(root)}
+            </span>
+            {rootMissing && (
+              <span className="shrink-0 text-caption text-cf-error-text" data-testid="workspace-root-missing">
+                missing
+              </span>
+            )}
           </span>
         </Tip>
       ) : (
         <span className="min-w-0 truncate text-caption text-cf-text-muted">kept by the app</span>
-      )}
-      {rootMissing && (
-        <span className="shrink-0 text-caption text-cf-error-text" data-testid="workspace-root-missing">
-          missing
-        </span>
       )}
       {!isDefault && (
         <RowActions>

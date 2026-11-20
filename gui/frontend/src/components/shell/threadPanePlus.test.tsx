@@ -102,10 +102,10 @@ const SURFACES = ["# This thread", "Diff", "PR #12open", "—", "# Terminals", "
 const REST = ["Terminal", "Pull Requests", "Projects"];
 
 describe("a thread pane's + menu", () => {
-  it("a strip's + is unchanged: named Open a tab, the thread's submenu, New thread with its chord", () => {
+  it("a strip's + is unchanged: named Open tab, the thread's submenu, New thread with its chord", () => {
     mode("panes");
     const menu = openPlus("p-1", false);
-    expect(screen.getByTestId("pane-plus").getAttribute("aria-label")).toBe("Open a tab");
+    expect(screen.getByTestId("pane-plus").getAttribute("aria-label")).toBe("Open tab");
     expect(entries(menu)).toEqual(["# This thread", "Refactor sidebar tree", "—", "New thread⌘N", ...REST]);
   });
 

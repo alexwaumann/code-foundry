@@ -102,7 +102,7 @@ afterEach(() => {
 });
 
 describe("EmberTimeline", () => {
-  it("only a turn's last text is the reply (Copy answer, task links as pointer lines); text between tool calls folds into the run and opens with it", () => {
+  it("only a turn's last text is the reply (Copy reply, task links as pointer lines); text between tool calls folds into the run and opens with it", () => {
     setLog([
       user("u1", "Validate the notes API input, and the same for thread read."),
       text("t1", "Two pieces, both can start now."),
@@ -116,7 +116,7 @@ describe("EmberTimeline", () => {
     const reply = replies()[0] as HTMLElement;
     expect(within(reply).getAllByTestId("ember-task-link")).toHaveLength(2);
     expect(within(reply).getByTestId("thread-copy-answer")).toBeTruthy();
-    // Its run opens to it, among the tool rows, not as a reply (no Copy answer).
+    // Its run opens to it, among the tool rows, not as a reply (no Copy reply).
     const work = screen.getAllByTestId("ember-work");
     expect(work).toHaveLength(1);
     fireEvent.click(within(work[0] as HTMLElement).getByRole("button"));

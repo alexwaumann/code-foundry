@@ -4,16 +4,17 @@ import { Tip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { openUrl } from "@/stores/gh";
 import { checkIcon, useChecksClock } from "./checkIcons";
-import { checkMeta, checkTone } from "./model";
+import { checkMeta, checkTip, checkTone } from "./model";
 import { toneText } from "./tones";
 
 function CheckRow({ c, now }: { c: CheckView; now: number }) {
   const tone = checkTone(c);
   const Icon = checkIcon[tone];
-  // The name and description (the row has no room for the latter; without one, only when
-  // the name is cut). On the item: a check without a URL is a disabled button (no pointer events).
+  // The name, workflow and description (the row has no room for the last; without one, only
+  // when the name or workflow is cut). On the item: a check without a URL is a disabled
+  // button (no pointer events).
   return (
-    <Tip label={[c.name, c.description].filter(Boolean).join("\n")} whenTruncated={!c.description} align="start">
+    <Tip label={checkTip(c)} whenTruncated={!c.description} align="start">
       <li>
         <button
           type="button"

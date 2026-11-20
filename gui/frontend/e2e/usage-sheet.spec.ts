@@ -92,7 +92,7 @@ test("a tooltip's Escape is its own; the next one closes the sheet", async ({ pa
   await openApp(page);
   await openUsage(page);
   await page.getByTestId("usage-page-close").hover();
-  await expect(openTooltip(page)).toHaveText("Close (Esc)");
+  await expect(openTooltip(page)).toHaveText("Close");
   await page.keyboard.press("Escape");
   await expect(openTooltip(page)).toHaveCount(0);
   await expect(sheet(page)).toBeVisible();

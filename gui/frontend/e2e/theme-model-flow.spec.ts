@@ -157,8 +157,6 @@ test("Undo hides once the slot moves on, is disabled when its theme is deleted, 
   await expect(undo2).toHaveText("Undo");
   await expect(undo).toHaveCount(0);
   await shot(page, "theme-card-undo-refinement", () => second);
-  await undo2.hover();
-  await expect(page.getByRole("tooltip")).toHaveText("Undo restores the previous colours");
   await undo2.click();
   await expect(undo2).toHaveText("Undone");
   await expect(invocations()).resolves.toContainEqual(expect.objectContaining({ name: "theme.restore" }));

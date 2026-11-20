@@ -153,7 +153,7 @@ export function BackdropEditor(props: EditorProps) {
       {hosted ? (
         addButton
       ) : (
-        <Tip label="Available in the app">
+        <Tip label="Available in the desktop app">
           {/* A disabled button gets no pointer events: the span takes the hover. */}
           <span className="block" tabIndex={0}>
             {addButton}

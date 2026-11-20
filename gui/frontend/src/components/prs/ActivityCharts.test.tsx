@@ -78,7 +78,7 @@ describe("ActivityCharts", () => {
     expect(screen.getAllByTestId("activity-crosshair")).toHaveLength(2);
     expect(screen.getAllByTestId("activity-tooltip")).toHaveLength(1);
     const tip = card("commits").getByTestId("activity-tooltip");
-    expect(tip.textContent).toBe("August210commits17merged prs");
+    expect(tip.textContent).toBe("August210commits17merged PRs");
     expect(tip.getAttribute("data-side")).toBe("left");
     const oct = card("merged").getAllByTestId("activity-month")[5];
     if (!oct) throw new Error("no October");

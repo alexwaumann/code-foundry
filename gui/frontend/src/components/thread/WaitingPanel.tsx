@@ -48,7 +48,7 @@ function RemoveButton({ threadId, wake }: { threadId: string; wake: WakeSubscrip
   // Not before the Watch has said the row is still there (a list kept from an earlier visit).
   const current = useWaitListCurrent(threadId);
   return (
-    <Tip label="Stop listening for this">
+    <Tip label="Stop waiting for this">
       <Button
         variant="ghost"
         size="icon-xs"

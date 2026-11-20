@@ -717,7 +717,7 @@ describe("Claude Code's API-error text", () => {
   const hi: ThreadItemView = { ...base, id: "u", ordinal: 1, kind: "user", text: "hi", attachments: [], composerText: "" };
   const apiError: ThreadItemView = { ...base, id: "x", ordinal: 2, kind: "text", text: "Invalid API key · Fix external API key", apiError: true };
 
-  it("is a red error row, not an answer: no Copy answer, kept when the turn folds", () => {
+  it("is a red error row, not an answer: no Copy reply, kept when the turn folds", () => {
     const c = show([hi, apiError, turnEndItem({ isError: true, terminalReason: "api_error" })], { fold: () => true });
     const row = c.querySelector('[data-testid="thread-error"]');
     expect(row?.textContent).toBe("Invalid API key · Fix external API key");

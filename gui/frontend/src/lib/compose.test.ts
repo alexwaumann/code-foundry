@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { FALLBACK_MODEL_CHOICES } from "./models";
 import {
+  ATTACHMENT_GONE,
+  attachmentChipTip,
   checkAttachments,
   checkoutBranch,
   inlineBytes,
@@ -454,5 +456,18 @@ describe("movedDraft", () => {
     const d = { ...draft };
     movedDraft(d, []);
     expect(d).toMatchObject({ projects: ["repo-cf", "repo-gp"], base: "origin/release", error: "the last send failed" });
+  });
+});
+
+describe("attachmentChipTip", () => {
+  const long = "screenshot-2026-11-19-at-20.14.07-the-whole-window.png";
+  it.each([
+    { name: "a short name, nothing to add: none", n: "a.png", extra: [], want: null },
+    { name: "a cut name shows in full", n: long, extra: [], want: long },
+    { name: "a short PDF's size", n: "spec.pdf", extra: ["1.4 MB"], want: "1.4 MB" },
+    { name: "a cut name over the size", n: long, extra: ["58 KB", ""], want: `${long}\n58 KB` },
+    { name: "a gone file says why it does not open", n: "a.png", extra: [ATTACHMENT_GONE], want: ATTACHMENT_GONE },
+  ])("$name", ({ n, extra, want }) => {
+    expect(attachmentChipTip(n, extra)).toBe(want);
   });
 });

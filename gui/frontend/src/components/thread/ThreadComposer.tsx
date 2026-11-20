@@ -262,6 +262,8 @@ export function ThreadComposer({
     insert: (t) => editorRef.current?.insertDictated(t),
     setMarker: (on) => editorRef.current?.setDictationMarker(on),
   });
+  // Send is off with nothing to send, except while the mic listens.
+  const sendOff = !canSend && !(dictation.listening && !inputOff && !setupBlocks);
   useLayoutEffect(() => {
     if (sending) focusedAtSend.current ||= hasFocusWithin(rootRef.current);
   }, [sending]);
@@ -435,8 +437,8 @@ export function ThreadComposer({
           <CompactChip threadId={threadId} />
           <div className="ml-auto flex items-center gap-0.5">
             <DictationMic dictation={dictation} disabled={inputOff} />
-            {/* The span carries the tooltip while the button is disabled (no pointer events). */}
-            <Tip label={attachLabel(hostFiles.hosted)}>
+            {/* No tooltip while disabled: "Attach files" would not say why it cannot. */}
+            <Tip label={inputOff ? null : attachLabel(hostFiles.hosted)}>
               <span className="flex">
                 <button
                   type="button"
@@ -498,12 +500,12 @@ export function ThreadComposer({
               Interrupt
             </button>
           )}
-          {/* The span carries the tooltip while the button is disabled (no pointer events). */}
-          <Tip label="Send">
+          {/* No tooltip while disabled: "Send" would not say why it cannot. */}
+          <Tip label={sendOff ? null : "Send"}>
             <span className="flex">
               <button
                 type="button"
-                disabled={!canSend && !(dictation.listening && !inputOff && !setupBlocks)}
+                disabled={sendOff}
                 aria-label={phase === "attaching" ? "Attaching files…" : sending ? "Sending…" : "Send"}
                 data-testid="thread-send"
                 data-phase={phase}

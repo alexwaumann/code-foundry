@@ -79,6 +79,13 @@ describe("the thread composer's dictation", () => {
     useCommandsStore.setState({ commands: [] });
   });
 
+  it("the listening pill's tooltip says what a click does", async () => {
+    await mount(dictationSnap());
+    fireEvent.click(mic());
+    const { tooltipText } = await import("@/test/tooltip");
+    expect(tooltipText(await pill())).toBe("Stop dictating");
+  });
+
   it("the placeholder says Listening… in an empty prompt", async () => {
     await mount(dictationSnap());
     expect(screen.getByTestId("composer-input").getAttribute("aria-placeholder")).not.toBe("Listening…");

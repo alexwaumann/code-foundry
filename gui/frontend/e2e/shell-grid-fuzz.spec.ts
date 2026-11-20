@@ -262,7 +262,7 @@ async function step(page: Page, r: Rng): Promise<string> {
     // A pane by its strip's free space: between the "+" and the collapse button (full screen's left neighbour).
     const panes = await page.locator('[data-testid="shell-pane"]').evaluateAll((els) =>
       els.flatMap((el) => {
-        const plus = el.querySelector('[aria-label="Open a tab"]')?.getBoundingClientRect();
+        const plus = el.querySelector('[aria-label="Open tab"]')?.getBoundingClientRect();
         const fs = (el.querySelector('[data-testid="shell-collapse"]') ?? el.querySelector('[data-testid="shell-fullscreen"]'))?.getBoundingClientRect();
         if (!plus || !fs || fs.left - plus.right < 16) return [];
         return [{ id: (el as HTMLElement).dataset.paneId ?? "", x: (plus.right + fs.left) / 2, y: plus.top + plus.height / 2 }];

@@ -45,13 +45,13 @@ export function PaneCollapseButton({ paneId, className }: { paneId: string; clas
 
 /** A collapsed pane's rail control: it opens the pane again, with the focus. */
 export function PaneExpandButton({ paneId, vertical }: { paneId: string; vertical: boolean }) {
-  const label = useNamed("Open pane");
+  const label = useNamed("Expand pane");
   const Icon = vertical ? UnfoldHorizontal : UnfoldVertical;
   return (
     <Tip label={label} side={vertical ? "right" : "bottom"}>
       <button
         type="button"
-        aria-label="Open pane"
+        aria-label="Expand pane"
         data-testid="shell-rail-expand"
         className={BUTTON}
         onClick={() => {

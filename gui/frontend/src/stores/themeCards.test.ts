@@ -41,7 +41,7 @@ describe("themeUndoState", () => {
     { name: "the previous theme was deleted", t: other, slot: "ocean", look: lookup({ ocean: { file: saved, version: "v2" } }), want: { kind: "gone", tip: "nord was deleted" } },
     { name: "the daemon found it gone", t: { ...other, gone: true }, slot: "ocean", look: lookup({ ocean: { file: saved, version: "v2" }, nord }), want: { kind: "gone", tip: "Nord was deleted" } },
     { name: "the previous colours, kept", t: own, slot: "ocean", look: lookup({ ocean: { file: saved, version: "v2" } }, { ocean: ["v1"] }),
-      want: { kind: "undo", tip: "Undo restores the previous colours" } },
+      want: { kind: "undo", tip: null } },
     { name: "the previous colours, no longer kept", t: own, slot: "ocean", look: lookup({ ocean: { file: saved, version: "v2" } }),
       want: { kind: "gone", tip: "The previous colours of Ocean are no longer kept" } },
     { name: "the previous colours are back", t: own, slot: "ocean", look: lookup({ ocean: { file: warmer, version: "v1" } }, { ocean: ["v2"] }),

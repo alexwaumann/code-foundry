@@ -5,7 +5,7 @@ import { useUiStore } from "@/stores/ui";
 import { EMBER_THREAD, EmberWorld, putEmberThread, setEmberEnabled } from "@/test/emberBoard";
 import { layoutSettled, resetFakeLayout, threadSeed } from "@/test/fakeLayout";
 import { layoutTabs } from "@/test/layoutTabs";
-import { tooltipText } from "@/test/tooltip";
+import { hoverTooltipText, tooltipText } from "@/test/tooltip";
 import { EmberMarkdown, TaskPointer } from "./EmberTimeline";
 
 vi.mock("@/api/layout", async (orig) => (await import("@/test/fakeLayout")).fakeLayoutApi(await orig()));
@@ -18,6 +18,13 @@ vi.mock("@/api/layout", async (orig) => (await import("@/test/fakeLayout")).fake
  */
 
 let world: EmberWorld;
+
+/** jsdom has no layout: makes `el` clip its text as `truncate` does. */
+function cut(el: HTMLElement) {
+  Object.defineProperty(el, "clientWidth", { configurable: true, value: 100 });
+  Object.defineProperty(el, "scrollWidth", { configurable: true, value: 180 });
+  el.style.overflowX = "hidden";
+}
 
 function link(id: string, name: string) {
   render(<TaskPointer id={id} name={name} />);
@@ -61,16 +68,26 @@ describe("TaskPointer", () => {
     expect(part("ember-task-link-meta")).toBe("· done");
   });
 
-  it("the board's title over the link's, a done task's branch, a rename live; the tooltip says where a click goes", () => {
+  it("the board's title over the link's, a done task's branch, a rename live; no tooltip on the row itself", () => {
     const { el, part } = link("t-3a4b5c6d", "Fix flaky TestSendSpawnFailure");
     expect(part("ember-task-link-title")).toBe("Fix the flaky TestSendSpawnFailure");
     expect(part("ember-task-link-meta")).toBe("· done");
     expect(part("ember-task-link-branch")).toBe("·cf/spawn-timeout-race");
-    expect(tooltipText(el)).toBe("Open on the board");
+    expect(tooltipText(el)).toBeNull();
     act(() => {
       world.task("t-3a4b5c6d", { title: "Pin the spawn timeout" });
     });
     expect(part("ember-task-link-title")).toBe("Pin the spawn timeout");
+  });
+
+  it("a cut title or branch shows in full on hover; an uncut one has no tooltip", async () => {
+    const { el } = link("t-3a4b5c6d", "Fix flaky TestSendSpawnFailure");
+    const title = within(el).getByTestId("ember-task-link-title");
+    const branch = within(el).getByText("cf/spawn-timeout-race");
+    title.tabIndex = 0;
+    expect(tooltipText(title)).toBeNull();
+    cut(branch);
+    expect(await hoverTooltipText(branch)).toBe("cf/spawn-timeout-race");
   });
 
   it("a task not on the board keeps the link's words and no state", () => {

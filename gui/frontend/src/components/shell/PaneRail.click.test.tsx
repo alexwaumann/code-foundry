@@ -1,7 +1,7 @@
 /**
  * A click on a rail (docs/notes/shell-model.md, "Small windows" and "Collapsing a pane";
  * docs/notes/shell-25j-rail-click.md): anywhere that is not one of its controls opens the pane on
- * its selected tab (a collapsed pane as its Open pane button does, a folded one as its selected
+ * its selected tab (a collapsed pane as its Expand pane button does, a folded one as its selected
  * icon does); an icon still opens on that tab; the buttons do what they did; a click from the
  * tab's context menu (a portal) is not a click on the rail.
  */
@@ -113,7 +113,7 @@ describe("a click on a rail's controls", () => {
     expect(ran).toEqual(svg ? ["tab.focus t-a", "tab.focus t-a"] : ["tab.focus t-a"]);
   });
 
-  it("Open pane opens a collapsed pane once, and Full screen only shows it full screen", async () => {
+  it("Expand pane opens a collapsed pane once, and Full screen only shows it full screen", async () => {
     await seed(true);
     render(<PaneRail paneId="p-1" rect={RECT} />);
     fireEvent.click(screen.getByTestId("shell-rail-expand"));

@@ -106,7 +106,7 @@ export function FileRow({ f, collapsed, onToggle, place }: { f: PatchFile; colla
       ) : (
         <span className="size-5 shrink-0" />
       )}
-      <Tip label={f.prevPath ? `${f.prevPath} → ${f.path}` : f.path} whenTruncated={!f.prevPath} align="start">
+      <Tip label={f.prevPath ? `${f.prevPath} → ${f.path}` : f.path} whenTruncated align="start">
         <span className="flex min-w-0 items-center gap-1.5 font-mono" data-testid="file-patch-path">
           {f.prevPath && (
             <>
@@ -123,8 +123,8 @@ export function FileRow({ f, collapsed, onToggle, place }: { f: PatchFile; colla
         </span>
       )}
       {f.problem && (
-        <Tip label={`Did not parse whole: ${f.problem}`}>
-          <TriangleAlert className="size-3.5 shrink-0 text-cf-warning-text" aria-label="Did not parse whole" data-testid="file-patch-problem" />
+        <Tip label={`Partially parsed: ${f.problem}`}>
+          <TriangleAlert className="size-3.5 shrink-0 text-cf-warning-text" aria-label="Partially parsed" data-testid="file-patch-problem" />
         </Tip>
       )}
       <span className="ml-auto flex shrink-0 items-center gap-2 font-mono text-caption tabular-nums">

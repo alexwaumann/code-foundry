@@ -78,7 +78,7 @@ function InnerTabBar({ d, prRef, target, tabKey, inner }: { d: PullRequestDetail
               {entries} {entries === 1 ? "entry" : "entries"}
             </span>
             <span>·</span>
-            <Tip label={`${String(d.commitCount)} commits`}>
+            <Tip label={`${String(d.commitCount)} ${d.commitCount === 1 ? "commit" : "commits"}`}>
               <span className="flex items-center gap-1">
                 <GitCommitHorizontal className="size-3.5" aria-hidden />
                 {d.commitCount}

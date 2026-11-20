@@ -830,7 +830,7 @@ export function setAnswering(threadId: string, requestId: string, on: boolean): 
 
 /**
  * What the timeline knows about an item. Claude Code's API-error text (apiError) is an
- * error there, not Claude's text: a red row that is no answer (no Copy answer, never a
+ * error there, not Claude's text: a red row that is no answer (no Copy reply, never a
  * final text, never Ember's reply) and stays when the turn folds.
  */
 export function structOf(it: ThreadItemView): Parameters<typeof timelineKey>[0] {

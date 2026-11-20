@@ -39,8 +39,9 @@ function SpanView({ span }: { span: Span }) {
   const cls = cn(toneText[span.tone ?? ""], span.mono && "font-mono", span.strong && "font-semibold");
   if (span.url) {
     // A click opens the browser (openUrl, as openElementUrl); a right-click shows the link menu.
+    // The tooltip is the hint, else where it goes, unless the text already says that (a bare URL).
     return (
-      <WebLink url={span.url} tip={span.hint ?? span.url} className={cn("text-link", cls)}>
+      <WebLink url={span.url} tip={span.hint ?? (span.text === span.url ? undefined : span.url)} className={cn("text-link", cls)}>
         {body}
       </WebLink>
     );

@@ -138,7 +138,7 @@ describe("an inline page's card", () => {
       expect(source.querySelector('[data-testid="file-code"] diffs-container')).not.toBeNull();
     });
     expect(toggle.getAttribute("aria-pressed")).toBe("true");
-    expect(toggle.getAttribute("aria-label")).toBe("Show the page");
+    expect(toggle.getAttribute("aria-label")).toBe("Show page");
     fireEvent.click(toggle);
     expect(within(c()).queryByTestId("thread-html-source")).toBeNull();
     expect(within(c()).getByTestId("thread-html-frame")).toBeTruthy();

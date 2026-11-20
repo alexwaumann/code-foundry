@@ -1,6 +1,7 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { DASHBOARD_KEY, dashboardResource } from "@/stores/gh";
+import { ATTACHMENT_GONE } from "@/lib/compose";
 import { seedPrWorld } from "@/test/prWorld";
 import { UserBubble } from "./UserBubble";
 
@@ -90,6 +91,19 @@ describe("UserBubble", () => {
       expect(pdf.className).toContain("border-dashed");
     });
     expect((pdf as HTMLButtonElement).disabled).toBe(true);
+    // The disabled chip takes no hover: its wrapper says why it does not open.
+    const { hoverTooltipText } = await import("@/test/tooltip");
+    expect(await hoverTooltipText(screen.getByTestId("thread-tag-tip"))).toBe(ATTACHMENT_GONE);
+  });
+
+  it("a chip that cuts its name shows it in full on hover; one that shows it whole has no tooltip", async () => {
+    const long = "screenshot-2026-11-19-at-20.14.07-the-whole-window.png";
+    render(<UserBubble text="" composerText={`See ${chip("0", long)} and ${chip("1", "a.png")}`} attachments={["/att/0a.png", "/att/1b.png"]} createdAtMs={null} />);
+    const cut = await screen.findByRole("button", { name: `Image ${long}` });
+    expect(cut.textContent).not.toBe(long);
+    const { hoverTooltipText, tooltipText } = await import("@/test/tooltip");
+    expect(await hoverTooltipText(cut)).toBe(long);
+    expect(tooltipText(await screen.findByRole("button", { name: "Image a.png" }))).toBeNull();
   });
 
   it("a pull request tag is a chip in its state's colour; its tooltip is the title and owner/repo#N", async () => {

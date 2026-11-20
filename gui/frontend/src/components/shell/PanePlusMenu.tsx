@@ -165,7 +165,7 @@ function useGeneral(paneId: string, threadPane: boolean): readonly GeneralItem[]
 export function PanePlusMenu({ paneId, threadPane = false }: { paneId: string; threadPane?: boolean }) {
   const threadId = useActiveThread(paneId);
   const general = useGeneral(paneId, threadPane);
-  const name = threadPane ? "Open" : "Open a tab";
+  const name = threadPane ? "Open" : "Open tab";
   const spaceId = useLayoutStore((s) => s.panes[paneId]?.spaceId ?? "");
   const untabbed = useUntabbedTerminals();
   const anyTab = useTakesAnyTab(paneId, spaceId);

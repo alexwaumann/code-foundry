@@ -122,8 +122,8 @@ function NeedsStepper({ open, current, go }: Stepper) {
           const line = requestLine(p);
           const on = p.requestId === current;
           return (
-            // The dot hides which request it is: its tooltip says.
-            <Tip key={p.requestId} label={line.text} side="bottom">
+            // The dot hides which request it is: its tooltip says (not on the current one, shown below).
+            <Tip key={p.requestId} label={on ? null : line.text} side="bottom">
               <button
                 type="button"
                 aria-label={`${String(i + 1)} of ${String(ids.length)}: ${line.text}`}
@@ -187,7 +187,7 @@ function Crumb({ threadId }: { threadId: string }) {
         {noProject ? "No project" : inFolder ? set : project}
       </span>
       <ChevronRight className="size-3.5 shrink-0 text-cf-icon-muted" aria-hidden />
-      <Tip label={name} whenTruncated>
+      <Tip label={name || threadId} whenTruncated>
         <DialogTitle className="min-w-0 truncate text-heading" data-testid="needs-popup-title">
           {name || threadId}
         </DialogTitle>
