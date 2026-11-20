@@ -121,3 +121,63 @@ export function parseUserMessage(text: string, composerText: string, attachments
 export function inlineAttachmentPaths(pieces: readonly MessagePiece[]): Set<string> {
   return new Set(pieces.flatMap((p) => ((p.kind === "image" || p.kind === "pdf") && p.path ? [p.path] : [])));
 }
+
+/** A piece as plain text (promptCopyText): what Claude got for it, without the app's own addresses. */
+function plainPiece(p: Exclude<MessagePiece, { kind: "text" | "cite" }>): string {
+  switch (p.kind) {
+    case "skill":
+      return `/${p.name}`;
+    case "file":
+      return `@${p.path}${p.line !== undefined && !p.path.endsWith("/") ? `#L${String(p.line)}` : ""}`;
+    case "thread":
+      return p.name.trim() || p.id;
+    case "pr":
+      return `${p.slug}#${String(p.number)}`;
+    case "image":
+      return `[Image: ${p.name}]`;
+    case "pdf":
+      return `[PDF: ${p.name}]`;
+  }
+}
+
+/**
+ * What a user message's Copy copies (docs/notes/copy-prompt.md): the message as the user
+ * wrote it, as plain text to paste into any composer or editor. Text runs as typed; a skill
+ * `/name`, a file `@path` (`#L24` for a line: what Claude Code's @ mention reads), another
+ * thread its name, a pull request `owner/repo#123`, an image or PDF `[Image: name]` in its
+ * place, and a citation its quote as a Markdown blockquote on its own lines, then the
+ * comment. A skill or file gets a space before a word right against it (not before
+ * punctuation: "/tdd." stays). "" when the message has nothing but attachments (and whitespace): no Copy then.
+ */
+export function promptCopyText(pieces: readonly MessagePiece[]): string {
+  const said = pieces.some((p) => (p.kind === "text" ? p.text.trim() !== "" : p.kind !== "image" && p.kind !== "pdf"));
+  if (!said) return "";
+  let out = "";
+  // After a skill or file a word needs a space; after a citation the text starts a new line.
+  let after: "word" | "block" | null = null;
+  const add = (t: string) => {
+    if (!t) return;
+    if (after === "word" && /^[\p{L}\p{N}_]/u.test(t)) out += " ";
+    if (after === "block" && !t.startsWith("\n")) out += "\n";
+    after = null;
+    out += t;
+  };
+  for (const p of pieces) {
+    if (p.kind === "text") {
+      add(p.text);
+    } else if (p.kind === "cite") {
+      if (out && !out.endsWith("\n")) out += "\n";
+      after = null;
+      const quote = p.cite.text
+        .split("\n")
+        .map((l) => (l ? `> ${l}` : ">"))
+        .join("\n");
+      out += p.cite.comment ? `${quote}\n\n${p.cite.comment}` : quote;
+      after = "block";
+    } else {
+      add(plainPiece(p));
+      after = p.kind === "skill" || p.kind === "file" ? "word" : null;
+    }
+  }
+  return out;
+}
