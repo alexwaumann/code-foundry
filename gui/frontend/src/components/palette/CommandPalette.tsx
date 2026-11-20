@@ -12,7 +12,7 @@ import { PromptsPicker } from "./PromptsPicker";
 import { RunInPicker } from "./RunInPicker";
 import { FileFinder } from "./FileFinder";
 import { SearchDialog } from "@/components/search/SearchDialog";
-import { inPalette, invokeStarted, presentCommand, presentInPalette } from "@/keys/bindings";
+import { inPalette, invokeStarted, isStartable, presentCommand, presentInPalette } from "@/keys/bindings";
 import { formatChord } from "@/keys/chord";
 import { argChoices, groupByCategory, previousArg, promptedArgs, startPrompt, submitArg, UNSET_CHOICE, type ArgPrompt } from "@/palette/args";
 import { rankCommands } from "@/palette/rank";
@@ -115,12 +115,14 @@ function PaletteBody({ initialQuery, initialCommand, initialContext, close }: Bo
   };
 
   // A keybinding (or the sidebar "+") can open the palette straight into a command's arg
-  // prompts. Adjusts state during render once it's listed.
+  // prompts. Adjusts state during render once the daemon's list has it.
+  // The caller named the command, so one the list leaves out (NoPalette: the Plugins page's
+  // "Add a dev plugin") is found too, as long as it can start here.
   // With a given context, wait for that context's list (the current one may not have it).
   // Only a command with args to ask is opened this way (startCommand runs one with none), and
   // the prompted args do not depend on the context, so there is never one to run from here.
   if (pendingCommand && (!initialContext || fresh)) {
-    const c = available.find((x) => x.name === pendingCommand);
+    const c = commands.find((x) => x.name === pendingCommand && isStartable(x));
     if (c) {
       setPendingCommand(null);
       const p = startPrompt(c);

@@ -41,3 +41,9 @@ clear the thread's; workspace.set-root stays (a path, with completion).
   set on the mock's copies of the marked verbs, so the e2e palette matches the daemon.
 - `NoKeybinding` is not in the proto; `NoPalette` is, because the palette is a client.
 - The CLI, pages (bridge) and chords see no change: the flag is a listing hint only.
+- Opening the palette on a named command (`openPalette("", name)`: a chord through
+  `startCommand`, the Plugins page's "Add a dev plugin") is not listing it, so that lookup
+  goes through every startable command, not the listed ones. It used the listed ones at
+  first, which left "Add a dev plugin" (`plugin.dev`, NoPalette) on the plain command list
+  with no folder prompt. A named command that cannot start in the context still falls back
+  to the list.
