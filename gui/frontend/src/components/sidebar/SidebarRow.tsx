@@ -162,16 +162,14 @@ const stop = (e: SyntheticEvent) => {
  * keyboard cursor's row (`cursor`), so Tab leaves the list after one row's actions rather
  * than walking every row's; the context menu and the palette have the same commands.
  */
-function RowActions({ id, cursor, onShownChange }: { id: string; cursor: boolean; onShownChange: (shown: boolean) => void }) {
+function RowActions({ id, cursor }: { id: string; cursor: boolean }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [focused, setFocused] = useState(false);
   // The daemon refuses a snooze while a setup runs: spawn may be reading the row.
   const settingUp = useThreadsStore((s) => s.byId[id]?.setup?.phase === "running");
   const woken = useThreadsStore((s) => statusLine(s.byId[id]).kind === "snoozeEnded");
+  // HoverSlot reads data-shown (a CSS :has) to give way while they are shown off hover.
   const shown = menuOpen || focused;
-  useEffect(() => {
-    onShownChange(shown);
-  }, [shown, onShownChange]);
   const tab = cursor ? 0 : -1;
   return (
     <span
@@ -240,14 +238,14 @@ function RowActions({ id, cursor, onShownChange }: { id: string; cursor: boolean
 /**
  * The right end of a row's last line: what `children` shows at rest, and on hover the row's
  * actions (RowActions) in its place, keeping at least their own width so they never cover the
- * text before them. They stay while one of them has the keyboard or the snooze menu is open.
+ * text before them. They stay while one of them has the keyboard or the snooze menu is open
+ * (RowActions sets data-shown, which the slot reads with :has).
  */
 export function HoverSlot({ id, cursor, children }: { id: string; cursor: boolean; children?: ReactNode }) {
-  const [actionsShown, setActionsShown] = useState(false);
   return (
-    <span className={cn("relative ml-auto flex shrink-0 items-center justify-end pl-1.5 group-hover/row:min-w-[97px]", actionsShown && "min-w-[97px]")} data-testid="row-hover-slot">
-      <span className={cn("flex min-w-0 items-center gap-2 group-hover/row:invisible", actionsShown && "invisible")}>{children}</span>
-      <RowActions id={id} cursor={cursor} onShownChange={setActionsShown} />
+    <span className="group/slot relative ml-auto flex shrink-0 items-center justify-end pl-1.5 group-hover/row:min-w-[97px] has-[>[data-shown]]:min-w-[97px]" data-testid="row-hover-slot">
+      <span className="flex min-w-0 items-center gap-2 group-hover/row:invisible group-has-[>[data-shown]]/slot:invisible">{children}</span>
+      <RowActions id={id} cursor={cursor} />
     </span>
   );
 }
