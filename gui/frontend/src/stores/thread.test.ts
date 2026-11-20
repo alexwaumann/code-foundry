@@ -580,6 +580,35 @@ describe("page modals (inline-page-shows)", () => {
     expect(useThreadStore.getState()).toBe(same);
   });
 
+  it("close where the log loses their page, and stay shut when it comes back", () => {
+    const html = (id: string, ordinal: number) => text(id, ordinal, "", { kind: "html", path: `${id}.html`, title: "", baseDir: "/p" });
+    applyWatchBatch("s", [snapshot(1, [html("h1", 1), html("h2", 2), text("t1", 3)])]);
+    applyWatchBatch("u", [snapshot(1, [text("t9", 1)])]);
+    openPageModal("s", "s", "h1");
+    openPageModal("s/run", "s", "h2");
+    // Another thread's modal is not this log's to judge.
+    openPageModal("u", "u", "h1");
+    const cases: { name: string; events: ThreadEventView[]; open: string[] }[] = [
+      { name: "an item appended", events: [{ kind: "appended", threadId: "s", seq: 2, item: text("t2", 4) }], open: ["s", "s/run", "u"] },
+      { name: "a resync keeping both pages", events: [snapshot(3, [html("h1", 1), html("h2", 2)])], open: ["s", "s/run", "u"] },
+      { name: "a resync without h2", events: [snapshot(4, [html("h1", 1)])], open: ["s", "u"] },
+      { name: "h2 back", events: [snapshot(5, [html("h1", 1), html("h2", 2)])], open: ["s", "u"] },
+      { name: "an empty resync", events: [snapshot(6, [])], open: ["u"] },
+      { name: "h1 back", events: [snapshot(7, [html("h1", 1)])], open: ["u"] },
+    ];
+    for (const c of cases) {
+      applyWatchBatch("s", c.events);
+      expect(Object.keys(useThreadStore.getState().pageModals), c.name).toEqual(c.open);
+    }
+    // A log let go (leaving the thread) closes nothing: the modal is up again on return.
+    openPageModal("s", "s", "h1");
+    useThreadStore.setState((st) => {
+      const { s: _s, ...logs } = st.logs;
+      return { logs };
+    });
+    expect(useThreadStore.getState().pageModals.s).toEqual({ thread: "s", id: "h1", source: false });
+  });
+
   it("flashPage marks the card a link row pointed at, one per thread", () => {
     flashPage("s", "a", 100);
     flashPage("s", "b", 200);

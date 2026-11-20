@@ -70,8 +70,8 @@ get the same fix.
   - Close (`closePageModal`);
   - the thread being removed or archived (`prunePageModals` on every thread-list event,
     once the list is loaded);
-  - the item leaving the log (the modal closes itself once the log is loaded and the item
-    is not an html item in it).
+  - the item leaving the log (`applyWatchBatch` drops the thread's modals whose item is not an
+    html item in the new log; dialog-open-flags.md).
   Whether the modal shows the page or its source is kept in the same entry, so it comes back
   as it was. The card's Source toggle stays local to the card.
 - **One frame per file:** while a scope's modal shows a file (`usePageModalPath`), that

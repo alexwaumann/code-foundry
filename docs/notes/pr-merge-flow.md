@@ -66,7 +66,8 @@ guarded dialog exactly as before. How the page asks exactly once:
   reach it.
 - The merge dialog's open state lives in `stores/mergeDialog.ts` and is registered with
   `registerOwnDialog`, so a page's guarded question waits for it instead of opening over it. The
-  button closes it on unmount or when it stops showing, so a stale "open" never blocks the queue.
+  flag is set only while the dialog shows (dialog-open-flags.md): a merge starting on the pull
+  request clears it in the store, and the button's shown part clears it when it unmounts.
 
 ## Refresh right after each action (stores/prPanel.ts)
 

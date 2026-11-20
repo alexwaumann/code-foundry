@@ -1,12 +1,12 @@
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { PullRequestDetailView } from "@/api/gh";
 
 const viewer = vi.hoisted(() => ({ login: "me" }));
 vi.mock("@/stores/gh", async (orig) => ({ ...(await orig<typeof import("@/stores/gh")>()), useViewerLogin: () => viewer.login }));
 
 const { usePrPanelStore } = await import("@/stores/prPanel");
-const { pullRequestDetailResource, pullRequestKey } = await import("@/stores/gh");
+const { pullRequestDetailResource, pullRequestKey, VIEWER_KEY, viewerResource } = await import("@/stores/gh");
 const { setReviewDraft, useReviewDialogStore } = await import("@/stores/reviewDialog");
 const { PrDiffReviewButton, ReviewButton } = await import("./ReviewButton");
 
@@ -21,12 +21,24 @@ function detail(over: { author?: string; state?: string; reviewers?: { login: st
   } as unknown as PullRequestDetailView;
 }
 
+/** The detail the button shows, also in its store: the dialog opens only for what the stores say it can show. */
+function shown(d: PullRequestDetailView): PullRequestDetailView {
+  pullRequestDetailResource.store.setState({ entries: { [KEY]: { data: d, error: null, loading: false } } });
+  return d;
+}
+
+beforeEach(() => {
+  // The stores' viewer (stores/reviewDialog.ts reads it), the same as the mocked hook's.
+  viewerResource.store.setState({ entries: { [VIEWER_KEY]: { data: { login: viewer.login, name: "", url: "" }, error: null, loading: false } } });
+});
+
 afterEach(() => {
   cleanup();
   viewer.login = "me";
   usePrPanelStore.setState({ reviewing: {} });
   useReviewDialogStore.setState({ open: null, drafts: {} });
   pullRequestDetailResource.store.setState({ entries: {} });
+  viewerResource.store.setState({ entries: {} });
 });
 
 const opened = () => {
@@ -36,7 +48,7 @@ const opened = () => {
 
 describe("ReviewButton", () => {
   it("Review, no chevron and no menu: pressing it opens the review dialog on Approve (someone else's pull request)", () => {
-    render(<ReviewButton prRef={REF} detail={detail()} />);
+    render(<ReviewButton prRef={REF} detail={shown(detail())} />);
     const b = screen.getByTestId("pr-review-button");
     expect(b.textContent).toBe("Review");
     expect(b.getAttribute("aria-haspopup")).toBe("dialog");
@@ -47,13 +59,13 @@ describe("ReviewButton", () => {
   });
 
   it("on the viewer's own pull request it opens on Comment", () => {
-    render(<ReviewButton prRef={REF} detail={detail({ author: "Me" })} />);
+    render(<ReviewButton prRef={REF} detail={shown(detail({ author: "Me" }))} />);
     fireEvent.click(screen.getByTestId("pr-review-button"));
     expect(opened()?.verdict).toBe("comment");
   });
 
   it("primary (the viewer's review is requested) is the primary button saying Review, even after a review", () => {
-    render(<ReviewButton prRef={REF} detail={detail({ reviewers: [{ login: "me", state: "approved", requested: true }] })} primary />);
+    render(<ReviewButton prRef={REF} detail={shown(detail({ reviewers: [{ login: "me", state: "approved", requested: true }] }))} primary />);
     const b = screen.getByTestId("pr-review-button");
     expect(b.dataset.primary).toBe("true");
     expect(b.textContent).toBe("Review");
@@ -64,7 +76,7 @@ describe("ReviewButton", () => {
     ["changes_requested", "You requested changes", "request-changes"],
     ["commented", "You commented", "comment"],
   ] as const)("once the viewer has %s: the chip says %s and reopens the dialog on %s", (state, label, verdict) => {
-    render(<ReviewButton prRef={REF} detail={detail({ reviewers: [{ login: "ME", state }] })} />);
+    render(<ReviewButton prRef={REF} detail={shown(detail({ reviewers: [{ login: "ME", state }] }))} />);
     expect(screen.queryByTestId("pr-review-button")).toBeNull();
     const chip = screen.getByTestId("pr-your-review");
     expect(chip.textContent).toBe(label);
@@ -75,7 +87,7 @@ describe("ReviewButton", () => {
 
   it("an unsent draft (a failed submit, a cancel) reopens with its verdict and text", () => {
     setReviewDraft(REF, { verdict: "request-changes", text: "Rename the flag." });
-    render(<ReviewButton prRef={REF} detail={detail({ reviewers: [{ login: "me", state: "approved" }] })} />);
+    render(<ReviewButton prRef={REF} detail={shown(detail({ reviewers: [{ login: "me", state: "approved" }] }))} />);
     fireEvent.click(screen.getByTestId("pr-your-review"));
     expect(opened()).toEqual({ ref: REF, verdict: "request-changes", text: "Rename the flag." });
   });
@@ -85,7 +97,7 @@ describe("ReviewButton", () => {
     ["request-changes", "Requesting changes…"],
     ["comment", "Commenting…"],
   ] as const)("while a %s review is submitted: busy saying %s, and it opens nothing", (verdict, words) => {
-    render(<ReviewButton prRef={REF} detail={detail({ reviewers: [{ login: "me", state: "commented" }] })} />);
+    render(<ReviewButton prRef={REF} detail={shown(detail({ reviewers: [{ login: "me", state: "commented" }] }))} />);
     act(() => {
       usePrPanelStore.setState({ reviewing: { [KEY]: verdict } });
     });

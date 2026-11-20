@@ -6,7 +6,7 @@ import { closeMergeDialog, openMergeDialog, useMergeDialogOpen } from "@/stores/
 import { setMergeMethodDefault, useMergeMethodDefault } from "@/stores/mergeDefaults";
 import { mergePullRequest, useMergingMethod } from "@/stores/prPanel";
 import type { PrRef } from "@/surfaces/pullrequestTarget";
-import { branchDelete, defaultMergeMethod, MERGE_BUSY_LABELS, MERGE_BUTTON_LABELS, MERGE_METHOD_LABELS, mergeAvailability, mergeMethodHint } from "./merge";
+import { branchDelete, defaultMergeMethod, MERGE_BUSY_LABELS, MERGE_BUTTON_LABELS, MERGE_METHOD_LABELS, mergeAvailability, mergeMethodHint, type MergeAvailability } from "./merge";
 import { MergeDialog } from "./MergeDialog";
 import { SplitButton } from "./SplitButton";
 
@@ -25,24 +25,28 @@ import { SplitButton } from "./SplitButton";
  */
 export function MergeButton({ prRef, detail, note = null }: { prRef: PrRef; detail: PullRequestDetailView; note?: string | null }) {
   const a = useMemo(() => mergeAvailability(detail), [detail]);
+  // Hidden, the shown part unmounts, and its cleanup shuts a dialog it left open.
+  if (!a.visible) return null;
+  return <ShownMergeButton prRef={prRef} detail={detail} note={note} a={a} />;
+}
+
+/**
+ * The button while it shows, and its dialog's open flag (stores/mergeDialog.ts), which goes
+ * with it: a page's guarded question never waits behind a dialog whose button is gone.
+ */
+function ShownMergeButton({ prRef, detail, note, a }: { prRef: PrRef; detail: PullRequestDetailView; note: string | null; a: MergeAvailability }) {
   const merging = useMergingMethod(prRef);
   const picked = useMergeMethodDefault(prRef.slug);
   const del = branchDelete(detail);
   const [deleteBranch, setDeleteBranch] = useState(true);
   const dialogId = useId();
   const dialogOpen = useMergeDialogOpen(dialogId);
-  // A dialog left open by a button that went away (merged elsewhere, the tab closed) would
-  // keep a page's guarded question waiting (stores/mergeDialog.ts).
-  useEffect(() => {
-    if (!a.visible) closeMergeDialog(dialogId);
-  }, [a.visible, dialogId]);
   useEffect(
     () => () => {
       closeMergeDialog(dialogId);
     },
     [dialogId],
   );
-  if (!a.visible) return null;
   const pr = detail.pullRequest;
   const method = defaultMergeMethod(a.methods, picked);
   const pick = (v: string) => {
@@ -58,7 +62,7 @@ export function MergeButton({ prRef, detail, note = null }: { prRef: PrRef; deta
         reason={a.reason}
         busy={merging !== null}
         onRun={() => {
-          openMergeDialog(dialogId);
+          openMergeDialog(dialogId, prRef);
         }}
         menuLabel="Merge options"
         testId="pr-merge-button"
@@ -122,7 +126,7 @@ export function MergeButton({ prRef, detail, note = null }: { prRef: PrRef; deta
       </SplitButton>
       <MergeDialog
         prRef={prRef}
-        open={dialogOpen && merging === null}
+        open={dialogOpen}
         onOpenChange={(open) => {
           if (!open) closeMergeDialog(dialogId);
         }}

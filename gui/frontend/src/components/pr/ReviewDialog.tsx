@@ -1,5 +1,5 @@
 import { Check, CircleX, Eye, type LucideIcon } from "lucide-react";
-import { useEffect, useLayoutEffect, useRef, type KeyboardEvent } from "react";
+import { useLayoutEffect, useRef, type KeyboardEvent } from "react";
 import type { PullRequestDetailView } from "@/api/gh";
 import { DictationMic, DictationNote } from "@/components/compose/DictationMic";
 import { useComposerDictation } from "@/components/compose/useComposerDictation";
@@ -13,11 +13,11 @@ import { cn } from "@/lib/utils";
 import { focusPaneOf } from "@/shell/paneBox";
 import { pullRequestDetailResource, pullRequestKey, useViewerLogin } from "@/stores/gh";
 import { submitReview, usePrPanelStore } from "@/stores/prPanel";
-import { clearReviewDraft, closeReviewDialog, setReviewDraft, useReviewDialogStore, type ReviewDraft } from "@/stores/reviewDialog";
+import { clearReviewDraft, closeReviewDialog, reviewDialogShows, setReviewDraft, useReviewDialogStore, type ReviewDraft } from "@/stores/reviewDialog";
 import type { PrRef } from "@/surfaces/pullrequestTarget";
 import { composerKeyAction } from "./keys";
 import { PrDialogHeading } from "./PrDialogHeading";
-import { canSubmit, disabledVerdicts, OWN_PULL_REQUEST_NOTE, reviewHint, reviewVisible, VERDICT_SPECS, VERDICTS, type Verdict } from "./review";
+import { canSubmit, disabledVerdicts, OWN_PULL_REQUEST_NOTE, reviewHint, VERDICT_SPECS, VERDICTS, type Verdict } from "./review";
 import { verdictIcons } from "./reviewIcons";
 import { statusPill } from "./tones";
 
@@ -50,7 +50,7 @@ const EMPTY: ReviewDraft = { verdict: "comment", text: "" };
  * submits, Escape cancels (stopping dictation first). Submitting shuts the dialog and runs
  * pr.review (submitReview), the Review button busy until the detail shows the review; the
  * text lives in the store's draft, so a refusal (toasted) loses nothing. It shuts by itself
- * when the pull request stops taking reviews or its detail goes.
+ * (stores/reviewDialog.ts) when the pull request stops taking reviews or its detail goes.
  */
 export function ReviewDialog() {
   const open = useReviewDialogStore((s) => s.open);
@@ -58,12 +58,8 @@ export function ReviewDialog() {
   const detail = pullRequestDetailResource.store((s) => (key ? (s.entries[key]?.data ?? null) : null));
   const viewer = useViewerLogin();
   const busy = usePrPanelStore((s) => (key ? s.reviewing[key] !== undefined : false));
-  const shown = open !== null && detail !== null && reviewVisible(detail, viewer) && !busy;
-  // Open with nothing to show (merged meanwhile, the tab closed and its detail gone): shut,
-  // so a page's guarded question is not left waiting behind it.
-  useEffect(() => {
-    if (open !== null && !shown) closeReviewDialog();
-  }, [open, shown]);
+  // The store shuts `open` when this turns false (stores/reviewDialog.ts); the same rule here.
+  const shown = open !== null && reviewDialogShows(detail, viewer, busy);
   return (
     <Dialog
       open={shown}
@@ -71,7 +67,7 @@ export function ReviewDialog() {
         if (!next) closeReviewDialog();
       }}
     >
-      {shown && <ReviewDialogBody key={key} prRef={open} detail={detail} viewer={viewer} />}
+      {shown && detail !== null && <ReviewDialogBody key={key} prRef={open} detail={detail} viewer={viewer} />}
     </Dialog>
   );
 }
