@@ -62,6 +62,7 @@ import { HtmlRow } from "./InlineHtml";
 import { ThemeCardRow } from "./ThemeCard";
 import { ToolPathChip } from "./PathChip";
 import { AgentReport, ToolDetail } from "./ToolDetail";
+import { GutterCopy } from "./GutterCopy";
 import { useTurnActive } from "./turnActivity";
 import { UserBubble } from "./UserBubble";
 import { WorkerCardRow } from "./WorkerCard";
@@ -1060,26 +1061,10 @@ const GutterRow = memo(function GutterRow({ row }: { row: Extract<TimelineRow, {
   if (end?.model) info.push(canonicalModelName(models, end.model));
   const at = sentTime(end?.createdAtMs ?? null);
   if (at) info.push(at);
-  const label = copied ? "Copied" : "Copy reply";
   return (
     <div className="tgut text-caption" data-testid="thread-turn-gutter" data-shown={shown || undefined}>
       <div className="in">
-        {row.reply && (
-          <Tip label={label}>
-            <button
-              type="button"
-              className="ib"
-              aria-label={label}
-              data-copied={copied || undefined}
-              data-testid="thread-copy-reply"
-              onClick={() => {
-                void copy(replyText(threadId, row.reply));
-              }}
-            >
-              <CopyIcon copied={copied} />
-            </button>
-          </Tip>
-        )}
+        {row.reply && <GutterCopy label="Copy reply" copied={copied} copy={copy} text={() => replyText(threadId, row.reply)} testId="thread-copy-reply" />}
         <ForkFromHereButton threadId={threadId} held={fork.held} onFork={fork.fork} />
         {toggle && (
           <button

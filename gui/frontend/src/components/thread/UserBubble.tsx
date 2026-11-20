@@ -8,11 +8,13 @@ import { Tip } from "@/components/ui/tooltip";
 import { ATTACHMENT_GONE, attachmentChipTip, pageCount, previewLabel } from "@/lib/compose";
 import { sentTime } from "@/lib/format";
 import { formatAttachmentSize, kindFromName, middleTruncate, stagedPdfPages, tagLabel } from "@/lib/prompt";
-import { inlineAttachmentPaths, parseUserMessage } from "@/lib/userMessage";
+import { inlineAttachmentPaths, parseUserMessage, promptCopyText } from "@/lib/userMessage";
+import { useCopied } from "@/lib/useCopied";
 import { cn } from "@/lib/utils";
 import { type PdfSummary, useAttachment, usePdfSummary } from "@/stores/attachments";
 import { useProjectsStore } from "@/stores/projects";
 import { CiteChip } from "./cite/CiteChip";
+import { GutterCopy } from "./GutterCopy";
 import { MessageFold } from "./MessageFold";
 import { QueuedTag } from "./QueuedTag";
 
@@ -178,6 +180,10 @@ function PrChip({ slug, number }: { slug: string; number: number }) {
  * under it. `queued`: Claude has not read it yet (QueuedTag after the time). With `foldKey`,
  * long text folds (MessageFold), in a steer or queued message too: where it sits does not
  * make a long paste any shorter. Without, it shows whole (the search preview, the theme gallery).
+ * With `foldKey` (a message in a timeline) and any text, a Copy sits just left of the time
+ * or caption, shown while the bubble or that line is hovered (thread.css `.u-meta`,
+ * docs/notes/copy-prompt.md); it copies the whole message as plain text (promptCopyText),
+ * a folded one's too.
  */
 export const UserBubble = memo(function UserBubble({
   text,
@@ -205,6 +211,8 @@ export const UserBubble = memo(function UserBubble({
   const pieces = useMemo(() => parseUserMessage(text, composerText, attachments), [text, composerText, attachments]);
   const inline = useMemo(() => inlineAttachmentPaths(pieces), [pieces]);
   const extra = attachments.filter((p) => !inline.has(p));
+  const plain = useMemo(() => (foldKey === undefined ? "" : promptCopyText(pieces)), [foldKey, pieces]);
+  const { copied, copy } = useCopied();
   const body = (
     <>
       {pieces.map((p, i) => {
@@ -232,6 +240,21 @@ export const UserBubble = memo(function UserBubble({
       })}
     </>
   );
+  // The time (a steer's caption) and a queued message's tag.
+  const meta = steer ? (
+    <span className="text-caption inline-flex items-center gap-1 tabular-nums" data-testid="thread-steer-caption">
+      <ArrowDown className="size-3" aria-hidden />
+      {["sent mid-turn", sentTime(createdAtMs)].filter(Boolean).join(" · ")}
+      {queued && <QueuedTag />}
+    </span>
+  ) : queued ? (
+    <span className="inline-flex items-center gap-1.5">
+      <span className="when">{sentTime(createdAtMs)}</span>
+      <QueuedTag />
+    </span>
+  ) : (
+    <span className="when">{sentTime(createdAtMs)}</span>
+  );
   return (
     <div className={cn("u", steer && "steer")} data-testid={testId ?? (steer ? "thread-steer" : "thread-user")}>
       {extra.length > 0 && (
@@ -252,19 +275,13 @@ export const UserBubble = memo(function UserBubble({
           )}
         </div>
       )}
-      {steer ? (
-        <span className="text-caption inline-flex items-center gap-1 tabular-nums" data-testid="thread-steer-caption">
-          <ArrowDown className="size-3" aria-hidden />
-          {["sent mid-turn", sentTime(createdAtMs)].filter(Boolean).join(" · ")}
-          {queued && <QueuedTag />}
-        </span>
-      ) : queued ? (
-        <span className="inline-flex items-center gap-1.5">
-          <span className="when">{sentTime(createdAtMs)}</span>
-          <QueuedTag />
+      {plain ? (
+        <span className="u-meta">
+          <GutterCopy label="Copy prompt" copied={copied} copy={copy} text={() => plain} testId="thread-copy-prompt" />
+          {meta}
         </span>
       ) : (
-        <span className="when">{sentTime(createdAtMs)}</span>
+        meta
       )}
     </div>
   );

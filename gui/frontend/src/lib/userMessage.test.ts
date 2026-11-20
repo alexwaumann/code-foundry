@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { citeLink, parseCiteLink } from "./citation";
 import { projectPrompt, tagToken } from "./prompt";
-import { inlineAttachmentPaths, parseUserMessage, sentComposerText } from "./userMessage";
+import { inlineAttachmentPaths, parseUserMessage, promptCopyText, sentComposerText } from "./userMessage";
 
 const image = (id: string, name: string) => tagToken({ tagKind: "image", id, name });
 const file = (projectId: string, path: string) => tagToken({ tagKind: "file", projectId, path });
@@ -134,5 +134,28 @@ describe("citations", () => {
 
   it("a draft token stored as is (no body) shows nothing", () => {
     expect(parseUserMessage("x", `a ${C} b`, [])).toEqual([{ kind: "text", text: "a  b" }]);
+  });
+});
+
+describe("promptCopyText", () => {
+  const thread = tagToken({ tagKind: "thread", id: "s-0123456789ab", name: "Fix resize race" });
+  const pr = tagToken({ tagKind: "pr", slug: "owner/repo", number: 123 });
+  const cite = { threadId: "t1", itemId: "a1", text: "Use a mutex.\nOr a channel.", comment: "Which one?", start: 0, end: 25, prefix: "", suffix: "" };
+  it.each([
+    { name: "plain text as typed", text: "fix it\n\n  then test", composer: "", atts: [], want: "fix it\n\n  then test" },
+    { name: "a CLI message: its text", text: "sent from the CLI", composer: "", atts: [], want: "sent from the CLI" },
+    {
+      name: "skill, file (a line, a directory) and a word right after a tag",
+      text: "(projected)",
+      composer: `${skill("tdd")}on ${tagToken({ tagKind: "file", projectId: "p", path: "src/a b.ts", line: 3 })} and ${file("p", "docs/")}.`,
+      atts: [],
+      want: "/tdd on @src/a b.ts#L3 and @docs/.",
+    },
+    { name: "thread and pull request", text: "(projected)", composer: `read ${thread} and ${pr}`, atts: [], want: "read Fix resize race and owner/repo#123" },
+    { name: "an image and a PDF in their places", text: "(projected)", composer: `see ${image("0", "shot.png")} and ${image("1", "spec.pdf")}`, atts: ["/att/0.png", "/att/1.pdf"], want: "see [Image: shot.png] and [PDF: spec.pdf]" },
+    { name: "only attachments and whitespace: nothing", text: "(projected)", composer: `${image("0", "shot.png")}  \n${image("1", "b.png")}`, atts: ["/att/0.png", "/att/1.png"], want: "" },
+    { name: "a citation: its quote as a blockquote on its own lines, then the comment", text: `Look:${citeLink(cite)}thanks`, composer: "", atts: [], want: "Look:\n> Use a mutex.\n> Or a channel.\n\nWhich one?\nthanks" },
+  ])("$name", ({ text, composer, atts, want }) => {
+    expect(promptCopyText(parseUserMessage(text, composer, atts))).toBe(want);
   });
 });
