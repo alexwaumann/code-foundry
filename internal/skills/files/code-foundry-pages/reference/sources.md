@@ -2,8 +2,14 @@
 
 {{cf.provenance}}
 
-For the code-foundry-pages skill: the value `cf.on(source, fn)` passes to `fn`, per source.
-It is the app's own view model, the one its windows draw from:
+For the code-foundry-pages skill. Contents (grep `^## <name>`): the two shapes (below); Lists
+with buttons that update live; Page storage, in detail (limits, `onChange`, how long it lives, a
+page that was hidden); External APIs: cf.fetch and tokens; then each source: `thread-list`
+(statuses as the sidebar groups them), `thread`, `gh` (PRs, checks, `headSha`), `action`,
+`plugin`, `terminal`, `project`, `workspace`, `settings`, `update`, `ember`, `ui`.
+
+The value `cf.on(source, fn)` passes to `fn` is the app's own view model, the one its windows
+draw from:
 
 - enum values are lower case (idle, merged, running), never THREAD_STATUS_IDLE;
 - times are epoch milliseconds in fields ending in AtMs (null when unknown): render them
@@ -41,8 +47,11 @@ pointer makes a click act on the wrong one. So:
 
 `get(key)` and `keys()` answer at once from the copy the page got with `cf.ready`; `set`,
 `remove` and `clear` change that copy at once and return a Promise that rejects when the
-storage is full (256 KiB per page file; 1 KiB a key, prefix and `:` included) or the write was
-refused: the value is then put back. Every open copy of the page shares one storage: its card,
+storage is full or the write was refused: the value is then put back.
+
+Limits: 256 KiB per page file for everything in it, keys and values as JSON text in UTF-8 bytes.
+One value may be any size within that: a list in one key (`s.set("cards", cards)`) is fine, and
+a note needs no cap of its own. Only a key's name is limited, to 1 KiB (prefix and `:` included). Every open copy of the page shares one storage: its card,
 its tabs, the app's other windows, and its own other files opened in its frame.
 
 `onChange(fn)` keeps a copy in step: `fn(keys)` runs once now with every key the prefix holds,
@@ -50,6 +59,18 @@ then with the keys (prefix left out) another copy set or removed, or a refused w
 `get` already answers the new values. Never for the page's own `set`: draw after it yourself.
 It returns an unsubscribe (in React: `useEffect(() => s.onChange(...), [])`). State the page
 keeps only in variables is not shared: keep in storage what every copy should show.
+
+**A hidden page is unloaded**: behind another tab or in another space, it stops, and loads
+afresh when shown again. So draw everything from storage on load (`draw()` above does), and
+keep in it what the user expects back: a draft, the chosen tab or filter. Data fetched from
+outside: store the last good answer with its time (`s.set("last", {at: Date.now(), data})`),
+draw it at once ("as of 10:42"), then refetch and replace it; on a failure keep it and say so.
+
+**How long it lives**: with the file, by its path. Editing the file in place keeps it. A moved
+or renamed file starts empty (the old storage waits 30 days for a file at that path). Archiving
+the thread keeps its pages and their storage; removing the thread deletes its pages folder and
+those pages' storage (a page elsewhere keeps its own). The user gets back to a page from its card
+in this conversation or its tab; a thread can open it again with `view.open.page <path>`.
 
 ```html
 <button id="b"></button>
@@ -103,13 +124,24 @@ An array of the user's threads in sidebar order (threads a plugin owns left out)
 - `id`, `name`, `projectId`, `worktreePath`, `workspaceId`, `model`, `effort`: strings.
 - `status`: busy, idle, attention, error or unknown. `statusReason` says why in one line
   (finished, at prompt, "permission: Bash git push", interrupted, crashed);
-  `statusChangedAtMs`.
+  `statusChangedAtMs`. What they mean to the user, as the sidebar groups them (a board should
+  agree with it):
+  - **Working**: busy (on a turn), or idle with reason "waiting" or "waiting on N child
+    threads" (it will be woken).
+  - **Needs you**: attention with any reason but finished: a permission, a question, a plan
+    to approve, a notification, a woken snooze, an API error.
+  - **Done**: attention with reason finished: a turn ended and the user has not looked yet
+    (the sidebar's check mark). Once they look it becomes idle, at prompt.
+  - **Error**: error (interrupted, crashed, or another reason): it stopped mid-turn.
+  - **Idle**: any other idle, and unknown: nothing to do.
+  Three columns: Running is Working; Waiting on you is Needs you and Error; Done is Done and Idle.
 - `pinned`; `archivedAtMs`, `snoozedUntilMs` and `savedAtMs`: null unless the thread is
   archived, snoozed or saved for later, a snooze with no wake time (filter those out of a
   board).
 - `createdAtMs`, `lastActivityAtMs`.
 - `parentId`, `createdBy`, `createdByName`: the thread that started it ("" for the user's
-  own; a child is out of the sidebar while its creator exists); `labels`: strings.
+  own; a child is out of the sidebar while its creator exists, so a board that matches it leaves
+  out a thread whose `createdBy` is in the list); `labels`: strings.
 - `costUsd`: USD so far; `unpriced` true means a lower bound (say so, never $0).
   `usage`: buckets of `model`, `day` (UTC YYYY-MM-DD), `requests`, `input`, `output`,
   `cacheRead`, `costUsd`.

@@ -34,12 +34,13 @@ Imports (`/cf/jsx.js` maps them; nothing else resolves, no other package exists)
   user too: fix the file, the card reloads.
 - No charting or other library: draw charts as SVG in JSX (`<rect>`, `<path>`), coloured
   with `var(--cf-chart-1)` … `var(--cf-chart-6)`.
-- `/cf/ui.css` has the components' own classes and everyday utilities (flex, grid, gap,
-  padding, margin, `bg-cf-*`, `text-cf-*`, `border-cf-*`, the type roles, `rounded-*`, and
-  `w-`, `h-`, `min-h-`, `max-h-` … in 4px steps up to 160: `min-h-112` is 448px).
-  An arbitrary value (`min-h-[420px]`, `w-[217px]`, `grid-cols-[2fr_1fr]`) does nothing with
-  it alone (view.inline warns): use the scale or a `style={{…}}`, or add `/cf/tailwind.js`
-  for any utility (`ui.css` still first; it compiles in the page, about 130 ms).
+- `/cf/ui.css` is a fixed set, not all of Tailwind: the components' own classes and everyday
+  utilities (flex, grid, gap, padding, margin, `bg-cf-*`, `text-cf-*`, `border-cf-*` and their
+  `hover:`, the type roles, `rounded-*`, and `w-`, `h-`, `min-h-`, `max-h-` … in 4px steps up to
+  160: `min-h-112` is 448px). A class it lacks (`line-through`, `font-mono`) or an arbitrary
+  value (`min-h-[420px]`, `grid-cols-[2fr_1fr]`) does nothing; view.inline names each. Use the
+  scale, a `style={{…}}` or a rule in your own `<style>`, or add `/cf/tailwind.js` for any
+  utility (`ui.css` still first; it compiles in the page, about 130 ms).
 - `dark:` follows the app's scheme. Paint with the cf colours (`bg-cf-surface-raised`,
   `text-cf-text-muted`, `border-cf-border`, `text-cf-success-text`), never `bg-white` or a
   hex: the user's theme decides, dark or light.

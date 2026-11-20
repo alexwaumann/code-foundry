@@ -23,7 +23,9 @@ show `e.message` in the page where it happened (that row, that button); `alert()
 ## Limits
 
 - **On screen only.** A page runs only while it is on screen: a closed card, a scrolled-away row or
-  another thread stops it. To be told or have it done later, that is a wake.
+  another thread stops it, and one behind another tab or in another space is unloaded and loads
+  afresh when shown (keep in `cf.storage` what should come back). To be told or have it done
+  later, that is a wake.
 - **No sign-in.** SSO and OAuth redirects fail. For an external API ask the user to paste an API
   token into a password field, keep it in `cf.storage`, send it in a header with `cf.fetch` (CORS
   never blocks it). Plain `fetch` only for an API known to allow any origin.
