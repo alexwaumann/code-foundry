@@ -111,12 +111,6 @@ export function ThreadListbox({ rows, scrollToRow, testId, label = "Threads", cl
   }, [rows, cursorKey, selectedKey]);
   const shownCursor = cursorKey !== null && rows[cursorIndex]?.key === cursorKey ? cursorKey : null;
 
-  // A selection made elsewhere moves the highlight and drops an old keyboard cursor.
-  useEffect(() => {
-    const ui = useUiStore.getState();
-    if (ui.cursorKey !== null && ui.cursorKey !== selectedKey) ui.setCursor(null);
-  }, [selectedKey]);
-
   // Each request takes the keyboard once: a list mounted later (the rail giving way to the
   // expanded list for a rename) must not take it again from the field that has it.
   useEffect(() => {

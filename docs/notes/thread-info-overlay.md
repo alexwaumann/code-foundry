@@ -32,6 +32,8 @@ over the conversation there.
   field or a menu, list or dialog; a press outside it or the toggle; another thread (unless
   the overlay was shown for that one, the PR tag's case); room again; leaving the thread
   body (a subagent view, Ember, another page).
+  With several thread panes the first two are the store's (setCardRoom), so another pane
+  mounting or going does not hide it: docs/notes/shell-reset-rules.md.
 * **Focus**: a non-modal region labelled "Thread info" (`tabIndex -1`). Opened from a key
   (the chord, the palette's Enter) it takes focus; from a click it does not
   (`lib/inputModality`: the last input, tracked ahead of the key handler). Escape gives

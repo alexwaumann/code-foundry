@@ -55,6 +55,16 @@ export function leaveFullscreen(): void {
   if (useShellViewStore.getState().fullscreen) setFullscreen("");
 }
 
+/**
+ * Full screen ends when the window leaves its space or the space has no pane to show: the stored
+ * flag is cleared then, so coming back to the space does not resume it. A rule of the layout,
+ * whether or not a pane grid is mounted (docs/notes/shell-reset-rules.md).
+ */
+useLayoutStore.subscribe((s) => {
+  const fullscreen = useShellViewStore.getState().fullscreen;
+  if (fullscreen && fullscreenPaneOf(s, fullscreen) === "") setFullscreen("");
+});
+
 /** On for `paneId` (default: the focused pane), or off when it is on. */
 export function toggleFullscreen(paneId?: string): void {
   if (fullscreenOn()) leaveFullscreen();

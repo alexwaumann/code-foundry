@@ -60,14 +60,25 @@ export function roomFor(s: { room: boolean; rooms: Readonly<Record<string, boole
   return (threadId === null ? undefined : s.rooms[threadId]) ?? s.room;
 }
 
-/** A thread body measured its room (`threadId`: whose; none for the window's one body). */
+/**
+ * A thread body measured its room (`threadId`: whose; none for the window's one body). The
+ * overlay's rules live here rather than in each body (docs/notes/shell-reset-rules.md), so
+ * they hold however many thread panes are mounted:
+ *
+ * - With room again the inline card (when on) takes that thread's overlay's place. The
+ *   unnamed measure stands only for a thread no body measures: another pane's never hides it.
+ * - Another thread's body arriving hides an overlay left for a thread no body shows ("another
+ *   thread hides the overlay"); one that a pane on screen shows stays.
+ */
 export function setCardRoom(room: boolean, threadId = ""): void {
   const st = useCardRoom.getState();
   if (st.room === room && (!threadId || st.rooms[threadId] === room)) return;
   const rooms = threadId ? { ...st.rooms, [threadId]: room } : st.rooms;
-  // With room again the inline card (when on) takes that thread's overlay's place.
-  const clears = room && (!threadId || st.overlayFor === threadId);
-  useCardRoom.setState(clears ? { room, rooms, overlayFor: null } : { room, rooms });
+  const { overlayFor } = st;
+  const unmeasured = overlayFor !== null && !(overlayFor in st.rooms);
+  const roomAgain = room && (threadId ? overlayFor === threadId : unmeasured);
+  const arrived = threadId !== "" && !(threadId in st.rooms) && overlayFor !== threadId && unmeasured;
+  useCardRoom.setState(roomAgain || arrived ? { room, rooms, overlayFor: null } : { room, rooms });
 }
 
 /** A thread body went away: forget its measure. */
