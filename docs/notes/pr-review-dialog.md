@@ -23,9 +23,9 @@ merge dialog's sibling. The Diff tab gets the same button.
   showing one PR open only the pressed button's). The brief asked for one dialog shared by every
   surface showing the pull request, so it is a single host in `App.tsx` reading the detail from
   `pullRequestDetailResource`. Any surface (the header, the Diff tab) opens it through the store.
-  It shuts by itself when the detail goes or the pull request stops taking reviews
-  (`reviewVisible`), or while a review of it is in flight, so a stale "open" never keeps a guarded
-  question waiting.
+  It shuts when the detail goes or the pull request stops taking reviews (`reviewVisible`), or
+  when a review of it is in flight: the store does it where those change (dialog-open-flags.md),
+  so a stale "open" never keeps a guarded question waiting.
 - **The draft lives in the store, not the dialog.** Submitting shuts the dialog at once and runs
   `submitReview` (pr.review, unchanged: the same args, the generic failure toast with GitHub's
   message, the detail read at once and waited for on success). Success clears the draft; a refusal

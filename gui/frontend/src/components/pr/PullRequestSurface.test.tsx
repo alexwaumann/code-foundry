@@ -18,6 +18,8 @@ const { seedWorld, CF } = await import("@/test/projectsWorld");
 const { tooltipText } = await import("@/test/tooltip");
 const { runCommandForResult } = await import("@/stores/commands");
 const { mergePullRequest, usePrPanelStore } = await import("@/stores/prPanel");
+const { answerConfirm, requestConfirm } = await import("@/stores/confirm");
+const { useMergeDialogStore } = await import("@/stores/mergeDialog");
 const { useUiStore } = await import("@/stores/ui");
 const { applyLayoutOp } = await import("@/api/layout");
 const { layoutSettled } = await import("@/test/fakeLayout");
@@ -1224,6 +1226,38 @@ describe("the merge button", () => {
     expect(button().hasAttribute("aria-disabled")).toBe(false);
     expect(byTestId("pr-header").dataset.state).toBe("open");
     expect(button().textContent).toBe("Rebase and merge");
+  });
+
+  it("#142: a merge started elsewhere while its dialog is open shuts the dialog: a page's question does not wait behind it, and a refused merge does not bring it back", async () => {
+    renderPrPanel();
+    await openPr(142);
+    fireEvent.click(button());
+    await settle();
+    expect(queryTestId("pr-merge-dialog")).not.toBeNull();
+    world.failNext.add("pr.merge");
+    const release = world.hold("pr.merge");
+    // Not from this dialog: no surface does this today (the busy button is inert and the
+    // dialog's own Merge shuts it first), but nothing in the store stops it.
+    void mergePullRequest({ slug: SLUG, number: 142 }, "squash", true, HEAD_142, { asked: true });
+    await settle();
+    expect(queryTestId("pr-merge-dialog")).toBeNull();
+    expect(useMergeDialogStore.getState().open).toBeNull();
+    // A page's guarded question: nothing on screen to wait behind, so it shows.
+    const answer = requestConfirm({ title: "A page asks", message: "Go?", confirmLabel: "Go", guarded: true });
+    await settle();
+    expect(queryTestId("confirm-dialog")).not.toBeNull();
+    act(() => {
+      answerConfirm(false);
+    });
+    expect(await answer).toBe(false);
+    release();
+    await expectToast("Merge Pull Request failed");
+    await vi.waitFor(() => {
+      expect(button().hasAttribute("aria-busy")).toBe(false);
+    });
+    await settle();
+    // The merge is over and the pull request still open: the dialog stays shut.
+    expect(queryTestId("pr-merge-dialog")).toBeNull();
   });
 
   it("#146 from a fork: no branch to delete in the menu or the dialog; pr.merge asked elsewhere confirms calmly and toasts that the branch was kept", async () => {

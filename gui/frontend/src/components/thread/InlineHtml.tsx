@@ -31,7 +31,6 @@ import {
   usePageModal,
   usePageModalPath,
   useThreadItem,
-  useThreadLoaded,
   type PageModalState,
 } from "@/stores/thread";
 import { useThreadsStore } from "@/stores/threads";
@@ -447,15 +446,13 @@ export function PaneOverlay({ scope, threadId, children }: { scope: string; thre
   );
 }
 
-/** The open page: closes itself when its item leaves the log (once the log is there). */
+/**
+ * The open page. Nothing until its thread's log is here (back on a thread whose log was let
+ * go); its item leaving the log shuts it in the store (stores/thread.ts applyWatchBatch).
+ */
 function PageModal({ scope, threadId, modal }: { scope: string; threadId: string; modal: PageModalState }) {
   const item = useThreadItem(modal.thread, modal.id);
-  const loaded = useThreadLoaded(modal.thread);
-  const gone = modal.thread !== threadId || (loaded && item?.kind !== "html");
-  useEffect(() => {
-    if (gone) closePageModal(scope);
-  }, [gone, scope]);
-  if (gone || item?.kind !== "html") return null;
+  if (modal.thread !== threadId || item?.kind !== "html") return null;
   return <PageModalBox scope={scope} threadId={threadId} item={item} source={modal.source} />;
 }
 

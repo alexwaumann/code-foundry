@@ -89,7 +89,7 @@ export interface ThreadState {
    * by the pane's scope (PaneOverlay: the thread's id for its body, `<thread>/<run>` for a
    * subagent view). Not forgotten when the reader leaves the thread (forgetTurnView), so the
    * modal is up again on return; closing it, the thread going or being archived
-   * (prunePageModals) and its item going (the modal closes itself) clear it. Session only.
+   * (prunePageModals) and its item leaving the log (applyWatchBatch) clear it. Session only.
    */
   pageModals: Readonly<Record<string, PageModalState>>;
   /**
@@ -326,8 +326,18 @@ export function applyWatchBatch(threadId: string, events: readonly ThreadEventVi
     const sync = snapshot && log && !s.synced[threadId] ? { synced: { ...s.synced, [threadId]: true as const } } : undefined;
     if (log === s.logs[threadId] || !log) return sync ?? s;
     const answering = withoutAnswered(s.answering, threadId, log.pending, s.pending[threadId]?.pending);
-    return { logs: { ...s.logs, [threadId]: log }, ...sync, ...(answering !== s.answering ? { answering } : undefined) };
+    const pageModals = withoutGonePages(s.pageModals, threadId, log);
+    return { logs: { ...s.logs, [threadId]: log }, ...sync, ...(answering !== s.answering ? { answering } : undefined), ...(pageModals !== s.pageModals ? { pageModals } : undefined) };
   });
+}
+
+/**
+ * `pageModals` without the thread's modals whose page left its log (a snapshot without the
+ * item): shut for good, so it does not come back with the item. The same object when none went.
+ */
+function withoutGonePages(pageModals: ThreadState["pageModals"], threadId: string, log: ThreadLog): ThreadState["pageModals"] {
+  const kept = Object.entries(pageModals).filter(([, m]) => m.thread !== threadId || log.byId[m.id]?.kind === "html");
+  return kept.length === Object.keys(pageModals).length ? pageModals : Object.fromEntries(kept);
 }
 
 /** Whether the thread's open Watch has delivered a snapshot (its log is current, not one kept from an earlier visit). */
