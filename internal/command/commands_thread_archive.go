@@ -29,7 +29,7 @@ func threadArchive(b ThreadBackend, idArg ArgSpec) Command {
 		Title: "Archive or Unarchive Thread",
 		Description: "Archive a thread: Claude is closed, its terminals removed, and it is unpinned and listed apart. " +
 			"Without archived, toggles. Pinning or sending a message unarchives it too. " +
-			"From a thread: only a thread it created (or below); another archived thread cannot be messaged or unarchived: read it, or ask the user. " +
+			"A thread (or its page) may archive any thread, but unarchive only one it created (or below): another archived thread cannot be unarchived, messaged, pinned or snoozed by it: read it, or ask the user. " +
 			"On itself mid-turn: at turn's end.",
 		Category: "Thread",
 		// cmd+shift+a was a reserved view action (the Needs you jump, now thread.needs.next) until

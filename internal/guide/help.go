@@ -76,12 +76,18 @@ const maxHelpPlaceholder = 32
 
 // helpFlag is a flag as WriteHelp's column shows it: "--until idle|attention",
 // "--for string", and a bool "--sidebar[=false]" (a bool flag takes no separate word:
-// `--sidebar false` is a flag and a stray word).
+// `--sidebar false` is a flag and a stray word). A positional arg, which the CLI also takes
+// as its flag, shows both: "<path>, --path path", as the usage line spells it first (a
+// "--path (required)" alone read as if the word after the verb were not enough).
 func helpFlag(a *v1.ArgSpec) string {
+	flag := "--" + a.GetName() + " " + ArgPlaceholder(a)
 	if a.GetType() == v1.ArgType_ARG_TYPE_BOOL {
-		return "--" + a.GetName() + "[=false]"
+		flag = "--" + a.GetName() + "[=false]"
 	}
-	return "--" + a.GetName() + " " + ArgPlaceholder(a)
+	if a.GetPositional() {
+		return guideArg(a) + ", " + flag
+	}
+	return flag
 }
 
 // WriteCommonFlags writes the flags every command takes, as WriteHelp lists them

@@ -36,7 +36,9 @@ func TestWriteHelp(t *testing.T) {
 			want: []string{
 				"plugin.secrets.delete - Delete Plugin Secret\n\nDelete one of a plugin's secrets.\n",
 				"  code-foundry plugin.secrets.delete <name> [<key>] [flags]\n  code-foundry plugin secrets delete <name> [<key>] [flags]\n",
-				"  --lines n ", "How many (default \"50\")", "Common flags:", "  --yes", "  --context-thread id", "Keybindings: cmd+k",
+				"  --lines n ", "How many (default \"50\")",
+				// A positional is listed as the word the usage line shows, and its flag.
+				"  <name>, --name string  Plugin name (required)\n", "  <key>, --key string    Secret name\n", "Common flags:", "  --yes", "  --context-thread id", "Keybindings: cmd+k",
 			},
 			not: []string{"Asks for confirmation"},
 		},

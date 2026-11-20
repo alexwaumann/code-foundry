@@ -14,7 +14,8 @@ Args by name, values after them in plain text; `code-foundry help <verb>` has th
 | `pr.close` (asks first) | `repo-slug`, `number` |
 | `pr.reopen` (no dialog) | `repo-slug`, `number` |
 | `pr.checks` (read) | `repo-slug`, `number`; watch one PR: run it again in `cf.on("gh", …)` |
-| `thread.archive` (asks when busy) | `id`; `archived` false unarchives (a page acts as its thread: only a thread it created) |
+| `thread.archive` (asks when busy) | `id`; any thread. `archived` false unarchives: only a thread this one created (or below); another archived thread is refused that, and messages, pins and snoozes too |
+| `thread.open` | `id`; `focus` true takes the user there: a click on a row is the user asking, so pass it from the click (without it the tab opens but the user stays put) |
 | `thread.snooze` | `id`, `until` 1h, 3h, tomorrow, next-week, mon…sun or a date; or `save` true (no wake); or `clear` true |
 | `thread.pin`, `thread.send` | `id`; `pinned` true or false; `text` the message; `reply` wanted or none, required when `id` is another thread than the page's |
 | `thread.new` | `prompt`, `name`, `project` id, `new-worktree` true, `created-by` "" for a thread of the user's own |
