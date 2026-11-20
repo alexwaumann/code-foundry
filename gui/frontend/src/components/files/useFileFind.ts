@@ -3,15 +3,15 @@
  * bar's query in the body's text, the current one, and where they are on screen. The bar is
  * FileFind.tsx; the sessions and the presenter are stores/fileFind.ts.
  */
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type RefObject } from "react";
 import { DIFFS_TAG_NAME } from "@pierre/diffs";
 import { plainText, rangeOf } from "@/components/thread/cite/citeDom";
-import { draftText, type EditorPlace } from "@/lib/codeEditor";
+import { draftSnapshot, subscribeDraft, type EditorPlace } from "@/lib/codeEditor";
 import { fileMatchIndex, findInFile, paintedMatches, pickCurrent, type FileMatch, type FileMatches } from "@/lib/fileFind";
 import { matchOffsets, stepIndex } from "@/lib/threadFind";
 import { zoomFactor } from "@/lib/zoom";
 import { focusEditor, selectInEditor } from "@/stores/fileEdit";
-import { fileFindOf, registerFileFindHost, setFileFindCount, setFileFindCurrent, setFileFindDraft, useFileFindCurrent, useFileFindDraft, useFileFindOpen, useFileFindQuery, useFileFindRevealSeq } from "@/stores/fileFind";
+import { fileFindOf, registerFileFindHost, setFileFindCount, setFileFindCurrent, useFileFindCurrent, useFileFindOpen, useFileFindQuery, useFileFindRevealSeq } from "@/stores/fileFind";
 import { paintFileFind } from "./fileFindPaint";
 import { readerPlace } from "./readerPlace";
 
@@ -333,19 +333,23 @@ function codeSurface(findKey: string | undefined, box: RefObject<HTMLDivElement 
 }
 
 /**
+ * The editor's document while `stateKey` is set, read from the library and again after each
+ * change (lib/codeEditor.ts); null without one, or before the editor has a document.
+ */
+function useDraft(stateKey: string | undefined): string | null {
+  const subscribe = useCallback((onChange: () => void) => (stateKey === undefined ? () => undefined : subscribeDraft(stateKey, onChange)), [stateKey]);
+  return useSyncExternalStore(subscribe, () => (stateKey === undefined ? null : draftSnapshot(stateKey)));
+}
+
+/**
  * The find over a CodeBody: the file's text in view mode, the editor's document in edit
  * mode; matches painted on the lines @pierre/diffs has rendered (a long file renders only
  * those near the viewport, and paints more as they come), a match off screen rendered by
  * scrolling to where its line must be first.
  */
 export function useCodeFind(findKey: string | undefined, box: RefObject<HTMLDivElement | null>, virtual: boolean, text: string, editing: string | undefined): void {
-  const draft = useFileFindDraft(findKey ?? "");
-  const open = useFileFindOpen(findKey ?? "");
-  // The editor's document: what it holds as the bar opens, then each change (FileTab onDraft).
-  useEffect(() => {
-    if (findKey === undefined) return;
-    setFileFindDraft(findKey, open && editing !== undefined ? draftText(editing) : null);
-  }, [findKey, open, editing]);
+  const open = useFileFindOpen(findKey ?? "") && findKey !== undefined;
+  const draft = useDraft(open ? editing : undefined);
   const surface = useMemo(() => codeSurface(findKey, box, virtual, editing), [box, virtual, editing, findKey]);
   useFindLayer(findKey, editing !== undefined ? (draft ?? text) : text, surface);
 }

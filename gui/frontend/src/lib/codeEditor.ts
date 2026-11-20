@@ -5,7 +5,9 @@
  *
  * A draft is the library's: its `EditStateManager` keeps each `editStateKey`'s document
  * and undo history in memory, also while the tab is not on screen. Nothing else holds the
- * edited text, and nothing writes it anywhere but FilesystemService.WriteFile.
+ * edited text, and nothing writes it anywhere but FilesystemService.WriteFile. A reader that
+ * follows the text as it changes subscribes here (`subscribeDraft`, `draftSnapshot`): every
+ * editor made through `createCodeEditor` reports its changes by its key.
  */
 import type { EditorFactory } from "@pierre/diffs/react";
 
@@ -64,11 +66,65 @@ export async function loadCodeEditor(): Promise<void> {
   edit ??= await import("@pierre/diffs/edit");
 }
 
-/** EditProvider's createEditor. */
+/** A key's readers, and its text as last read (undefined: read it again). */
+interface DraftWatch {
+  listeners: Set<() => void>;
+  text: string | null | undefined;
+}
+
+const watches = new Map<string, DraftWatch>();
+
+function draftChanged(stateKey: string): void {
+  const w = watches.get(stateKey);
+  if (!w) return;
+  w.text = undefined;
+  for (const l of [...w.listeners]) l();
+}
+
+/** EditProvider's createEditor: the editor also tells `subscribeDraft`'s readers of each change. */
 export const createCodeEditor: EditorFactory<undefined, undefined> = (type, options, key) => {
   if (!edit) throw new Error("loadCodeEditor has not finished");
-  return new edit.Editor(type, options, key);
+  if (key === undefined) return new edit.Editor(type, options, key);
+  const onChange = options.onChange;
+  return new edit.Editor(
+    type,
+    {
+      ...options,
+      onChange: (event) => {
+        onChange?.(event);
+        draftChanged(key);
+      },
+    },
+    key,
+  );
 };
+
+/** Calls `onChange` after each change to `stateKey`'s document; returns the stop (useSyncExternalStore's subscribe). */
+export function subscribeDraft(stateKey: string, onChange: () => void): () => void {
+  let w = watches.get(stateKey);
+  if (!w) {
+    w = { listeners: new Set(), text: undefined };
+    watches.set(stateKey, w);
+  }
+  const watch = w;
+  watch.listeners.add(onChange);
+  return () => {
+    watch.listeners.delete(onChange);
+    if (watch.listeners.size === 0 && watches.get(stateKey) === watch) watches.delete(stateKey);
+  };
+}
+
+/**
+ * `draftText` for a reader subscribed to the key: read once per change, so React may ask
+ * as often as it likes (the document has no cached text: each read joins its pieces). A key
+ * with no document yet is read again next time: an editor that attaches says nothing.
+ */
+export function draftSnapshot(stateKey: string): string | null {
+  const w = watches.get(stateKey);
+  if (!w) return draftText(stateKey);
+  if (w.text === undefined || w.text === null) w.text = draftText(stateKey);
+  return w.text;
+}
 
 /** A draft's text, from the editor on screen or the one its tab left; null when there is none. */
 export function draftText(stateKey: string): string | null {

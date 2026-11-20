@@ -1070,7 +1070,7 @@ describe("the find chords in a File tab", () => {
 
   it("cmd+alt+f in the editor is the library's replace, which takes the bar's query", () => {
     const { content } = editor();
-    useFileFindStore.setState({ byTab: { k1: { query: "value", focusSeq: 1, focusedSeq: 1, current: null, revealSeq: 0, index: -1, total: 0, capped: false, draft: null } } });
+    useFileFindStore.setState({ byTab: { k1: { query: "value", focusSeq: 1, focusedSeq: 1, current: null, revealSeq: 0, index: -1, total: 0, capped: false } } });
     const e = press(content, { key: "f", code: "KeyF", metaKey: true, altKey: true, composed: true });
     expect(e.defaultPrevented).toBe(false);
     expect(handOff).toHaveBeenCalledWith("value");

@@ -14,7 +14,6 @@ import {
   registerFileFindHost,
   setFileFindCount,
   setFileFindCurrent,
-  setFileFindDraft,
   setFileFindQuery,
   stepFileFind,
   useFileFindStore,
@@ -59,11 +58,10 @@ describe("file find sessions", () => {
     expect(h.opened).toHaveBeenCalledTimes(2);
   });
 
-  it("ignores a query, a count, a match or a draft for a closed bar", () => {
+  it("ignores a query, a count or a match for a closed bar", () => {
     setFileFindQuery("k1", "x");
     setFileFindCount("k1", 0, 1, false);
     setFileFindCurrent("k1", { line: 0, nth: 0 }, true);
-    setFileFindDraft("k1", "text");
     expect(session("k1")).toBeUndefined();
   });
 

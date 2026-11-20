@@ -73,6 +73,7 @@ vi.mock("@/components/code/CodeFile", () => ({
           data-testid="draft"
           onChange={(e) => {
             edit.onChange(e.target.value);
+            for (const r of draft.readers) r();
           }}
         />
       )}
@@ -80,8 +81,19 @@ vi.mock("@/components/code/CodeFile", () => ({
   ),
 }));
 // The library's draft: what the stand-in above was last told is what a save reads.
-const draft = vi.hoisted(() => ({ text: null as string | null }));
-vi.mock("@/lib/codeEditor", () => ({ loadCodeEditor: () => Promise.resolve(), draftText: () => draft.text, forgetDraft: () => undefined, createCodeEditor: () => undefined }));
+// The library's editor tells the draft's readers of each change (lib/codeEditor.ts subscribeDraft).
+const draft = vi.hoisted(() => ({ text: null as string | null, readers: new Set<() => void>() }));
+vi.mock("@/lib/codeEditor", () => ({
+  loadCodeEditor: () => Promise.resolve(),
+  draftText: () => draft.text,
+  draftSnapshot: () => draft.text,
+  subscribeDraft: (_key: string, onChange: () => void) => {
+    draft.readers.add(onChange);
+    return () => draft.readers.delete(onChange);
+  },
+  forgetDraft: () => undefined,
+  createCodeEditor: () => undefined,
+}));
 // What Copy path and Copy contents put on the clipboard.
 const copied = vi.hoisted(() => ({ fn: vi.fn<(text: string) => Promise<void>>(() => Promise.resolve()) }));
 vi.mock("@/lib/clipboard", () => ({ copyText: copied.fn }));
