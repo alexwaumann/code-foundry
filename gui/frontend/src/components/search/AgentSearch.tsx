@@ -1,12 +1,13 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import { Square } from "lucide-react";
 import type { AgentHitView, SearchEntryView } from "@/api/search";
 import { Kbd } from "@/components/ui/kbd";
 import { formatChord } from "@/keys/chord";
-import { ANSWER_ROW, defaultSelection, endedNote, footerModel, hasAnswerRow, moveHit, restoreSelection, resultRows, searchEnded, tookLabel } from "@/lib/agentSearch";
+import { ANSWER_ROW, endedNote, footerModel, hasAnswerRow, moveHit, resultRows, searchEnded, settleSelection, startSelection, tookLabel } from "@/lib/agentSearch";
 import { useNow } from "@/lib/clock";
 import { canonicalModelName } from "@/lib/models";
 import { imeKeyDown } from "@/lib/ime";
+import { useSettled } from "@/lib/useListSelection";
 import { markSearchSeen, openAgentHit, promoteAgent, stopAgent } from "@/stores/agentSearch";
 import { useDictateChord } from "@/stores/commands";
 import { useModelChoices, useSettingValue } from "@/stores/settings";
@@ -14,7 +15,7 @@ import { AnswerPane, AnswerRow, HitRow, SectionHeading, StepList, SummaryLine } 
 import { paintQuote, type PreviewSubject } from "./preview";
 import { RecentList, RecentPreview, UnseenCueRow } from "./RecentSearches";
 import { SearchPreview } from "./SearchPreview";
-import type { RestoreInit, SearchModeProps } from "./types";
+import type { SearchModeProps } from "./types";
 import { useSearchWatch } from "./useAgentSearch";
 import { previewKey, useSearchPreview, type PreviewLoaders, type PreviewTarget } from "./useSearch";
 
@@ -131,11 +132,6 @@ function Results({
   );
 }
 
-/** Whether a restored selection is the user's: one that was reported, or a hit opened. */
-function restoredPick(r: RestoreInit): boolean {
-  return r.selectedN !== null || r.openedN !== null;
-}
-
 /** Before a question, the left column's hint; Recent searches under it. */
 function AskHint() {
   return (
@@ -165,33 +161,20 @@ export function AgentSearch({ query: raw, header, dialog, loaders }: SearchModeP
   const rows = useMemo(() => resultRows({ status, answer, hits }), [status, answer, hits]);
 
   // The selection: restored (the next unopened hit after the one opened), else the first
-  // hit as it arrives, then the Answer row when the run ends. `picked`: the row is one the
-  // user chose (a key, the pointer, a marker, or restored), which a run's end leaves alone.
-  const [selectedN, setSelectedN] = useState<number | null>(dialog.restore?.selectedN ?? null);
-  const [picked, setPicked] = useState(dialog.restore ? restoredPick(dialog.restore) : false);
-  const pick = useCallback((n: number) => {
-    setPicked(true);
-    setSelectedN(n);
-  }, []);
-  // Another search shown: its own selection.
-  const [selectionFor, setSelectionFor] = useState(dialog.entryId);
-  if (selectionFor !== dialog.entryId) {
-    setSelectionFor(dialog.entryId);
-    setPicked(false);
-    if (!dialog.restore) setSelectedN(null);
-  }
-  const restored = useRef<RestoreInit | null>(null);
-  useEffect(() => {
-    if (rows.length === 0) return;
-    const r = dialog.restore;
-    if (r && restored.current !== r) {
-      restored.current = r;
-      setPicked(restoredPick(r));
-      setSelectedN(restoreSelection(rows, r.openedN, r.selectedN));
-      return;
-    }
-    setSelectedN((cur) => defaultSelection(rows, cur, picked));
-  }, [rows, dialog.restore, picked]);
+  // hit as it arrives, then the Answer row when the run ends (lib/agentSearch
+  // settleSelection). Worked out during render, so new rows or another search never show
+  // the old row selected for a frame.
+  const [selection, setSelection] = useSettled(
+    () => startSelection(dialog.entryId, dialog.restore),
+    (s) => settleSelection(s, dialog.entryId, dialog.restore, rows),
+  );
+  const { n: selectedN, picked } = selection;
+  const pick = useCallback(
+    (n: number | null) => {
+      setSelection((s) => ({ ...s, picked: true, n }));
+    },
+    [setSelection],
+  );
   const selected = hits.find((h) => h.n === selectedN) ?? null;
   const answerSelected = selectedN === ANSWER_ROW && rows[0]?.n === ANSWER_ROW;
   const { report } = dialog;
@@ -242,8 +225,7 @@ export function AgentSearch({ query: raw, header, dialog, loaders }: SearchModeP
     if (imeKeyDown(e.nativeEvent)) return;
     if (resultsShown && (e.key === "ArrowDown" || e.key === "ArrowUp" || (e.ctrlKey && (e.key === "n" || e.key === "p")))) {
       e.preventDefault();
-      setPicked(true);
-      setSelectedN((cur) => moveHit(rows, cur, e.key === "ArrowDown" || e.key === "n" ? 1 : -1));
+      pick(moveHit(rows, selectedN, e.key === "ArrowDown" || e.key === "n" ? 1 : -1));
       return;
     }
     if (e.key === "Backspace" && e.metaKey && resultsShown) {

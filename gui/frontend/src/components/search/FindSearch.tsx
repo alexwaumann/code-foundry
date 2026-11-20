@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { Sparkle } from "lucide-react";
 import { Kbd } from "@/components/ui/kbd";
 import { Tip } from "@/components/ui/tooltip";
 import { firstSelectable, keepSelection, moveSelection, searchRows, selectable, type SearchRow } from "@/lib/threadSearch";
 import { imeKeyDown } from "@/lib/ime";
+import { useListSelection } from "@/lib/useListSelection";
 import { findHitCount } from "@/lib/agentSearch";
 import { recordFind } from "@/stores/agentSearch";
 import { activateSearchRow } from "@/stores/threadSearch";
@@ -120,13 +121,8 @@ export function FindSearch({ query: raw, header, search, loaders, dialog }: Sear
   const rows = useMemo(() => (query !== "" && state.result ? searchRows(state.result) : []), [query, state.result]);
 
   // The selection: the first row of each new query's answer, else where the keys or pointer put it.
-  const [selected, setSelected] = useState("");
-  const shownQuery = useRef("");
-  useEffect(() => {
-    const same = shownQuery.current === state.answered;
-    shownQuery.current = state.answered;
-    setSelected((cur) => keepSelection(rows, cur, same));
-  }, [rows, state.answered]);
+  // Worked out during render, so a new answer never shows the old row selected for a frame.
+  const [selected, setSelected] = useListSelection(state.answered, (cur: string, same) => keepSelection(rows, cur, same), "");
   const row = rows.find((r) => r.key === selected);
   const preview = previewOf(row);
   const data = useSearchPreview(preview?.target ?? null, loaders);
@@ -160,7 +156,7 @@ export function FindSearch({ query: raw, header, search, loaders, dialog }: Sear
     if (imeKeyDown(e.nativeEvent)) return;
     if (e.key === "ArrowDown" || e.key === "ArrowUp" || (e.ctrlKey && (e.key === "n" || e.key === "p"))) {
       e.preventDefault();
-      setSelected((cur) => moveSelection(rows, cur, e.key === "ArrowDown" || e.key === "n" ? 1 : -1));
+      setSelected(moveSelection(rows, selected, e.key === "ArrowDown" || e.key === "n" ? 1 : -1));
       return;
     }
     if (e.key === "Enter") {

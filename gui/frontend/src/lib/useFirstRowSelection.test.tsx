@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
-import { act, renderHook } from "@testing-library/react";
+import { act, render, renderHook } from "@testing-library/react";
+import { useLayoutEffect } from "react";
 import { describe, expect, it } from "vitest";
 import { useFirstRowSelection } from "./useFirstRowSelection";
 
@@ -31,5 +32,30 @@ describe("useFirstRowSelection", () => {
     const { result, rerender } = start([]);
     rerender({ k: ["a", "b"] });
     expect(result.current[0]).toBe("a");
+  });
+
+  it("a first row that comes back starts on it again, not on the row picked before", () => {
+    const { result, rerender } = start(["a", "b"]);
+    act(() => {
+      result.current[1]("b");
+    });
+    rerender({ k: ["z", "b"] });
+    rerender({ k: ["a", "b"] });
+    expect(result.current[0]).toBe("a");
+  });
+
+  it("no commit shows the old list's row (the controlled value cmdk reads in a layout effect)", () => {
+    const committed: string[] = [];
+    function List({ keys }: { keys: readonly string[] }) {
+      const [selected] = useFirstRowSelection(keys);
+      useLayoutEffect(() => {
+        committed.push(selected);
+      });
+      return null;
+    }
+    const { rerender } = render(<List keys={["a", "b"]} />);
+    rerender(<List keys={["z", "a"]} />);
+    rerender(<List keys={[]} />);
+    expect(committed).toEqual(["a", "z", ""]);
   });
 });

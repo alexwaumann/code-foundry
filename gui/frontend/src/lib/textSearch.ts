@@ -111,6 +111,11 @@ export function firstMatch(rows: readonly TextRow[]): string {
   return rows.find(isMatch)?.key ?? "";
 }
 
+/** The selection after an answer: the same match row when it is still listed and the answer is the same search's, else the first match. */
+export function keepMatch(rows: readonly TextRow[], key: string, sameAnswer: boolean): string {
+  return sameAnswer && rows.some((r) => r.key === key && isMatch(r)) ? key : firstMatch(rows);
+}
+
 /** The selection after an arrow key: the next (1) or previous (-1) match row, wrapping; from outside the rows, the first or the last. */
 export function moveMatch(rows: readonly TextRow[], key: string, dir: 1 | -1): string {
   const keys = rows.filter(isMatch).map((r) => r.key);

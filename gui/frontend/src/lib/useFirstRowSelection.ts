@@ -1,20 +1,15 @@
-import { useEffect, useRef, useState } from "react";
+import { useListSelection } from "./useListSelection";
 
 /**
  * A cmdk list whose rows arrive after the search (a daemon's answer): the controlled value.
- * cmdk picks the first row when the input changes, which is the old list's, and does not
- * look again when the answer replaces the rows. So the first row of each new list takes
- * over here, and whenever the selected row leaves the list; otherwise the selection stays
- * where the keys or the pointer moved it. keys should be stable between lists.
+ * cmdk 1.1.1 selects the first row on screen when the input changes, which is the old
+ * list's, and only looks again when the selected row unmounts. So the first row of each new
+ * list takes over here, and whenever the selected row leaves the list; otherwise the
+ * selection stays where the keys or the pointer moved it. Worked out during render
+ * (useListSelection), so a new list never shows the old selection for a frame; cmdk takes
+ * the controlled value in a layout effect. keys should be stable between lists.
  */
 export function useFirstRowSelection(keys: readonly string[]): [string, (value: string) => void] {
-  const [selected, setSelected] = useState("");
   const first = keys[0] ?? "";
-  const shownFirst = useRef(first);
-  useEffect(() => {
-    const moved = shownFirst.current !== first;
-    shownFirst.current = first;
-    setSelected((cur) => (moved || !keys.includes(cur) ? first : cur));
-  }, [keys, first]);
-  return [selected, setSelected];
+  return useListSelection<string>(first, (cur, sameFirst) => (sameFirst && keys.includes(cur) ? cur : first), "");
 }
