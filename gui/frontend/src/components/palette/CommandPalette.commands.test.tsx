@@ -48,6 +48,7 @@ const COMMANDS: CommandView[] = [
   cmd("terminal.remove", "Remove Terminal", { category: "Terminal", noPalette: true }),
   cmd("project.refresh", "Refresh Project", { category: "Project" }),
   cmd("worktree.create", "Create Worktree", { category: "Project", args: [arg("branch", { description: "Branch name" })] }),
+  cmd("plugin.dev", "Develop Plugin", { category: "Plugin", noPalette: true, args: [arg("path", { description: "The plugin's folder" })] }),
   cmd("theme.set-dark", "Set Dark Theme", { category: "Appearance", args: [arg("theme", { type: "enum", enumValues: ["catppuccin-mocha", "github-dark", "nord"], defaultValue: "nord" })] }),
 ];
 
@@ -168,6 +169,39 @@ describe("arg prompts", () => {
     await settle();
     expect(palette()).toBeNull();
     expect(invocationsOf("theme.set-dark").map((i) => i.args)).toEqual([{ theme: "catppuccin-mocha" }]);
+  });
+});
+
+describe("opened on a command", () => {
+  it("a NoPalette command a button names is asked for its args and runs, though the list never shows it", async () => {
+    await openPalette();
+    expect(row("plugin.dev")).toBeNull();
+    act(() => {
+      useUiStore.getState().closePalette();
+    });
+    await settle();
+
+    // The Plugins page's "Add a dev plugin".
+    act(() => {
+      useUiStore.getState().openPalette("", "plugin.dev");
+    });
+    await settle();
+    expect(palette()?.dataset.mode).toBe("args");
+    await type("~/src/my-plugin");
+    await enter();
+    expect(palette()).toBeNull();
+    expect(invocationsOf("plugin.dev").map((i) => i.args)).toEqual([{ path: "~/src/my-plugin" }]);
+  });
+
+  it("a command that cannot start in the context is not opened into: the list shows instead", async () => {
+    // No terminal in the context: a terminal command is unavailable.
+    listed.commands = [...COMMANDS, cmd("terminal.resize", "Resize Terminal", { category: "Terminal", noPalette: true, args: [arg("cols")] })];
+    act(() => {
+      useUiStore.getState().openPalette("", "terminal.resize");
+    });
+    await settle();
+    expect(palette()?.dataset.mode).not.toBe("args");
+    expect(row("thread.new")).not.toBeNull();
   });
 });
 
