@@ -31,8 +31,11 @@ export const NO_PROJECT_TERMS: readonly string[] = [NO_PROJECT, "home", "~"];
 /** Names sorted the way a workspace row lists its members: by name, case-insensitively. */
 export const byName = (a: string, b: string) => a.localeCompare(b, undefined, { sensitivity: "base" });
 
-/** One row of cmd+N's flat list: its target, cmdk value, and the text a search scores. */
-export type PickerRow = ({ kind: "none" } | { kind: "workspace"; id: string } | { kind: "project"; id: string }) & { value: string; text: string };
+/**
+ * One row of a picker's flat list: its target, cmdk value, its own name (the project's, the
+ * workspace's, "No project") and the text a search scores (the name and its keywords).
+ */
+export type PickerRow = ({ kind: "none" } | { kind: "workspace"; id: string } | { kind: "project"; id: string }) & { value: string; name: string; text: string };
 
 /**
  * cmd+N's rows in their default order: "No project" first (once projects have loaded),
@@ -66,28 +69,46 @@ export function usePickerRows(): { rows: readonly PickerRow[]; workspaces: reado
       }),
     ),
   );
+  const projectNames = useProjectsStore(useShallow((s) => projects.map((id) => s.byId[id]?.name ?? id)));
+  const workspaceNames = useWorkspacesStore(useShallow((s) => workspaces.map((id) => s.byId[id]?.name ?? id)));
   const rows = useMemo<PickerRow[]>(
     () => [
-      ...(loaded ? [{ kind: "none" as const, value: HOME_KEY, text: NO_PROJECT_TERMS.join(" ") }] : []),
-      ...workspaces.map((id, i) => ({ kind: "workspace" as const, id, value: draftKey({ kind: "workspace", workspaceId: id }), text: workspaceTexts[i] ?? id })),
-      ...projects.map((id, i) => ({ kind: "project" as const, id, value: id, text: projectTexts[i] ?? id })),
+      ...(loaded ? [{ kind: "none" as const, value: HOME_KEY, name: NO_PROJECT, text: NO_PROJECT_TERMS.join(" ") }] : []),
+      ...workspaces.map((id, i) => ({ kind: "workspace" as const, id, value: draftKey({ kind: "workspace", workspaceId: id }), name: workspaceNames[i] ?? id, text: workspaceTexts[i] ?? id })),
+      ...projects.map((id, i) => ({ kind: "project" as const, id, value: id, name: projectNames[i] ?? id, text: projectTexts[i] ?? id })),
     ],
-    [loaded, workspaces, projects, workspaceTexts, projectTexts],
+    [loaded, workspaces, projects, workspaceNames, workspaceTexts, projectNames, projectTexts],
   );
   return { rows, workspaces, projects, loaded };
 }
 
 /**
- * The rows a query shows, best first: cmdk's scorer (command-score) over each row's text;
- * a row scoring 0 is hidden and ties keep the default order. An empty query keeps every
- * row in the default order.
+ * How well a query matches a row's own name, before anything else the row can be found by:
+ * 3 the whole name, 2 its start, 1 the start of a later word in it (words split at anything
+ * but a letter or digit), 0 not at all. Case does not count.
+ */
+export function nameMatch(name: string, query: string): 0 | 1 | 2 | 3 {
+  const n = name.toLowerCase();
+  const q = query.toLowerCase();
+  if (n === q) return 3;
+  if (n.startsWith(q)) return 2;
+  return n.split(/[^\p{L}\p{N}]+/u).some((w) => w.startsWith(q)) ? 1 : 0;
+}
+
+/**
+ * The rows a query shows, best first. A row whose own name matches comes before one found
+ * only by its keywords (a workspace by a member's name, a project by its path), so typing a
+ * project's name puts that project first, not the workspace that contains it (nameMatch).
+ * Within the same kind of match: cmdk's scorer (command-score) over the row's text, ties in
+ * the default order. A row scoring 0 is hidden. An empty query keeps every row in the
+ * default order.
  */
 export function rankPickerRows(rows: readonly PickerRow[], query: string): readonly PickerRow[] {
   const q = query.trim();
   if (q === "") return rows;
   return rows
-    .map((row, i) => ({ row, i, score: defaultFilter(row.text, q) }))
+    .map((row, i) => ({ row, i, name: nameMatch(row.name, q), score: defaultFilter(row.text, q) }))
     .filter((r) => r.score > 0)
-    .sort((a, b) => b.score - a.score || a.i - b.i)
+    .sort((a, b) => b.name - a.name || b.score - a.score || a.i - b.i)
     .map((r) => r.row);
 }

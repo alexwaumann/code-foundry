@@ -1,7 +1,7 @@
-import { useRef, useState } from "react";
-import { ProjectRowGroups } from "./ProjectRows";
-import { useProjectRows } from "./useProjectRows";
-import { Command, CommandEmpty, CommandInput, CommandList } from "@/components/ui/command";
+import { useMemo, useRef, useState } from "react";
+import { NoProjectRow, ProjectRow, ProjectRowGroups, WorkspaceRow } from "./ProjectRows";
+import { rankPickerRows, usePickerRows } from "./useProjectRows";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandList } from "@/components/ui/command";
 import { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { draftKey, HOME_KEY, type ComposeTarget } from "@/lib/compose";
 import { pickDraftWorkspace, retargetComposeTab, setDraftProject, switchDraftTarget } from "@/stores/compose";
@@ -16,6 +16,10 @@ import { useUiStore } from "@/stores/ui";
  * composer (stores/compose switchDraftTarget), and on the no-project composer any row
  * moves it to that target. The row of the current target is checked: the referenced
  * workspace, or a lone project. Adding to the set is the chip row's "Add project".
+ *
+ * A query replaces the groups with one list of the rows that match, best first, as cmd+N's
+ * picker shows them (rankPickerRows; cmdk's own filtering is off): the top row is the
+ * highlighted one, so Enter picks the best match, not the first group's first match.
  *
  * In the window shell's compose tab (`tabId`), a pick of another target moves the tab itself
  * (stores/compose retargetComposeTab): its params, and so its draft row and what a reload shows,
@@ -51,7 +55,9 @@ export function ProjectSwitcher({
   const [query, setQuery] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
-  const { workspaces, projects, loaded } = useProjectRows();
+  const { rows, workspaces, projects, loaded } = usePickerRows();
+  const filtering = query.trim() !== "";
+  const ranked = useMemo(() => (filtering ? rankPickerRows(rows, query) : []), [filtering, rows, query]);
   const home = target.kind === "home";
 
   const { draft: _draft, ...current } = target;
@@ -70,6 +76,21 @@ export function ProjectSwitcher({
     if (home) return value === HOME_KEY;
     if (set.workspaceId) return value === draftKey({ kind: "workspace", workspaceId: set.workspaceId });
     return set.projectIds.length === 1 && value === set.projectIds[0];
+  };
+
+  const pickProject = (projectId: string) => {
+    const to: ComposeTarget = { kind: "project", projectId };
+    if (home || (tabId && draftKey(current) !== draftKey(to))) move(to);
+    else pick(setDraftProject(target, projectId));
+  };
+  const pickWorkspace = (workspaceId: string) => {
+    const to: ComposeTarget = { kind: "workspace", workspaceId };
+    if (home || (tabId && draftKey(current) !== draftKey(to))) move(to);
+    else pick(pickDraftWorkspace(target, workspaceId));
+  };
+  const pickNoProject = () => {
+    if (home) setOpen(false);
+    else move({ kind: "home" });
   };
 
   return (
@@ -123,33 +144,27 @@ export function ProjectSwitcher({
           if (!el || el === document.body || contentRef.current?.contains(el)) focusPrompt();
         }}
       >
-        <Command loop label="Projects of the thread" className="rounded-lg outline-hidden">
+        <Command loop shouldFilter={false} label="Projects of the thread" className="rounded-lg outline-hidden">
           <CommandInput ref={inputRef} placeholder="Switch to a workspace or project…" aria-label="Filter projects" value={query} onValueChange={setQuery} />
           <CommandList className="max-h-80">
             <CommandEmpty>{loaded ? "No matching projects." : "Loading projects…"}</CommandEmpty>
-            <ProjectRowGroups
-              workspaces={workspaces}
-              projects={projects}
-              checked={checked}
-              onPickProject={(projectId) => {
-                const to: ComposeTarget = { kind: "project", projectId };
-                if (home || (tabId && draftKey(current) !== draftKey(to))) move(to);
-                else pick(setDraftProject(target, projectId));
-              }}
-              onPickWorkspace={(workspaceId) => {
-                const to: ComposeTarget = { kind: "workspace", workspaceId };
-                if (home || (tabId && draftKey(current) !== draftKey(to))) move(to);
-                else pick(pickDraftWorkspace(target, workspaceId));
-              }}
-              onPickNoProject={
-                loaded
-                  ? () => {
-                      if (home) setOpen(false);
-                      else move({ kind: "home" });
-                    }
-                  : undefined
-              }
-            />
+            {filtering ? (
+              ranked.length > 0 && (
+                <CommandGroup data-testid="composer-project-matches">
+                  {ranked.map((row) =>
+                    row.kind === "project" ? (
+                      <ProjectRow key={row.value} id={row.id} current={checked(row.value)} onPick={pickProject} />
+                    ) : row.kind === "workspace" ? (
+                      <WorkspaceRow key={row.value} id={row.id} current={checked(row.value)} onPick={pickWorkspace} />
+                    ) : (
+                      <NoProjectRow key={row.value} current={checked(HOME_KEY)} onPick={pickNoProject} />
+                    ),
+                  )}
+                </CommandGroup>
+              )
+            ) : (
+              <ProjectRowGroups workspaces={workspaces} projects={projects} checked={checked} onPickProject={pickProject} onPickWorkspace={pickWorkspace} onPickNoProject={loaded ? pickNoProject : undefined} />
+            )}
           </CommandList>
         </Command>
       </PopoverContent>

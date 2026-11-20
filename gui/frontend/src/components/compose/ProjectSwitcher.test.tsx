@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ComposeTarget } from "@/lib/compose";
-import { seedWorld } from "@/test/projectsWorld";
+import { addWorkspace, seedWorld } from "@/test/projectsWorld";
 
 const retargetComposeTab = vi.hoisted(() => vi.fn(() => Promise.resolve(true)));
 const switchDraftTarget = vi.hoisted(() => vi.fn(() => Promise.resolve(true)));
@@ -68,3 +68,48 @@ describe("ProjectSwitcher in a compose tab", () => {
     expect(retargetComposeTab).not.toHaveBeenCalled();
   });
 });
+
+describe("ProjectSwitcher with a query", () => {
+  beforeEach(() => {
+    seedWorld();
+    vi.clearAllMocks();
+  });
+  afterEach(cleanup);
+
+  /** Opens the picker and types into its filter; the rows shown, as "project:<id>" or "workspace:<id>". */
+  async function type(query: string): Promise<string[]> {
+    fireEvent.click(screen.getByTestId("composer-project-trigger"));
+    const list = await screen.findByTestId("composer-project-list");
+    fireEvent.change(screen.getByLabelText("Filter projects"), { target: { value: query } });
+    return [...list.querySelectorAll<HTMLElement>("[data-project], [data-workspace]")].map((el) => (el.dataset.project ? `project:${el.dataset.project}` : `workspace:${el.dataset.workspace ?? ""}`));
+  }
+
+  it("lists the project named by the query above the workspace that contains it, with no group headings; Enter picks it", async () => {
+    const ws = addWorkspace("everything", ["repo-cf", "repo-dot"]);
+    mount(cf, "t-c");
+    expect(await type("dotfiles")).toEqual(["project:repo-dot", `workspace:${ws.id}`]);
+    expect(screen.queryByText("Workspaces")).toBeNull();
+    expect(screen.queryByText("Projects")).toBeNull();
+    fireEvent.keyDown(screen.getByLabelText("Filter projects"), { key: "Enter" });
+    await waitFor(() => {
+      expect(retargetComposeTab).toHaveBeenCalledWith("t-c", cf, { kind: "project", projectId: "repo-dot" });
+    });
+  });
+
+  it("clearing the query brings the groups back", async () => {
+    addWorkspace("everything", ["repo-cf", "repo-dot"]);
+    mount(cf, "t-c");
+    await type("dotfiles");
+    fireEvent.change(screen.getByLabelText("Filter projects"), { target: { value: "" } });
+    expect(screen.getByText("Workspaces")).toBeTruthy();
+    expect(screen.getByText("Projects")).toBeTruthy();
+    expect(screen.getByTestId("picker-no-project")).toBeTruthy();
+  });
+
+  it("says so when nothing matches", async () => {
+    mount(cf, "t-c");
+    expect(await type("zzzz")).toEqual([]);
+    expect(screen.getByText("No matching projects.")).toBeTruthy();
+  });
+});
+
