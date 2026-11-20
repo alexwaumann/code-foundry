@@ -53,6 +53,8 @@ type Thread struct {
 	PageShown bool
 	// PassUpAsk makes PassUp answer that the question was a thread ask.
 	PassUpAsk bool
+	// AskRepeated makes Ask answer that the question was just asked.
+	AskRepeated bool
 	// PageEarlier is ShowHtml's earlier_item_id when it adds a card.
 	PageEarlier string
 	// FailIDs are the thread ids Remove and Archive fail for, with these errors (the

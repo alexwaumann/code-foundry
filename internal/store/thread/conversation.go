@@ -52,7 +52,8 @@ func (r *runner) exchange(ctx context.Context, cmd threadCmd) (threadReply, erro
 // message unarchives and unsnoozes the thread; another thread's message, or a wake, leaves
 // a snooze as it is, and is refused on an archived thread unless that thread created it
 // (holds.go). A thread's message to a thread whose --notify
-// subscription to it ended subscribes it again (renotify, subscriptions_until.go).
+// subscription to it ended subscribes it again (renotify, subscriptions_until.go): one that
+// wants a reply, or one that answers the receiver's open thread ask (answersAsk).
 //
 // A message from another thread carries a reply mark (replies.go): without one it is
 // refused; with one its item records it, the receiver is told what it asks, and the
@@ -64,6 +65,7 @@ func (m *Manager) Send(ctx context.Context, id string, msg Message) (Item, error
 	if _, ok := msg.fromThread(id); !ok {
 		msg.Reply = "" // the user's own message, a wake, a thread's to itself: no mark
 	}
+	msg.answersAsk = m.answersAsk(id, msg.ByThreadID) // before noteLeadSent marks it answered
 	it, err := m.send(ctx, id, msg)
 	if err == nil {
 		m.noteLeadSent(id, msg.ByThreadID) // its lead answered its ask (passup.go)
@@ -79,7 +81,11 @@ func (m *Manager) Send(ctx context.Context, id string, msg Message) (Item, error
 // the subscriptions, which would add a reply-wait and wake the sender twice.
 func (m *Manager) afterSend(ctx context.Context, id string, msg Message, it Item) {
 	notified := false
-	if msg.Reply != ReplyNone { // no reply wanted: no wake for the turn that reads it
+	// No reply wanted: no wake for the turn that reads it, unless the message answers the
+	// receiver's open question to the sender. The receiver may have ended its turn to wait
+	// for that answer, which ended the sender's --notify as a finish; the turn the answer
+	// starts is the one the sender is waiting for.
+	if msg.Reply != ReplyNone || msg.answersAsk {
 		notified = m.renotify(ctx, id, msg, it)
 	}
 	m.afterThreadSend(ctx, id, msg, it, notified)

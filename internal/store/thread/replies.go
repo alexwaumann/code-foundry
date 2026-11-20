@@ -31,7 +31,10 @@ import (
 //     lead's own worker answers in the last message of the turn that handles it, as every
 //     worker does, which its lead's --notify wake brings (renotify); only a lead with no
 //     such subscription gets the reply-wait, whose wake then carries that last message.
-//   - A message with no reply wanted renews no --notify subscription and sets up no wake.
+//   - A message with no reply wanted renews no --notify subscription and sets up no wake,
+//     except one that answers the receiver's open thread ask to the sender: the receiver
+//     may have ended its turn to wait for it, and the sender's --notify ended with that
+//     finish, so the answer renews it (Message.answersAsk).
 
 // Reply is a message's reply mark.
 type Reply string

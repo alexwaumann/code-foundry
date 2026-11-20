@@ -592,6 +592,22 @@ func (m *Manager) putAwayPassUpsLocked(rec *record) {
 	}()
 }
 
+// answersAsk reports whether a message from thread by to thread id answers an open thread
+// ask: by is above id, id asked, and no message from above came since. The user's answer
+// to an ask passed up arrives this way too (answerPassUp sends it as the lead's).
+func (m *Manager) answersAsk(id, by string) bool {
+	if by == "" {
+		return false
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	rec, ok := m.recs[id]
+	if !ok || rec.s.Asked == nil || !m.createdByLocked(id, by) {
+		return false
+	}
+	return !rec.passUp.leadSent.After(rec.s.Asked.At)
+}
+
 // noteLeadSentLocked records a message to rec from a thread above it: its ask is answered.
 func (m *Manager) noteLeadSent(id, by string) {
 	if by == "" {

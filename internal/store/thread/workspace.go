@@ -70,7 +70,9 @@ const CreatedThreadPrompt = "Another thread created this one. The last message o
 	"`code-foundry thread report blocked \"why\"` (or `failed`). " +
 	"A decision that would change the work and is not yours to make: " +
 	"`code-foundry thread ask \"question\" --assuming \"what you do until an answer comes\"`, then keep working; " +
-	"its answer arrives as a message at your next tool call. Do not ask about what you can settle yourself."
+	"its answer arrives as a message, at your next tool call or, once your turn has ended, as a new turn. " +
+	"Never wait for it with sleep, a timer or polling: with nothing left to do, end your turn. " +
+	"Do not ask about what you can settle yourself."
 
 // ReplyPrompt is what every thread but a resident gets after ThreadPrompt: the GUI shows
 // only a turn's last message at rest and folds the text before it away with the work
