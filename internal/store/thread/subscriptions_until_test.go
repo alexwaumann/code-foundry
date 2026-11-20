@@ -183,27 +183,45 @@ func TestNotifyRenewedBySend(t *testing.T) {
 		name  string
 		msg   func(n *notifyEnv) Message
 		renew bool
+		// ask: the child asked its creator something before its turn ended (thread ask).
+		ask bool
 	}{
-		{"the creator's send", func(n *notifyEnv) Message { return Message{Text: "more", ByThreadID: n.parent.ID, Reply: ReplyWanted} }, true},
-		{"with NoNotify", func(n *notifyEnv) Message {
+		{name: "the creator's send", msg: func(n *notifyEnv) Message { return Message{Text: "more", ByThreadID: n.parent.ID, Reply: ReplyWanted} }, renew: true},
+		// The child ended its turn to wait for the answer: the turn the answer starts is
+		// the one its creator waits for, whatever the answer's reply mark (the wake tells
+		// the creator to answer with --reply none; a passed-up answer is sent that way too).
+		{name: "the answer to its open ask, no reply wanted", ask: true, renew: true,
+			msg: func(n *notifyEnv) Message { return Message{Text: "blue", ByThreadID: n.parent.ID, Reply: ReplyNone} }},
+		{name: "another thread's message after its ask", ask: true,
+			msg: func(n *notifyEnv) Message {
+				return Message{Text: "fyi", ByThreadID: n.stopped("other").ID, Reply: ReplyNone}
+			}},
+		{name: "with NoNotify", msg: func(n *notifyEnv) Message {
 			return Message{Text: "more", ByThreadID: n.parent.ID, Reply: ReplyWanted, NoNotify: true}
-		}, false},
+		}},
 		// No reply wanted: the turn that reads it wakes nobody (replies.go).
-		{"with no reply wanted", func(n *notifyEnv) Message { return Message{Text: "fyi", ByThreadID: n.parent.ID, Reply: ReplyNone} }, false},
-		{"the user's message", func(n *notifyEnv) Message { return Message{Text: "more"} }, false},
-		{"a wake", func(n *notifyEnv) Message {
+		{name: "with no reply wanted", msg: func(n *notifyEnv) Message { return Message{Text: "fyi", ByThreadID: n.parent.ID, Reply: ReplyNone} }},
+		{name: "the user's message", msg: func(n *notifyEnv) Message { return Message{Text: "more"} }},
+		{name: "a wake", msg: func(n *notifyEnv) Message {
 			return Message{Text: "wake", ByThreadID: n.parent.ID, Origin: OriginWake, WakeTitle: "x"}
-		}, false},
-		{"another thread's send", func(n *notifyEnv) Message {
+		}},
+		{name: "another thread's send", msg: func(n *notifyEnv) Message {
 			return Message{Text: "more", ByThreadID: n.stopped("other").ID, Reply: ReplyNone}
-		}, false},
+		}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			n := newNotifyEnv(t)
+			before := 1 // the finish's wake
+			if tt.ask {
+				if _, _, err := n.m.Ask(n.ctx(), n.child.ID, "red or blue?", "waiting for the answer"); err != nil {
+					t.Fatal(err)
+				}
+				before++ // and the ask's
+			}
 			// Stopped, as a finished child is once its process went idle: the send starts it.
 			n.setStep(n.child.ID, step{StateDisconnected, StatusNeedsAttention, "finished", ""})
-			n.waitItems(n.parent.ID, "the finish's wake", func(items []Item) bool { return len(wakes(items)) == 1 })
+			n.waitItems(n.parent.ID, "the finish's wake", func(items []Item) bool { return len(wakes(items)) == before })
 			if subs := n.subsOf(n.parent.ID); len(subs) != 0 {
 				t.Fatalf("subscriptions after the finish = %+v", subs)
 			}
@@ -214,9 +232,9 @@ func TestNotifyRenewedBySend(t *testing.T) {
 			n.waitFor(n.child.ID, "the answer's turn ended", func(s Thread) bool {
 				return s.HandledThrough >= it.Ordinal && Meets(CondSettled, s)
 			})
-			want := 1
+			want := before
 			if tt.renew {
-				want = 2
+				want++
 			}
 			n.waitItems(n.parent.ID, "the wakes", func(items []Item) bool { return len(wakes(items)) == want })
 			time.Sleep(50 * time.Millisecond)

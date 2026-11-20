@@ -321,6 +321,9 @@ type Message struct {
 	Reply Reply
 	// compact: Compact's /compact (compact.go).
 	compact bool
+	// answersAsk: the message answers the receiver's open thread ask to its sender (Send
+	// sets it; passup.go answersAsk): it renews the sender's --notify whatever its reply mark.
+	answersAsk bool
 }
 
 // MessageOrigin is who sent a user message.

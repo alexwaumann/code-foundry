@@ -242,6 +242,14 @@ func threadLabelCmd(b ThreadBackend, idArg ArgSpec) Command {
 	}
 }
 
+// AskAnswerRule is how a thread ask's answer reaches the thread that asked, in the help and
+// in the command's reply (docs/notes/ask-answer-wording.md). The older text said only "at your
+// next tool call", and a thread with nothing left to do made tool calls to get it: sleeps
+// and timers in the background, which also showed it waiting on shells to its lead. The
+// same rule is in the thread store's CreatedThreadPrompt, in its own words.
+const AskAnswerRule = "The answer arrives as a message: at your next tool call, or as a new turn once yours has ended. " +
+	"Never wait for it with sleep, a timer or polling: with nothing left to do, end your turn"
+
 func threadReportCmd(b ThreadBackend, idArg ArgSpec) Command {
 	return Command{
 		Name:      "thread.report",
@@ -286,7 +294,7 @@ func threadAskCmd(b ThreadBackend, idArg ArgSpec) Command {
 		NoPalette: true,
 		Title:     "Ask the Thread That Created This One",
 		Description: "Ask the thread that created this one something and keep working: it gets a wake at once and answers " +
-			"with thread send, which arrives at your next tool call. --assuming says what you do until then. " +
+			"with thread send. --assuming says what you do until then. " + AskAnswerRule + ". " +
 			"To stop until you have the answer, use your question tool instead.",
 		Category:     "Thread",
 		NoKeybinding: true,
@@ -302,7 +310,7 @@ func threadAskCmd(b ThreadBackend, idArg ArgSpec) Command {
 				return Result{}, err
 			}
 			msg := "asked thread " + threadLabel(res.Msg.GetCreator()) + "; keep working on your assumption. If it is right you will not hear back; " +
-				"if it is wrong, the answer arrives at your next tool call"
+				"if it is wrong you get an answer. " + AskAnswerRule
 			if res.Msg.GetRepeated() {
 				msg = "you just asked thread " + threadLabel(res.Msg.GetCreator()) + " that; nothing was sent"
 			}

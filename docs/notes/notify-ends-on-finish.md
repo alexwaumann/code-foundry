@@ -70,6 +70,9 @@ Decided while building:
 * **A lead's parent sending to one of the lead's workers** holds no notify on it, so nothing
   renews: `reference/leads.md` now says to `send --wait` or `thread subscribe --thread
   <worker>` first.
+* **An answer to the worker's open `thread ask`** renews the creator's notify whatever its
+  reply mark (`Message.answersAsk`, docs/notes/ask-answer-wording.md): the worker may have
+  ended its turn to wait for it, which ended the subscription as a finish.
 * **Surfaces**: `thread subscriptions` shows REPEAT `until done` and leaves `until=finished`
   out of the target's args; a subscription line says `(repeat until it finishes)`; `thread new
   --notify` says "s-p is woken when it settles, until the wake that says it finished; s-p's
