@@ -108,7 +108,7 @@ click or while nothing is hovered; a button acts on the id its row was drawn wit
 
 ## State
 
-`cf.storage("<page name>")` keeps what the user
+`cf.storage("<page name>")` (`get`, `set`, `remove`, `keys`, `clear`) keeps what the user
 chose across restarts, one per page file, shared by its card and tabs; 256 KiB in all, any value
 size within that (1 KiB caps a key's name). Draw from it in a `draw()` called after each `set`
 and passed to `s.onChange(draw)` (now, and on another copy's change). A hidden page (another tab
@@ -116,7 +116,7 @@ or space in front) is unloaded and loads afresh when shown: keep there what shou
 draft, the chosen tab). Fetched data: store the last good result and its time, show it at once and
 refetch. Raw `localStorage` is cleared when the app quits; an API token goes in a password
 field, then `cf.storage`. A moved or renamed file starts empty; removing this thread deletes its
-pages and their storage (archiving keeps both). The user finds a page in its card here or its tab.
+pages and their storage (archiving keeps both).
 
 ## Show it, then say what it does
 
