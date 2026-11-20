@@ -9,6 +9,7 @@ import { PaneHeader } from "@/components/window/PaneHeader";
 import { agentMode, agentName } from "@/lib/agents";
 import { useNow } from "@/lib/clock";
 import { formatAge } from "@/lib/duration";
+import { heldByModal } from "@/lib/modalFocus";
 import { canonicalModelName } from "@/lib/models";
 import { agentPrompt, headerParts, lastTextId, reportIsLastText, runFolded, runFoldKey, runNodes, shownNodes, turnOfCall } from "@/lib/subagentView";
 import { decodeTimelineKey, type WorkNode } from "@/lib/threadTimeline";
@@ -312,6 +313,8 @@ export function SubagentPane({ threadId, runId }: { threadId: string; runId: str
   // A run that opens takes the keyboard (Escape goes back up), unless the palette has it.
   useEffect(() => {
     if (useUiStore.getState().palette.open) return;
+    // A sheet or dialog over the pane keeps the keyboard (lib/modalFocus.ts).
+    if (heldByModal(document.activeElement, rootRef.current)) return;
     rootRef.current?.focus({ preventScroll: true });
   }, [focusSeq, promptAsked, runId]);
   return (

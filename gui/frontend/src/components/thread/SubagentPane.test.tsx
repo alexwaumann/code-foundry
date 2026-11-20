@@ -337,6 +337,22 @@ describe("SubagentPane", () => {
     expect(document.activeElement).toBe(tid("subagent-pane"));
   });
 
+  it("a request while an open dialog over the view has the keyboard leaves it there", () => {
+    show();
+    const dialog = document.createElement("div");
+    dialog.setAttribute("role", "dialog");
+    dialog.dataset.state = "open";
+    const inside = document.createElement("button");
+    dialog.append(inside);
+    document.body.append(dialog);
+    inside.focus();
+    act(() => {
+      useUiStore.setState((s) => ({ contentFocusSeq: s.contentFocusSeq + 1 }));
+    });
+    expect(document.activeElement).toBe(inside);
+    dialog.remove();
+  });
+
   it("the thread's verbs do not start from the keyboard or the palette here; viewing ones do", () => {
     show();
     const commands = useCommandsStore.getState().commands;
