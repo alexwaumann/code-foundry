@@ -853,6 +853,414 @@ func (x *PageEvent) GetStoragePaths() []string {
 	return nil
 }
 
+type CheckPageRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The page file: absolute or "~/".
+	Path string `protobuf:"bytes,1,opt,name=path,proto3" json:"path,omitempty"`
+	// The thread asking: the page acts for it when it owns the page, else for its first
+	// owner (as a File tab does); "" for the first owner.
+	ThreadId string `protobuf:"bytes,2,opt,name=thread_id,json=threadId,proto3" json:"thread_id,omitempty"`
+	// The card's width in CSS pixels; 0 for 720 (shot.MinWidth to shot.MaxWidth).
+	Width int32 `protobuf:"varint,3,opt,name=width,proto3" json:"width,omitempty"`
+	// The most to wait for the page to settle, in ms; 0 for 5000; at most 10000.
+	SettleMs int32 `protobuf:"varint,4,opt,name=settle_ms,json=settleMs,proto3" json:"settle_ms,omitempty"`
+	// Also a PNG of the card's frame as drawn.
+	Png           bool `protobuf:"varint,5,opt,name=png,proto3" json:"png,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CheckPageRequest) Reset() {
+	*x = CheckPageRequest{}
+	mi := &file_codefoundry_v1_page_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CheckPageRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CheckPageRequest) ProtoMessage() {}
+
+func (x *CheckPageRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_page_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CheckPageRequest.ProtoReflect.Descriptor instead.
+func (*CheckPageRequest) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_page_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *CheckPageRequest) GetPath() string {
+	if x != nil {
+		return x.Path
+	}
+	return ""
+}
+
+func (x *CheckPageRequest) GetThreadId() string {
+	if x != nil {
+		return x.ThreadId
+	}
+	return ""
+}
+
+func (x *CheckPageRequest) GetWidth() int32 {
+	if x != nil {
+		return x.Width
+	}
+	return 0
+}
+
+func (x *CheckPageRequest) GetSettleMs() int32 {
+	if x != nil {
+		return x.SettleMs
+	}
+	return 0
+}
+
+func (x *CheckPageRequest) GetPng() bool {
+	if x != nil {
+		return x.Png
+	}
+	return false
+}
+
+type CheckPageResponse struct {
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	Report *PageCheckReport       `protobuf:"bytes,1,opt,name=report,proto3" json:"report,omitempty"`
+	// The PNG when asked and drawn (report.shot_error says why not).
+	Png []byte `protobuf:"bytes,2,opt,name=png,proto3" json:"png,omitempty"`
+	// The width it was rendered at, and the thread it acted for ("" for none: a page the
+	// user allowed).
+	Width    int32  `protobuf:"varint,3,opt,name=width,proto3" json:"width,omitempty"`
+	ThreadId string `protobuf:"bytes,4,opt,name=thread_id,json=threadId,proto3" json:"thread_id,omitempty"`
+	// The resolved path (PageAccess.path).
+	Path          string `protobuf:"bytes,5,opt,name=path,proto3" json:"path,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CheckPageResponse) Reset() {
+	*x = CheckPageResponse{}
+	mi := &file_codefoundry_v1_page_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CheckPageResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CheckPageResponse) ProtoMessage() {}
+
+func (x *CheckPageResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_page_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CheckPageResponse.ProtoReflect.Descriptor instead.
+func (*CheckPageResponse) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_page_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *CheckPageResponse) GetReport() *PageCheckReport {
+	if x != nil {
+		return x.Report
+	}
+	return nil
+}
+
+func (x *CheckPageResponse) GetPng() []byte {
+	if x != nil {
+		return x.Png
+	}
+	return nil
+}
+
+func (x *CheckPageResponse) GetWidth() int32 {
+	if x != nil {
+		return x.Width
+	}
+	return 0
+}
+
+func (x *CheckPageResponse) GetThreadId() string {
+	if x != nil {
+		return x.ThreadId
+	}
+	return ""
+}
+
+func (x *CheckPageResponse) GetPath() string {
+	if x != nil {
+		return x.Path
+	}
+	return ""
+}
+
+// PageCheckReport is what one render of a page saw (the GUI's src/lib/pageCheck.ts).
+type PageCheckReport struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The frame's document loaded and answered the app (a daemon-served page).
+	Loaded bool `protobuf:"varint,1,opt,name=loaded,proto3" json:"loaded,omitempty"`
+	// The page library's TSX loader (/cf/jsx.js): "" when the page has none, "ready" when
+	// every script ran, "error" when one did not, "running" when it had not finished.
+	Loader   string              `protobuf:"bytes,2,opt,name=loader,proto3" json:"loader,omitempty"`
+	Problems []*PageCheckProblem `protobuf:"bytes,3,rep,name=problems,proto3" json:"problems,omitempty"`
+	// The card frame's height in CSS px (the page's own ask through the bridge, else the
+	// card's default), and the document's own scroll height.
+	Height     int32 `protobuf:"varint,4,opt,name=height,proto3" json:"height,omitempty"`
+	PageHeight int32 `protobuf:"varint,5,opt,name=page_height,json=pageHeight,proto3" json:"page_height,omitempty"`
+	// Whether the page asked for its height (cf.resize, which /cf/bridge.js does by itself).
+	Resized bool `protobuf:"varint,6,opt,name=resized,proto3" json:"resized,omitempty"`
+	// How long from the frame's start until nothing more happened, in ms; with settled
+	// false, the bound it gave up at.
+	SettleMs int32 `protobuf:"varint,7,opt,name=settle_ms,json=settleMs,proto3" json:"settle_ms,omitempty"`
+	Settled  bool  `protobuf:"varint,8,opt,name=settled,proto3" json:"settled,omitempty"`
+	// Bridge calls still waiting at the bound.
+	Busy int32 `protobuf:"varint,9,opt,name=busy,proto3" json:"busy,omitempty"`
+	// cf.storage writes the page made (kept in the check, never saved).
+	StorageWrites int32 `protobuf:"varint,10,opt,name=storage_writes,json=storageWrites,proto3" json:"storage_writes,omitempty"`
+	// Bridge calls and subscriptions the page made.
+	Calls int32 `protobuf:"varint,11,opt,name=calls,proto3" json:"calls,omitempty"`
+	// Why there is no render at all ("Could not render this page: ..."); empty otherwise.
+	Failure string `protobuf:"bytes,12,opt,name=failure,proto3" json:"failure,omitempty"`
+	// Why there is no PNG when one was asked for.
+	ShotError     string `protobuf:"bytes,13,opt,name=shot_error,json=shotError,proto3" json:"shot_error,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PageCheckReport) Reset() {
+	*x = PageCheckReport{}
+	mi := &file_codefoundry_v1_page_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PageCheckReport) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PageCheckReport) ProtoMessage() {}
+
+func (x *PageCheckReport) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_page_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PageCheckReport.ProtoReflect.Descriptor instead.
+func (*PageCheckReport) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_page_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *PageCheckReport) GetLoaded() bool {
+	if x != nil {
+		return x.Loaded
+	}
+	return false
+}
+
+func (x *PageCheckReport) GetLoader() string {
+	if x != nil {
+		return x.Loader
+	}
+	return ""
+}
+
+func (x *PageCheckReport) GetProblems() []*PageCheckProblem {
+	if x != nil {
+		return x.Problems
+	}
+	return nil
+}
+
+func (x *PageCheckReport) GetHeight() int32 {
+	if x != nil {
+		return x.Height
+	}
+	return 0
+}
+
+func (x *PageCheckReport) GetPageHeight() int32 {
+	if x != nil {
+		return x.PageHeight
+	}
+	return 0
+}
+
+func (x *PageCheckReport) GetResized() bool {
+	if x != nil {
+		return x.Resized
+	}
+	return false
+}
+
+func (x *PageCheckReport) GetSettleMs() int32 {
+	if x != nil {
+		return x.SettleMs
+	}
+	return 0
+}
+
+func (x *PageCheckReport) GetSettled() bool {
+	if x != nil {
+		return x.Settled
+	}
+	return false
+}
+
+func (x *PageCheckReport) GetBusy() int32 {
+	if x != nil {
+		return x.Busy
+	}
+	return 0
+}
+
+func (x *PageCheckReport) GetStorageWrites() int32 {
+	if x != nil {
+		return x.StorageWrites
+	}
+	return 0
+}
+
+func (x *PageCheckReport) GetCalls() int32 {
+	if x != nil {
+		return x.Calls
+	}
+	return 0
+}
+
+func (x *PageCheckReport) GetFailure() string {
+	if x != nil {
+		return x.Failure
+	}
+	return ""
+}
+
+func (x *PageCheckReport) GetShotError() string {
+	if x != nil {
+		return x.ShotError
+	}
+	return ""
+}
+
+// PageCheckProblem is one thing that went wrong, repeats counted.
+type PageCheckProblem struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// "script" (an uncaught error), "rejection" (an unhandled promise rejection), "loader"
+	// (/cf/jsx.js: a compile, import or evaluation error), "resource" (a script, stylesheet
+	// or image that did not load), "bridge" (a cf.run, cf.fetch, cf.storage or cf.on call
+	// the app refused or that failed), "unsupported" (alert, confirm, a download, ...).
+	Kind string `protobuf:"bytes,1,opt,name=kind,proto3" json:"kind,omitempty"`
+	// For bridge and unsupported: the call (a verb, cf.on("source"), cf.fetch host, alert).
+	Call string `protobuf:"bytes,2,opt,name=call,proto3" json:"call,omitempty"`
+	// For bridge: the bridge error code (invalid, unavailable, failed, timeout, gesture, ...).
+	Code    string `protobuf:"bytes,3,opt,name=code,proto3" json:"code,omitempty"`
+	Message string `protobuf:"bytes,4,opt,name=message,proto3" json:"message,omitempty"`
+	// Where: "page.html:42:13", or the URL that did not load.
+	Where         string `protobuf:"bytes,5,opt,name=where,proto3" json:"where,omitempty"`
+	Count         int32  `protobuf:"varint,6,opt,name=count,proto3" json:"count,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PageCheckProblem) Reset() {
+	*x = PageCheckProblem{}
+	mi := &file_codefoundry_v1_page_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PageCheckProblem) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PageCheckProblem) ProtoMessage() {}
+
+func (x *PageCheckProblem) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_page_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PageCheckProblem.ProtoReflect.Descriptor instead.
+func (*PageCheckProblem) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_page_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *PageCheckProblem) GetKind() string {
+	if x != nil {
+		return x.Kind
+	}
+	return ""
+}
+
+func (x *PageCheckProblem) GetCall() string {
+	if x != nil {
+		return x.Call
+	}
+	return ""
+}
+
+func (x *PageCheckProblem) GetCode() string {
+	if x != nil {
+		return x.Code
+	}
+	return ""
+}
+
+func (x *PageCheckProblem) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+func (x *PageCheckProblem) GetWhere() string {
+	if x != nil {
+		return x.Where
+	}
+	return ""
+}
+
+func (x *PageCheckProblem) GetCount() int32 {
+	if x != nil {
+		return x.Count
+	}
+	return 0
+}
+
 var File_codefoundry_v1_page_proto protoreflect.FileDescriptor
 
 const file_codefoundry_v1_page_proto_rawDesc = "" +
@@ -917,7 +1325,43 @@ const file_codefoundry_v1_page_proto_rawDesc = "" +
 	"\x05paths\x18\x01 \x03(\tR\x05paths\x12%\n" +
 	"\x0eremoved_thread\x18\x02 \x01(\tR\rremovedThread\x12\x10\n" +
 	"\x03all\x18\x03 \x01(\bR\x03all\x12#\n" +
-	"\rstorage_paths\x18\x04 \x03(\tR\fstoragePaths*\xb1\x01\n" +
+	"\rstorage_paths\x18\x04 \x03(\tR\fstoragePaths\"\x88\x01\n" +
+	"\x10CheckPageRequest\x12\x12\n" +
+	"\x04path\x18\x01 \x01(\tR\x04path\x12\x1b\n" +
+	"\tthread_id\x18\x02 \x01(\tR\bthreadId\x12\x14\n" +
+	"\x05width\x18\x03 \x01(\x05R\x05width\x12\x1b\n" +
+	"\tsettle_ms\x18\x04 \x01(\x05R\bsettleMs\x12\x10\n" +
+	"\x03png\x18\x05 \x01(\bR\x03png\"\xa5\x01\n" +
+	"\x11CheckPageResponse\x127\n" +
+	"\x06report\x18\x01 \x01(\v2\x1f.codefoundry.v1.PageCheckReportR\x06report\x12\x10\n" +
+	"\x03png\x18\x02 \x01(\fR\x03png\x12\x14\n" +
+	"\x05width\x18\x03 \x01(\x05R\x05width\x12\x1b\n" +
+	"\tthread_id\x18\x04 \x01(\tR\bthreadId\x12\x12\n" +
+	"\x04path\x18\x05 \x01(\tR\x04path\"\x93\x03\n" +
+	"\x0fPageCheckReport\x12\x16\n" +
+	"\x06loaded\x18\x01 \x01(\bR\x06loaded\x12\x16\n" +
+	"\x06loader\x18\x02 \x01(\tR\x06loader\x12<\n" +
+	"\bproblems\x18\x03 \x03(\v2 .codefoundry.v1.PageCheckProblemR\bproblems\x12\x16\n" +
+	"\x06height\x18\x04 \x01(\x05R\x06height\x12\x1f\n" +
+	"\vpage_height\x18\x05 \x01(\x05R\n" +
+	"pageHeight\x12\x18\n" +
+	"\aresized\x18\x06 \x01(\bR\aresized\x12\x1b\n" +
+	"\tsettle_ms\x18\a \x01(\x05R\bsettleMs\x12\x18\n" +
+	"\asettled\x18\b \x01(\bR\asettled\x12\x12\n" +
+	"\x04busy\x18\t \x01(\x05R\x04busy\x12%\n" +
+	"\x0estorage_writes\x18\n" +
+	" \x01(\x05R\rstorageWrites\x12\x14\n" +
+	"\x05calls\x18\v \x01(\x05R\x05calls\x12\x18\n" +
+	"\afailure\x18\f \x01(\tR\afailure\x12\x1d\n" +
+	"\n" +
+	"shot_error\x18\r \x01(\tR\tshotError\"\x94\x01\n" +
+	"\x10PageCheckProblem\x12\x12\n" +
+	"\x04kind\x18\x01 \x01(\tR\x04kind\x12\x12\n" +
+	"\x04call\x18\x02 \x01(\tR\x04call\x12\x12\n" +
+	"\x04code\x18\x03 \x01(\tR\x04code\x12\x18\n" +
+	"\amessage\x18\x04 \x01(\tR\amessage\x12\x14\n" +
+	"\x05where\x18\x05 \x01(\tR\x05where\x12\x14\n" +
+	"\x05count\x18\x06 \x01(\x05R\x05count*\xb1\x01\n" +
 	"\vPageConsent\x12\x1c\n" +
 	"\x18PAGE_CONSENT_UNSPECIFIED\x10\x00\x12\x16\n" +
 	"\x12PAGE_CONSENT_OWNED\x10\x01\x12\x18\n" +
@@ -929,13 +1373,14 @@ const file_codefoundry_v1_page_proto_rawDesc = "" +
 	"\x1dPAGE_OWNER_SOURCE_UNSPECIFIED\x10\x00\x12\x1b\n" +
 	"\x17PAGE_OWNER_SOURCE_SHOWN\x10\x01\x12\x1d\n" +
 	"\x19PAGE_OWNER_SOURCE_WRITTEN\x10\x02\x12%\n" +
-	"!PAGE_OWNER_SOURCE_PAGES_DIRECTORY\x10\x032\x87\x03\n" +
+	"!PAGE_OWNER_SOURCE_PAGES_DIRECTORY\x10\x032\xdb\x03\n" +
 	"\vPageService\x12L\n" +
 	"\aGetPage\x12\x1e.codefoundry.v1.GetPageRequest\x1a\x1f.codefoundry.v1.GetPageResponse\"\x00\x12`\n" +
 	"\vPageStorage\x12&.codefoundry.v1.PageFileStorageRequest\x1a'.codefoundry.v1.PageFileStorageResponse\"\x00\x12i\n" +
 	"\x0eSetPageStorage\x12).codefoundry.v1.SetPageFileStorageRequest\x1a*.codefoundry.v1.SetPageFileStorageResponse\"\x00\x12]\n" +
 	"\n" +
-	"ProxyFetch\x12%.codefoundry.v1.PageProxyFetchRequest\x1a&.codefoundry.v1.PageProxyFetchResponse\"\x00B\xc1\x01\n" +
+	"ProxyFetch\x12%.codefoundry.v1.PageProxyFetchRequest\x1a&.codefoundry.v1.PageProxyFetchResponse\"\x00\x12R\n" +
+	"\tCheckPage\x12 .codefoundry.v1.CheckPageRequest\x1a!.codefoundry.v1.CheckPageResponse\"\x00B\xc1\x01\n" +
 	"\x12com.codefoundry.v1B\tPageProtoP\x01ZGgithub.com/alexwaumann/code-foundry/gen/go/codefoundry/v1;codefoundryv1\xa2\x02\x03CXX\xaa\x02\x0eCodefoundry.V1\xca\x02\x0eCodefoundry\\V1\xe2\x02\x1aCodefoundry\\V1\\GPBMetadata\xea\x02\x0fCodefoundry::V1b\x06proto3"
 
 var (
@@ -951,7 +1396,7 @@ func file_codefoundry_v1_page_proto_rawDescGZIP() []byte {
 }
 
 var file_codefoundry_v1_page_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_codefoundry_v1_page_proto_msgTypes = make([]protoimpl.MessageInfo, 15)
+var file_codefoundry_v1_page_proto_msgTypes = make([]protoimpl.MessageInfo, 19)
 var file_codefoundry_v1_page_proto_goTypes = []any{
 	(PageConsent)(0),                   // 0: codefoundry.v1.PageConsent
 	(PageOwnerSource)(0),               // 1: codefoundry.v1.PageOwnerSource
@@ -966,10 +1411,14 @@ var file_codefoundry_v1_page_proto_goTypes = []any{
 	(*PageProxyFetchRequest)(nil),      // 10: codefoundry.v1.PageProxyFetchRequest
 	(*PageProxyFetchResponse)(nil),     // 11: codefoundry.v1.PageProxyFetchResponse
 	(*PageEvent)(nil),                  // 12: codefoundry.v1.PageEvent
-	nil,                                // 13: codefoundry.v1.PageFileStorageResponse.ValuesEntry
-	nil,                                // 14: codefoundry.v1.SetPageFileStorageResponse.ValuesEntry
-	nil,                                // 15: codefoundry.v1.PageProxyFetchRequest.HeadersEntry
-	nil,                                // 16: codefoundry.v1.PageProxyFetchResponse.HeadersEntry
+	(*CheckPageRequest)(nil),           // 13: codefoundry.v1.CheckPageRequest
+	(*CheckPageResponse)(nil),          // 14: codefoundry.v1.CheckPageResponse
+	(*PageCheckReport)(nil),            // 15: codefoundry.v1.PageCheckReport
+	(*PageCheckProblem)(nil),           // 16: codefoundry.v1.PageCheckProblem
+	nil,                                // 17: codefoundry.v1.PageFileStorageResponse.ValuesEntry
+	nil,                                // 18: codefoundry.v1.SetPageFileStorageResponse.ValuesEntry
+	nil,                                // 19: codefoundry.v1.PageProxyFetchRequest.HeadersEntry
+	nil,                                // 20: codefoundry.v1.PageProxyFetchResponse.HeadersEntry
 }
 var file_codefoundry_v1_page_proto_depIdxs = []int32{
 	1,  // 0: codefoundry.v1.PageOwner.source:type_name -> codefoundry.v1.PageOwnerSource
@@ -978,23 +1427,27 @@ var file_codefoundry_v1_page_proto_depIdxs = []int32{
 	0,  // 3: codefoundry.v1.PageAccess.answer:type_name -> codefoundry.v1.PageConsent
 	2,  // 4: codefoundry.v1.PageAccess.owners:type_name -> codefoundry.v1.PageOwner
 	3,  // 5: codefoundry.v1.GetPageResponse.page:type_name -> codefoundry.v1.PageAccess
-	13, // 6: codefoundry.v1.PageFileStorageResponse.values:type_name -> codefoundry.v1.PageFileStorageResponse.ValuesEntry
-	14, // 7: codefoundry.v1.SetPageFileStorageResponse.values:type_name -> codefoundry.v1.SetPageFileStorageResponse.ValuesEntry
-	15, // 8: codefoundry.v1.PageProxyFetchRequest.headers:type_name -> codefoundry.v1.PageProxyFetchRequest.HeadersEntry
-	16, // 9: codefoundry.v1.PageProxyFetchResponse.headers:type_name -> codefoundry.v1.PageProxyFetchResponse.HeadersEntry
-	4,  // 10: codefoundry.v1.PageService.GetPage:input_type -> codefoundry.v1.GetPageRequest
-	6,  // 11: codefoundry.v1.PageService.PageStorage:input_type -> codefoundry.v1.PageFileStorageRequest
-	8,  // 12: codefoundry.v1.PageService.SetPageStorage:input_type -> codefoundry.v1.SetPageFileStorageRequest
-	10, // 13: codefoundry.v1.PageService.ProxyFetch:input_type -> codefoundry.v1.PageProxyFetchRequest
-	5,  // 14: codefoundry.v1.PageService.GetPage:output_type -> codefoundry.v1.GetPageResponse
-	7,  // 15: codefoundry.v1.PageService.PageStorage:output_type -> codefoundry.v1.PageFileStorageResponse
-	9,  // 16: codefoundry.v1.PageService.SetPageStorage:output_type -> codefoundry.v1.SetPageFileStorageResponse
-	11, // 17: codefoundry.v1.PageService.ProxyFetch:output_type -> codefoundry.v1.PageProxyFetchResponse
-	14, // [14:18] is the sub-list for method output_type
-	10, // [10:14] is the sub-list for method input_type
-	10, // [10:10] is the sub-list for extension type_name
-	10, // [10:10] is the sub-list for extension extendee
-	0,  // [0:10] is the sub-list for field type_name
+	17, // 6: codefoundry.v1.PageFileStorageResponse.values:type_name -> codefoundry.v1.PageFileStorageResponse.ValuesEntry
+	18, // 7: codefoundry.v1.SetPageFileStorageResponse.values:type_name -> codefoundry.v1.SetPageFileStorageResponse.ValuesEntry
+	19, // 8: codefoundry.v1.PageProxyFetchRequest.headers:type_name -> codefoundry.v1.PageProxyFetchRequest.HeadersEntry
+	20, // 9: codefoundry.v1.PageProxyFetchResponse.headers:type_name -> codefoundry.v1.PageProxyFetchResponse.HeadersEntry
+	15, // 10: codefoundry.v1.CheckPageResponse.report:type_name -> codefoundry.v1.PageCheckReport
+	16, // 11: codefoundry.v1.PageCheckReport.problems:type_name -> codefoundry.v1.PageCheckProblem
+	4,  // 12: codefoundry.v1.PageService.GetPage:input_type -> codefoundry.v1.GetPageRequest
+	6,  // 13: codefoundry.v1.PageService.PageStorage:input_type -> codefoundry.v1.PageFileStorageRequest
+	8,  // 14: codefoundry.v1.PageService.SetPageStorage:input_type -> codefoundry.v1.SetPageFileStorageRequest
+	10, // 15: codefoundry.v1.PageService.ProxyFetch:input_type -> codefoundry.v1.PageProxyFetchRequest
+	13, // 16: codefoundry.v1.PageService.CheckPage:input_type -> codefoundry.v1.CheckPageRequest
+	5,  // 17: codefoundry.v1.PageService.GetPage:output_type -> codefoundry.v1.GetPageResponse
+	7,  // 18: codefoundry.v1.PageService.PageStorage:output_type -> codefoundry.v1.PageFileStorageResponse
+	9,  // 19: codefoundry.v1.PageService.SetPageStorage:output_type -> codefoundry.v1.SetPageFileStorageResponse
+	11, // 20: codefoundry.v1.PageService.ProxyFetch:output_type -> codefoundry.v1.PageProxyFetchResponse
+	14, // 21: codefoundry.v1.PageService.CheckPage:output_type -> codefoundry.v1.CheckPageResponse
+	17, // [17:22] is the sub-list for method output_type
+	12, // [12:17] is the sub-list for method input_type
+	12, // [12:12] is the sub-list for extension type_name
+	12, // [12:12] is the sub-list for extension extendee
+	0,  // [0:12] is the sub-list for field type_name
 }
 
 func init() { file_codefoundry_v1_page_proto_init() }
@@ -1009,7 +1462,7 @@ func file_codefoundry_v1_page_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_codefoundry_v1_page_proto_rawDesc), len(file_codefoundry_v1_page_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   15,
+			NumMessages:   19,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

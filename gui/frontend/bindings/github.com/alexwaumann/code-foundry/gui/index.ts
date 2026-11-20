@@ -15,6 +15,8 @@ export {
 export type {
     AppInfo,
     DaemonEndpoint,
+    PageCheckIssue,
+    PageChecked,
     ShotRendered,
     WindowBackground
 } from "./models.js";

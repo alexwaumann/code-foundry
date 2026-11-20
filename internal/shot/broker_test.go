@@ -14,6 +14,11 @@ import (
 // png is a PNG's signature and a little body: the broker checks the signature only.
 func png(n int) []byte { return append(bytes.Clone(pngMagic), make([]byte, n)...) }
 
+// pub is a host's answer.
+func pub(id string, png []byte, reason string, contentHeight int) *v1.PublishShotRequest {
+	return &v1.PublishShotRequest{Id: id, Png: png, Error: reason, ContentHeight: int32(contentHeight)}
+}
+
 // next is the capturer's next request, or a failure after a second.
 func next(t *testing.T, reqs <-chan *v1.ShotRequest) *v1.ShotRequest {
 	t.Helper()
@@ -41,23 +46,23 @@ func TestShoot(t *testing.T) {
 			if r.GetWidth() != 420 || r.GetInstance() != "hello/main/global" || r.GetId() == "" {
 				t.Errorf("request %v", r)
 			}
-			if err := b.Publish(r.GetId(), png(4), "", 1640); err != nil {
+			if err := b.Publish(pub(r.GetId(), png(4), "", 1640)); err != nil {
 				t.Errorf("publish: %v", err)
 			}
 		}, want: Result{PNG: png(4), ContentHeight: 1640}},
 		{name: "the app's reason", capture: func(t *testing.T, b *Broker, reqs <-chan *v1.ShotRequest, _ func()) {
-			if err := b.Publish(next(t, reqs).GetId(), nil, "the surface sent no view", 0); err != nil {
+			if err := b.Publish(pub(next(t, reqs).GetId(), nil, "the surface sent no view", 0)); err != nil {
 				t.Errorf("publish: %v", err)
 			}
 		}, wantErr: &CaptureError{Reason: "the surface sent no view"}},
 		{name: "timeout", capture: func(t *testing.T, _ *Broker, reqs <-chan *v1.ShotRequest, _ func()) { next(t, reqs) }, wantErr: ErrTimeout},
 		{name: "oversize PNG fails the publish and the shot", capture: func(t *testing.T, b *Broker, reqs <-chan *v1.ShotRequest, _ func()) {
-			if err := b.Publish(next(t, reqs).GetId(), png(2000), "", 10); !errors.Is(err, ErrTooLarge) {
+			if err := b.Publish(pub(next(t, reqs).GetId(), png(2000), "", 10)); !errors.Is(err, ErrTooLarge) {
 				t.Errorf("publish: %v, want ErrTooLarge", err)
 			}
 		}, wantErr: ErrTooLarge},
 		{name: "not a PNG", capture: func(t *testing.T, b *Broker, reqs <-chan *v1.ShotRequest, _ func()) {
-			if err := b.Publish(next(t, reqs).GetId(), []byte("GIF89a"), "", 10); !errors.Is(err, ErrNotPNG) {
+			if err := b.Publish(pub(next(t, reqs).GetId(), []byte("GIF89a"), "", 10)); !errors.Is(err, ErrNotPNG) {
 				t.Errorf("publish: %v, want ErrNotPNG", err)
 			}
 		}, wantErr: ErrNotPNG},
@@ -97,10 +102,72 @@ func TestShoot(t *testing.T) {
 	}
 }
 
+// A page check is answered by its report, with or without a PNG, and waits its settle time
+// on top of the broker's own.
+func TestShootPageCheck(t *testing.T) {
+	report := &v1.PageCheckReport{Loaded: true, Height: 312, Problems: []*v1.PageCheckProblem{{Kind: "script", Message: "x is not defined"}}}
+	tests := []struct {
+		name    string
+		answer  func(id string) *v1.PublishShotRequest
+		delay   time.Duration
+		want    Result
+		wantErr error
+	}{
+		{name: "report alone", answer: func(id string) *v1.PublishShotRequest {
+			return &v1.PublishShotRequest{Id: id, PageReport: report, ContentHeight: 312}
+		}, want: Result{PageReport: report, ContentHeight: 312}},
+		{name: "report and PNG", answer: func(id string) *v1.PublishShotRequest {
+			return &v1.PublishShotRequest{Id: id, PageReport: report, Png: png(3)}
+		}, want: Result{PageReport: report, PNG: png(3)}},
+		{name: "a PNG alone is no answer", answer: func(id string) *v1.PublishShotRequest {
+			return &v1.PublishShotRequest{Id: id, Png: png(3)}
+		}, wantErr: ErrEmpty},
+		{name: "not a PNG beside the report", answer: func(id string) *v1.PublishShotRequest {
+			return &v1.PublishShotRequest{Id: id, PageReport: report, Png: []byte("GIF89a")}
+		}, wantErr: ErrNotPNG},
+		{name: "the app's reason", answer: func(id string) *v1.PublishShotRequest {
+			return &v1.PublishShotRequest{Id: id, Error: "the page window is gone"}
+		}, wantErr: &CaptureError{Reason: "the page window is gone"}},
+		// Past the broker's 200 ms, within its 200 ms plus the 400 ms settle.
+		{name: "waits the settle time longer", delay: 350 * time.Millisecond, answer: func(id string) *v1.PublishShotRequest {
+			return &v1.PublishShotRequest{Id: id, PageReport: report}
+		}, want: Result{PageReport: report}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			b := New(WithTimeout(200*time.Millisecond), WithMaxPNG(1024))
+			reqs, _, disconnect := b.Connect()
+			t.Cleanup(disconnect)
+			go func() {
+				r := next(t, reqs)
+				if r.GetPage().GetPath() != "/p/board.html" {
+					t.Errorf("request %v", r)
+				}
+				time.Sleep(tt.delay)
+				_ = b.Publish(tt.answer(r.GetId()))
+			}()
+			got, err := b.Shoot(context.Background(), &v1.ShotRequest{Width: 720, Height: 2400, Page: &v1.PageShot{Path: "/p/board.html", SettleMs: 400}})
+			var ce *CaptureError
+			switch {
+			case errors.As(tt.wantErr, &ce):
+				var got *CaptureError
+				if !errors.As(err, &got) || got.Reason != ce.Reason {
+					t.Fatalf("err = %v, want the app's %q", err, ce.Reason)
+				}
+			case !errors.Is(err, tt.wantErr):
+				t.Fatalf("err = %v, want %v", err, tt.wantErr)
+			}
+			if !bytes.Equal(got.PNG, tt.want.PNG) || got.ContentHeight != tt.want.ContentHeight || got.PageReport != tt.want.PageReport {
+				t.Errorf("result %+v, want %+v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestPublishUnknownID(t *testing.T) {
 	b := New()
 	for _, id := range []string{"", "shot-nope"} {
-		if err := b.Publish(id, png(1), "", 0); !errors.Is(err, ErrUnknownID) {
+		if err := b.Publish(pub(id, png(1), "", 0)); !errors.Is(err, ErrUnknownID) {
 			t.Errorf("Publish(%q) = %v, want ErrUnknownID", id, err)
 		}
 	}
@@ -111,7 +178,7 @@ func TestPublishUnknownID(t *testing.T) {
 	if _, err := b.Shoot(context.Background(), &v1.ShotRequest{}); !errors.Is(err, ErrTimeout) {
 		t.Fatalf("shoot: %v", err)
 	}
-	if err := b.Publish(next(t, reqs).GetId(), png(1), "", 0); !errors.Is(err, ErrUnknownID) {
+	if err := b.Publish(pub(next(t, reqs).GetId(), png(1), "", 0)); !errors.Is(err, ErrUnknownID) {
 		t.Errorf("late publish = %v, want ErrUnknownID", err)
 	}
 }
@@ -137,7 +204,7 @@ func TestTwoShotsAtOnce(t *testing.T) {
 	}
 	// Answer in reverse, each with its width as the content height.
 	for _, r := range []*v1.ShotRequest{r2, r1} {
-		if err := b.Publish(r.GetId(), png(1), "", int(r.GetWidth())); err != nil {
+		if err := b.Publish(pub(r.GetId(), png(1), "", int(r.GetWidth()))); err != nil {
 			t.Fatal(err)
 		}
 	}

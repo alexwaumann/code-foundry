@@ -140,6 +140,19 @@ export function dispatchEvent(ev: EventView): void {
   for (const tap of taps) tap(ev);
 }
 
+/**
+ * The sources an observer applies (startEventSync's observer): the slices a page's bridge
+ * reads (stores/bridgeSources.ts) and the page source its storage follows. Not the window's
+ * own (the layout, intents, the bell and its toasts): an observer shows none of them.
+ */
+const OBSERVED: ReadonlySet<EventView["source"]> = new Set(["project", "workspace", "terminal", "threadList", "thread", "gh", "settings", "update", "action", "plugin", "page"]);
+
+/** dispatchEvent for an observer: the observed slices only; every tap still hears every event (the ui source's intents reach a page that way). */
+export function dispatchObserved(ev: EventView): void {
+  if (OBSERVED.has(ev.source)) (handlers[ev.source] as (e: EventView["event"]) => void)(ev.event);
+  for (const tap of taps) tap(ev);
+}
+
 /** Lists threads without failing the resync: a failed List keeps the threads it has. */
 export async function reconcileThreads(signal: AbortSignal): Promise<void> {
   try {
@@ -156,13 +169,17 @@ export async function reconcileThreads(signal: AbortSignal): Promise<void> {
  * per-service List calls run alongside the stream (events are buffered until they
  * resolve), so a reconnect reconciles removals the stream's snapshot cannot express
  * (terminal.proto has no snapshot message).
+ *
+ * An observer (the shot window's page check, docs/notes/page-self-check.md) keeps only the
+ * slices a page's bridge reads (dispatchObserved), as a client the daemon counts as no
+ * window, and tells it no visibility or focus.
  */
-export function startEventSync(): () => void {
+export function startEventSync({ observer = false }: { observer?: boolean } = {}): () => void {
   // Counted in ticks, not by the clock: a Mac waking from sleep is not a silent stream.
   let delivered = false;
   let quietTicks = 0;
   const stop = runStream<EventView>({
-    open: (signal) => watchEvents(signal),
+    open: (signal) => watchEvents(signal, daemon, observer),
     onConnect: async (signal) => {
       // The schema carries the model registry; a restarted daemon may have a new one.
       void loadSettingsSchema();
@@ -170,7 +187,7 @@ export function startEventSync(): () => void {
       useProjectsStore.setState({ ...replaceProjects(projects), loaded: true });
       useTerminalsStore.setState((s) => ({ ...replaceTerminals(s, terminals), loaded: true }));
     },
-    onEvent: dispatchEvent,
+    onEvent: observer ? dispatchObserved : dispatchEvent,
     onStatus: (stream, err) => {
       if (stream === "connecting" || stream === "retrying") delivered = false;
       useEventsStore.setState({ stream, streamError: err ?? null });
@@ -191,7 +208,7 @@ export function startEventSync(): () => void {
   }, HEARTBEAT_MS);
   // The daemon polls GitHub less while no GUI window is visible, and counts an open
   // thread as seen only while a window is visible and focused.
-  const unwatchPageState = onPageStateChange(() => void reportClientState());
+  const unwatchPageState = observer ? () => undefined : onPageStateChange(() => void reportClientState());
   return () => {
     unwatchPageState();
     clearInterval(silence);

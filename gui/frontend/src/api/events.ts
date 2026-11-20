@@ -190,15 +190,18 @@ async function sendClientState(): Promise<void> {
 
 /**
  * Opens EventService.Watch (all sources) as a GUI client with the page's visibility and
- * focus and yields mapped events and HEARTBEAT for heartbeats.
+ * focus and yields mapped events and HEARTBEAT for heartbeats. An observer (the shot
+ * window's page check: docs/notes/page-self-check.md) watches as a client the daemon does
+ * not count as a window, and reports no visibility or focus.
  */
-export async function* watchEvents(signal: AbortSignal, conn: DaemonConnection = daemon): AsyncGenerator<EventView | Heartbeat> {
+export async function* watchEvents(signal: AbortSignal, conn: DaemonConnection = daemon, observer = false): AsyncGenerator<EventView | Heartbeat> {
   const c = await conn.client(EventService);
   const me: Watching = { id: newClientId(), conn, reported: pageClientState() };
-  watching = me;
+  if (!observer) watching = me;
   try {
-    let first = true;
-    for await (const ev of c.watch({ clientKind: ClientKind.GUI, clientId: me.id, ...me.reported }, { signal })) {
+    let first = !observer;
+    const as = observer ? { clientKind: ClientKind.CLI } : { clientKind: ClientKind.GUI, clientId: me.id, ...me.reported };
+    for await (const ev of c.watch(as, { signal })) {
       if (first) {
         // The daemon has registered the stream: catch up on a change made while it opened.
         first = false;

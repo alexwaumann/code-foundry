@@ -72,6 +72,22 @@ function report(title: string, detail: string, err?: unknown): void {
   box.appendChild(entry);
 }
 
+/**
+ * A script the loader could not run: shown and logged as report does, and told to the frame
+ * script the daemon writes into the page (internal/preview/frame.js), which hands it to the
+ * app for a page check (docs/notes/page-self-check.md). Uncaught errors are not told here:
+ * the frame script hears those itself.
+ */
+function fail(title: string, detail: string, err?: unknown): void {
+  report(title, detail, err);
+  tell({ error: title + "\n" + detail });
+}
+
+/** A `cf:jsx` event for the frame script: a loader error, or the loader's end state. */
+function tell(detail: { error: string } | { state: string }): void {
+  window.dispatchEvent(new CustomEvent("cf:jsx", { detail }));
+}
+
 function message(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
 }
@@ -93,6 +109,8 @@ let htmlAt = 0;
 
 /** Blob module URLs, by the name a stack frame should show instead (WebKit ignores sourceURL there). */
 const blobNames = new Map<string, string>();
+// The frame script (internal/preview/frame.js) names a module's errors by this too.
+(window as { __cfSourceName?: (url: string) => string | undefined }).__cfSourceName = (url) => blobNames.get(url);
 
 /** An error's message and stack (WebKit's stack has no message line), blob URLs named. */
 function detail(err: Error): string {
@@ -125,7 +143,7 @@ async function run(script: HTMLScriptElement, n: number): Promise<boolean> {
       if (!res.ok) throw new Error(`HTTP ${String(res.status)}`);
       source = await res.text();
     } catch (err) {
-      report(`Could not load ${src}`, message(err), err);
+      fail(`Could not load ${src}`, message(err), err);
       return false;
     }
   }
@@ -136,7 +154,7 @@ async function run(script: HTMLScriptElement, n: number): Promise<boolean> {
   const mismatch = tagMismatch(source, first || 1);
   if (mismatch) {
     const at = where(mismatch);
-    report(`Syntax error in ${name}`, at.message + at.frame);
+    fail(`Syntax error in ${name}`, at.message + at.frame);
     return false;
   }
   try {
@@ -149,7 +167,7 @@ async function run(script: HTMLScriptElement, n: number): Promise<boolean> {
     }).code;
   } catch (err) {
     const at = where(message(err).replace(/^Error transforming .*?: /, ""));
-    report(`Syntax error in ${name}`, at.message + at.frame, err);
+    fail(`Syntax error in ${name}`, at.message + at.frame, err);
     return false;
   }
   // Sucrase keeps line numbers, so blank lines before the code make the module's lines the
@@ -162,7 +180,7 @@ async function run(script: HTMLScriptElement, n: number): Promise<boolean> {
     return true;
   } catch (err) {
     const what = err instanceof SyntaxError || /import|module|specifier|export/i.test(message(err)) ? "Could not import in" : "Error in";
-    report(`${what} ${name}`, err instanceof Error && !(err instanceof SyntaxError) ? detail(err) : message(err), err);
+    fail(`${what} ${name}`, err instanceof Error && !(err instanceof SyntaxError) ? detail(err) : message(err), err);
     return false;
   } finally {
     URL.revokeObjectURL(url);
@@ -177,6 +195,7 @@ async function runAll(): Promise<void> {
     ok = (await run(s, i + 1)) && ok;
   }
   root.dataset.cfJsx = ok ? "ready" : "error";
+  tell({ state: root.dataset.cfJsx });
 }
 
 /**

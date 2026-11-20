@@ -175,6 +175,22 @@ describe("bridge.js", () => {
     await expect(p).rejects.toMatchObject({ code: "declined", message: "the user said no" });
   });
 
+  // A page check hears them (docs/notes/page-self-check.md); the page's own error is unchanged.
+  it("tells the app the calls it refused itself: no click, a source that is not there, args it cannot send", async () => {
+    const h = load();
+    h.ready();
+    await expect(h.cf.run("thread.send", { message: "hi" })).rejects.toMatchObject({ code: "gesture" });
+    expect(() => h.cf.on("threads", () => {})).toThrow(/no source threads/);
+    await expect(h.cf.run("thread.get", [])).rejects.toMatchObject({ code: "invalid" });
+    await expect(h.cf.fetch("/relative")).rejects.toMatchObject({ code: "invalid" });
+    expect(h.sent("cf:refused")).toEqual([
+      expect.objectContaining({ cf: 1, nonce: N, call: "thread.send", code: "gesture", message: expect.stringContaining("within 5 s of a click") as unknown }),
+      expect.objectContaining({ call: 'cf.on("threads")', code: "invalid" }),
+      expect.objectContaining({ call: "thread.get", code: "invalid", message: "args must be an object of strings" }),
+      expect.objectContaining({ call: "cf.fetch", code: "invalid" }),
+    ]);
+  });
+
   it("says how long a gesture lasts, and what to do, when a call comes too late", async () => {
     const h = load();
     h.ready({ verbs: ["thread.get", "thread.send"] });

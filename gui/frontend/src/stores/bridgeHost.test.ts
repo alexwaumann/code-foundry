@@ -1196,3 +1196,66 @@ describe("bridge host: storage per page file", () => {
     expect(posts).toContainEqual(expect.objectContaining({ type: "cf:result", id: "w", ok: false }));
   });
 });
+
+// A page check's copy (docs/notes/page-self-check.md): what the page does is counted, every
+// refusal reported, nothing saved and nothing asked.
+describe("a check's copy", () => {
+  function checked(present = false) {
+    const seen: string[] = [];
+    const errors: { call: string; code: string }[] = [];
+    const posts: Record<string, unknown>[] = [];
+    const h = createBridgeHost({
+      threadId: "t-1",
+      storagePath: "/Users/me/p/page.html",
+      pageName: "page.html",
+      userPresent: () => present,
+      post: (m) => posts.push(m as unknown as Record<string, unknown>),
+      onError: (e) => errors.push(e),
+      check: { busy: (d) => seen.push(d > 0 ? "busy+" : "busy-"), call: () => seen.push("call"), stored: () => seen.push("stored") },
+    });
+    return { h, seen, errors, posts };
+  }
+
+  it("counts the ready and each run in flight, and reports a click the page did not have", async () => {
+    invokeCommand.mockResolvedValue({ message: "", resultJson: "[]" });
+    const c = checked();
+    c.h.receive(hello);
+    await vi.waitFor(() => {
+      expect(c.posts.some((p) => p.type === "cf:ready")).toBe(true);
+    });
+    c.h.receive(run("r1", "thread.list"));
+    c.h.receive(run("r2", "ui.notify"));
+    await vi.waitFor(() => {
+      expect(c.errors).toEqual([expect.objectContaining({ call: "ui.notify", code: "gesture" })]);
+    });
+    await vi.waitFor(() => {
+      expect(c.seen.filter((s) => s === "busy+")).toHaveLength(c.seen.filter((s) => s === "busy-").length);
+    });
+    expect(c.seen.slice(0, 2)).toEqual(["busy+", "busy-"]);
+    expect(c.seen.filter((s) => s === "call")).toHaveLength(2);
+  });
+
+  it("keeps a storage write in the page and saves nothing", async () => {
+    const c = checked();
+    c.h.receive(hello);
+    await vi.waitFor(() => {
+      expect(c.posts.some((p) => p.type === "cf:ready")).toBe(true);
+    });
+    c.h.receive({ cf: 1, type: "cf:store", id: "w1", key: "seeded", value: "true" });
+    expect(c.seen).toContain("stored");
+    expect(c.posts.at(-1)).toMatchObject({ id: "w1", ok: true });
+    expect(fileStore.sets).toEqual([]);
+    expect(pageStore.sets).toEqual([]);
+  });
+
+  it("never asks: what needs a yes is declined at once", async () => {
+    invokeCommand.mockRejectedValueOnce(archiveConfirm);
+    const c = checked(true);
+    c.h.receive(run("a", "thread.archive"));
+    await vi.waitFor(() => {
+      expect(c.posts.at(-1)).toMatchObject({ id: "a", error: { code: "declined" } });
+    });
+    expect(useConfirmStore.getState().pending).toBeNull();
+    expect(c.errors).toEqual([expect.objectContaining({ call: "thread.archive", code: "declined" })]);
+  });
+});

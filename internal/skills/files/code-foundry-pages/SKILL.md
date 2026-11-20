@@ -120,10 +120,9 @@ pages and their storage (archiving keeps both).
 
 ## Show it, then say what it does
 
-Run `code-foundry view.inline <path> --title "<what it is>"` once per file; fix every
-warning it prints by editing the file in place: the card reloads by itself, so never run
-view.inline for that file again, not even for "show me" after an edit (`--panel` also opens
-it beside the thread). Reply in two or
-three sentences: what it shows, what each button does, that the app asks before merging or
-archiving; for "track" or "watch", that it updates only while shown (offer a wake). You have not
-clicked anything: never say it worked.
+Run `code-foundry view.inline <path> --title "<what it is>"` once per file and fix warnings
+in place: the card reloads on each edit, so never show it again, not even for "show me"
+(`--panel` opens it beside the thread). Then run
+`code-foundry page.check <path> --shot out.png` after each edit until it is clean. Reply in 2-3 sentences: what it shows, what each
+button does, that the app asks before merging or archiving; for "track" or "watch", that it
+updates only while shown (offer a wake). The check clicks nothing: never say a button works.

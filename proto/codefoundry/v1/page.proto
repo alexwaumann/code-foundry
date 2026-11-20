@@ -34,6 +34,16 @@ service PageService {
   // limits and errors, at most 8 requests at once per page file (more wait). The consent
   // errors of PageStorage.
   rpc ProxyFetch(PageProxyFetchRequest) returns (PageProxyFetchResponse) {}
+  // CheckPage has the app render the page once, off screen, as a card of the thread it acts
+  // for would show it, and answers what that render saw (page.check;
+  // docs/notes/page-self-check.md): whether it loaded, its script, loader and resource
+  // errors, the bridge calls refused or failed, what the frame could not do, its height and
+  // how long it took to settle, and a PNG when asked. The render is the app host's
+  // (UiService.WatchShots): nothing that needs a click runs, no question is asked, and its
+  // cf.storage writes are not saved. FailedPrecondition when no app window is open (the
+  // message says so) or no thread owns the page and the user has not allowed it; the path
+  // errors of GetPage; DeadlineExceeded when the app did not answer in time.
+  rpc CheckPage(CheckPageRequest) returns (CheckPageResponse) {}
 }
 
 // The user's answer for a page, and whether the page may use the bridge.
@@ -178,4 +188,77 @@ message PageEvent {
   // open copy of a page hears another's write (docs/notes/page-storage-change-event.md). Not
   // a change of answer: paths stays empty for it. An event names only one of the two.
   repeated string storage_paths = 4;
+}
+
+message CheckPageRequest {
+  // The page file: absolute or "~/".
+  string path = 1;
+  // The thread asking: the page acts for it when it owns the page, else for its first
+  // owner (as a File tab does); "" for the first owner.
+  string thread_id = 2;
+  // The card's width in CSS pixels; 0 for 720 (shot.MinWidth to shot.MaxWidth).
+  int32 width = 3;
+  // The most to wait for the page to settle, in ms; 0 for 5000; at most 10000.
+  int32 settle_ms = 4;
+  // Also a PNG of the card's frame as drawn.
+  bool png = 5;
+}
+
+message CheckPageResponse {
+  PageCheckReport report = 1;
+  // The PNG when asked and drawn (report.shot_error says why not).
+  bytes png = 2;
+  // The width it was rendered at, and the thread it acted for ("" for none: a page the
+  // user allowed).
+  int32 width = 3;
+  string thread_id = 4;
+  // The resolved path (PageAccess.path).
+  string path = 5;
+}
+
+// PageCheckReport is what one render of a page saw (the GUI's src/lib/pageCheck.ts).
+message PageCheckReport {
+  // The frame's document loaded and answered the app (a daemon-served page).
+  bool loaded = 1;
+  // The page library's TSX loader (/cf/jsx.js): "" when the page has none, "ready" when
+  // every script ran, "error" when one did not, "running" when it had not finished.
+  string loader = 2;
+  repeated PageCheckProblem problems = 3;
+  // The card frame's height in CSS px (the page's own ask through the bridge, else the
+  // card's default), and the document's own scroll height.
+  int32 height = 4;
+  int32 page_height = 5;
+  // Whether the page asked for its height (cf.resize, which /cf/bridge.js does by itself).
+  bool resized = 6;
+  // How long from the frame's start until nothing more happened, in ms; with settled
+  // false, the bound it gave up at.
+  int32 settle_ms = 7;
+  bool settled = 8;
+  // Bridge calls still waiting at the bound.
+  int32 busy = 9;
+  // cf.storage writes the page made (kept in the check, never saved).
+  int32 storage_writes = 10;
+  // Bridge calls and subscriptions the page made.
+  int32 calls = 11;
+  // Why there is no render at all ("Could not render this page: ..."); empty otherwise.
+  string failure = 12;
+  // Why there is no PNG when one was asked for.
+  string shot_error = 13;
+}
+
+// PageCheckProblem is one thing that went wrong, repeats counted.
+message PageCheckProblem {
+  // "script" (an uncaught error), "rejection" (an unhandled promise rejection), "loader"
+  // (/cf/jsx.js: a compile, import or evaluation error), "resource" (a script, stylesheet
+  // or image that did not load), "bridge" (a cf.run, cf.fetch, cf.storage or cf.on call
+  // the app refused or that failed), "unsupported" (alert, confirm, a download, ...).
+  string kind = 1;
+  // For bridge and unsupported: the call (a verb, cf.on("source"), cf.fetch host, alert).
+  string call = 2;
+  // For bridge: the bridge error code (invalid, unavailable, failed, timeout, gesture, ...).
+  string code = 3;
+  string message = 4;
+  // Where: "page.html:42:13", or the URL that did not load.
+  string where = 5;
+  int32 count = 6;
 }

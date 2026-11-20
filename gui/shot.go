@@ -1,6 +1,7 @@
 package main
 
 import (
+	"cmp"
 	"context"
 	"log/slog"
 	"sync"
@@ -13,7 +14,9 @@ import (
 // each `plugin surface --shot` request on UiService.WatchShots (shotwatch.go). The host
 // draws the surface in a window the user never sees (shot_darwin.go), with the shot page
 // (frontend/shot.html), snapshots the webview and answers with UiService.PublishShot. One
-// request at a time, in the order they came.
+// request at a time, in the order they came. A request with a page is a page check
+// (docs/notes/page-self-check.md): the page renders it in a card's frame and reports what it
+// saw (Checked); the host snapshots the frame when asked and answers with the report.
 
 const (
 	// shotHostTimeout is how long a request has from the moment the host receives it to
@@ -44,12 +47,24 @@ type shotPageRequest struct {
 	Scope      string `json:"scope,omitempty"`
 	MinVersion uint64 `json:"minVersion,omitempty"`
 	TimeoutMs  int64  `json:"timeoutMs"`
+	// Page is a page check in place of a surface.
+	Page *shotPageCheck `json:"page,omitempty"`
+}
+
+// shotPageCheck is the page's PageCheckRequest (frontend/src/shot/pageCheckRunner.ts).
+type shotPageCheck struct {
+	Path     string `json:"path"`
+	ThreadID string `json:"threadId"`
+	SettleMs int32  `json:"settleMs"`
 }
 
 // pageRequestOf is the page's request for r, waiting at most timeout for a live view. An
 // instance names the surface by itself (the CLI always sends one); without one the scope
 // is the context's thread, else its project, else its worktree, else global.
 func pageRequestOf(r *v1.ShotRequest, timeout time.Duration) shotPageRequest {
+	if p := r.GetPage(); p != nil {
+		return shotPageRequest{ID: r.GetId(), TimeoutMs: timeout.Milliseconds(), Page: &shotPageCheck{Path: p.GetPath(), ThreadID: p.GetThreadId(), SettleMs: p.GetSettleMs()}}
+	}
 	ref := r.GetRef()
 	p := shotPageRequest{
 		ID:         r.GetId(),
@@ -93,8 +108,9 @@ type shotPanel interface {
 	// show sizes the page's viewport to width by height CSS px, orders the window in
 	// outside every display and hands the page req; or says why it cannot.
 	show(width, height int, req shotPageRequest) error
-	// snapshot captures the viewport; the channel gets one picture.
-	snapshot() <-chan shotPicture
+	// snapshot captures the viewport, or its top clip CSS px when clip is over 0; the
+	// channel gets one picture.
+	snapshot(clip int) <-chan shotPicture
 	// hide orders the window out.
 	hide()
 	// close destroys the window; the next open makes a new one.
@@ -107,9 +123,50 @@ type ShotRendered struct {
 	ContentHeight int `json:"contentHeight"`
 }
 
-// shotAnswer is the page's report: rendered, or the reason it could not.
+// PageChecked is the page's report of a page check (frontend/src/lib/pageCheck.ts
+// PageCheckReport; page.proto's PageCheckReport).
+type PageChecked struct {
+	Loaded        bool             `json:"loaded"`
+	Loader        string           `json:"loader"`
+	Problems      []PageCheckIssue `json:"problems"`
+	Height        int              `json:"height"`
+	PageHeight    int              `json:"pageHeight"`
+	Resized       bool             `json:"resized"`
+	SettleMs      int              `json:"settleMs"`
+	Settled       bool             `json:"settled"`
+	Busy          int              `json:"busy"`
+	StorageWrites int              `json:"storageWrites"`
+	Calls         int              `json:"calls"`
+	Failure       string           `json:"failure"`
+}
+
+// PageCheckIssue is one problem a page check saw.
+type PageCheckIssue struct {
+	Kind    string `json:"kind"`
+	Call    string `json:"call"`
+	Code    string `json:"code"`
+	Message string `json:"message"`
+	Where   string `json:"where"`
+	Count   int    `json:"count"`
+}
+
+// proto is the report as the daemon takes it.
+func (c *PageChecked) proto() *v1.PageCheckReport {
+	r := &v1.PageCheckReport{
+		Loaded: c.Loaded, Loader: c.Loader, Height: int32(c.Height), PageHeight: int32(c.PageHeight), Resized: c.Resized,
+		SettleMs: int32(c.SettleMs), Settled: c.Settled, Busy: int32(c.Busy), StorageWrites: int32(c.StorageWrites),
+		Calls: int32(c.Calls), Failure: c.Failure,
+	}
+	for _, p := range c.Problems {
+		r.Problems = append(r.Problems, &v1.PageCheckProblem{Kind: p.Kind, Call: p.Call, Code: p.Code, Message: p.Message, Where: p.Where, Count: int32(p.Count)})
+	}
+	return r
+}
+
+// shotAnswer is the page's report: rendered, a page check's report, or the reason it could not.
 type shotAnswer struct {
 	rendered *ShotRendered
+	checked  *PageChecked
 	reason   string
 }
 
@@ -155,7 +212,9 @@ func NewShotService(log *slog.Logger) *ShotService {
 
 // take queues r, received on a stream whose context is ctx. A full queue answers at once.
 func (s *ShotService) take(ctx context.Context, r *v1.ShotRequest) {
-	job := shotJob{ctx: ctx, req: r, deadline: time.Now().Add(s.timeout)}
+	// A page check has its settle time on top (the daemon waits as long more).
+	settle := time.Duration(r.GetPage().GetSettleMs()) * time.Millisecond
+	job := shotJob{ctx: ctx, req: r, deadline: time.Now().Add(s.timeout + settle)}
 	select {
 	case s.jobs <- job:
 	default:
@@ -210,7 +269,11 @@ func (s *ShotService) shoot(ctx context.Context, job shotJob) {
 	}
 
 	left := time.Until(job.deadline) - shotCaptureMargin
-	if err := s.panel.show(int(job.req.GetWidth()), int(job.req.GetHeight()), pageRequestOf(job.req, min(shotPageTimeout, max(left, time.Second)))); err != nil {
+	timeout := min(shotPageTimeout, max(left, time.Second))
+	if job.req.GetPage() != nil {
+		timeout = max(left, time.Second)
+	}
+	if err := s.panel.show(int(job.req.GetWidth()), int(job.req.GetHeight()), pageRequestOf(job.req, timeout)); err != nil {
 		s.panel.hide()
 		s.answerError(job, err.Error())
 		return
@@ -222,6 +285,10 @@ func (s *ShotService) shoot(ctx context.Context, job shotJob) {
 		s.abandon(ctx, job, "the screenshot page did not answer")
 		return
 	}
+	if job.req.GetPage() != nil {
+		s.checked(jctx, ctx, job, got)
+		return
+	}
 	if got.rendered == nil {
 		s.panel.hide()
 		s.answerError(job, got.reason)
@@ -230,7 +297,7 @@ func (s *ShotService) shoot(ctx context.Context, job shotJob) {
 
 	var pic shotPicture
 	select {
-	case pic = <-s.panel.snapshot():
+	case pic = <-s.panel.snapshot(0):
 	case <-jctx.Done():
 		s.abandon(ctx, job, "the snapshot did not finish")
 		return
@@ -242,6 +309,39 @@ func (s *ShotService) shoot(ctx context.Context, job shotJob) {
 	}
 	s.log.Info("shot: captured", "id", id, "bytes", len(pic.png), "content_height", got.rendered.ContentHeight)
 	s.reply(job, &v1.PublishShotRequest{Id: id, Png: pic.png, ContentHeight: int32(got.rendered.ContentHeight)})
+}
+
+// checked answers a page check with the page's report, and a snapshot of the card's frame
+// when one was asked for and the page rendered. A snapshot that fails is said in the report
+// (shot_error): the check itself stands.
+func (s *ShotService) checked(jctx, ctx context.Context, job shotJob, got shotAnswer) {
+	if got.checked == nil {
+		s.panel.hide()
+		s.answerError(job, cmp.Or(got.reason, "the page check sent no report"))
+		return
+	}
+	report := got.checked.proto()
+	out := &v1.PublishShotRequest{Id: job.req.GetId(), PageReport: report, ContentHeight: int32(got.checked.Height)}
+	if job.req.GetPage().GetPng() {
+		if got.checked.Failure != "" {
+			report.ShotError = "the page was not rendered"
+		} else {
+			select {
+			case pic := <-s.panel.snapshot(got.checked.Height):
+				if pic.err != nil {
+					report.ShotError = "the snapshot failed: " + pic.err.Error()
+				} else {
+					out.Png = pic.png
+				}
+			case <-jctx.Done():
+				s.abandon(ctx, job, "the snapshot did not finish")
+				return
+			}
+		}
+	}
+	s.panel.hide()
+	s.log.Info("shot: page checked", "id", job.req.GetId(), "problems", len(report.GetProblems()), "bytes", len(out.GetPng()))
+	s.reply(job, out)
 }
 
 // abandon ends a request that ran out of time or lost its stream. Out of time, the
@@ -352,6 +452,12 @@ func (s *ShotService) PageReady() {
 // Rendered is the page's report that request id's surface is drawn: the host snapshots it.
 func (s *ShotService) Rendered(id string, r ShotRendered) {
 	s.deliver(id, shotAnswer{rendered: &r})
+}
+
+// Checked is the page's report of page check id: what the render saw. The host snapshots the
+// card's frame when the check asked for a PNG.
+func (s *ShotService) Checked(id string, r PageChecked) {
+	s.deliver(id, shotAnswer{checked: &r})
 }
 
 // Failed is the page's report that request id could not be drawn: failure is its kind

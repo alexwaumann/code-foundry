@@ -6,24 +6,32 @@
  * how the Wails host (gui/shot.go) sends them. Its report marks <html>: data-shot-ready (the
  * content height) or data-shot-error ("<failure>: <reason>"), and data-shot-id; and in the
  * app it goes to the host, which snapshots the window (src/api/shot.ts).
+ *
+ * A request with a `page` (or `?page=<path>&thread=<id>`) is a page check instead
+ * (docs/notes/page-self-check.md, pageCheckRunner.ts): its report is also data-page-check,
+ * the report as JSON, and data-shot-ready is the card frame's height.
  */
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import "../index.css";
 import { listPlugins } from "@/api/plugin";
-import { reportShotToHost, shotPageReady } from "@/api/shot";
+import { reportPageCheckToHost, reportShotToHost, shotPageReady } from "@/api/shot";
 import { getPublishedTheme } from "@/api/ui";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import type { PageCheckReport } from "@/lib/pageCheck";
+import { startEventSync } from "@/stores/events";
 import { applyPluginEvent, usePluginsStore } from "@/stores/plugins";
 import { startSurfaceWatch, usePluginSurfacesStore } from "@/stores/pluginSurfaces";
 import { requestFromSearch, ShotController, type ShotReport, type ShotRequest } from "./controller";
+import { PageCheckRunner, pageCheckFromSearch, type PageCheckRequest } from "./pageCheckRunner";
+import { PageCheckStage } from "./PageCheckStage";
 import { Stage } from "./Stage";
 import { useShotStage } from "./stageStore";
 
 declare global {
   interface Window {
-    /** Starts a shot request, replacing the one in hand (src/shot/controller.ts). */
-    cfShot?: (req: ShotRequest) => void;
+    /** Starts a shot request or a page check, replacing the one in hand (src/shot/controller.ts, pageCheckRunner.ts). */
+    cfShot?: (req: ShotRequest | PageCheckRequest) => void;
   }
 }
 
@@ -97,11 +105,30 @@ const controller = new ShotController({
   report,
 });
 
+const checks = new PageCheckRunner({
+  applyTheme,
+  follow: () => startEventSync({ observer: true }),
+  report: (id: string, r: PageCheckReport) => {
+    // Marked first, as a surface's report is.
+    const ds = document.documentElement.dataset;
+    ds.shotId = id;
+    ds.pageCheck = JSON.stringify(r);
+    ds.shotReady = String(r.height);
+    reportPageCheckToHost(id, r);
+  },
+});
+
 window.cfShot = (req) => {
   const ds = document.documentElement.dataset;
   delete ds.shotId;
   delete ds.shotReady;
   delete ds.shotError;
+  delete ds.pageCheck;
+  if ("page" in req) {
+    void checks.start(req);
+    return;
+  }
+  checks.stop();
   controller.start(req);
 };
 
@@ -111,10 +138,11 @@ createRoot(root).render(
   <StrictMode>
     <TooltipProvider>
       <Stage />
+      <PageCheckStage />
     </TooltipProvider>
   </StrictMode>,
 );
 
-const fromUrl = requestFromSearch(window.location.search);
+const fromUrl = pageCheckFromSearch(window.location.search) ?? requestFromSearch(window.location.search);
 if (fromUrl) window.cfShot(fromUrl);
 shotPageReady();

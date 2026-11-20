@@ -4,7 +4,8 @@
  * and reports each one here. Outside the app (the mock, a browser) there is no host and
  * these do nothing: the page's <html> marks are the report there.
  */
-import { Failed, PageReady, Rendered } from "../../bindings/github.com/alexwaumann/code-foundry/gui/shotservice";
+import { Checked, Failed, PageReady, Rendered } from "../../bindings/github.com/alexwaumann/code-foundry/gui/shotservice";
+import type { PageCheckReport } from "@/lib/pageCheck";
 
 /** A report the host takes: the page's ShotReport (src/shot/controller.ts). */
 export type HostShotReport =
@@ -34,4 +35,10 @@ export function reportShotToHost(r: HostShotReport): void {
   if (!inShotHost()) return;
   const call = r.ok ? Rendered(r.id, { contentHeight: r.contentHeight }) : Failed(r.id, r.failure, r.reason);
   call.catch(warn("shot report"));
+}
+
+/** Hands the host a page check's report (docs/notes/page-self-check.md): it snapshots the card's frame when asked, then answers the daemon. */
+export function reportPageCheckToHost(id: string, r: PageCheckReport): void {
+  if (!inShotHost()) return;
+  Checked(id, r).catch(warn("page check report"));
 }

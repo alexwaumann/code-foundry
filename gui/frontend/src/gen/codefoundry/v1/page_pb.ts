@@ -10,7 +10,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file codefoundry/v1/page.proto.
  */
 export const file_codefoundry_v1_page: GenFile = /*@__PURE__*/
-  fileDesc("Chljb2RlZm91bmRyeS92MS9wYWdlLnByb3RvEg5jb2RlZm91bmRyeS52MSJPCglQYWdlT3duZXISEQoJdGhyZWFkX2lkGAEgASgJEi8KBnNvdXJjZRgCIAEoDjIfLmNvZGVmb3VuZHJ5LnYxLlBhZ2VPd25lclNvdXJjZSKjAgoKUGFnZUFjY2VzcxIMCgRwYXRoGAEgASgJEhQKDG93bmVyX3RocmVhZBgCIAEoCRI1Cgxvd25lcl9zb3VyY2UYAyABKA4yHy5jb2RlZm91bmRyeS52MS5QYWdlT3duZXJTb3VyY2USLAoHY29uc2VudBgEIAEoDjIbLmNvZGVmb3VuZHJ5LnYxLlBhZ2VDb25zZW50EisKBmFuc3dlchgFIAEoDjIbLmNvZGVmb3VuZHJ5LnYxLlBhZ2VDb25zZW50EhoKEnVuYXZhaWxhYmxlX3JlYXNvbhgGIAEoCRIpCgZvd25lcnMYByADKAsyGS5jb2RlZm91bmRyeS52MS5QYWdlT3duZXISGAoQc3RvcmFnZV9wZXJfZmlsZRgIIAEoCCIeCg5HZXRQYWdlUmVxdWVzdBIMCgRwYXRoGAEgASgJIjsKD0dldFBhZ2VSZXNwb25zZRIoCgRwYWdlGAEgASgLMhouY29kZWZvdW5kcnkudjEuUGFnZUFjY2VzcyImChZQYWdlRmlsZVN0b3JhZ2VSZXF1ZXN0EgwKBHBhdGgYASABKAkijQEKF1BhZ2VGaWxlU3RvcmFnZVJlc3BvbnNlEkMKBnZhbHVlcxgBIAMoCzIzLmNvZGVmb3VuZHJ5LnYxLlBhZ2VGaWxlU3RvcmFnZVJlc3BvbnNlLlZhbHVlc0VudHJ5Gi0KC1ZhbHVlc0VudHJ5EgsKA2tleRgBIAEoCRINCgV2YWx1ZRgCIAEoCToCOAEiVAoZU2V0UGFnZUZpbGVTdG9yYWdlUmVxdWVzdBIMCgRwYXRoGAEgASgJEgsKA2tleRgCIAEoCRISCgV2YWx1ZRgDIAEoCUgAiAEBQggKBl92YWx1ZSKTAQoaU2V0UGFnZUZpbGVTdG9yYWdlUmVzcG9uc2USRgoGdmFsdWVzGAEgAygLMjYuY29kZWZvdW5kcnkudjEuU2V0UGFnZUZpbGVTdG9yYWdlUmVzcG9uc2UuVmFsdWVzRW50cnkaLQoLVmFsdWVzRW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgJOgI4ASLZAQoVUGFnZVByb3h5RmV0Y2hSZXF1ZXN0EgwKBHBhdGgYASABKAkSCwoDdXJsGAIgASgJEg4KBm1ldGhvZBgDIAEoCRJDCgdoZWFkZXJzGAQgAygLMjIuY29kZWZvdW5kcnkudjEuUGFnZVByb3h5RmV0Y2hSZXF1ZXN0LkhlYWRlcnNFbnRyeRIMCgRib2R5GAUgASgMEhIKCnRpbWVvdXRfbXMYBiABKA0aLgoMSGVhZGVyc0VudHJ5EgsKA2tleRgBIAEoCRINCgV2YWx1ZRgCIAEoCToCOAEizgEKFlBhZ2VQcm94eUZldGNoUmVzcG9uc2USDgoGc3RhdHVzGAEgASgNEkQKB2hlYWRlcnMYAiADKAsyMy5jb2RlZm91bmRyeS52MS5QYWdlUHJveHlGZXRjaFJlc3BvbnNlLkhlYWRlcnNFbnRyeRIMCgRib2R5GAMgASgMEgsKA3VybBgEIAEoCRITCgtzdGF0dXNfdGV4dBgFIAEoCRouCgxIZWFkZXJzRW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgJOgI4ASJWCglQYWdlRXZlbnQSDQoFcGF0aHMYASADKAkSFgoOcmVtb3ZlZF90aHJlYWQYAiABKAkSCwoDYWxsGAMgASgIEhUKDXN0b3JhZ2VfcGF0aHMYBCADKAkqsQEKC1BhZ2VDb25zZW50EhwKGFBBR0VfQ09OU0VOVF9VTlNQRUNJRklFRBAAEhYKElBBR0VfQ09OU0VOVF9PV05FRBABEhgKFFBBR0VfQ09OU0VOVF9BTExPV0VEEAISGAoUUEFHRV9DT05TRU5UX1JFRlVTRUQQAxIaChZQQUdFX0NPTlNFTlRfTk9UX0FTS0VEEAQSHAoYUEFHRV9DT05TRU5UX1VOQVZBSUxBQkxFEAUqlwEKD1BhZ2VPd25lclNvdXJjZRIhCh1QQUdFX09XTkVSX1NPVVJDRV9VTlNQRUNJRklFRBAAEhsKF1BBR0VfT1dORVJfU09VUkNFX1NIT1dOEAESHQoZUEFHRV9PV05FUl9TT1VSQ0VfV1JJVFRFThACEiUKIVBBR0VfT1dORVJfU09VUkNFX1BBR0VTX0RJUkVDVE9SWRADMocDCgtQYWdlU2VydmljZRJMCgdHZXRQYWdlEh4uY29kZWZvdW5kcnkudjEuR2V0UGFnZVJlcXVlc3QaHy5jb2RlZm91bmRyeS52MS5HZXRQYWdlUmVzcG9uc2UiABJgCgtQYWdlU3RvcmFnZRImLmNvZGVmb3VuZHJ5LnYxLlBhZ2VGaWxlU3RvcmFnZVJlcXVlc3QaJy5jb2RlZm91bmRyeS52MS5QYWdlRmlsZVN0b3JhZ2VSZXNwb25zZSIAEmkKDlNldFBhZ2VTdG9yYWdlEikuY29kZWZvdW5kcnkudjEuU2V0UGFnZUZpbGVTdG9yYWdlUmVxdWVzdBoqLmNvZGVmb3VuZHJ5LnYxLlNldFBhZ2VGaWxlU3RvcmFnZVJlc3BvbnNlIgASXQoKUHJveHlGZXRjaBIlLmNvZGVmb3VuZHJ5LnYxLlBhZ2VQcm94eUZldGNoUmVxdWVzdBomLmNvZGVmb3VuZHJ5LnYxLlBhZ2VQcm94eUZldGNoUmVzcG9uc2UiAELBAQoSY29tLmNvZGVmb3VuZHJ5LnYxQglQYWdlUHJvdG9QAVpHZ2l0aHViLmNvbS9hbGV4d2F1bWFubi9jb2RlLWZvdW5kcnkvZ2VuL2dvL2NvZGVmb3VuZHJ5L3YxO2NvZGVmb3VuZHJ5djGiAgNDWFiqAg5Db2RlZm91bmRyeS5WMcoCDkNvZGVmb3VuZHJ5XFYx4gIaQ29kZWZvdW5kcnlcVjFcR1BCTWV0YWRhdGHqAg9Db2RlZm91bmRyeTo6VjFiBnByb3RvMw");
+  fileDesc("Chljb2RlZm91bmRyeS92MS9wYWdlLnByb3RvEg5jb2RlZm91bmRyeS52MSJPCglQYWdlT3duZXISEQoJdGhyZWFkX2lkGAEgASgJEi8KBnNvdXJjZRgCIAEoDjIfLmNvZGVmb3VuZHJ5LnYxLlBhZ2VPd25lclNvdXJjZSKjAgoKUGFnZUFjY2VzcxIMCgRwYXRoGAEgASgJEhQKDG93bmVyX3RocmVhZBgCIAEoCRI1Cgxvd25lcl9zb3VyY2UYAyABKA4yHy5jb2RlZm91bmRyeS52MS5QYWdlT3duZXJTb3VyY2USLAoHY29uc2VudBgEIAEoDjIbLmNvZGVmb3VuZHJ5LnYxLlBhZ2VDb25zZW50EisKBmFuc3dlchgFIAEoDjIbLmNvZGVmb3VuZHJ5LnYxLlBhZ2VDb25zZW50EhoKEnVuYXZhaWxhYmxlX3JlYXNvbhgGIAEoCRIpCgZvd25lcnMYByADKAsyGS5jb2RlZm91bmRyeS52MS5QYWdlT3duZXISGAoQc3RvcmFnZV9wZXJfZmlsZRgIIAEoCCIeCg5HZXRQYWdlUmVxdWVzdBIMCgRwYXRoGAEgASgJIjsKD0dldFBhZ2VSZXNwb25zZRIoCgRwYWdlGAEgASgLMhouY29kZWZvdW5kcnkudjEuUGFnZUFjY2VzcyImChZQYWdlRmlsZVN0b3JhZ2VSZXF1ZXN0EgwKBHBhdGgYASABKAkijQEKF1BhZ2VGaWxlU3RvcmFnZVJlc3BvbnNlEkMKBnZhbHVlcxgBIAMoCzIzLmNvZGVmb3VuZHJ5LnYxLlBhZ2VGaWxlU3RvcmFnZVJlc3BvbnNlLlZhbHVlc0VudHJ5Gi0KC1ZhbHVlc0VudHJ5EgsKA2tleRgBIAEoCRINCgV2YWx1ZRgCIAEoCToCOAEiVAoZU2V0UGFnZUZpbGVTdG9yYWdlUmVxdWVzdBIMCgRwYXRoGAEgASgJEgsKA2tleRgCIAEoCRISCgV2YWx1ZRgDIAEoCUgAiAEBQggKBl92YWx1ZSKTAQoaU2V0UGFnZUZpbGVTdG9yYWdlUmVzcG9uc2USRgoGdmFsdWVzGAEgAygLMjYuY29kZWZvdW5kcnkudjEuU2V0UGFnZUZpbGVTdG9yYWdlUmVzcG9uc2UuVmFsdWVzRW50cnkaLQoLVmFsdWVzRW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgJOgI4ASLZAQoVUGFnZVByb3h5RmV0Y2hSZXF1ZXN0EgwKBHBhdGgYASABKAkSCwoDdXJsGAIgASgJEg4KBm1ldGhvZBgDIAEoCRJDCgdoZWFkZXJzGAQgAygLMjIuY29kZWZvdW5kcnkudjEuUGFnZVByb3h5RmV0Y2hSZXF1ZXN0LkhlYWRlcnNFbnRyeRIMCgRib2R5GAUgASgMEhIKCnRpbWVvdXRfbXMYBiABKA0aLgoMSGVhZGVyc0VudHJ5EgsKA2tleRgBIAEoCRINCgV2YWx1ZRgCIAEoCToCOAEizgEKFlBhZ2VQcm94eUZldGNoUmVzcG9uc2USDgoGc3RhdHVzGAEgASgNEkQKB2hlYWRlcnMYAiADKAsyMy5jb2RlZm91bmRyeS52MS5QYWdlUHJveHlGZXRjaFJlc3BvbnNlLkhlYWRlcnNFbnRyeRIMCgRib2R5GAMgASgMEgsKA3VybBgEIAEoCRITCgtzdGF0dXNfdGV4dBgFIAEoCRouCgxIZWFkZXJzRW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgJOgI4ASJWCglQYWdlRXZlbnQSDQoFcGF0aHMYASADKAkSFgoOcmVtb3ZlZF90aHJlYWQYAiABKAkSCwoDYWxsGAMgASgIEhUKDXN0b3JhZ2VfcGF0aHMYBCADKAkiYgoQQ2hlY2tQYWdlUmVxdWVzdBIMCgRwYXRoGAEgASgJEhEKCXRocmVhZF9pZBgCIAEoCRINCgV3aWR0aBgDIAEoBRIRCglzZXR0bGVfbXMYBCABKAUSCwoDcG5nGAUgASgIIoEBChFDaGVja1BhZ2VSZXNwb25zZRIvCgZyZXBvcnQYASABKAsyHy5jb2RlZm91bmRyeS52MS5QYWdlQ2hlY2tSZXBvcnQSCwoDcG5nGAIgASgMEg0KBXdpZHRoGAMgASgFEhEKCXRocmVhZF9pZBgEIAEoCRIMCgRwYXRoGAUgASgJIpkCCg9QYWdlQ2hlY2tSZXBvcnQSDgoGbG9hZGVkGAEgASgIEg4KBmxvYWRlchgCIAEoCRIyCghwcm9ibGVtcxgDIAMoCzIgLmNvZGVmb3VuZHJ5LnYxLlBhZ2VDaGVja1Byb2JsZW0SDgoGaGVpZ2h0GAQgASgFEhMKC3BhZ2VfaGVpZ2h0GAUgASgFEg8KB3Jlc2l6ZWQYBiABKAgSEQoJc2V0dGxlX21zGAcgASgFEg8KB3NldHRsZWQYCCABKAgSDAoEYnVzeRgJIAEoBRIWCg5zdG9yYWdlX3dyaXRlcxgKIAEoBRINCgVjYWxscxgLIAEoBRIPCgdmYWlsdXJlGAwgASgJEhIKCnNob3RfZXJyb3IYDSABKAkiawoQUGFnZUNoZWNrUHJvYmxlbRIMCgRraW5kGAEgASgJEgwKBGNhbGwYAiABKAkSDAoEY29kZRgDIAEoCRIPCgdtZXNzYWdlGAQgASgJEg0KBXdoZXJlGAUgASgJEg0KBWNvdW50GAYgASgFKrEBCgtQYWdlQ29uc2VudBIcChhQQUdFX0NPTlNFTlRfVU5TUEVDSUZJRUQQABIWChJQQUdFX0NPTlNFTlRfT1dORUQQARIYChRQQUdFX0NPTlNFTlRfQUxMT1dFRBACEhgKFFBBR0VfQ09OU0VOVF9SRUZVU0VEEAMSGgoWUEFHRV9DT05TRU5UX05PVF9BU0tFRBAEEhwKGFBBR0VfQ09OU0VOVF9VTkFWQUlMQUJMRRAFKpcBCg9QYWdlT3duZXJTb3VyY2USIQodUEFHRV9PV05FUl9TT1VSQ0VfVU5TUEVDSUZJRUQQABIbChdQQUdFX09XTkVSX1NPVVJDRV9TSE9XThABEh0KGVBBR0VfT1dORVJfU09VUkNFX1dSSVRURU4QAhIlCiFQQUdFX09XTkVSX1NPVVJDRV9QQUdFU19ESVJFQ1RPUlkQAzLbAwoLUGFnZVNlcnZpY2USTAoHR2V0UGFnZRIeLmNvZGVmb3VuZHJ5LnYxLkdldFBhZ2VSZXF1ZXN0Gh8uY29kZWZvdW5kcnkudjEuR2V0UGFnZVJlc3BvbnNlIgASYAoLUGFnZVN0b3JhZ2USJi5jb2RlZm91bmRyeS52MS5QYWdlRmlsZVN0b3JhZ2VSZXF1ZXN0GicuY29kZWZvdW5kcnkudjEuUGFnZUZpbGVTdG9yYWdlUmVzcG9uc2UiABJpCg5TZXRQYWdlU3RvcmFnZRIpLmNvZGVmb3VuZHJ5LnYxLlNldFBhZ2VGaWxlU3RvcmFnZVJlcXVlc3QaKi5jb2RlZm91bmRyeS52MS5TZXRQYWdlRmlsZVN0b3JhZ2VSZXNwb25zZSIAEl0KClByb3h5RmV0Y2gSJS5jb2RlZm91bmRyeS52MS5QYWdlUHJveHlGZXRjaFJlcXVlc3QaJi5jb2RlZm91bmRyeS52MS5QYWdlUHJveHlGZXRjaFJlc3BvbnNlIgASUgoJQ2hlY2tQYWdlEiAuY29kZWZvdW5kcnkudjEuQ2hlY2tQYWdlUmVxdWVzdBohLmNvZGVmb3VuZHJ5LnYxLkNoZWNrUGFnZVJlc3BvbnNlIgBCwQEKEmNvbS5jb2RlZm91bmRyeS52MUIJUGFnZVByb3RvUAFaR2dpdGh1Yi5jb20vYWxleHdhdW1hbm4vY29kZS1mb3VuZHJ5L2dlbi9nby9jb2RlZm91bmRyeS92MTtjb2RlZm91bmRyeXYxogIDQ1hYqgIOQ29kZWZvdW5kcnkuVjHKAg5Db2RlZm91bmRyeVxWMeICGkNvZGVmb3VuZHJ5XFYxXEdQQk1ldGFkYXRh6gIPQ29kZWZvdW5kcnk6OlYxYgZwcm90bzM");
 
 /**
  * PageOwner is one thread that owns a page.
@@ -384,6 +384,255 @@ export const PageEventSchema: GenMessage<PageEvent> = /*@__PURE__*/
   messageDesc(file_codefoundry_v1_page, 10);
 
 /**
+ * @generated from message codefoundry.v1.CheckPageRequest
+ */
+export type CheckPageRequest = Message<"codefoundry.v1.CheckPageRequest"> & {
+  /**
+   * The page file: absolute or "~/".
+   *
+   * @generated from field: string path = 1;
+   */
+  path: string;
+
+  /**
+   * The thread asking: the page acts for it when it owns the page, else for its first
+   * owner (as a File tab does); "" for the first owner.
+   *
+   * @generated from field: string thread_id = 2;
+   */
+  threadId: string;
+
+  /**
+   * The card's width in CSS pixels; 0 for 720 (shot.MinWidth to shot.MaxWidth).
+   *
+   * @generated from field: int32 width = 3;
+   */
+  width: number;
+
+  /**
+   * The most to wait for the page to settle, in ms; 0 for 5000; at most 10000.
+   *
+   * @generated from field: int32 settle_ms = 4;
+   */
+  settleMs: number;
+
+  /**
+   * Also a PNG of the card's frame as drawn.
+   *
+   * @generated from field: bool png = 5;
+   */
+  png: boolean;
+};
+
+/**
+ * Describes the message codefoundry.v1.CheckPageRequest.
+ * Use `create(CheckPageRequestSchema)` to create a new message.
+ */
+export const CheckPageRequestSchema: GenMessage<CheckPageRequest> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_page, 11);
+
+/**
+ * @generated from message codefoundry.v1.CheckPageResponse
+ */
+export type CheckPageResponse = Message<"codefoundry.v1.CheckPageResponse"> & {
+  /**
+   * @generated from field: codefoundry.v1.PageCheckReport report = 1;
+   */
+  report?: PageCheckReport | undefined;
+
+  /**
+   * The PNG when asked and drawn (report.shot_error says why not).
+   *
+   * @generated from field: bytes png = 2;
+   */
+  png: Uint8Array;
+
+  /**
+   * The width it was rendered at, and the thread it acted for ("" for none: a page the
+   * user allowed).
+   *
+   * @generated from field: int32 width = 3;
+   */
+  width: number;
+
+  /**
+   * @generated from field: string thread_id = 4;
+   */
+  threadId: string;
+
+  /**
+   * The resolved path (PageAccess.path).
+   *
+   * @generated from field: string path = 5;
+   */
+  path: string;
+};
+
+/**
+ * Describes the message codefoundry.v1.CheckPageResponse.
+ * Use `create(CheckPageResponseSchema)` to create a new message.
+ */
+export const CheckPageResponseSchema: GenMessage<CheckPageResponse> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_page, 12);
+
+/**
+ * PageCheckReport is what one render of a page saw (the GUI's src/lib/pageCheck.ts).
+ *
+ * @generated from message codefoundry.v1.PageCheckReport
+ */
+export type PageCheckReport = Message<"codefoundry.v1.PageCheckReport"> & {
+  /**
+   * The frame's document loaded and answered the app (a daemon-served page).
+   *
+   * @generated from field: bool loaded = 1;
+   */
+  loaded: boolean;
+
+  /**
+   * The page library's TSX loader (/cf/jsx.js): "" when the page has none, "ready" when
+   * every script ran, "error" when one did not, "running" when it had not finished.
+   *
+   * @generated from field: string loader = 2;
+   */
+  loader: string;
+
+  /**
+   * @generated from field: repeated codefoundry.v1.PageCheckProblem problems = 3;
+   */
+  problems: PageCheckProblem[];
+
+  /**
+   * The card frame's height in CSS px (the page's own ask through the bridge, else the
+   * card's default), and the document's own scroll height.
+   *
+   * @generated from field: int32 height = 4;
+   */
+  height: number;
+
+  /**
+   * @generated from field: int32 page_height = 5;
+   */
+  pageHeight: number;
+
+  /**
+   * Whether the page asked for its height (cf.resize, which /cf/bridge.js does by itself).
+   *
+   * @generated from field: bool resized = 6;
+   */
+  resized: boolean;
+
+  /**
+   * How long from the frame's start until nothing more happened, in ms; with settled
+   * false, the bound it gave up at.
+   *
+   * @generated from field: int32 settle_ms = 7;
+   */
+  settleMs: number;
+
+  /**
+   * @generated from field: bool settled = 8;
+   */
+  settled: boolean;
+
+  /**
+   * Bridge calls still waiting at the bound.
+   *
+   * @generated from field: int32 busy = 9;
+   */
+  busy: number;
+
+  /**
+   * cf.storage writes the page made (kept in the check, never saved).
+   *
+   * @generated from field: int32 storage_writes = 10;
+   */
+  storageWrites: number;
+
+  /**
+   * Bridge calls and subscriptions the page made.
+   *
+   * @generated from field: int32 calls = 11;
+   */
+  calls: number;
+
+  /**
+   * Why there is no render at all ("Could not render this page: ..."); empty otherwise.
+   *
+   * @generated from field: string failure = 12;
+   */
+  failure: string;
+
+  /**
+   * Why there is no PNG when one was asked for.
+   *
+   * @generated from field: string shot_error = 13;
+   */
+  shotError: string;
+};
+
+/**
+ * Describes the message codefoundry.v1.PageCheckReport.
+ * Use `create(PageCheckReportSchema)` to create a new message.
+ */
+export const PageCheckReportSchema: GenMessage<PageCheckReport> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_page, 13);
+
+/**
+ * PageCheckProblem is one thing that went wrong, repeats counted.
+ *
+ * @generated from message codefoundry.v1.PageCheckProblem
+ */
+export type PageCheckProblem = Message<"codefoundry.v1.PageCheckProblem"> & {
+  /**
+   * "script" (an uncaught error), "rejection" (an unhandled promise rejection), "loader"
+   * (/cf/jsx.js: a compile, import or evaluation error), "resource" (a script, stylesheet
+   * or image that did not load), "bridge" (a cf.run, cf.fetch, cf.storage or cf.on call
+   * the app refused or that failed), "unsupported" (alert, confirm, a download, ...).
+   *
+   * @generated from field: string kind = 1;
+   */
+  kind: string;
+
+  /**
+   * For bridge and unsupported: the call (a verb, cf.on("source"), cf.fetch host, alert).
+   *
+   * @generated from field: string call = 2;
+   */
+  call: string;
+
+  /**
+   * For bridge: the bridge error code (invalid, unavailable, failed, timeout, gesture, ...).
+   *
+   * @generated from field: string code = 3;
+   */
+  code: string;
+
+  /**
+   * @generated from field: string message = 4;
+   */
+  message: string;
+
+  /**
+   * Where: "page.html:42:13", or the URL that did not load.
+   *
+   * @generated from field: string where = 5;
+   */
+  where: string;
+
+  /**
+   * @generated from field: int32 count = 6;
+   */
+  count: number;
+};
+
+/**
+ * Describes the message codefoundry.v1.PageCheckProblem.
+ * Use `create(PageCheckProblemSchema)` to create a new message.
+ */
+export const PageCheckProblemSchema: GenMessage<PageCheckProblem> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_page, 14);
+
+/**
  * The user's answer for a page, and whether the page may use the bridge.
  *
  * @generated from enum codefoundry.v1.PageConsent
@@ -547,6 +796,24 @@ export const PageService: GenService<{
     methodKind: "unary";
     input: typeof PageProxyFetchRequestSchema;
     output: typeof PageProxyFetchResponseSchema;
+  },
+  /**
+   * CheckPage has the app render the page once, off screen, as a card of the thread it acts
+   * for would show it, and answers what that render saw (page.check;
+   * docs/notes/page-self-check.md): whether it loaded, its script, loader and resource
+   * errors, the bridge calls refused or failed, what the frame could not do, its height and
+   * how long it took to settle, and a PNG when asked. The render is the app host's
+   * (UiService.WatchShots): nothing that needs a click runs, no question is asked, and its
+   * cf.storage writes are not saved. FailedPrecondition when no app window is open (the
+   * message says so) or no thread owns the page and the user has not allowed it; the path
+   * errors of GetPage; DeadlineExceeded when the app did not answer in time.
+   *
+   * @generated from rpc codefoundry.v1.PageService.CheckPage
+   */
+  checkPage: {
+    methodKind: "unary";
+    input: typeof CheckPageRequestSchema;
+    output: typeof CheckPageResponseSchema;
   },
 }> = /*@__PURE__*/
   serviceDesc(file_codefoundry_v1_page, 0);

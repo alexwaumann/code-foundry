@@ -5,6 +5,7 @@ import { createBridgeHost, type BridgeHost, type PageBridge } from "@/stores/bri
 import { watchFrameAttention } from "@/lib/frameAttention";
 import { frameNonce, nonceMatches, withNonce } from "@/lib/bridge";
 import { addPageError, type PageError } from "@/lib/pageErrors";
+import { frameShapeOf, pageRefusalOf, scriptErrorOf, type PageCheckTap } from "@/lib/pageCheck";
 import { activeThemeSlots, onThemePublished, subscribeThemeSlots, themeFrameMessage, useActiveTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 import { zoomFactor } from "@/lib/zoom";
@@ -131,6 +132,12 @@ export const LEFT_WAIT_MS = 400;
  * storage frame.js keeps in memory) arrives as `cf:unsupported` and joins the page's errors.
  * Neither needs the nonce: a page that left for another document of its own keeps them.
  *
+ * A page check (`check`; docs/notes/page-self-check.md) hears everything else too: the
+ * frame's load, the document's answers with its height and the TSX loader's state, its script
+ * errors (`cf:script-error`, which only a check reads), every bridge refusal (the app's, and
+ * the bridge's own in the page: `cf:refused`) and the bridge's
+ * calls (stores/bridgeHost.ts `check`), and it may ping the document itself.
+ *
  * A frame that went to another site anyway (docs/notes/leftovers-pages.md): after each
  * `load` the frame posts `{ type: "cf:ping", seq }`, which the script in every document the
  * daemon serves answers `{ type: "cf:here", seq }`; a document says `cf:going` before it
@@ -162,6 +169,7 @@ export function HtmlFrame({
   onStale,
   onPageErrors,
   onKey,
+  check,
   scope = null,
   scrollKey = "",
 }: {
@@ -192,6 +200,8 @@ export function HtmlFrame({
   onPageErrors?: (errors: readonly PageError[]) => void;
   /** Escape pressed in the page and not consumed there (its bridge forwards it). */
   onKey?: (key: "Escape") => void;
+  /** A page check's tap (lib/pageCheck.ts): set for the frame's life, never changed. */
+  check?: PageCheckTap;
   testId: string;
   /** The place and file the page's scroll is kept under (pageScrollKey); "" keeps none. */
   scrollKey?: string;
@@ -335,7 +345,9 @@ export function HtmlFrame({
       },
       onError: (e) => {
         report(addPageError(errors.current, e));
+        check?.problem({ kind: "bridge", call: e.call, code: e.code, message: e.message, where: "" });
       },
+      ...(check ? { check } : {}),
     });
     host.current = h;
     present.current = attention.present;
@@ -344,7 +356,7 @@ export function HtmlFrame({
       attention.stop();
       if (host.current === h) host.current = null;
     };
-  }, [thread, storagePath, target, report]);
+  }, [thread, storagePath, target, report, check]);
   // The user answered (or the grant changed): the host is told; a document that had its ready loads again.
   useEffect(() => {
     const p = pageRef.current;
@@ -370,7 +382,10 @@ export function HtmlFrame({
       const h = resizeHeight(e.data);
       if (h !== null) {
         // The page measures at scale 1 (the frame undoes the zoom); the box's height is in layout px.
-        if (nonceMatches(e.data, nonce, true)) resizeRef.current?.(h / zoomFactor());
+        if (nonceMatches(e.data, nonce, true)) {
+          resizeRef.current?.(h / zoomFactor());
+          check?.resize(h);
+        }
         return;
       }
       const link = pageOpenUrl(e.data);
@@ -384,6 +399,21 @@ export function HtmlFrame({
       const cannot = pageUnsupported(e.data, opaque);
       if (cannot !== null) {
         report(addPageError(errors.current, { ...cannot, code: "unavailable", atMs: Date.now() }));
+        check?.problem({ kind: "unsupported", call: cannot.call, code: "", message: cannot.message, where: "" });
+        return;
+      }
+      // A check's alone: the page's own errors and the loader's end (internal/preview/frame.js).
+      const scriptError = scriptErrorOf(e.data);
+      if (scriptError) {
+        check?.problem(scriptError);
+        return;
+      }
+      const shape = frameShapeOf(e.data);
+      if (shape && check) check.note(shape);
+      // A call the page's bridge refused itself (no click, say): the strip leaves those to the page.
+      const refusal = pageRefusalOf(e.data);
+      if (refusal) {
+        if (nonceMatches(e.data, nonce)) check?.problem(refusal);
         return;
       }
       const at = pageScrollNote(e.data);
@@ -415,7 +445,14 @@ export function HtmlFrame({
     return () => {
       window.removeEventListener("message", onMessage);
     };
-  }, [origin, nonce, report, opaque, url]);
+  }, [origin, nonce, report, opaque, url, check]);
+  // A check pings the document itself, for its height once the page is quiet.
+  useEffect(() => {
+    if (!check) return;
+    return check.attach((seq) => {
+      if (target) frameRef.current?.contentWindow?.postMessage({ type: "cf:ping", seq }, target);
+    });
+  }, [check, target]);
   // The files the document said it loaded, watched: one written reloads the document in place.
   useEffect(() => {
     if (!files) return;
@@ -487,6 +524,7 @@ export function HtmlFrame({
           if (errors.current.length > 0) report([]);
           host.current?.loaded();
           loaded();
+          check?.loaded();
         }}
         aria-label={`${name} (rendered)`}
         src={src}

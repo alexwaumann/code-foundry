@@ -64,8 +64,9 @@ static void cfShotOrderOut(void* nsWindow) {
 }
 
 // Snapshots the window's webview after its next screen update and hands the PNG, in device
-// pixels, to cfShotDone. Main thread only; the completion runs on the main thread too.
-static void cfShotSnapshot(void* nsWindow, uintptr_t token) {
+// pixels, to cfShotDone: all of it, or its top clip points when clip is over 0 (a page
+// check's card frame). Main thread only; the completion runs on the main thread too.
+static void cfShotSnapshot(void* nsWindow, uintptr_t token, double clip) {
 	NSWindow* w = (__bridge NSWindow*)nsWindow;
 	WKWebView* view = w == nil ? nil : cfShotWebView(w.contentView);
 	if (view == nil) {
@@ -73,7 +74,13 @@ static void cfShotSnapshot(void* nsWindow, uintptr_t token) {
 		return;
 	}
 	WKSnapshotConfiguration* config = [[WKSnapshotConfiguration alloc] init];
-	config.rect = view.bounds;
+	NSRect rect = view.bounds;
+	if (clip > 0 && clip < rect.size.height) {
+		// The top of the view: a flipped view's origin is its top.
+		if (!view.isFlipped) rect.origin.y = NSMaxY(rect) - clip;
+		rect.size.height = clip;
+	}
+	config.rect = rect;
 	config.afterScreenUpdates = YES;
 	[view takeSnapshotWithConfiguration:config completionHandler:^(NSImage* image, NSError* error) {
 		if (image == nil) {
@@ -190,7 +197,7 @@ func (s *shotWindow) show(width, height int, req shotPageRequest) error {
 	return nil
 }
 
-func (s *shotWindow) snapshot() <-chan shotPicture {
+func (s *shotWindow) snapshot(clip int) <-chan shotPicture {
 	ch := make(chan shotPicture, 1)
 	w := s.current()
 	if w == nil {
@@ -202,7 +209,7 @@ func (s *shotWindow) snapshot() <-chan shotPicture {
 	token := shotSnapshots.next
 	shotSnapshots.open[token] = ch
 	shotSnapshots.Unlock()
-	application.InvokeAsync(func() { C.cfShotSnapshot(w.NativeWindow(), C.uintptr_t(token)) })
+	application.InvokeAsync(func() { C.cfShotSnapshot(w.NativeWindow(), C.uintptr_t(token), C.double(clip)) })
 	return ch
 }
 

@@ -503,7 +503,7 @@ describe("the frame script", () => {
     f.message({ type: "cf:ping", seq: 4 }, {});
     f.message({ type: "cf:ping", seq: "5" });
     f.message({ type: "cf:theme" });
-    expect(got).toEqual([{ type: "cf:here", seq: 3, files: ["/preview/g/page.html"], theme: false }]);
+    expect(got).toEqual([{ type: "cf:here", seq: 3, files: ["/preview/g/page.html"], theme: false, height: 0, loader: "" }]);
   });
 
   /** The script's answers to the app's ping, and its later file lists. */
@@ -526,7 +526,7 @@ describe("the frame script", () => {
     document.body.append(css);
     const got = answers(f);
     f.message({ type: "cf:ping", seq: 1 });
-    expect(got).toEqual([{ type: "cf:here", seq: 1, files: ["/preview/g/page.html", "/preview/g/js/app.js", "/preview/g/data.json", "/preview/g/css/site.css"], theme: false }]);
+    expect(got).toEqual([{ type: "cf:here", seq: 1, files: ["/preview/g/page.html", "/preview/g/js/app.js", "/preview/g/data.json", "/preview/g/css/site.css"], theme: false, height: 0, loader: "" }]);
     const theme = document.createElement("link");
     theme.rel = "stylesheet";
     theme.href = "/cf/theme.css";
@@ -540,7 +540,53 @@ describe("the frame script", () => {
     const f = load({ at: `${own}/dist/index.html?cf-nonce=n#/about`, resources: [`${own}/assets/index.js`, `${own}/cf/theme.css`, `${own}/cf/bridge.js`, "http://127.0.0.1:9246/preview/g/x.css"] });
     const got = answers(f);
     f.message({ type: "cf:ping", seq: 1 });
-    expect(got).toEqual([{ type: "cf:here", seq: 1, files: ["/dist/index.html", "/assets/index.js", "/cf/theme.css", "/cf/bridge.js"], theme: true }]);
+    expect(got).toEqual([{ type: "cf:here", seq: 1, files: ["/dist/index.html", "/assets/index.js", "/cf/theme.css", "/cf/bridge.js"], theme: true, height: 0, loader: "" }]);
+  });
+
+  // A page check reads these (docs/notes/page-self-check.md).
+  it("holds the page's errors until the app's ping, then tells each with where it was", () => {
+    const f = load();
+    const page = `http://${HOST}/preview/g/page.html`;
+    document.dispatchEvent(new ErrorEvent("error", { error: new ReferenceError("Can't find variable: totl"), message: "x", filename: `${page}?cf-page=1`, lineno: 7, colno: 3 }));
+    expect(f.posted).toEqual([]);
+    f.message({ type: "cf:ping", seq: 1 });
+    expect(f.posted).toEqual([{ type: "cf:script-error", kind: "script", message: "ReferenceError: Can't find variable: totl", where: "page.html:7:3" }]);
+    // After the answer, at once: a rejection with its stack's place, a file that did not load, the loader's error and end.
+    const rejected = Object.assign(new Event("unhandledrejection"), { reason: Object.assign(new TypeError("x is null"), { stack: `draw@${page}:12:9\nglobal code@${page}:20:1` }) });
+    document.dispatchEvent(rejected);
+    const script = document.createElement("script");
+    script.src = "/preview/g/missing.js";
+    document.body.append(script);
+    script.dispatchEvent(new Event("error"));
+    script.remove();
+    document.dispatchEvent(new CustomEvent("cf:jsx", { detail: { error: "Syntax error in page.html\nUnexpected token (4:2)" } }));
+    document.dispatchEvent(new CustomEvent("cf:jsx", { detail: { state: "error" } }));
+    // The browser's own noise is not the page's.
+    document.dispatchEvent(new ErrorEvent("error", { message: "ResizeObserver loop completed with undelivered notifications." }));
+    expect(f.posted.slice(1)).toEqual([
+      { type: "cf:script-error", kind: "rejection", message: "TypeError: x is null", where: "page.html:12:9" },
+      { type: "cf:script-error", kind: "resource", message: "script did not load", where: `http://${HOST}/preview/g/missing.js` },
+      { type: "cf:script-error", kind: "loader", message: "Syntax error in page.html\nUnexpected token (4:2)", where: "" },
+      { type: "cf:loader", state: "error" },
+    ]);
+  });
+
+  it("answers with the loader's state, and gives lines in the page's own file", () => {
+    // The daemon writes the script in after <head>: its own lines push the page's down.
+    Object.defineProperty(document, "currentScript", { configurable: true, value: { text: "a\nb\nc" } });
+    try {
+      const f = load();
+      const got = answers(f);
+      document.documentElement.dataset.cfJsx = "running";
+      f.message({ type: "cf:ping", seq: 1 });
+      expect(got[0]).toMatchObject({ loader: "running" });
+      document.dispatchEvent(new ErrorEvent("error", { error: new Error("boom"), filename: `http://${HOST}/preview/g/page.html`, lineno: 10, colno: 1 }));
+      document.dispatchEvent(new ErrorEvent("error", { error: new Error("boom"), filename: `http://${HOST}/preview/g/app.js`, lineno: 10, colno: 1 }));
+      expect(f.posted.map((m) => (m as { where?: string }).where)).toEqual(["page.html:8:1", "app.js:10:1"]);
+    } finally {
+      delete document.documentElement.dataset.cfJsx;
+      Reflect.deleteProperty(document, "currentScript");
+    }
   });
 
   it("tells the app of files it fetched after it answered, not before", () => {

@@ -12,6 +12,7 @@ import (
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
 	"github.com/alexwaumann/code-foundry/internal/proxyfetch"
+	"github.com/alexwaumann/code-foundry/internal/shot"
 	"github.com/alexwaumann/code-foundry/internal/store/page"
 )
 
@@ -32,6 +33,7 @@ type Page struct {
 	store PageStore
 	home  string
 	fetch *proxyfetch.Client
+	shots *shot.Broker // nil: CheckPage is unimplemented (WithChecks)
 }
 
 var _ codefoundryv1connect.PageServiceHandler = (*Page)(nil)

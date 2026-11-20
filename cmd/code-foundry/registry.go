@@ -354,6 +354,11 @@ func (cl *cli) runRegistry(ctx context.Context, args []string) error {
 	if err != nil {
 		return err
 	}
+	if output, ok := cliOutputs[cmd.GetName()]; ok {
+		if err := output(cl, vals, res); err != nil {
+			return err
+		}
+	}
 	for _, w := range res.GetWarnings() {
 		fmt.Fprintln(cl.stderr, "warning: "+w)
 	}

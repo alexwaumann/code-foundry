@@ -162,7 +162,7 @@ func (h *UI) PublishShot(_ context.Context, req *connect.Request[v1.PublishShotR
 		return nil, errNoShots
 	}
 	m := req.Msg
-	err := h.shots.Publish(m.GetId(), m.GetPng(), m.GetError(), int(m.GetContentHeight()))
+	err := h.shots.Publish(m)
 	switch {
 	case err == nil:
 		return connect.NewResponse(&v1.PublishShotResponse{}), nil

@@ -61,6 +61,10 @@ func (d ViewDeps) runPanelPage(ctx context.Context, uctx Context, a Args) (Resul
 	}
 	// The tab's frame fills it, so a page without the bridge is not cut short there.
 	res.Warnings = slices.DeleteFunc(d.pageWarnings(ctx, base, a.Path("path")), func(w string) bool { return w == WarnNoResize })
+	// For the model that showed it; the app's own call prints nothing.
+	if res.Message != "" {
+		res.Message += "\n" + NextCheckLine(a.Path("path"), len(res.Warnings))
+	}
 	return res, nil
 }
 
