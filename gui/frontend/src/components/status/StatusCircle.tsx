@@ -6,7 +6,8 @@ import { cn } from "@/lib/utils";
  * The app's one mark for "a thread or check is working or waiting" (docs/notes/working-circle.md):
  * a dashed circle that turns slowly. Working turns once in 5 s in the info tone; waiting once in
  * 11 s, muted. Nothing else moves: the box is the icon's own and only `transform` rotates
- * (index.css --animate-status-*), and under prefers-reduced-motion it stands still.
+ * (index.css --animate-status-*). It turns under prefers-reduced-motion too: the turn says
+ * something is running, it is not a transition, so it is not gated (like the arrival tilt).
  *
  * Every circle keeps the page clock's phase (a negative animation-delay taken when it mounts), so
  * one that mounts again (a virtualized sidebar row scrolled back, the live turn header settling)
@@ -48,7 +49,7 @@ export const StatusCircle = forwardRef<SVGSVGElement, StatusCircleProps>(functio
     <CircleDashed
       ref={ref}
       data-status-circle={tone}
-      className={cn(colour[tone], motion[tone], "motion-reduce:animate-none", className)}
+      className={cn(colour[tone], motion[tone], className)}
       style={{ animationDelay: statusCirclePhase(tone, mountedAt), ...style }}
       {...props}
     />

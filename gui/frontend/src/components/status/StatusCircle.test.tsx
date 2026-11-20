@@ -41,9 +41,9 @@ describe("StatusCircle", () => {
     expect((container.querySelector("svg") as SVGSVGElement).style.animationDelay).toBe("-1000ms");
   });
 
-  it("stands still under prefers-reduced-motion", () => {
+  it("is not gated on prefers-reduced-motion: the turn says something is running", () => {
     const { container } = render(<StatusCircle tone="working" />);
-    expect(classes(container.querySelector("svg"))).toContain("motion-reduce:animate-none");
+    expect(classes(container.querySelector("svg")).filter((c) => c.startsWith("motion-"))).toEqual([]);
   });
 
   it("a colour in className replaces the tone's", () => {
@@ -73,9 +73,10 @@ describe("WorkingCircle and WaitingCircle (icon tables)", () => {
     );
     const c = classes(container.querySelector("svg"));
     expect(container.querySelector("svg")?.getAttribute("data-status-circle")).toBe(tone);
-    expect(c).toEqual(expect.arrayContaining(["text-current", motion, "motion-reduce:animate-none", "size-3.5", "shrink-0"]));
+    expect(c).toEqual(expect.arrayContaining(["text-current", motion, "size-3.5", "shrink-0"]));
     expect(c).not.toContain("text-cf-info-text");
     expect(c).not.toContain("text-cf-text-muted");
+    expect(c.filter((k) => k.startsWith("motion-"))).toEqual([]);
   });
 
   it("a colour passed to the icon wins over the inherited one", () => {

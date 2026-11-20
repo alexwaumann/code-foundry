@@ -23,8 +23,14 @@ once in about 11 s, muted, linear, forever; nothing else moves.
   header, which mounts its icon a second time as the thread view settles) carries on where it
   was instead of jumping back to the top, and every circle of a tone turns in step.
 - **Calm.** Transform only, on the icon's own fixed box: nothing lays out or repaints around it.
-  `motion-reduce:animate-none` stops it under prefers-reduced-motion. A status indicator, not a
-  user action, so the "frequent actions are instant" rule does not apply.
+  A status indicator, not a user action, so the "frequent actions are instant" rule does not apply.
+- **Turns under Reduce Motion.** The circle first carried `motion-reduce:animate-none`, so on a
+  Mac with Reduce Motion on every working and waiting circle stood still. A user with the setting
+  on reported that the circles never move, and decided: this animation is semantic (it says
+  something is running), and Reduce Motion is for transition and interaction animations, so the
+  circle ignores the setting. Same reasoning as the arrival tilt (`docs/notes/arrival-tilt.md`)
+  and Ember (`components/ember/ember.css`). Only the dashed circle: spinners
+  (`LoaderCircle`/`Loader2`) and other transitions keep their reduced-motion handling.
 - **Only these two things.** Button pending states, loading placeholders, the collapsed work
   strip's running step and the plugin `running` status keep their spinners.
 
@@ -55,5 +61,5 @@ change only animates circles that were dashed already.
 - oxlint's `only-export-components` refuses a factory that returns components; the two icons
   are declared with `forwardRef` directly.
 - `e2e/status-circle.spec.ts` checks the compiled turn (`getAnimations()`: `cf-status-turn`,
-  5000 / 11000 ms, infinite) and reduced motion, polling because the live header remounts its
+  5000 / 11000 ms, infinite) and that it still turns under emulated reduced motion, polling because the live header remounts its
   icon once. `SHOTS=<dir>` saves the turn header, the sidebar and a running checks card.
