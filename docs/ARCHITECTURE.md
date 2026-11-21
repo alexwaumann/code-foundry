@@ -201,7 +201,7 @@ gui/
   frontend/                Vite + React 19 + TypeScript + Tailwind v4 + shadcn + Zustand
   build/                   Wails build assets; darwin Taskfile builds the bare GUI executable
 scripts/                   install.sh (embedded in the binary), package.sh, release.sh,
-                           next-version.sh, ghostty-vt.sh, whisper-cpp.sh, attest.sh, drive.sh,
+                           next-version.sh, ghostty-vt.sh, whisper-cpp.sh, attest.sh, drive.sh, gui-drive.sh,
                            sweep-report.sh, go-test.sh, guide-eval/
 docs/                      this file, GETTING-STARTED.md and THEMES.md (embedded by embed.go,
                            package docs, for the help skill), notes/ (decisions and gotchas, a note per step)

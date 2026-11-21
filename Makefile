@@ -77,7 +77,7 @@ plugins:
 	done
 
 .PHONY: all gen build check check-unlocked attest go-check go-lint go-test frontend-check frontend-deps bun-version gui-dist-stub pagelib pagelib-check \
-        dev drive gui-build gui-dev gui-e2e gui-mock ghostty-vt whisper-cpp ripgrep package release promote clean fuzz \
+        dev drive gui-build gui-drive gui-dev gui-e2e gui-mock ghostty-vt whisper-cpp ripgrep package release promote clean fuzz \
         guide-eval guide-eval-compare
 
 all: build
@@ -251,6 +251,14 @@ drive: frontend-deps $(if $(filter dev,$(DAEMON)),build)
 ## gui-mock: run the mock daemon on :7788 (token dev-mock-token); pair with `bun run dev:mock`.
 gui-mock: frontend-deps
 	$(BUN) mock
+
+## gui-drive: run the real Wails GUI for an agent to drive (.claude/skills/drive-app, "The real
+## window"): gui/bin/drive/Code Foundry, built with Wails's `mcp` tag (an in-app server that
+## evaluates JS, sends input and sets native zoom), on a scratch home (DRIVE_HOME, else a new
+## /tmp dir). Foreground; scripts/gui-drive.sh call|eval|shot talk to it. Never a release build.
+gui-drive: build
+	cd gui && $(WAILS3) build EXTRA_TAGS=mcp OUTPUT="bin/drive/Code Foundry"
+	scripts/gui-drive.sh
 
 ## gui-dev: run the GUI with hot reload (auto-starts ./bin/code-foundry daemon if needed).
 gui-dev: build

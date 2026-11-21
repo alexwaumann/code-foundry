@@ -1,6 +1,6 @@
 ---
 name: drive-app
-description: Drive the Code Foundry GUI in a headless WebKit browser with `playwright cli` to check a change while making it, explore a flow, or render a sketch inside the real app. Use instead of one-off Playwright scripts. Not for PR screenshots (the SHOTS-gated e2e specs make those) and never for public web pages.
+description: Drive the Code Foundry GUI in a headless WebKit browser with `playwright cli` to check a change while making it, explore a flow, or render a sketch inside the real app; or drive the real Wails window (`make gui-drive`) for what only the native host shows (native zoom, traffic lights, the system webview). Use instead of one-off Playwright scripts. Not for PR screenshots (the SHOTS-gated e2e specs make those) and never for public web pages.
 ---
 
 # Drive the app
@@ -85,6 +85,44 @@ make drive DAEMON=dev`, register scratch projects, then `. .playwright/drive.env
 e2e:live e2e/live.spec.ts`, one spec at a time. They start real Claude threads (Haiku 5.5, a few short
 turns per spec) and some read GitHub through `gh`; they are not part of `make check`. Fixtures, what
 each spec needs and costs: `docs/notes/live-e2e.md`.
+
+## The real window
+
+The browser drive is the default: headless, parallel, real input events, no build. Use the real
+window only for what the browser cannot show: native zoom, the traffic lights and title band,
+the system WKWebView's own behaviour, the host's bound methods, a check before a release.
+
+```bash
+make gui-drive           # background; builds gui/bin/drive/Code Foundry and opens it on a scratch home
+G=scripts/gui-drive.sh
+$G eval 'return { w: innerWidth, dpr: devicePixelRatio }'      # a function body; `return` the value
+$G eval 'return mcp.snapshot(8)'                                # the visible DOM as a tree
+$G call window_control '{"action":"set_zoom","zoom":1.25}'      # native zoom (WKWebView pageZoom)
+$G call mouse_click '{"selector":"button[aria-label=Settings]"}'      # or {"x":120,"y":80}
+$G call keyboard_type '{"text":"hello"}'
+$G shot /tmp/x.png                                              # the window's pixels, title bar included
+```
+
+- The build carries Wails's `mcp` tag: a loopback HTTP server inside the app, behind a token in
+  `gui/frontend/.playwright/gui-drive.env`. Its tools:
+  `app_info`, `windows_list`, `window_control`, `js_eval`, `dom_html`, `dom_query`, `mouse_move`,
+  `mouse_click`, `mouse_drag`, `mouse_scroll`, `keyboard_type`, `keyboard_press`,
+  `call_bound_method`, `emit_event`, `wait_for_event` and `screenshot_dom` (a DOM tree, not
+  pixels). Arguments: the tool's schema in Wails's `pkg/application/mcp_tools_enabled.go`.
+- It is a production frontend: no `window.__cfModule`, no hot reload. Rebuild to see an edit.
+  Change state through the page, or the CLI with `CODE_FOUNDRY_HOME` set to the drive's home
+  (printed at start) on every call.
+- Input is synthetic DOM events. What goes through AppKit is out of reach and stays a check
+  by hand: a file dropped from Finder, dragging the window by its title band, native menus.
+  So do drags a component follows with pointer capture (pane gutters, the sidebar's edge).
+  A Finder drop can be replayed from where AppKit hands it over (`docs/notes/gui-drive.md`).
+- The window opens on the user's screen and takes focus once. Do not leave it up: stop the
+  background task when done (it stops the GUI and its daemon by PID).
+- `shot` needs the window on screen and Screen Recording permission for the terminal.
+
+Host checks worth a pass in the real window before a stable release, and after a Wails upgrade
+(`docs/notes/gui-drive.md` has the list): zoom at 80/125/150%, the traffic lights on the title
+band, popovers and menus under zoom, a terminal's sharpness, an HTML preview, a plugin surface.
 
 ## Stop
 

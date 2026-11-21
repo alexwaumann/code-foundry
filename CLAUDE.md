@@ -15,6 +15,7 @@ make build    # builds ./bin/code-foundry and ./bin/code-foundry-dictate; copies
 make check    # gofmt, go vet, staticcheck, go test ./..., frontend typecheck + lint + test (the frontend phase is skipped when the branch touches none of scripts/frontend-inputs.txt; CHECK_ALL=1 runs it)
 make gui-e2e  # Playwright (WebKit, 4 workers) against the mock daemon; not part of check
 make drive    # mock daemon + Vite for an agent to drive with `playwright cli` (DAEMON=dev: scratch dev daemon); skill .claude/skills/drive-app
+make gui-drive  # the real Wails window for an agent to drive (in-app server: JS eval, input, native zoom, window shots) on a scratch home; skill .claude/skills/drive-app
 make dev      # daemon in foreground with text logs; the browser dev frontend on :9245 may call it (CODE_FOUNDRY_DEV_ORIGINS for other ports)
 make package VERSION=vX.Y.Z   # release assets in dist/ (tarball of the four executables + notices + VERSION, install.sh, checksums.txt)
 make release  # manual release fallback (DRY_RUN=1 prints the commands); a tip is released after each green sweep on main
