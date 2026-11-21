@@ -116,6 +116,12 @@ describe("a turn split at the steers Claude read", () => {
       ["user:u1", "h(0 start-1000 1)", "tool:A", "steer:s1(read)", "h(1 1000-end 1)", "tool:B", "final:a", "gutter split"],
     ],
     [
+      "a request blocks the running turn: no live header, as before, but the settled stretches keep theirs",
+      [user("u1"), bash("A"), read("s1", 1000), bash("B"), item("permission", { id: "p", requestState: "pending" })],
+      { fold: () => undefined, working: false, strips: true },
+      ["user:u1", "h(0 start-1000 1)", "tool:A", "steer:s1(read)", "tool:B", "permission:p"],
+    ],
+    [
       "running with strips: the last stretch's run is a strip, the earlier one's too",
       [user("u1"), bash("A"), bash("B"), read("s1", 1000), bash("C"), bash("D")],
       { fold: () => undefined, working: true, strips: true },

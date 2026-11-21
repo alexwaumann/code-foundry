@@ -687,8 +687,9 @@ export function buildRows(turns: readonly TimelineTurn[], opts: TimelineOptions)
     const headed = finished(t) || t === live;
     const since = t.user[t.user.length - 1] ?? t.key;
     // A turn with a header splits at the user's steers Claude read (one segment otherwise):
-    // a header per stretch, each folding its own work; only the last one's can be live.
-    const segs = headed ? segments(t.body) : [{ steer: null, nodes: t.body }];
+    // a header per stretch, each folding its own work; only the last one's can be live. The
+    // turn a request blocks (no live header) keeps its settled stretches' headers.
+    const segs = headed || t === stripped ? segments(t.body) : [{ steer: null, nodes: t.body }];
     const split = segs.length > 1;
     const byDefault = t.end !== "" && (opts.deferred?.(t.end) ? false : defaultFolded(t));
     segs.forEach((s, i) => {
@@ -698,7 +699,7 @@ export function buildRows(turns: readonly TimelineTurn[], opts: TimelineOptions)
       const fold = segmentFoldKey(t.key, s.steer);
       // A finished turn's stretches fold by default; a running turn's settled ones only when the user folds them.
       const folded = !isLive && (t.end !== "" || split) && (opts.fold(fold) ?? byDefault);
-      if (headed) {
+      if (headed || !last) {
         const nodes = split ? s.nodes : t.body;
         rows.push({
           type: "header",

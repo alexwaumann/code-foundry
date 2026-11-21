@@ -22,7 +22,9 @@ caption "queued", the smaller steer bubble. Daemon (`internal/store/thread`), AP
 * **Running**: every stretch before the latest read steer has a settled header (open, folds
   when the user clicks it); only the stretch after it has the live header ("Working · 2 steps ·
   41s"), counting that stretch's steps and the time since Claude read the steer. The pill above
-  the composer keeps the whole turn's time. While the turn runs no text folds (as before).
+  the composer keeps the whole turn's time. While the turn runs no text folds (as before). While
+  a permission or question blocks the turn there is no live header (as before); the settled
+  stretches keep theirs.
 * **At send**: the message is at once the live turn's last row, the smaller bubble with a
   dotted accent border and the bubble at 70% opacity, captioned "queued · 14:15" (the word's
   tooltip says when Claude reads it). Copy stays in the caption row. Anything that arrives while
