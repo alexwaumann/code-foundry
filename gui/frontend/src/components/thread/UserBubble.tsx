@@ -270,7 +270,7 @@ export const UserBubble = memo(function UserBubble({
     <span className="when">{time}</span>
   );
   return (
-    <div className={cn("u", small && "steer")} data-testid={testId ?? (steer ? "thread-steer" : "thread-user")} data-delivery={delivery}>
+    <div className={cn("u", small && "small", steer && "steer")} data-testid={testId ?? (steer ? "thread-steer" : "thread-user")} data-delivery={delivery}>
       {extra.length > 0 && (
         <ul className="flex flex-wrap justify-end gap-2" aria-label="Attached files">
           {extra.map((p) => (

@@ -49,6 +49,8 @@ const bash = (id: string, ordinal: number): ThreadItemView => ({
 const text = (id: string, ordinal: number): ThreadItemView => ({ ...base, id, ordinal, kind: "text", text: `text ${id}` });
 const turnEnd = (ordinal: number, durationMs: number, over: Partial<Extract<ThreadItemView, { kind: "turnEnd" }>> = {}): ThreadItemView => ({
   ...base,
+  // It arrives when the turn ends, on the daemon's clock; Claude's duration_ms runs a little short of it.
+  createdAtMs: T0 + durationMs + 400,
   id: "e",
   ordinal,
   kind: "turnEnd",
@@ -107,7 +109,7 @@ describe("a turn split at its steers", () => {
   it("heads each stretch with its length: Worked for, then Continued for; the gutter says the whole", () => {
     const c = show(steered());
     expect(headers(c)).toEqual(["Worked for 3m 10s", "Continued for 2m 41s", "Continued for 3m 17s"]);
-    expect(c.querySelector('[data-testid="thread-turn-gutter"] .info')?.textContent).toBe(`9m 8s total·3 steps·$0.62·${time(T0)}`);
+    expect(c.querySelector('[data-testid="thread-turn-gutter"] .info')?.textContent).toBe(`9m 8s total·3 steps·$0.62·${time(T0 + 548_400)}`);
   });
 
   it("an interrupted or failed turn says so on its last stretch, in red", () => {
@@ -171,12 +173,13 @@ describe("a message's caption by what became of it", () => {
   it("too late: queued under the finished turn it is the small queued bubble; read, it is the next turn's full-size prompt with just its time", () => {
     const waiting = show([user("u1", 1), text("a", 2), turnEnd(3, 2_000), user("q", 4, { at: T0 + 2_500, delivery: "queued" })], true);
     const q = waiting.querySelector('[data-testid="thread-user"][data-delivery="queued"]');
-    expect(q?.classList.contains("steer")).toBe(true);
+    expect(q?.classList.contains("small")).toBe(true);
+    expect(q?.classList.contains("steer")).toBe(false);
     expect(headers(waiting)).toEqual(["Worked for 2.0s"]);
     cleanup();
     const started = show([user("u1", 1), text("a", 2), turnEnd(3, 2_000), user("q", 4, { at: T0 + 2_500, delivery: "read", readAtMs: T0 + 2_600, placedAfter: 3 })], true);
     const p = started.querySelectorAll('[data-testid="thread-user"]')[1];
-    expect(p?.classList.contains("steer")).toBe(false);
+    expect(p?.classList.contains("small")).toBe(false);
     expect(p?.querySelector(".when")?.textContent).toBe(time(T0 + 2_500));
     expect(started.querySelectorAll('[data-testid="thread-working"]')).toHaveLength(1);
   });

@@ -93,7 +93,8 @@
  *   POST /__mock/thread?state=permission|question|streaming|idle|…   (the scripted thread s-r1:
  *        mock/thread.ts, every state in its THREAD_STATES); POST /__mock/thread/delta?text=… | /__mock/thread/stream?text=… |
  *        /__mock/thread/finish[?total=1.5&turnCost=1.5&model=claude-sonnet-5] (the turn_end's figures) |
- *        /__mock/thread/tool?command=…|name=…&input=<json> (a tool call that starts running now, a live turn's running row) |
+ *        /__mock/thread/tool?command=…|name=…&input=<json>[&done=1] (a tool call that starts running now, a live turn's running row;
+ *        done=1: one that already finished) |
  *        /__mock/thread/fail-turn[?subtype=error_max_turns] (the next message's turn ends in error
  *        before any text; default error_during_execution);
  *        /__mock/thread/api-error[?text=…] (the next message's turn ends with Claude Code's API-error
@@ -104,8 +105,9 @@
  *        /__mock/thread/mcp-age?id=s-r1&ago=720 (the last MCP check that many seconds ago: mock/mcp.ts) |
  *        /__mock/thread/mcp-servers?id=s-r1&keep=t3-code,github (only those of the six: mock/mcp.ts)
  *   POST /__mock/thread/steer?do=hold[&on=0]       (a message sent mid-turn stays queued until do=read or do=drop;
- *        default: Claude reads it 600ms after it lands) | ?id=s-r1&do=read[&item=…] (Claude reads the queued steers
- *        and answers in the same turn, or as the next once the turn ended: /finish first for "too late") |
+ *        default: Claude reads it 600ms after it lands) | ?id=s-r1&do=read[&item=…][&reply=0] (Claude reads the queued steers
+ *        and answers in the same turn, or as the next once the turn ended: /finish first for "too late"; reply=0: no answer, the turn
+ *        goes on as /tool, /stream and /finish script it) |
  *        ?id=s-r1&do=drop (Claude never reads them: "not sent"; /thread/stop does it too)
  *   POST /__mock/thread/retry?id=s-r1&in=20&attempt=3&max=10&status=429&error=rate_limit | ?id=…&clear=1
  *        (Claude Code is retrying an API error: Thread.retry; clear ends it)
@@ -1478,7 +1480,7 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
         break;
       }
       const id = q.get("id") ?? "s-r1";
-      const done = what === "drop" ? world.logs.dropQueued(id) : what === "read" ? world.logs.readQueued(id, q.get("item") ?? "") : null;
+      const done = what === "drop" ? world.logs.dropQueued(id) : what === "read" ? world.logs.readQueued(id, q.get("item") ?? "", q.get("reply") !== "0") : null;
       if (done === null) json(res, 400, { error: "do must be hold, read or drop" });
       else json(res, done ? 200 : 404, { ok: done });
       break;
@@ -1489,7 +1491,7 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       break;
     case "POST /__mock/thread/tool":
       // A tool call that starts running now: name (Bash) and its input as JSON, or a Bash command.
-      world.logs.runTool(q.get("id") ?? "s-r1", q.get("name") ?? "Bash", q.has("input") ? (JSON.parse(q.get("input") ?? "{}") as object) : { command: q.get("command") ?? "make check" });
+      world.logs.runTool(q.get("id") ?? "s-r1", q.get("name") ?? "Bash", q.has("input") ? (JSON.parse(q.get("input") ?? "{}") as object) : { command: q.get("command") ?? "make check" }, q.get("done") === "1");
       json(res, 200, { ok: true });
       break;
     case "POST /__mock/thread/delta":

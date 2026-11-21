@@ -532,9 +532,11 @@ html[data-thread-width="full"] {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
-/* A turn's opening message; a steer (sent mid-turn) sizes its bubble with utilities
-   (UserBubble), which these unlayered rules would otherwise beat. */
-.cf-thread .u:not(.steer) .bubble {
+/* A turn's opening message; a smaller one (a steer, or a message still queued or never
+   read, docs/notes/steer-segments.md) sizes its bubble with utilities (UserBubble), which
+   these unlayered rules would otherwise beat. A steer's margins are its own; a queued
+   prompt-to-be keeps a prompt's, so turning into one moves only its size. */
+.cf-thread .u:not(.small) .bubble {
   max-width: 80%;
   border-radius: 16px;
   padding: 9px 14px;

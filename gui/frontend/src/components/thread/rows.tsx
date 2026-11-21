@@ -904,9 +904,9 @@ function useTurnStart(threadId: string, since: string, on: boolean): number | nu
   return sent !== null && setupEnd !== null ? Math.max(sent, setupEnd) : sent;
 }
 
-/** A stretch's length for a header or a caption ("3m 10s"); "" when unknown or negative. */
+/** A stretch's length for a header or a caption ("3m 10s", "0s" under 50ms); "" when unknown. */
 function spanText(ms: number | null): string {
-  return ms === null ? "" : tookText(Math.max(0, ms));
+  return ms === null ? "" : tookText(Math.max(0, ms)) || "0s";
 }
 
 /**
@@ -1043,8 +1043,8 @@ function stepsLabel(steps: number): string {
  *
  * A turn split at steers (`row.seg`, docs/notes/steer-segments.md) has one per stretch:
  * "Worked for 3m 10s" over the first, "Continued for 2m 41s" over each after a steer, from
- * the times Claude read them; the last one's length is the turn's (the daemon's) less where
- * the stretch began, and an interrupted or failed turn says so there. Live, only the last
+ * the times Claude read them (the daemon's clock, as the messages' times); the last one runs
+ * to the turn_end's arrival, and an interrupted or failed turn says so there. Live, only the last
  * stretch's is: its steps and the time since the steer above it.
  */
 const HeaderRow = memo(function HeaderRow({ row }: { row: Extract<TimelineRow, { type: "header" }> }) {
@@ -1074,8 +1074,9 @@ const HeaderRow = memo(function HeaderRow({ row }: { row: Extract<TimelineRow, {
     return <TurnHead parts={[took ? `${what} for ${took}` : what]} folded={row.folded} foldable={row.foldable} onToggle={toggle} />;
   }
   if (!end) return null;
-  // The last stretch of a split turn: the turn's length less where it began.
-  const took = seg ? spanText(start === null || seg.from === null ? null : end.durationMs - (seg.from - start)) : tookText(end.durationMs);
+  // The last stretch of a split turn: from the read to the turn's end, both on the daemon's clock
+  // (Claude's duration_ms starts a little after the message's time, so it is the gutter's total only).
+  const took = seg ? spanText(seg.from === null || end.createdAtMs === null ? null : end.createdAtMs - seg.from) : tookText(end.durationMs);
   // An API failure ends with is_error and subtype success (docs/notes/api-error-reply-flag.md): no "(success)".
   const failedAs = end.subtype && end.subtype !== "success" ? ` (${end.subtype.replace(/_/g, " ")})` : "";
   const what = end.interrupted ? "Interrupted" : end.isError ? `Failed${failedAs}` : seg ? "Continued" : "Worked";

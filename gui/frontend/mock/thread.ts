@@ -539,9 +539,9 @@ export class MockThreadLogs {
    * live turn's running row, or one more of a parallel batch (docs/notes/running-rows.md).
    * Its item id is its tool_use id, like the daemon's; /finish ends it interrupted.
    */
-  runTool(id: string, name: string, input: object): void {
+  runTool(id: string, name: string, input: object, done = false): void {
     const toolUseId = `toolu_mock_run_${String(this.log(id).nextOrdinal)}`;
-    this.append(id, this.item(id, { case: "toolCall", value: { toolUseId, name, inputJson: JSON.stringify(input), status: ToolCallStatus.RUNNING } }, { id: toolUseId }));
+    this.append(id, this.item(id, { case: "toolCall", value: { toolUseId, name, inputJson: JSON.stringify(input), status: done ? ToolCallStatus.DONE : ToolCallStatus.RUNNING } }, { id: toolUseId }));
   }
 
   /** Text appended to the streaming text item (a delta). */
@@ -1539,14 +1539,15 @@ export class MockThreadLogs {
   /**
    * Claude reads the queued steers (all, or `itemId`): the text it was writing completes,
    * each is placed and marked read, and it answers them, in the same turn while it runs or
-   * as the next turn when the turn ended first (too late). False when none is queued.
+   * as the next turn when the turn ended first (too late); with `answer` false it only reads
+   * them, the turn going on as scripted (/tool, /stream, /finish). False when none is queued.
    */
-  readQueued(id: string, itemId = ""): boolean {
+  readQueued(id: string, itemId = "", answer = true): boolean {
     const q = this.queuedSteers(id, itemId);
     if (q.length === 0) return false;
     for (const x of this.log(id).items) if (x.streaming) this.update(id, { ...x, streaming: false, updatedAt: timestampFromDate(new Date()) });
     for (const it of q) this.settleQueued(id, it, MessageDelivery.READ);
-    this.reply(id);
+    if (answer) this.reply(id);
     return true;
   }
 
