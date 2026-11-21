@@ -248,15 +248,19 @@ func (m *Manager) saveItem(id string, it Item) {
 
 // closeUnfinished completes items a run left open: streaming text stays as it is,
 // running tool calls become errors, pending requests are cancelled, queued messages
-// stay where they are (Claude never read them) and stop being queued, unless the row still
-// has them for the next process (Setup.Queued): those are still on their way.
+// become Unsent (Claude never read them; consume places them where the GUI drew them),
+// unless the row still has them for the next process (Setup.Queued): those are still on
+// their way.
 func closeUnfinished(w itemWriter, why string) {
 	for _, it := range w.log.unfinished() {
-		if it.Queued && w.log.queuedHeld(it.ID) {
+		if it.Queued {
+			if !w.log.queuedHeld(it.ID) {
+				w.consume(it.ID, false)
+			}
 			continue
 		}
 		w.change(it.ID, func(x *Item) {
-			x.Streaming, x.Queued = false, false
+			x.Streaming = false
 			if x.Tool != nil && x.Tool.Status == ToolRunning {
 				x.Tool.Status = ToolError
 				if x.Tool.Output == "" {
@@ -473,8 +477,8 @@ func (r *runner) deliver(o *outgoing) bool {
 	if _, err := r.sendMessage(o); err != nil {
 		r.log().warn("send a message that waited for the handshake", "err", err)
 		if o.itemID != "" {
-			// Written queued (queue): Claude will never read it, so it is not queued any more.
-			r.st.proj.w.change(o.itemID, func(x *Item) { x.Queued = false })
+			// Written queued (queue): Claude will never read it.
+			r.st.proj.w.consume(o.itemID, false)
 			r.st.proj.w.add(Item{ID: r.st.proj.nextID("err"), Kind: KindError, Text: "Claude did not get this message: " + err.Error()})
 		}
 		return false

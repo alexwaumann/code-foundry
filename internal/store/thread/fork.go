@@ -51,7 +51,10 @@ func forkItems(parent []Item, noteID, note string, now time.Time) []Item {
 			continue
 		}
 		it = cloneItem(it)
-		// Renumbered in the log's order: a placed message's place is its ordinal now.
+		// Renumbered in the log's order: a placed message's place is its ordinal now. ReadAt
+		// and Unsent stay (history: when Claude read it, or that it never did); a message
+		// still queued is never read in the copy.
+		it.Unsent = it.Unsent || it.Queued
 		it.Queued, it.PlacedAfter = false, 0
 		if it.Tool != nil && it.Tool.Status == ToolRunning {
 			it.Tool.Status = ToolError

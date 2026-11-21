@@ -217,7 +217,7 @@ func (t *threadLog) htmlItems(anywhere bool) []Item {
 	for i := len(t.items) - 1; i >= 0; i-- {
 		it := t.items[i]
 		switch {
-		case it.Kind == KindUserMessage && !it.Queued && !anywhere:
+		case it.Kind == KindUserMessage && !it.Queued && !it.Unsent && !anywhere:
 			return out
 		case it.Kind == KindHTML && it.HTML != nil:
 			out = append(out, cloneItem(it))

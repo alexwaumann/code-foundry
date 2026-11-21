@@ -22,7 +22,8 @@ func TestItemsDBRoundTrip(t *testing.T) {
 		{"an API error text", Item{ID: "rt-api-error", Kind: KindAssistantText, Text: "Invalid API key · Fix external API key", APIError: true}},
 		{"a message another thread sent", Item{ID: "rt-by", Kind: KindUserMessage, Text: "status?", SentBy: "s-lead"}},
 		{"an inline html page", Item{ID: "rt-html", Kind: KindHTML, HTML: &HTMLPage{Path: "docs/page.html", Title: "Page", BaseDir: "/home/a/proj"}}},
-		{"a message placed where Claude read it", Item{ID: "rt-placed", Kind: KindUserMessage, Text: "status?", PlacedAfter: 1200}},
+		{"a message placed where Claude read it", Item{ID: "rt-placed", Kind: KindUserMessage, Text: "status?", PlacedAfter: 1200, ReadAt: time.UnixMilli(1_700_000_123_456)}},
+		{"a message Claude never read", Item{ID: "rt-unsent", Kind: KindUserMessage, Text: "status?", PlacedAfter: 1200, Unsent: true}},
 	}
 	for i, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

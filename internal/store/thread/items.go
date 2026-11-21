@@ -160,13 +160,23 @@ type Item struct {
 	// the item is in the log from its arrival so the send shows at once (queued.go).
 	Queued bool
 	// PlacedAfter: the ordinal of the item a user_message is shown after, set when Claude
-	// read it later than it arrived (queued.go); 0 for every other item. The item keeps its
-	// Ordinal (an agent's since/after still names it); only its place in the log moves.
+	// read it later than it arrived, or when it was queued and Claude never read it
+	// (queued.go); 0 for every other item. The item keeps its Ordinal (an agent's
+	// since/after still names it); only its place in the log moves.
 	PlacedAfter int64
-	Tool        *ToolCall
-	Request     *Request // permission_request and question
-	Turn        *TurnEnd
-	Compaction  *Compaction
+	// ReadAt: when Claude read a user_message that waited queued (consume's "started"),
+	// zero for every other item, and for messages read before the field existed. The GUI
+	// splits a steered turn at it (docs/notes/steer-segments.md). Not UpdatedAt: later
+	// edits move that.
+	ReadAt time.Time
+	// Unsent: a user_message that was queued when Claude's process ended or dropped it
+	// (closeUnfinished, a "cancelled" lifecycle, a failed delivery): Claude never read it.
+	// Queued is false then; the two never both hold.
+	Unsent     bool
+	Tool       *ToolCall
+	Request    *Request // permission_request and question
+	Turn       *TurnEnd
+	Compaction *Compaction
 	// HTML: an html item's page (html.go).
 	HTML *HTMLPage
 	// Theme: a theme item's card (theme.go).

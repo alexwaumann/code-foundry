@@ -476,7 +476,7 @@ message UserMessageItem {
   string resume_note = 7;
   // Claude has the message but has not read it yet: it came while Claude worked, and Claude
   // reads it at its next tool call or when its reply ends. Once read the flag clears and
-  // the item moves there (ThreadItem.placed_after).
+  // the item moves there (ThreadItem.placed_after). delivery says the same and more.
   bool queued = 8;
   // The seed prefix Claude got before the text (and the resume note): the first message
   // of a fresh session a ThreadService.Reseed asked for starts with it. Empty for most
@@ -491,6 +491,25 @@ message UserMessageItem {
   // wakes, a created thread's first prompt (its task) and items from before the mark.
   ThreadRelation sender_relation = 11;
   ReplyMark reply = 12;
+  // What became of a message sent while Claude worked (docs/notes/steer-segments.md):
+  // QUEUED while Claude has not read it (queued is true too), READ once it did (read_at
+  // says when), UNSENT when Claude's process ended or dropped it first. UNSPECIFIED for a
+  // message Claude took in at once, and for one read before the field existed.
+  MessageDelivery delivery = 13;
+  // READ only: when Claude read it. The GUI splits the turn there.
+  google.protobuf.Timestamp read_at = 14;
+}
+
+// MessageDelivery is what became of a user message that waited in Claude Code's queue.
+enum MessageDelivery {
+  // Taken in at once (never queued), or from before the field.
+  MESSAGE_DELIVERY_UNSPECIFIED = 0;
+  // Claude has it but has not read it yet.
+  MESSAGE_DELIVERY_QUEUED = 1;
+  // Claude read it mid-turn (or as the next turn's prompt).
+  MESSAGE_DELIVERY_READ = 2;
+  // Claude never read it: its process ended, or it dropped the message.
+  MESSAGE_DELIVERY_UNSENT = 3;
 }
 
 // What one thread is to another.
