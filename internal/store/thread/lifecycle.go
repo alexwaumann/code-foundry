@@ -348,7 +348,11 @@ func recordUser(w itemWriter, o *outgoing) (Item, error) {
 }
 
 func userItem(id string, o *outgoing) Item {
-	return Item{ID: id, Kind: KindUserMessage, Text: o.text, Attachments: attachmentPaths(o.attachments), ComposerText: o.composer,
+	shown := attachmentPaths(o.attachments)
+	if o.shown != nil {
+		shown = o.shown
+	}
+	return Item{ID: id, Kind: KindUserMessage, Text: o.text, Attachments: shown, ComposerText: o.composer,
 		Origin: o.origin, WakeTitle: o.wakeTitle, WakeJSON: o.wakeJSON, ResumeNote: o.note, SentBy: o.by,
 		SenderRelation: o.relation, Reply: o.reply}
 }

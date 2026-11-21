@@ -42,6 +42,9 @@ type outgoing struct {
 	composer    string       // the composer's text: the item's ComposerText
 	attachments []attachment // staged files
 	prompt      string       // the text Claude gets (file refs rewritten, attachment lines)
+	// shown: the item's attachments when they are not attachments' paths (a Re-send's gone
+	// ones; Message.shownAttachments).
+	shown []string
 	// itemID is the user item's id when the item was written before the message could
 	// go out (a message to a stopped or starting thread: recordUser); sendMessage then
 	// delivers it under that id without writing a second item.
@@ -1014,9 +1017,11 @@ func (r *runner) beginClose() {
 	r.m.update(r.id, true, func(rec *record) { rec.s.State = StateClosing })
 	r.log().info("closing thread")
 	busy := st.sd.busy || st.sd.compacting
-	conn := st.conn
+	conn, w := st.conn, st.proj.w
 	go func() {
 		if busy {
+			// Not started as a turn on the way out: held, then not sent (cancel.go).
+			holdUserQueued(context.Background(), w, conn, streamControlTimeout, r.m.log.With("thread", r.id))
 			ctx, cancel := context.WithTimeout(context.Background(), streamControlTimeout)
 			_ = conn.Interrupt(ctx)
 			cancel()

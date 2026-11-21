@@ -1029,6 +1029,45 @@ func (f *Fake) Interrupt(_ context.Context, id, by string) error {
 	return err
 }
 
+// CancelMessage records "CancelMessage <id> <item>". The item's text is "cancelled
+// <item>"; an item id starting with "read" is refused as read, one starting with "x" as
+// not found.
+func (f *Fake) CancelMessage(_ context.Context, id, itemID string) (thread.Item, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if err := f.record("CancelMessage " + id + " " + itemID); err != nil {
+		return thread.Item{}, err
+	}
+	if _, err := f.get(id); err != nil {
+		return thread.Item{}, err
+	}
+	switch {
+	case strings.HasPrefix(itemID, "read"):
+		return thread.Item{}, fmt.Errorf("%w: message %s: already read by Claude", thread.ErrFailedPrecondition, itemID)
+	case strings.HasPrefix(itemID, "x"):
+		return thread.Item{}, fmt.Errorf("%w: thread %s has no message %s", thread.ErrNotFound, id, itemID)
+	}
+	return thread.Item{ID: itemID, Kind: thread.KindUserMessage, Text: "cancelled " + itemID, Cancelled: true}, nil
+}
+
+// ResendMessage records "ResendMessage <id> <item>" and returns a new item "<item>-again";
+// an item id starting with "gone" reports its attachment "a.png" gone.
+func (f *Fake) ResendMessage(_ context.Context, id, itemID string) (thread.Item, []string, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if err := f.record("ResendMessage " + id + " " + itemID); err != nil {
+		return thread.Item{}, nil, err
+	}
+	if _, err := f.get(id); err != nil {
+		return thread.Item{}, nil, err
+	}
+	var gone []string
+	if strings.HasPrefix(itemID, "gone") {
+		gone = []string{"a.png"}
+	}
+	return thread.Item{ID: itemID + "-again", Kind: thread.KindUserMessage, Text: "again"}, gone, nil
+}
+
 // SetModel records "SetModel <id> <model>" and sets Model.
 func (f *Fake) SetModel(_ context.Context, id, model string) (thread.Thread, error) {
 	return f.mutate("SetModel "+id+" "+model, id, func(s *thread.Thread) error {

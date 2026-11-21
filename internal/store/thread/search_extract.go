@@ -62,9 +62,10 @@ func storedLabel(string) (string, bool) { return "", false }
 // userSearchText is a user message as the timeline shows it (steers included): the
 // composer's text with its tags as their chips read (promptText), else the typed text,
 // thread tags as their stored label (storedLabel). A wake is drawn as a lineage note, not
-// a message: nothing.
+// a message: nothing. A cancelled message was never sent (cancel.go): nothing, and saving
+// it drops the document it had while it waited.
 func userSearchText(it Item) string {
-	if it.Origin == OriginWake {
+	if it.Origin == OriginWake || it.Cancelled {
 		return ""
 	}
 	display, _ := promptText(it.Text, it.ComposerText, storedLabel)

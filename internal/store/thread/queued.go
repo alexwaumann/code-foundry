@@ -21,7 +21,8 @@ import (
 // turn right after the tool_result it waited behind; after the last text when it came
 // during the reply, still inside the same result), "completed" at the turn's end,
 // "cancelled" when dropped. The next system/status "requesting" lists it in
-// user_message_uuids too, a second signal. An interrupt starts what is queued at once.
+// user_message_uuids too, a second signal. An interrupt starts what is still queued at
+// once, so the daemon first takes the user's own queued messages back (cancel.go).
 // A message that arrives as the reply ends is started right after the result (whose
 // queued_turn_count is 0 all the same): a turn of its own.
 
@@ -67,6 +68,9 @@ func (t *threadLog) consume(id string, read bool) (Item, bool) {
 	i, ok := t.byID[id]
 	if !ok || !t.items[i].Queued {
 		return Item{}, false
+	}
+	if !read && t.takingBack[id] {
+		return t.takeBackLocked(i), true // the user's Cancel: it leaves the log (cancel.go)
 	}
 	it := cloneItem(t.items[i])
 	it.Queued = false

@@ -76,9 +76,12 @@ func userMessageToProto(it thread.Item) *v1.UserMessageItem {
 }
 
 // deliveryOf is what became of a message that waited in Claude Code's queue
-// (docs/notes/steer-segments.md); UNSPECIFIED for one never queued.
+// (docs/notes/steer-segments.md, cancel-queued-messages.md); UNSPECIFIED for one never
+// queued.
 func deliveryOf(it thread.Item) v1.MessageDelivery {
 	switch {
+	case it.Cancelled:
+		return v1.MessageDelivery_MESSAGE_DELIVERY_CANCELLED
 	case it.Queued:
 		return v1.MessageDelivery_MESSAGE_DELIVERY_QUEUED
 	case it.Unsent:

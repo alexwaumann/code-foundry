@@ -79,8 +79,12 @@ func (r *runner) interruptForRestart() {
 	st.restartInterrupted = true
 	st.restartForce = time.NewTimer(r.m.opts.CloseTimeout)
 	r.log().info("interrupting the turn for a restart")
-	conn := st.conn
+	conn, w := st.conn, st.proj.w
 	go func() {
+		// The old process would start the user's queued messages as the next turn and the
+		// restart would wait for it (or cut it off): they are held, not sent, for the user
+		// to send again to the new process (cancel.go).
+		holdUserQueued(context.Background(), w, conn, streamControlTimeout, r.m.log.With("thread", r.id))
 		ctx, cancel := context.WithTimeout(context.Background(), streamControlTimeout)
 		defer cancel()
 		_ = conn.Interrupt(ctx)

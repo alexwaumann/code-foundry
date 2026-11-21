@@ -265,8 +265,21 @@ service ThreadService {
   // running has none (FAILED_PRECONDITION).
   rpc Respond(RespondThreadRequest) returns (RespondThreadResponse) {}
   // Interrupt stops the running turn; pending requests are withdrawn. A no-op on a
-  // thread that is not running.
+  // thread that is not running. The user's own queued messages are taken out of Claude's
+  // queue first and become not sent (MESSAGE_DELIVERY_UNSENT) instead of starting as the
+  // next turn; other threads' messages and wakes still start at once
+  // (docs/notes/cancel-queued-messages.md).
   rpc Interrupt(InterruptThreadRequest) returns (InterruptThreadResponse) {}
+  // CancelMessage takes back the user's own message Claude has not read: a queued one
+  // leaves Claude's queue, a not sent one just goes. The item leaves the timeline (its
+  // ThreadItemChange says MESSAGE_DELIVERY_CANCELLED once). FAILED_PRECONDITION when Claude
+  // read it first, it is another thread's or a wake, or the thread is archived;
+  // NOT_FOUND for no such message.
+  rpc CancelMessage(CancelThreadMessageRequest) returns (CancelThreadMessageResponse) {}
+  // ResendMessage sends the user's own not sent message again as a new message (like
+  // Send: it starts a stopped thread, or queues behind a running turn) and drops the old
+  // one as CancelMessage does. FAILED_PRECONDITION for a message that is not "not sent".
+  rpc ResendMessage(ResendThreadMessageRequest) returns (ResendThreadMessageResponse) {}
   // SetModel switches a running thread's model (from its next request) and records it
   // for later spawns; on a thread that is not running it only records it.
   rpc SetModel(SetThreadModelRequest) returns (SetThreadModelResponse) {}
@@ -508,8 +521,13 @@ enum MessageDelivery {
   MESSAGE_DELIVERY_QUEUED = 1;
   // Claude read it mid-turn (or as the next turn's prompt).
   MESSAGE_DELIVERY_READ = 2;
-  // Claude never read it: its process ended, or it dropped the message.
+  // Claude never read it: its process ended, it dropped the message, or an interrupt held
+  // it (docs/notes/cancel-queued-messages.md).
   MESSAGE_DELIVERY_UNSENT = 3;
+  // The user took it back before Claude read it (Cancel), or sent it again (Re-send). Only
+  // the ThreadItemChange that removes it from the timeline says so: no snapshot or page
+  // has it.
+  MESSAGE_DELIVERY_CANCELLED = 4;
 }
 
 // What one thread is to another.
@@ -1098,6 +1116,31 @@ message InterruptThreadRequest {
 }
 
 message InterruptThreadResponse {}
+
+message CancelThreadMessageRequest {
+  string thread_id = 1;
+  // The user_message item's id.
+  string item_id = 2;
+}
+
+message CancelThreadMessageResponse {
+  // The message as it was taken back (delivery MESSAGE_DELIVERY_CANCELLED): its text,
+  // composer text and attachments, for the composer.
+  ThreadItem item = 1;
+}
+
+message ResendThreadMessageRequest {
+  string thread_id = 1;
+  // The not sent user_message item's id.
+  string item_id = 2;
+}
+
+message ResendThreadMessageResponse {
+  // The new user_message item.
+  ThreadItem item = 1;
+  // The names of the attachments that were no longer staged: sent without them.
+  repeated string gone_attachments = 2;
+}
 
 message SetThreadModelRequest {
   string thread_id = 1;

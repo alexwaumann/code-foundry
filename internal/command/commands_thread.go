@@ -104,6 +104,9 @@ type ThreadBackend interface {
 	PromptsBackend
 	// SearchBackend backs thread.search (commands_thread_search.go).
 	SearchBackend
+	// MessageBackend backs thread.message.cancel and thread.message.resend
+	// (commands_thread_message.go).
+	MessageBackend
 }
 
 var (
@@ -125,7 +128,7 @@ var threadDecisions = map[string]v1.ThreadDecision{
 }
 
 // RegisterThread registers thread.send, thread.compact, thread.respond, thread.interrupt,
-// thread.items, thread.read, thread.set-model, thread.set-mode, thread.set-effort, thread.wait,
+// thread.message.cancel, thread.message.resend, thread.items, thread.read, thread.set-model, thread.set-mode, thread.set-effort, thread.wait,
 // thread.subscribe, thread.unsubscribe and thread.subscriptions.
 func RegisterThread(r *Registry, b ThreadBackend) error {
 	idArg := ArgSpec{Name: "id", Type: String, Required: true, Context: ContextThread, ID: ThreadID, Description: "Thread id" + IDHelp}
@@ -314,6 +317,8 @@ func RegisterThread(r *Registry, b ThreadBackend) error {
 				return Result{Message: "interrupted thread " + a.String("id")}, nil
 			},
 		},
+		threadMessageCancel(b, idArg),
+		threadMessageResend(b, idArg),
 		Command{
 			Name:         "thread.items",
 			NoPalette:    true,

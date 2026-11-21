@@ -1,0 +1,23 @@
+{"t":3,"dir":"out","msg":{"type":"control_request","request_id":"cf-1","request":{"subtype":"initialize"}}}
+{"t":3,"dir":"out","msg":{"type":"user","uuid":"85cd7cdb-02c3-43b0-9a84-8c2fad784974","message":{"role":"user","content":[{"type":"text","text":"Use the Bash tool to run `sleep 8` three times, one call at a time: wait for each to finish before the next, never in parallel or in one command. Say nothing between calls. After the third, reply with just DONE."}]},"parent_tool_use_id":null}}
+{"t":385,"dir":"in","msg":{"type":"control_response","response":{"subtype":"success","request_id":"cf-1","response":{}}}}
+{"t":388,"dir":"in","msg":{"type":"command_lifecycle","command_uuid":"85cd7cdb-02c3-43b0-9a84-8c2fad784974","state":"queued"}}
+{"t":390,"dir":"in","msg":{"type":"command_lifecycle","command_uuid":"85cd7cdb-02c3-43b0-9a84-8c2fad784974","state":"started"}}
+{"t":422,"dir":"in","msg":{"type":"system","subtype":"init","model":"claude-haiku-5-5"}}
+{"t":424,"dir":"in","msg":{"type":"system","subtype":"status","status":"requesting"}}
+{"t":1555,"dir":"in","msg":{"type":"assistant","message":{"id":"msg_011ChFEf4XmYuqErApx9UhKj","model":"claude-haiku-5-5","role":"assistant","content":[{"type":"tool_use","id":"toolu_01W8HmMeESxj5AMamw7PVW9w","name":"Bash","input":{"command":"sleep 8","description":"Sleep 8 seconds (first)"},"caller":{"type":"direct"}}]},"parent_tool_use_id":null}}
+{"t":1555,"dir":"out","msg":{"type":"user","uuid":"696d243f-f645-4559-af23-a496d7c1b664","message":{"role":"user","content":[{"type":"text","text":"Also reply with the word PINEAPPLE."}]},"parent_tool_use_id":null}}
+{"t":1561,"dir":"in","msg":{"type":"command_lifecycle","command_uuid":"696d243f-f645-4559-af23-a496d7c1b664","state":"queued"}}
+{"t":1561,"dir":"out","msg":{"type":"control_request","request_id":"cf-2","request":{"subtype":"interrupt"}}}
+{"t":1562,"dir":"in","msg":{"type":"control_response","response":{"subtype":"success","request_id":"cf-2","response":{"still_queued":["696d243f-f645-4559-af23-a496d7c1b664"]}}}}
+{"t":1565,"dir":"in","msg":{"type":"user","message":{"role":"user","content":[{"type":"tool_result","content":"The user doesn't want to proceed with this tool use. The tool use was rejected (eg. if it was a file edit, the new_string was NOT written to the file). STOP what you are doing and wait for the user to tell you how to proceed.\n\nNote: The user's next message may contain a correction or preference. Pay close attention \u2014 if they explain what went wrong or how they'd prefer you to work, consider saving that to memory for future sessions.","is_error":true,"tool_use_id":"toolu_01W8HmMeESxj5AMamw7PVW9w"}]},"parent_tool_use_id":null}}
+{"t":1565,"dir":"in","msg":{"type":"user","message":{"role":"user","content":[{"type":"text","text":"[Request interrupted by user]"}]},"parent_tool_use_id":null}}
+{"t":1567,"dir":"in","msg":{"type":"result","subtype":"error_during_execution","is_error":true,"duration_ms":1175,"num_turns":3,"stop_reason":null,"terminal_reason":"aborted_streaming","total_cost_usd":0.001005}}
+{"t":1568,"dir":"in","msg":{"type":"command_lifecycle","command_uuid":"85cd7cdb-02c3-43b0-9a84-8c2fad784974","state":"cancelled"}}
+{"t":1569,"dir":"in","msg":{"type":"command_lifecycle","command_uuid":"696d243f-f645-4559-af23-a496d7c1b664","state":"started"}}
+{"t":1574,"dir":"in","msg":{"type":"system","subtype":"init","model":"claude-haiku-5-5"}}
+{"t":1574,"dir":"in","msg":{"type":"system","subtype":"status","status":"requesting"}}
+{"t":2577,"dir":"in","msg":{"type":"assistant","message":{"id":"msg_011ChFEf9H2GrJ5a1WB7otyg","model":"claude-haiku-5-5","role":"assistant","content":[{"type":"thinking","thinking":"","signature":""}]},"parent_tool_use_id":null}}
+{"t":2605,"dir":"in","msg":{"type":"assistant","message":{"id":"msg_011ChFEf9H2GrJ5a1WB7otyg","model":"claude-haiku-5-5","role":"assistant","content":[{"type":"text","text":"PINEAPPLE"}]},"parent_tool_use_id":null}}
+{"t":2610,"dir":"in","msg":{"type":"result","subtype":"success","is_error":false,"duration_ms":1040,"num_turns":1,"stop_reason":"end_turn","terminal_reason":"completed","total_cost_usd":0.00193559}}
+{"t":2610,"dir":"in","msg":{"type":"command_lifecycle","command_uuid":"696d243f-f645-4559-af23-a496d7c1b664","state":"completed"}}

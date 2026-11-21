@@ -1,0 +1,29 @@
+{"t":3,"dir":"out","msg":{"type":"control_request","request_id":"cf-1","request":{"subtype":"initialize"}}}
+{"t":3,"dir":"out","msg":{"type":"user","uuid":"1a282054-025c-404b-8b29-67b78e291f9b","message":{"role":"user","content":[{"type":"text","text":"Use the Bash tool to run `sleep 8` three times, one call at a time: wait for each to finish before the next, never in parallel or in one command. Say nothing between calls. After the third, reply with just DONE."}]},"parent_tool_use_id":null}}
+{"t":372,"dir":"in","msg":{"type":"control_response","response":{"subtype":"success","request_id":"cf-1","response":{}}}}
+{"t":375,"dir":"in","msg":{"type":"command_lifecycle","command_uuid":"1a282054-025c-404b-8b29-67b78e291f9b","state":"queued"}}
+{"t":376,"dir":"in","msg":{"type":"command_lifecycle","command_uuid":"1a282054-025c-404b-8b29-67b78e291f9b","state":"started"}}
+{"t":390,"dir":"in","msg":{"type":"system","subtype":"init","model":"claude-haiku-5-5"}}
+{"t":391,"dir":"in","msg":{"type":"system","subtype":"status","status":"requesting"}}
+{"t":1533,"dir":"in","msg":{"type":"assistant","message":{"id":"msg_011ChFEgyLn2PhFts8sQo5Mf","model":"claude-haiku-5-5","role":"assistant","content":[{"type":"tool_use","id":"toolu_0131fpessk4CxtzxBVreznif","name":"Bash","input":{"command":"sleep 8","description":"Sleep 8 seconds (first)"},"caller":{"type":"direct"}}]},"parent_tool_use_id":null}}
+{"t":1534,"dir":"out","msg":{"type":"user","uuid":"9fd9f601-1d5c-48c4-ba26-6fe2198178cb","message":{"role":"user","content":[{"type":"text","text":"Also reply with the word PINEAPPLE."}]},"parent_tool_use_id":null}}
+{"t":1534,"dir":"out","msg":{"type":"user","uuid":"bc5a744d-fc39-4898-a6d7-c007b2b8d2a8","message":{"role":"user","content":[{"type":"text","text":"Also reply with the word MANGO."}]},"parent_tool_use_id":null}}
+{"t":1544,"dir":"in","msg":{"type":"command_lifecycle","command_uuid":"9fd9f601-1d5c-48c4-ba26-6fe2198178cb","state":"queued"}}
+{"t":1544,"dir":"in","msg":{"type":"command_lifecycle","command_uuid":"bc5a744d-fc39-4898-a6d7-c007b2b8d2a8","state":"queued"}}
+{"t":1544,"dir":"out","msg":{"type":"control_request","request_id":"cf-2","request":{"subtype":"cancel_async_message","message_uuid":"9fd9f601-1d5c-48c4-ba26-6fe2198178cb"}}}
+{"t":1544,"dir":"in","msg":{"type":"command_lifecycle","command_uuid":"9fd9f601-1d5c-48c4-ba26-6fe2198178cb","state":"cancelled"}}
+{"t":1544,"dir":"in","msg":{"type":"control_response","response":{"subtype":"success","request_id":"cf-2","response":{"cancelled":true}}}}
+{"t":10089,"dir":"in","msg":{"type":"user","message":{"role":"user","content":[{"tool_use_id":"toolu_0131fpessk4CxtzxBVreznif","type":"tool_result","content":"(Bash completed with no output)","is_error":false}]},"parent_tool_use_id":null}}
+{"t":10095,"dir":"in","msg":{"type":"command_lifecycle","command_uuid":"bc5a744d-fc39-4898-a6d7-c007b2b8d2a8","state":"started"}}
+{"t":10095,"dir":"in","msg":{"type":"system","subtype":"status","status":"requesting"}}
+{"t":11618,"dir":"in","msg":{"type":"assistant","message":{"id":"msg_011ChFEhgdV13E232SJBG8uu","model":"claude-haiku-5-5","role":"assistant","content":[{"type":"thinking","thinking":"","signature":""}]},"parent_tool_use_id":null}}
+{"t":11797,"dir":"in","msg":{"type":"assistant","message":{"id":"msg_011ChFEhgdV13E232SJBG8uu","model":"claude-haiku-5-5","role":"assistant","content":[{"type":"tool_use","id":"toolu_016H5Ww6SYv6x6bdJJNd172P","name":"Bash","input":{"command":"sleep 8","description":"Sleep 8 seconds (second)"},"caller":{"type":"direct"}}]},"parent_tool_use_id":null}}
+{"t":20026,"dir":"in","msg":{"type":"user","message":{"role":"user","content":[{"tool_use_id":"toolu_016H5Ww6SYv6x6bdJJNd172P","type":"tool_result","content":"(Bash completed with no output)","is_error":false}]},"parent_tool_use_id":null}}
+{"t":20031,"dir":"in","msg":{"type":"system","subtype":"status","status":"requesting"}}
+{"t":20903,"dir":"in","msg":{"type":"assistant","message":{"id":"msg_011ChFEiR8qXocuXEbg4ZdFy","model":"claude-haiku-5-5","role":"assistant","content":[{"type":"tool_use","id":"toolu_01BbdCCR1oS6LAiDePz9UHqx","name":"Bash","input":{"command":"sleep 8","description":"Sleep 8 seconds (third)"},"caller":{"type":"direct"}}]},"parent_tool_use_id":null}}
+{"t":29203,"dir":"in","msg":{"type":"user","message":{"role":"user","content":[{"tool_use_id":"toolu_01BbdCCR1oS6LAiDePz9UHqx","type":"tool_result","content":"(Bash completed with no output)","is_error":false}]},"parent_tool_use_id":null}}
+{"t":29205,"dir":"in","msg":{"type":"system","subtype":"status","status":"requesting"}}
+{"t":29873,"dir":"in","msg":{"type":"assistant","message":{"id":"msg_011ChFEj6Kn4V4M8VDcJi6fn","model":"claude-haiku-5-5","role":"assistant","content":[{"type":"text","text":"DONE\n\nMANGO"}]},"parent_tool_use_id":null}}
+{"t":29877,"dir":"in","msg":{"type":"command_lifecycle","command_uuid":"bc5a744d-fc39-4898-a6d7-c007b2b8d2a8","state":"completed"}}
+{"t":29878,"dir":"in","msg":{"type":"result","subtype":"success","is_error":false,"duration_ms":29500,"num_turns":4,"stop_reason":"end_turn","terminal_reason":"completed","total_cost_usd":0.00446965}}
+{"t":29879,"dir":"in","msg":{"type":"command_lifecycle","command_uuid":"1a282054-025c-404b-8b29-67b78e291f9b","state":"completed"}}

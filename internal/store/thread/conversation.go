@@ -133,7 +133,7 @@ func (m *Manager) send(ctx context.Context, id string, msg Message) (Item, error
 	if s.setupUnfinished() {
 		// No process to send it to, and maybe no worktrees yet (setup_actions.go).
 		o := &outgoing{text: strings.TrimSpace(msg.Text), composer: strings.TrimSpace(msg.ComposerText), attachments: attachments, prompt: prompt,
-			by: strings.TrimSpace(msg.ByThreadID), reply: msg.Reply}
+			by: strings.TrimSpace(msg.ByThreadID), reply: msg.Reply, shown: msg.shownAttachments}
 		o.relation, _, _ = m.sender(s, msg)
 		m.nameFromFirstMessage(id, log, o)
 		it, handled, err := m.sendToSetup(ctx, id, log, o, rv)
@@ -169,7 +169,7 @@ func (m *Manager) send(ctx context.Context, id string, msg Message) (Item, error
 	}
 	o := &outgoing{text: strings.TrimSpace(msg.Text), composer: strings.TrimSpace(msg.ComposerText), attachments: attachments, prompt: prompt,
 		origin: msg.Origin, wakeTitle: msg.WakeTitle, wakeJSON: msg.WakeJSON, by: strings.TrimSpace(msg.ByThreadID), relation: rel, reply: msg.Reply,
-		note: note, resume: resume, itemID: written, compact: msg.compact}
+		note: note, resume: resume, itemID: written, compact: msg.compact, shown: msg.shownAttachments}
 	m.nameFromFirstMessage(id, log, o)
 	for {
 		live, closing, reserved, _, err := m.lifecycle(id)
@@ -234,6 +234,15 @@ func (m *Manager) Respond(ctx context.Context, id, requestID string, d Decision)
 	if r == nil {
 		return Item{}, fmt.Errorf("%w: no pending request %s on thread %s: Claude is not running", ErrFailedPrecondition, requestID, id)
 	}
+	if d.Interrupt && !d.Allow {
+		// A deny that stops the turn stops like Interrupt: the user's queued messages are
+		// held, not started (cancel.go).
+		if conn, err := r.st.connection(); err == nil {
+			if log, err := m.thread(ctx, id); err == nil {
+				holdUserQueued(ctx, m.writer(id, log), conn, m.opts.ControlTimeout, m.log.With("thread", id))
+			}
+		}
+	}
 	it, err := r.call(ctx, threadCmd{requestID: requestID, decision: d})
 	if err == nil {
 		// One line per answer, beside "claude asks" (E3: the log had none).
@@ -258,7 +267,9 @@ func (d Decision) word() string {
 
 // Interrupt implements Store. A thread that is not running has nothing to stop: a
 // no-op. With by (another thread asked for it), a turn it stopped leaves a resume note
-// (resumenote.go).
+// (resumenote.go). The user's own queued messages are taken out of Claude's queue first
+// and become not sent (cancel.go holdUserQueued): an interrupt stops, it does not start
+// them as the next turn.
 func (m *Manager) Interrupt(ctx context.Context, id, by string) error {
 	if t, ok := m.Snapshot().Thread(id); ok && t.SettingUp() {
 		return nil // no turn yet: it must not wait for the setup and stop the first one
@@ -272,6 +283,9 @@ func (m *Manager) Interrupt(ctx context.Context, id, by string) error {
 	conn, err := r.st.connection()
 	if err != nil {
 		return err
+	}
+	if log, err := m.thread(ctx, id); err == nil {
+		holdUserQueued(ctx, m.writer(id, log), conn, m.opts.ControlTimeout, m.log.With("thread", id))
 	}
 	if err := controlErr(m.boundedControl(ctx, "interrupt", conn.Interrupt)); err != nil {
 		return err

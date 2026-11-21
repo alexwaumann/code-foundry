@@ -572,6 +572,9 @@ const (
 	SubtypeCanUseTool        = "can_use_tool"
 	SubtypeMcpStatus         = "mcp_status"
 	SubtypeMcpReconnect      = "mcp_reconnect"
+	// SubtypeCancelAsyncMessage drops a user message from Claude's queue before Claude
+	// reads it (Conn.CancelAsyncMessage).
+	SubtypeCancelAsyncMessage = "cancel_async_message"
 )
 
 // InitializeResponse is the part of initialize's success payload we read.

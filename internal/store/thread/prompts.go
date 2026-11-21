@@ -233,6 +233,9 @@ func scanPrompts(ctx context.Context, db *sql.DB, thread string, add func(prompt
 		if err := json.Unmarshal([]byte(data), &d); err != nil {
 			return fmt.Errorf("thread: list prompts: item %s of %s: %w", r.itemID, r.threadID, err)
 		}
+		if d.Cancelled {
+			continue // never sent: Cancel put it back in the composer (cancel.go)
+		}
 		r.createdAt, r.text, r.composer, r.origin, r.sentBy = fromMillis(created), d.Text, d.Composer, MessageOrigin(d.Origin), d.SentBy
 		if !add(r) {
 			break
