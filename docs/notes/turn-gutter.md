@@ -5,6 +5,9 @@ still showed every text written between tool calls. The agreed design (turn sket
 section 1, and 4, section 5) moves the turn's details and its Copy into a fixed-height row
 under the turn, and folds a turn down to its final reply. It also tells the model so.
 
+Update 2026-11-20 (`steer-segments.md`): a turn split at steers starts its gutter with the whole
+turn's length ("9m 08s total"); each stretch's header says its own.
+
 Update 2026-11-19 (`worker-card.md`): a turn the thread's own workers started has no header;
 its gutter's steps count is its fold toggle, and a turn that left nothing hands "latest" to the
 gutter before it.
