@@ -6,7 +6,6 @@
 import { useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type RefObject } from "react";
 import type { Row } from "@/api/plugin";
 import { VirtualScrollRoot } from "@/components/pr/virtualRoot";
-import { zoomFactor } from "@/lib/zoom";
 import { actOnElement, CHOICE_HOLD_MS, usePluginSurfacesStore, useSurfaceEntry } from "@/stores/pluginSurfaces";
 import { useViewCtx } from "./context";
 import { addPending, applyChanges, dropAt, edgeScroll, keyMove, keysOf, settle, type PendingChange, type RowChange } from "./rows";
@@ -156,14 +155,12 @@ export function useRowDrag(keys: readonly string[], box: RefObject<HTMLElement |
         after = at?.after ?? null;
         const lr = list.getBoundingClientRect();
         const shown = at !== null && at.after !== null;
-        // Measured in viewport px; drawn fixed under the zoomed body, in layout px (lib/zoom).
-        const z = zoomFactor();
         setDrag({
           key,
-          top: (y - offset) / z,
-          left: r.left / z,
-          width: r.width / z,
-          line: shown ? { top: at.lineY / z, left: lr.left / z - 2, width: lr.width / z + 4 } : null,
+          top: (y - offset),
+          left: r.left,
+          width: r.width,
+          line: shown ? { top: at.lineY, left: lr.left - 2, width: lr.width + 4 } : null,
         });
       };
       const tick = () => {

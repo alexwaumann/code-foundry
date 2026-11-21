@@ -1,9 +1,9 @@
 import { expect, test, type Page } from "@playwright/test";
-import { mockPost, openApp, resetMock, setZoom } from "./fixtures";
+import { mockPost, openApp, resetMock } from "./fixtures";
 
 /**
  * The collapsed sidebar's rail (docs/notes/sidebar-rail.md), what only a browser shows: its
- * width at 100% and zoomed, Needs you and Active scrolling on their own without a scrollbar and
+ * width, Needs you and Active scrolling on their own without a scrollbar and
  * fading only the edge with more, a hover card landing beside the rail, and a Working, Snoozed or
  * Archived card landing beside it, staying open while the pointer crosses into it, its list capped
  * at 300px and scrolling inside it. Which icon a row gets, the sections, the separators, the cap,
@@ -37,7 +37,7 @@ test.beforeEach(async () => {
   await mockPost("status-kinds");
 });
 
-test("the rail is 40px wide and zooms with the page; the pane starts a shell gap after it", async ({ page }) => {
+test("the rail is 40px wide; the pane starts a shell gap after it", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
   await openApp(page);
   await collapse(page);
@@ -45,8 +45,6 @@ test("the rail is 40px wide and zooms with the page; the pane starts a shell gap
   expect((await rail.boundingBox())?.width).toBe(40);
   const grid = await page.getByTestId("shell-grid").boundingBox();
   expect(Math.round(grid?.x ?? 0)).toBe(52);
-  await setZoom(page, 150);
-  await expect.poll(async () => Math.round((await rail.boundingBox())?.width ?? 0)).toBe(60);
 });
 
 test("Needs you and Active scroll on their own, without a scrollbar, fading only the edge with more", async ({ page }) => {

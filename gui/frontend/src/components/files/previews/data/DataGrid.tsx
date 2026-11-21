@@ -2,7 +2,6 @@ import { useId, useState, type KeyboardEvent, type ReactNode } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
 import { useWidth } from "@/lib/useWidth";
-import { zoomFactor } from "@/lib/zoom";
 import { cn } from "@/lib/utils";
 import { columnLabel, MAX_COLUMN_CH, type Column, type Sort } from "./table";
 import "./data.css";
@@ -71,9 +70,7 @@ export function DataGrid({ columns, order, rowNumber, cell, span, flagged, sort,
     getItemKey: (i) => rowNumber(order[i] ?? 0),
     overscan: 12,
     scrollMargin: GRID_ROW,
-    // A rect is in viewport px; the rows are placed in layout px, so the page zoom is divided out
-    // (lib/zoom.ts). Without it rows overlap below 100% and leave gaps above it.
-    measureElement: expand ? (el) => el.getBoundingClientRect().height / zoomFactor() : undefined,
+    measureElement: expand ? (el) => el.getBoundingClientRect().height : undefined,
   });
   const margin = v.options.scrollMargin;
 

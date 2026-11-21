@@ -6,7 +6,6 @@ import { TerminalHost, type TerminalHostHandle } from "@/components/terminal/Ter
 import { tildify } from "@/lib/path";
 import { normalizeDir } from "@/lib/terminalName";
 import { cn } from "@/lib/utils";
-import { zoomFactor } from "@/lib/zoom";
 import { quickHeight, quickMode, quickTerminalOf, registerQuickHost } from "@/shell/quickTerminal";
 import { closeQuick, forgetQuickRan, handBackFromQuick, runQuickAgain, setQuickHeight } from "@/shell/terminalActions";
 import { useTerminalDir } from "@/shell/terminalTab";
@@ -29,8 +28,7 @@ function useBoxMetrics(box: React.RefObject<HTMLDivElement | null>, watch: boole
     const el = box.current;
     if (!el || !watch) return;
     const measure = () => {
-      const z = zoomFactor();
-      const next = { height: Math.round(el.getBoundingClientRect().height / z), chrome: Math.round(chromeOf(el)) };
+      const next = { height: Math.round(el.getBoundingClientRect().height), chrome: Math.round(chromeOf(el)) };
       setM((prev) => (prev.height === next.height && prev.chrome === next.chrome ? prev : next));
     };
     measure();
@@ -123,7 +121,7 @@ function QuickTerminal({ threadId, height, overlay, onDrag, onDrop }: { threadId
     e.currentTarget.setPointerCapture(e.pointerId);
     drag.current = { y: e.clientY, h: height };
   };
-  const at = (e: ReactPointerEvent<HTMLDivElement>) => (drag.current ? drag.current.h + (drag.current.y - e.clientY) / zoomFactor() : height);
+  const at = (e: ReactPointerEvent<HTMLDivElement>) => (drag.current ? drag.current.h + (drag.current.y - e.clientY) : height);
   return (
     <section
       aria-label="Quick terminal"

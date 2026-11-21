@@ -14,11 +14,7 @@
 /* cf:app-theme */
 
 /* A page's base, not the app's: the page scrolls and selects (no overflow or user-select
- * rules), the body keeps its children's margins, borders take the theme's colour, and --cf-zoom (the app's page zoom, which
- * DialogContent's offset divides by) is 1. */
-:root {
-  --cf-zoom: 1;
-}
+ * rules), the body keeps its children's margins and borders take the theme's colour. */
 /* A page's dialog stops at the card's bottom edge and scrolls, so a long one keeps its
  * buttons in reach (the wheel cannot scroll the page under a modal, and the card is only as
  * tall as the page). DialogContent sits 14vh down. Not the app's dialogs: they size

@@ -96,9 +96,11 @@ export function SetWindowBackground(bg: $models.WindowBackground): $CancellableP
 }
 
 /**
- * SetZoom tells the host the page zoom in percent (appearance.zoom; the frontend applies
- * it as CSS zoom). The host keeps the native traffic lights centred on the zoomed title
- * band (trafficlights_darwin.go). Called on start and after each change.
+ * SetZoom zooms the window to percent (appearance.zoom): the webview's own page zoom, so
+ * the page lays out again at the new size in one coordinate system, as a browser's zoom
+ * does. The native traffic lights are outside the page; the host keeps them centred on the
+ * zoomed title band (trafficlights_darwin.go). The value is saved for the next launch
+ * (windowzoom.go). The frontend calls it on start and after each change.
  */
 export function SetZoom(percent: number): $CancellablePromise<void> {
     return $Call.ByID(4242696881, percent);

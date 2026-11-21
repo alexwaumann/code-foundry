@@ -1,18 +1,16 @@
 /**
  * Tells the daemon the size of the pane area (LayoutService.SetViewport), which placement,
  * restore and the direction verbs lay out with (docs/notes/shell-10-layout-slice.md). The pane grid
- * reports its box as it resizes; a burst sends one call once the size holds still, in layout px
- * (viewport px divided by the page zoom). The daemon forgets the size when it restarts, so the
+ * reports its box as it resizes; a burst sends one call once the size holds still, in CSS px. The daemon forgets the size when it restarts, so the
  * layout slice sends the last one again on each snapshot.
  */
 import { setLayoutViewport } from "@/api/layout";
-import { zoomFactor } from "@/lib/zoom";
 
 /** How long the size must hold still before it is sent. */
 export const VIEWPORT_DEBOUNCE_MS = 200;
 
 export interface ViewportReporter {
-  /** The pane area's box in viewport px, as measured. */
+  /** The pane area's box, as measured. */
   report(width: number, height: number): void;
   /** Sends the last size again (the daemon restarted), if one was reported. */
   resend(): void;
@@ -22,13 +20,12 @@ export interface ViewportReporter {
 
 interface ReporterDeps {
   send: (width: number, height: number) => Promise<void>;
-  zoom: () => number;
   delayMs: number;
 }
 
 export function createViewportReporter(deps: ReporterDeps): ViewportReporter {
   let timer: ReturnType<typeof setTimeout> | null = null;
-  /** The last size reported, in layout px. */
+  /** The last size reported. */
   let size: { w: number; h: number } | null = null;
   /** The last size sent. */
   let sent: { w: number; h: number } | null = null;
@@ -46,9 +43,8 @@ export function createViewportReporter(deps: ReporterDeps): ViewportReporter {
 
   return {
     report(width, height) {
-      const z = deps.zoom();
-      const w = width / z;
-      const h = height / z;
+      const w = width;
+      const h = height;
       if (!(w > 0) || !(h > 0)) return;
       size = { w, h };
       if (timer) clearTimeout(timer);
@@ -72,11 +68,10 @@ export function createViewportReporter(deps: ReporterDeps): ViewportReporter {
 
 const reporter = createViewportReporter({
   send: (w, h) => setLayoutViewport(w, h),
-  zoom: zoomFactor,
   delayMs: VIEWPORT_DEBOUNCE_MS,
 });
 
-/** Reports the pane area's box (viewport px); the pane grid calls it from its resize observer. */
+/** Reports the pane area's box; the pane grid calls it from its resize observer. */
 export function reportViewport(width: number, height: number): void {
   reporter.report(width, height);
 }

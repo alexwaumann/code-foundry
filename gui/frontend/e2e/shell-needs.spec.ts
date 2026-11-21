@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { appPath, invocations, mockPost, mockUrl, openStreams, resetMock, setZoom, threadsOpenAsTabs } from "./fixtures";
+import { appPath, invocations, mockPost, mockUrl, openStreams, resetMock, threadsOpenAsTabs } from "./fixtures";
 
 /**
  * The Needs-you inbox (docs/notes/shell-17-needs-you.md), what only a browser shows: the pointer
@@ -158,18 +158,18 @@ test("the popup holds one WatchThread while open, shared with a pane showing the
   await expect.poll(watches).toBe(1);
 });
 
-test("at 200% in a 1100x720 window the card stays in the window and the popup's header is never covered", async ({ page }) => {
+test("in a 550x360 window (1100x720 at 200%) the card stays in the window and the popup's header is never covered", async ({ page }) => {
   await seed(pane("p-1", [threadTab("s-1")]), "p-1");
   await openShell(page);
-  await page.setViewportSize({ width: 1100, height: 720 });
-  await setZoom(page, 200);
+  // A 1100x720 window at 200% zoom: 550x360 CSS px.
+  await page.setViewportSize({ width: 550, height: 360 });
   await rowEl(page, "s-ny-badge").getByTestId("thread-name").hover();
   await expect(card(page)).toBeVisible();
   await still(page);
   // The room right of the sidebar is under the card's 320px minimum: it takes that room, not more.
   const box = await card(page).boundingBox();
-  expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual(1100);
-  expect((box?.y ?? 0) + (box?.height ?? 0)).toBeLessThanOrEqual(720);
+  expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual(550);
+  expect((box?.y ?? 0) + (box?.height ?? 0)).toBeLessThanOrEqual(360);
   // The popup: its thread's ask and composer are taller than its body; the header stays on top.
   await rowEl(page, "s-ny-badge").getByTestId("thread-name").click();
   await expect(page.getByTestId("needs-popup").getByTestId("thread-permission")).toBeVisible();
@@ -283,8 +283,7 @@ for (const scheme of ["dark", "light"] as const) {
     await page.emulateMedia({ colorScheme: scheme });
     await seed(pane("p-1", [threadTab("s-1")]), "p-1");
     await openShell(page);
-    await page.setViewportSize({ width: 1100, height: 720 });
-    await setZoom(page, 200);
+    await page.setViewportSize({ width: 550, height: 360 });
     await rowEl(page, "s-ny-badge").getByTestId("thread-name").hover();
     await expect(card(page)).toBeVisible();
     await still(page);

@@ -28,9 +28,8 @@ export function usePanelBoundary(): { ref: (el: HTMLElement | null) => void; bou
 
 /**
  * Never wider than the room Radix measured inside the collision boundary (less its padding).
- * Radix measures in viewport px; the content is zoomed (index.css), so the room divides by --cf-zoom.
  */
-export const POPUP_FIT = "max-w-[calc(var(--radix-popper-available-width)/var(--cf-zoom)-8px)]";
+export const POPUP_FIT = "max-w-[calc(var(--radix-popper-available-width)-8px)]";
 export const POPUP_COLLISION_PADDING = 8;
 
 /**

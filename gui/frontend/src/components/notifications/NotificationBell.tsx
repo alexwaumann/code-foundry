@@ -23,7 +23,7 @@ const CARD_ESTIMATE = 112;
 function NotificationList({ ids }: { ids: readonly string[] }) {
   const [root, setRoot] = useState<HTMLDivElement | null>(null);
   return (
-    <div ref={setRoot} className="max-h-[min(560px,calc(100vh/var(--cf-zoom)-120px))] overflow-y-auto" data-testid="notification-list">
+    <div ref={setRoot} className="max-h-[min(560px,calc(100vh-120px))] overflow-y-auto" data-testid="notification-list">
       <VirtualScrollRoot value={root}>
         <VirtualStack items={ids} itemKey={(id) => id} estimate={CARD_ESTIMATE} render={(id) => <NotificationItem id={id} className="border-t border-cf-divider" />} />
       </VirtualScrollRoot>
@@ -85,7 +85,7 @@ export function NotificationBell() {
       </Tip>
       <PopoverContent
         align="end"
-        className="flex w-[420px] max-w-[calc(100vw/var(--cf-zoom)-24px)] flex-col p-0"
+        className="flex w-[420px] max-w-[calc(100vw-24px)] flex-col p-0"
         data-testid="notification-popover"
         // The list takes the focus: a card's button focused at once would show its tooltip.
         onOpenAutoFocus={(e) => {

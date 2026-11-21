@@ -76,3 +76,31 @@ describe("pickFiles", () => {
     expect(await pickFiles("")).toEqual([]);
   });
 });
+
+describe("scaleNativeDrops", () => {
+  it("turns the host's view points into whole CSS px at the window zoom", async () => {
+    const { scaleNativeDrops } = await import("./app");
+    const over: number[][] = [];
+    const dropped: [string[], number, number][] = [];
+    const hooks = {
+      handleDragOver: (x: number, y: number) => over.push([x, y]),
+      handlePlatformFileDrop: (files: string[], x: number, y: number) => dropped.push([files, x, y]),
+    };
+    let zoom = 1.5;
+    expect(scaleNativeDrops(hooks, () => zoom)).toBe(true);
+    hooks.handleDragOver(698.25, 1039);
+    hooks.handlePlatformFileDrop(["/a/x.png"], 698.25, 1039);
+    // 698.25 / 1.5 = 465.5 and 1039 / 1.5 = 692.67: rounded, since the host refuses a fraction.
+    expect(over).toEqual([[466, 693]]);
+    expect(dropped).toEqual([[["/a/x.png"], 466, 693]]);
+    zoom = 1;
+    hooks.handleDragOver(300, 200);
+    expect(over[1]).toEqual([300, 200]);
+  });
+
+  it("waits for the runtime's hooks", async () => {
+    const { scaleNativeDrops } = await import("./app");
+    expect(scaleNativeDrops(undefined, () => 1)).toBe(false);
+    expect(scaleNativeDrops({}, () => 1)).toBe(false);
+  });
+});

@@ -38,8 +38,8 @@ WKWebView settings. `make gui-drive` runs the real GUI so an agent can look at t
   `window._wails.handleDragOver(x, y)`, then `window._wails.handlePlatformFileDrop([path], x, y)`
   in `eval`, with x and y in view points (CSS px times the native zoom).
 - A thrown error in `eval` comes back as a stack without the message; return values instead.
-- Under native zoom `devicePixelRatio` is multiplied by the zoom (2 → 2.5 at 125% on a Retina
-  screen) and `innerWidth` is divided by it. Under CSS zoom neither changes.
+- Under the window zoom `devicePixelRatio` is multiplied by the zoom (2 becomes 2.5 at 125%
+  on a Retina screen) and `innerWidth` is divided by it (`native-zoom.md`).
 - `WAILS_MCP_HIDE_CURSOR=1` is set: the server's animated cursor would be in every shot.
 
 ## Host checks

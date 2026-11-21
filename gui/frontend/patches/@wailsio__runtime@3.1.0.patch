@@ -23,25 +23,3 @@ index b15d87a08cfc19cbb5f7082cf60299c368127030..c215b8cc4f86a76196d62565f0113fd8
          }
      }, 50);
  }
-@@ -96,11 +98,17 @@ function suppressEvent(event) {
- function isDraggableEvent(event) {
-     const target = eventTarget(event);
-     const style = window.getComputedStyle(target);
--    return (style.getPropertyValue("--wails-draggable").trim() === "drag"
--        && event.offsetX >= 0
--        && event.offsetX < target.clientWidth
-+    if (style.getPropertyValue("--wails-draggable").trim() !== "drag") {
-+        return false;
-+    }
-+    // offsetX/Y are viewport px but clientWidth/Height are layout px: under CSS
-+    // `zoom` (standardized model: WebKit, Chromium 128+) they differ by the target's
-+    // effective zoom, so scale the client box (which still excludes scrollbars).
-+    const zoom = target.offsetWidth > 0 ? target.getBoundingClientRect().width / target.offsetWidth : 1;
-+    return (event.offsetX >= 0
-+        && event.offsetX < target.clientWidth * zoom
-         && event.offsetY >= 0
--        && event.offsetY < target.clientHeight);
-+        && event.offsetY < target.clientHeight * zoom);
- }
- // Use constants to avoid comparing strings multiple times.
- const MouseDown = 0;

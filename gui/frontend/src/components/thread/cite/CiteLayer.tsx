@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button";
 import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
 import { Textarea } from "@/components/ui/textarea";
 import { CITE_EDGE, CITE_GAP, citableItem, newCitationId, placeCite, quoteAt, type CitationBody, type CitePlacement, type CiteSide } from "@/lib/citation";
-import { zoomFactor } from "@/lib/zoom";
 import { findCitation, putCitation } from "@/stores/compose";
 import { endEdit, focusCiteTarget, insertCite, takeFlash, useCiteStore } from "@/stores/cite";
 import { threadDraftKey } from "@/stores/threadActions";
@@ -281,7 +280,7 @@ export function CiteLayer({ threadId, paneRef }: { threadId: string; paneRef: Re
       const field = fieldRef.current;
       if (p && field) {
         const chrome = size.height - field.getBoundingClientRect().height;
-        field.style.maxHeight = `${String(Math.max(36, (p.room - chrome) / zoomFactor()))}px`;
+        field.style.maxHeight = `${String(Math.max(36, (p.room - chrome)))}px`;
       }
     };
     tick();

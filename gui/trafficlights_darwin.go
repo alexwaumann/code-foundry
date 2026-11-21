@@ -6,7 +6,7 @@ package main
 #import <Cocoa/Cocoa.h>
 #import <objc/runtime.h>
 
-// The traffic lights are native, so the page zoom (CSS zoom on <html>) cannot move
+// The traffic lights are native, so the page zoom (the webview's, AppService.SetZoom) cannot move
 // them. Like T3 Code (Electron's setWindowButtonPosition) we move them with the zoomed
 // title band instead: centerY is the pane headers' centre in points below the window's
 // top edge (buttonCenterY below). AppKit lays the title bar out again on resize and when leaving full screen,

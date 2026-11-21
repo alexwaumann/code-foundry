@@ -13,7 +13,6 @@ import { revealSideways } from "@/components/files/useFileFind";
 import { paintAll, plainText, rangeOf } from "@/components/thread/cite/citeDom";
 import { paintedMatches } from "@/lib/fileFind";
 import { matchRanges } from "@/lib/textSearch";
-import { zoomFactor } from "@/lib/zoom";
 import type { PreviewRead } from "./useTextSearch";
 
 /** The preview's body: the file as code around the line, or the row's line alone with why. */
@@ -109,6 +108,6 @@ export function revealMatch(root: HTMLElement | null, range: Range): void {
   if (!box) return;
   const scroller = box.dataset.virtual !== undefined ? box.firstElementChild : box;
   if (!scroller) return;
-  const gutter = (root?.querySelector(DIFFS_TAG_NAME)?.shadowRoot?.querySelector("[data-gutter]")?.getBoundingClientRect().width ?? 0) / zoomFactor();
+  const gutter = (root?.querySelector(DIFFS_TAG_NAME)?.shadowRoot?.querySelector("[data-gutter]")?.getBoundingClientRect().width ?? 0);
   revealSideways(range, scroller, gutter);
 }

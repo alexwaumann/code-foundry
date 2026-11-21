@@ -4,7 +4,6 @@ import * as React from "react"
 import { cn } from "@/lib/utils"
 import { CheckIcon, ChevronDownIcon, ChevronUpIcon } from "lucide-react"
 import { Select as SelectPrimitive } from "radix-ui"
-import { useZoomFactor, zoomPx } from "@/lib/zoom"
 
 function Select({
   ...props
@@ -51,12 +50,8 @@ function SelectTrigger({
 }
 
 /**
- * The list. Defaults to `position="popper"` (shadcn's is "item-aligned"): item-aligned
- * places the list with its own fixed-position math, which the page zoom scales a second
- * time, while popper goes through `[data-radix-popper-content-wrapper]`, which index.css
- * keeps anchored under zoom (docs/notes/zoom-popovers.md). Offsets and the --radix-*
- * lengths are viewport px, so they are scaled or divided by the zoom like the other
- * floating primitives. Drawn like the app's menus (rounded-lg, shadow-lg).
+ * The list. Defaults to `position="popper"` (shadcn's is "item-aligned"): popper
+ * positions like the other floating primitives. Drawn like the app's menus (rounded-lg, shadow-lg).
  */
 function SelectContent({
   className,
@@ -68,25 +63,23 @@ function SelectContent({
   collisionPadding,
   ...props
 }: React.ComponentProps<typeof SelectPrimitive.Content>) {
-  // Offsets are viewport px; scale them with the page zoom (lib/zoom.ts).
-  const z = useZoomFactor()
   const popper = position === "popper"
   return (
     <SelectPrimitive.Portal>
       <SelectPrimitive.Content
         data-slot="select-content"
         className={cn(
-          "relative z-50 max-h-[calc(var(--radix-select-content-available-height)/var(--cf-zoom))] min-w-[8rem] origin-(--radix-select-content-transform-origin) overflow-x-hidden overflow-y-auto rounded-lg border bg-popover text-popover-foreground shadow-lg data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95",
+          "relative z-50 max-h-[var(--radix-select-content-available-height)] min-w-[8rem] origin-(--radix-select-content-transform-origin) overflow-x-hidden overflow-y-auto rounded-lg border bg-popover text-popover-foreground shadow-lg data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95",
           // As wide as the trigger, border included (on the viewport, the border made it 2px wider).
-          popper && "min-w-[calc(var(--radix-select-trigger-width)/var(--cf-zoom))]",
+          popper && "min-w-[var(--radix-select-trigger-width)]",
           className
         )}
         position={position}
         align={align}
         {...(popper && {
-          sideOffset: zoomPx(sideOffset, z),
-          alignOffset: zoomPx(alignOffset, z),
-          collisionPadding: zoomPx(collisionPadding, z),
+          sideOffset: sideOffset,
+          alignOffset: alignOffset,
+          collisionPadding: collisionPadding,
         })}
         {...props}
       >
@@ -95,7 +88,7 @@ function SelectContent({
           className={cn(
             "p-1",
             popper &&
-              "h-[calc(var(--radix-select-trigger-height)/var(--cf-zoom))] w-full scroll-my-1"
+              "h-[var(--radix-select-trigger-height)] w-full scroll-my-1"
           )}
         >
           {children}

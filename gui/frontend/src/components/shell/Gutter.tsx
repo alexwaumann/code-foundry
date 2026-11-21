@@ -1,7 +1,6 @@
 import { useRef } from "react";
 import type { GutterRect } from "@/shell/geometry/types";
 import { cn } from "@/lib/utils";
-import { zoomFactor } from "@/lib/zoom";
 import { gutterKeyDelta } from "@/shell/resize";
 
 /**
@@ -73,7 +72,7 @@ export function Gutter({
       onPointerMove={(e) => {
         const s = start.current;
         if (!s || s.id !== e.pointerId) return;
-        const delta = (pos(e) - s.at) / zoomFactor();
+        const delta = (pos(e) - s.at);
         if (delta !== 0) s.moved = true;
         onDrag(delta);
       }}

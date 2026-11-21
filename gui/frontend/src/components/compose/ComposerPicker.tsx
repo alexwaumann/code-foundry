@@ -327,8 +327,8 @@ export function ComposerPicker({
       </WarningTip>
       )}
       <PopoverContent
-        // Never taller than the room Radix found on its side (viewport px, so divided by the zoom).
-        className={cn("flex max-h-[calc(var(--radix-popover-content-available-height)/var(--cf-zoom))] flex-col p-0", contentClassName)}
+        // Never taller than the room Radix found on its side.
+        className={cn("flex max-h-[var(--radix-popover-content-available-height)] flex-col p-0", contentClassName)}
         data-testid={testId ? `${testId}-list` : undefined}
         onCloseAutoFocus={(e) => {
           // Back to the trigger unless something else took the keyboard (a click outside).

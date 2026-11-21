@@ -162,10 +162,10 @@ test("the sidebar at its minimum lines its right edge up with the top bar's togg
     return [Math.round((s?.x ?? 0) + (s?.width ?? 0)), Math.round((t?.x ?? 0) + (t?.width ?? 0))];
   };
   expect(await edges()).toEqual([240, 240]);
-  // Zoomed out (cmd+-): the lights' gutter keeps 80 screen px, the rest shrinks; the sidebar follows.
+  // Zoomed out (cmd+-, 90%): the lights' gutter keeps 80 screen px, which is 89 CSS px at 90%,
+  // and the sidebar follows the toggle. A browser has no window zoom, so it measures CSS px.
   await page.keyboard.press("Meta+Minus");
-  await expect.poll(async () => { const [s, t] = await edges(); return Math.abs((s ?? 0) - (t ?? 0)); }).toBeLessThanOrEqual(1);
-  expect((await edges())[0]).toBeLessThan(240);
+  await expect.poll(edges).toEqual([249, 249]);
 });
 
 /** SHOTS=<dir>: the scenes of docs/notes/shell-25f-sizes.md, dark and light; the same scenes on the tree before it. */

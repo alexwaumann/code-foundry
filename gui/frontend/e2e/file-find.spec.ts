@@ -5,7 +5,7 @@ import { CF, mockPost, openApp, openThreadChanges, resetMock, row, threadPrompt 
  * Find in a File tab (docs/notes/file-find-in-file.md), for what only a browser shows: the
  * chord reaching the tab from its code, its editor and the thread's prompt, the matches
  * painted on @pierre/diffs' lines in its shadow root (Custom Highlights), a match off a long
- * file's virtualized screen scrolled to, at 125% zoom too, and the keyboard and selection
+ * file's virtualized screen scrolled to, and the keyboard and selection
  * after Escape. The counting, stepping, routing and the bar's place are vitest's
  * (lib/fileFind.test.ts, stores/fileFind.test.ts, keys/bindings.test.ts, FileTab.test.tsx).
  */
@@ -76,29 +76,6 @@ test("from the code: cmd+f finds in the file, steps scroll a long file to matche
   // The keyboard is still the tab's: cmd+g opens the bar again.
   await page.keyboard.press("Meta+g");
   await expect(bar(page)).toBeVisible();
-});
-
-test("at 125% zoom a stepped-to match is scrolled into view and painted on its text", async ({ page }) => {
-  await mockPost(`fs/write?path=${encodeURIComponent(`${CF}/long.txt`)}&text=${encodeURIComponent(longText)}`);
-  await openFile(page, "long.txt");
-  await page.evaluate(`__cfModule("/src/stores/ui.ts").then((m) => m.useUiStore.getState().setZoom(125))`);
-  await code(page).locator('[data-content] [data-line="2"]').click();
-  await page.keyboard.press("Meta+f");
-  await page.keyboard.type("dog");
-  for (let i = 0; i < 9; i++) await page.keyboard.press("Enter");
-  await expect(count(page)).toHaveText("10 of 12");
-  await expect.poll(() => current(page)).toMatchObject({ line: "451", text: "dog", inView: true });
-  // The paint is the text's own range: its box starts where "dog" starts in the line.
-  const offset = await page.evaluate(() => {
-    const r = [...(CSS.highlights.get("cf-file-find-current") ?? [])][0] as Range;
-    const line = r.startContainer.parentElement?.closest("[data-line]");
-    const text = line?.textContent ?? "";
-    const whole = document.createRange();
-    whole.selectNodeContents(line as Node);
-    const per = whole.getBoundingClientRect().width / text.length;
-    return (r.getBoundingClientRect().left - whole.getBoundingClientRect().left) / per - text.indexOf("dog");
-  });
-  expect(Math.abs(offset)).toBeLessThan(0.25);
 });
 
 test("in the editor cmd+f is the tab's bar, not the library's panel; the bar and its match stay across the pencil", async ({ page }) => {

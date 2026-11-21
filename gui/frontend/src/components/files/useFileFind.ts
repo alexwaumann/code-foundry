@@ -9,7 +9,6 @@ import { plainText, rangeOf } from "@/components/thread/cite/citeDom";
 import { draftSnapshot, subscribeDraft, type EditorPlace } from "@/lib/codeEditor";
 import { fileMatchIndex, findInFile, paintedMatches, pickCurrent, type FileMatch, type FileMatches } from "@/lib/fileFind";
 import { matchOffsets, stepIndex } from "@/lib/threadFind";
-import { zoomFactor } from "@/lib/zoom";
 import { focusEditor, selectInEditor } from "@/stores/fileEdit";
 import { fileFindOf, registerFileFindHost, setFileFindCount, setFileFindCurrent, useFileFindCurrent, useFileFindOpen, useFileFindQuery, useFileFindRevealSeq } from "@/stores/fileFind";
 import { paintFileFind } from "./fileFindPaint";
@@ -163,14 +162,12 @@ function scrollParents(from: Element, stop: Element): Element[] {
 /**
  * Scrolls `scroller` (and any element between it and the range that scrolls sideways) so
  * the range shows: a third down when it was out of view, sideways only as far as needed.
- * Rects are viewport px and scroll offsets layout px, hence the zoom (lib/zoom.ts).
  * `leftInset`: what covers the scroller's left edge (a sticky gutter).
  */
 function revealRange(range: Range, scroller: Element, leftInset = 0): void {
-  const z = zoomFactor();
   const rect = range.getBoundingClientRect();
   const box = scroller.getBoundingClientRect();
-  if (rect.top < box.top || rect.bottom > box.bottom) scroller.scrollTop += (rect.top - box.top) / z - scroller.clientHeight / 3;
+  if (rect.top < box.top || rect.bottom > box.bottom) scroller.scrollTop += (rect.top - box.top) - scroller.clientHeight / 3;
   revealSideways(range, scroller, leftInset);
 }
 
@@ -180,15 +177,14 @@ function revealRange(range: Range, scroller: Element, leftInset = 0): void {
  * already scrolled to by CodeBody).
  */
 export function revealSideways(range: Range, scroller: Element, leftInset = 0): void {
-  const z = zoomFactor();
   const start = range.startContainer instanceof Element ? range.startContainer : range.startContainer.parentElement;
   if (!start) return;
   for (const el of scrollParents(start, scroller)) {
     const r = range.getBoundingClientRect();
     const e = el.getBoundingClientRect();
-    const left = e.left + leftInset * z;
-    const pad = 24 * z;
-    if (r.left < left + pad || r.right > e.right - pad) el.scrollLeft += (r.left - left) / z - Math.max(0, (el.clientWidth - leftInset) / 2);
+    const left = e.left + leftInset;
+    const pad = 24;
+    if (r.left < left + pad || r.right > e.right - pad) el.scrollLeft += (r.left - left) - Math.max(0, (el.clientWidth - leftInset) / 2);
   }
 }
 
@@ -227,7 +223,7 @@ function codeSurface(findKey: string | undefined, box: RefObject<HTMLDivElement 
   const scroller = () => (virtual ? (box.current?.firstElementChild ?? null) : box.current);
   const lines = () => Array.from(shadow()?.querySelectorAll<HTMLElement>("[data-content] [data-line]") ?? []);
   const lineEl = (line: number) => shadow()?.querySelector(`[data-content] [data-line="${String(line + 1)}"]`) ?? null;
-  const gutter = () => (shadow()?.querySelector("[data-gutter]")?.getBoundingClientRect().width ?? 0) / zoomFactor();
+  const gutter = () => (shadow()?.querySelector("[data-gutter]")?.getBoundingClientRect().width ?? 0);
   const rangeFor = (m: FileMatch, query: string) => {
     const el = lineEl(m.line);
     return el ? (lineRanges(el, query)[m.nth] ?? null) : null;
@@ -272,8 +268,7 @@ function codeSurface(findKey: string | undefined, box: RefObject<HTMLDivElement 
         const last = shown[shown.length - 1];
         if (first && last) {
           const ref = m.line + 1 < Number(first.dataset.line) ? first : last;
-          const z = zoomFactor();
-          const top = (ref.getBoundingClientRect().top - sc.getBoundingClientRect().top) / z;
+          const top = (ref.getBoundingClientRect().top - sc.getBoundingClientRect().top);
           sc.scrollTop += top + (m.line + 1 - Number(ref.dataset.line)) * LINE_H - sc.clientHeight / 3;
         } else if (sc.scrollTop === 0 && m.line > 0) sc.scrollTop = m.line * LINE_H - sc.clientHeight / 3;
         // Nothing rendered (the library's virtualizer, scrolled to the end of wrapped lines,

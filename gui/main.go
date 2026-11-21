@@ -61,7 +61,7 @@ func main() {
 	}
 
 	daemonService := NewDaemonService(p, log)
-	appService := NewAppService(log, p.WindowBackground())
+	appService := NewAppService(log, p.WindowBackground(), p.WindowZoom())
 	overlayService := NewOverlayService(log)
 	shotService := NewShotService(log)
 	// Set below, before the app runs, which is when a second launch can first be heard.
@@ -151,6 +151,8 @@ func main() {
 				guardNavigation(window.NativeWindow(), "main", log)
 			})
 			applyWindowFrame(window, app, p.WindowFrame(), log)
+			// The last zoom, while the window is still hidden (windowzoom.go).
+			appService.restoreZoom()
 			window.Show()
 			watchWindowFrame(window, app, p.WindowFrame(), log)
 		})

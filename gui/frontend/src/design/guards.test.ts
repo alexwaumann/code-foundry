@@ -147,8 +147,8 @@ describe("scanColours", () => {
 /**
  * Every `cf-*` utility and `var(--cf-*)` names something that exists
  * (docs/notes/theme-slots-3-hardening.md): a utility a slot, a var() a slot or a property
- * declared somewhere under src (a stylesheet's `--cf-zoom: 1`, a style object's
- * `"--cf-backdrop-wide"` key, a `setProperty("--cf-zoom", …)`). Scans the same sources and
+ * declared somewhere under src (a stylesheet's `--cf-flame-ink: …`, a style object's
+ * `"--cf-backdrop-wide"` key, a `setProperty("--cf-…", …)`). Scans the same sources and
  * every stylesheet; components/ui too.
  */
 const declaredCf = new Set([
@@ -165,7 +165,7 @@ const knownRef = (name: string, kind: "utility" | "variable") => isSlot(name) ||
 
 describe("slot-name guard", () => {
   it("knows the declared non-slot properties", () => {
-    expect([...declaredCf].filter((n) => !isSlot(n))).toEqual(expect.arrayContaining(["--cf-zoom", "--cf-flame-ink", "--cf-backdrop-wide"]));
+    expect([...declaredCf].filter((n) => !isSlot(n))).toEqual(expect.arrayContaining(["--cf-flame-ink", "--cf-backdrop-wide"]));
   });
 
   it("no utility or var() names a slot that does not exist", () => {
@@ -180,8 +180,8 @@ describe("slot-name guard", () => {
     ["a retired slot", `const c = "hover:bg-cf-sidebar-row-active/50";`, ["--cf-sidebar-row-active"]],
     ["a misspelt var()", `const c = "[--chip-accent:var(--cf-infoo)]";`, ["--cf-infoo"]],
     ["a component name with cf-", `const c = "bg-cf-card";`, ["--cf-card"]],
-    ["a utility on a declared non-slot", `const c = "bg-cf-zoom";`, ["--cf-zoom"]],
-    ["slots, opacity and variants pass", `const c = "bg-cf-surface-raised hover:text-cf-warning-text/80 [&>*]:border-cf-divider var(--cf-error-text) var(--cf-zoom)";`, []],
+    ["a utility on a declared non-slot", `const c = "bg-cf-flame-ink";`, ["--cf-flame-ink"]],
+    ["slots, opacity and variants pass", `const c = "bg-cf-surface-raised hover:text-cf-warning-text/80 [&>*]:border-cf-divider var(--cf-error-text) var(--cf-flame-ink)";`, []],
     ["class names that are not utilities pass", `const c = "cf-thread cf-markdown cf-code-view";`, []],
   ])("%s", (_name, source, want) => {
     expect(scanSlotRefs("x.tsx", source, knownRef).map((h) => h.name)).toEqual(want);

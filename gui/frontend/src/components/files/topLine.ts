@@ -23,24 +23,24 @@ export interface TopLine {
 
 /**
  * The first line whose row shows in the box (`boxTop`..`boxBottom`, viewport px), with its offset
- * from the box's top in layout px (`zoom` is the page zoom). Null when no row shows.
+ * from the box's top. Null when no row shows.
  */
-export function topLineOf(rows: readonly LineRow[], boxTop: number, boxBottom: number, zoom: number): TopLine | null {
+export function topLineOf(rows: readonly LineRow[], boxTop: number, boxBottom: number): TopLine | null {
   let best: LineRow | null = null;
   for (const r of rows) {
     if (r.height <= 0 || r.top + r.height <= boxTop + 1 || r.top >= boxBottom - 1) continue;
     if (!best || r.line < best.line) best = r;
   }
-  return best ? { line: best.line, offset: (best.top - boxTop) / zoom } : null;
+  return best ? { line: best.line, offset: best.top - boxTop } : null;
 }
 
 /**
  * How far to scroll (layout px, added to scrollTop) to put `anchor`'s line back where it was;
  * 0 when it is there (within half a pixel), null when its row is not rendered now.
  */
-export function topLineCorrection(anchor: TopLine, rows: readonly LineRow[], boxTop: number, zoom: number): number | null {
+export function topLineCorrection(anchor: TopLine, rows: readonly LineRow[], boxTop: number): number | null {
   const row = rows.find((r) => r.line === anchor.line && r.height > 0);
   if (!row) return null;
-  const delta = (row.top - boxTop) / zoom - anchor.offset;
+  const delta = row.top - boxTop - anchor.offset;
   return Math.abs(delta) < 0.5 ? 0 : delta;
 }

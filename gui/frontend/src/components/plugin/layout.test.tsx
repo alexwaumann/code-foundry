@@ -317,33 +317,6 @@ describe("pane heights", () => {
   });
 });
 
-describe("under page zoom", () => {
-  // Rects are in viewport px, which the zoom scales (lib/zoom); the thresholds are layout px.
-  beforeEach(() => {
-    document.documentElement.style.setProperty("--cf-zoom", "1.25");
-  });
-  afterEach(() => {
-    document.documentElement.style.removeProperty("--cf-zoom");
-  });
-
-  it("columns compare their layout width: 600 viewport px at 125% is 480, under the 492 two columns need", () => {
-    boxes.cols = { top: 0, height: 100, width: 600 };
-    inSurface(<NodeList nodes={[columns([col("a"), col("b")])]} />);
-    expect(layoutOf()).toBe("stack");
-    boxes.cols = { top: 0, height: 100, width: 615 };
-    resize();
-    expect(layoutOf()).toBe("row");
-  });
-
-  it("fill measures the node's top in layout px against the box's layout height", () => {
-    const pane = (key: string): ViewNode => ({ key, pane: { children: [text(`${key}-t`)], height: "fill" } });
-    boxes["scroll-root"] = { top: 0, height: 900, width: 360 };
-    boxes.p = { top: 250, height: 0, width: 360 };
-    inSurface(<NodeList nodes={[pane("p")]} />);
-    expect(document.querySelector<HTMLElement>('[data-testid="plugin-pane"][data-key="p"]')?.style.height).toBe(`${String(900 - 200 - FILL_BOTTOM)}px`);
-  });
-});
-
 describe("fill boxes", () => {
   it("is the nearest sized pane, else the scroll area; the scroll area leaves its bottom padding", () => {
     expect(fillHeight(900, 200)).toBe(684);

@@ -39,11 +39,21 @@ type AppService struct {
 	// bgMu guards bgSaved, the state last written to bgPath.
 	bgMu    sync.Mutex
 	bgSaved WindowBackground
+	// zoomPath is where SetZoom keeps the zoom for the next launch.
+	zoomPath string
+	// zoomMu guards zoomSaved, the percent last written to zoomPath.
+	zoomMu    sync.Mutex
+	zoomSaved int
 }
 
-// NewAppService returns an AppService that keeps the window background in bgPath.
-func NewAppService(log *slog.Logger, bgPath string) *AppService {
-	return &AppService{log: log, badge: &dockBadge{apply: setDockBadgeLabel}, bgPath: bgPath, bgSaved: loadWindowBackground(bgPath)}
+// NewAppService returns an AppService that keeps the window background in bgPath and the
+// window zoom in zoomPath.
+func NewAppService(log *slog.Logger, bgPath, zoomPath string) *AppService {
+	return &AppService{
+		log: log, badge: &dockBadge{apply: setDockBadgeLabel},
+		bgPath: bgPath, bgSaved: loadWindowBackground(bgPath),
+		zoomPath: zoomPath, zoomSaved: loadWindowZoom(zoomPath),
+	}
 }
 
 // SetWindowBackground paints the window behind the page in the active theme's sheet and
@@ -112,18 +122,43 @@ func (s *AppService) Info() AppInfo {
 	return AppInfo{Version: version.Version}
 }
 
-// SetZoom tells the host the page zoom in percent (appearance.zoom; the frontend applies
-// it as CSS zoom). The host keeps the native traffic lights centred on the zoomed title
-// band (trafficlights_darwin.go). Called on start and after each change.
+// SetZoom zooms the window to percent (appearance.zoom): the webview's own page zoom, so
+// the page lays out again at the new size in one coordinate system, as a browser's zoom
+// does. The native traffic lights are outside the page; the host keeps them centred on the
+// zoomed title band (trafficlights_darwin.go). The value is saved for the next launch
+// (windowzoom.go). The frontend calls it on start and after each change.
 func (s *AppService) SetZoom(percent int) error {
-	if percent < 10 || percent > 1000 {
+	if percent < windowZoomMin || percent > windowZoomMax {
 		return fmt.Errorf("set zoom: %d%% out of range", percent)
 	}
-	if s.window == nil {
+	s.applyZoom(percent)
+	s.zoomMu.Lock()
+	defer s.zoomMu.Unlock()
+	if percent == s.zoomSaved || s.zoomPath == "" {
 		return nil
 	}
-	positionWindowButtons(s.window.NativeWindow(), percent)
+	if err := saveWindowZoom(s.zoomPath, percent); err != nil {
+		return err
+	}
+	s.zoomSaved = percent
 	return nil
+}
+
+// restoreZoom applies the last launch's zoom. main calls it once the page has loaded and
+// before the window shows, so the window never opens at 100% and then jumps.
+func (s *AppService) restoreZoom() {
+	s.zoomMu.Lock()
+	percent := s.zoomSaved
+	s.zoomMu.Unlock()
+	s.applyZoom(percent)
+}
+
+func (s *AppService) applyZoom(percent int) {
+	if s.window == nil {
+		return
+	}
+	s.window.SetZoom(float64(percent) / 100)
+	positionWindowButtons(s.window.NativeWindow(), percent)
 }
 
 // Relaunch quits the app and starts this executable again once this process has
@@ -164,7 +199,7 @@ func shellQuote(s string) string { return "'" + strings.ReplaceAll(s, "'", `'\''
 // asks the frontend to open the update dialog and check. The View menu is custom: the
 // default one binds Reload (cmd+r) and Force Reload (cmd+shift+r): cmd+r is
 // thread.rename, a stray cmd+shift+r must not reload the GUI either, and Zoom (cmd+0/=/-), which the GUI uses for
-// its own page zoom (appearance.zoom; CSS zoom on <html>, see gui/frontend/src/lib/zoom.ts). A menu chord fires whenever the page leaves the key unhandled,
+// its own page zoom (appearance.zoom; AppService.SetZoom, see gui/frontend/src/lib/zoom.ts). A menu chord fires whenever the page leaves the key unhandled,
 // so cmd+r with no thread selected would reload the whole GUI. Keep the chords left
 // here in command.ReservedChords.
 //

@@ -1,6 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, type RefObject } from "react";
 import { DIFFS_TAG_NAME } from "@pierre/diffs";
-import { zoomFactor } from "@/lib/zoom";
 import { topLineCorrection, topLineOf, type LineRow, type TopLine } from "./topLine";
 
 /** How long after a width change the top line is put back while the library lays the rows out again. */
@@ -72,7 +71,7 @@ export function useKeepTopLine(box: RefObject<HTMLDivElement | null>, virtual: b
         seen.push(row);
         if (row.height > 0 && row.top + row.height > rect.top + 1) break;
       }
-      anchor = topLineOf(seen, rect.top, rect.bottom, zoomFactor()) ?? anchor;
+      anchor = topLineOf(seen, rect.top, rect.bottom) ?? anchor;
     };
     const stop = () => {
       if (restoring) cancelAnimationFrame(restoring);
@@ -86,7 +85,7 @@ export function useKeepTopLine(box: RefObject<HTMLDivElement | null>, virtual: b
         return;
       }
       const row = shadow()?.querySelector<HTMLElement>(rowSelector(a.line, rows));
-      const delta = row ? topLineCorrection(a, [rowOf(row, rows)], root.getBoundingClientRect().top, zoomFactor()) : null;
+      const delta = row ? topLineCorrection(a, [rowOf(row, rows)], root.getBoundingClientRect().top) : null;
       if (delta === 0) stable++;
       else stable = 0;
       if (delta) root.scrollTop += delta;

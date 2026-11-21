@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, type RefObject } from "react";
 import { DEFAULT_VIRTUAL_FILE_METRICS, DIFFS_TAG_NAME, type SupportedLanguages } from "@pierre/diffs";
 import { CodeFile, type CodeFileEdit } from "@/components/code/CodeFile";
 import { CodeScroll } from "@/components/code/CodeDiff";
-import { zoomFactor } from "@/lib/zoom";
 import { useCodeFind } from "./useFileFind";
 import { useKeepTopLine } from "./useKeepTopLine";
 
@@ -34,10 +33,9 @@ function useScrollToLine(box: RefObject<HTMLDivElement | null>, line: number | u
       const shadow = root.querySelector(DIFFS_TAG_NAME)?.shadowRoot;
       const row = shadow?.querySelector<HTMLElement>(`[data-line="${String(line)}"]`);
       if (row) {
-        // Rects are viewport px, scrollTop layout px: under a page zoom the distance is divided back.
-        const top = (row.getBoundingClientRect().top - root.getBoundingClientRect().top) / zoomFactor() + root.scrollTop;
+        const top = row.getBoundingClientRect().top - root.getBoundingClientRect().top + root.scrollTop;
         // A File tab's line lands with its top a third down; another place puts the line's middle there.
-        const middle = at === LINE_AT ? 0 : row.getBoundingClientRect().height / zoomFactor() / 2;
+        const middle = at === LINE_AT ? 0 : row.getBoundingClientRect().height / 2;
         root.scrollTop = Math.max(0, top + middle - root.clientHeight * at);
         return;
       }

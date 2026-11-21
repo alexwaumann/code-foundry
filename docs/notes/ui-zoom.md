@@ -1,5 +1,8 @@
 # UI zoom (cmd+= / cmd+- / cmd+0)
 
+> Superseded 2026-11-20 by `native-zoom.md`: zoom is the webview's page zoom now, and the
+> CSS-zoom design described here is gone. Kept for the history.
+
 Before: the chords only changed the terminal font (appearance.font_size). Now they zoom
 the whole window like T3 Code (Electron's `webContents.setZoomLevel`, ±0.5 steps).
 

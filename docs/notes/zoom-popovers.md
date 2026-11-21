@@ -1,5 +1,8 @@
 # Floating surfaces under page zoom
 
+> Superseded 2026-11-20 by `native-zoom.md`: zoom is the webview's page zoom now, and the
+> CSS-zoom handling of floating surfaces described here is gone. Kept for the history.
+
 Bug: at any page zoom other than 100% (`appearance.zoom`, CSS `zoom` on `<html>`,
 `ui-zoom.md`) every Radix floating surface (Popover, DropdownMenu, ContextMenu, Tooltip:
 composer pickers, PR menus, sidebar row menus, thread tooltips) opened away from its

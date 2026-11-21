@@ -3,10 +3,9 @@ import { ContextMenu as ContextMenuPrimitive } from "radix-ui"
 import { CheckIcon, ChevronRightIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { itemLeaveWhileClosing } from "@/components/ui/menuItemLeave"
-import { useZoomFactor, zoomPx } from "@/lib/zoom"
 
 const contentClass =
-  "z-50 max-h-[calc(var(--radix-context-menu-content-available-height)/var(--cf-zoom))] min-w-[10rem] origin-(--radix-context-menu-content-transform-origin) overflow-x-hidden overflow-y-auto rounded-lg border bg-popover p-1 text-popover-foreground shadow-lg data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:animate-in data-[state=open]:fade-in-0"
+  "z-50 max-h-[var(--radix-context-menu-content-available-height)] min-w-[10rem] origin-(--radix-context-menu-content-transform-origin) overflow-x-hidden overflow-y-auto rounded-lg border bg-popover p-1 text-popover-foreground shadow-lg data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:animate-in data-[state=open]:fade-in-0"
 
 const itemClass =
   "relative flex cursor-default items-center gap-2 rounded-md px-2 py-1.5 text-label outline-hidden select-none focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50 data-[variant=destructive]:text-cf-error-text data-[variant=destructive]:focus:bg-destructive/10 dark:data-[variant=destructive]:focus:bg-destructive/20 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 [&_svg:not([class*='text-'])]:text-muted-foreground"
@@ -20,11 +19,9 @@ function ContextMenuTrigger({ ...props }: React.ComponentProps<typeof ContextMen
 }
 
 function ContextMenuContent({ className, alignOffset, collisionPadding, ...props }: React.ComponentProps<typeof ContextMenuPrimitive.Content>) {
-  // Offsets are viewport px; scale them with the page zoom (lib/zoom.ts).
-  const z = useZoomFactor()
   return (
     <ContextMenuPrimitive.Portal>
-      <ContextMenuPrimitive.Content data-slot="context-menu-content" className={cn(contentClass, className)} alignOffset={zoomPx(alignOffset, z)} collisionPadding={zoomPx(collisionPadding, z)} {...props} />
+      <ContextMenuPrimitive.Content data-slot="context-menu-content" className={cn(contentClass, className)} alignOffset={alignOffset} collisionPadding={collisionPadding} {...props} />
     </ContextMenuPrimitive.Portal>
   )
 }
@@ -66,15 +63,14 @@ function ContextMenuSubTrigger({ className, children, chevron = true, ...props }
 }
 
 function ContextMenuSubContent({ className, sideOffset, alignOffset, collisionPadding, ...props }: React.ComponentProps<typeof ContextMenuPrimitive.SubContent>) {
-  const z = useZoomFactor()
   return (
     <ContextMenuPrimitive.Portal>
       <ContextMenuPrimitive.SubContent
         data-slot="context-menu-sub-content"
         className={cn(contentClass, className)}
-        sideOffset={zoomPx(sideOffset, z)}
-        alignOffset={zoomPx(alignOffset, z)}
-        collisionPadding={zoomPx(collisionPadding, z)}
+        sideOffset={sideOffset}
+        alignOffset={alignOffset}
+        collisionPadding={collisionPadding}
         {...props}
       />
     </ContextMenuPrimitive.Portal>

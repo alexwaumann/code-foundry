@@ -127,9 +127,6 @@ export default defineConfig(({ mode }) => {
     publicDir: false as const,
     resolve: {
       alias: [
-        // The ui primitives scale Radix offsets by the app's zoom (lib/zoom.ts, which reads the
-        // app's store and the Wails runtime); a page has no zoom.
-        { find: "@/lib/zoom", replacement: path.resolve(here, "src/pagelib/zoom.ts") },
         { find: "@", replacement: path.resolve(here, "src") },
       ],
     },

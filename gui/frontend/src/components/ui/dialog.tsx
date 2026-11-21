@@ -38,14 +38,13 @@ function DialogOverlay({ className, ...props }: React.ComponentProps<typeof Dial
  * The sizes a dialog comes in. "default": the dialog's own width (its className), its top
  * 14% down the window. "sheet": an app-level page in a modal (Settings, Themes, Usage;
  * docs/notes/settings-sheet.md), centred, at most 1280 by 1280 and never closer than 48px
- * to a window edge, so it shrinks with the window. Viewport units divide by --cf-zoom
- * (lib/zoom.ts: the page zoom would scale them twice); the px values zoom with the page.
+ * to a window edge, so it shrinks with the window.
  * The sheet is a flex column that clips: its body lays out its own scrolling regions.
  */
 const dialogSizes = {
-  default: "top-[calc(14vh/var(--cf-zoom))] w-full max-w-[calc(100%-2rem)]",
+  default: "top-[14vh] w-full max-w-[calc(100%-2rem)]",
   sheet:
-    "top-1/2 flex h-[min(1280px,calc(100vh/var(--cf-zoom)-96px))] w-[min(1280px,calc(100vw/var(--cf-zoom)-96px))] max-w-none -translate-y-1/2 flex-col overflow-hidden",
+    "top-1/2 flex h-[min(1280px,calc(100vh-96px))] w-[min(1280px,calc(100vw-96px))] max-w-none -translate-y-1/2 flex-col overflow-hidden",
 } as const
 
 function DialogContent({

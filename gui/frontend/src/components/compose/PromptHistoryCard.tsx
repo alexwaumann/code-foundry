@@ -7,7 +7,6 @@ import { sentTime } from "@/lib/format";
 import { pointerMoved } from "@/lib/pointerMotion";
 import { hitRanges, oneLine, PROMPT_SCOPES, relativeAge, SCOPE_LABELS } from "@/lib/promptHistory";
 import { cn } from "@/lib/utils";
-import { zoomFactor } from "@/lib/zoom";
 import { useFitBelow } from "./useFitBelow";
 import { listStatusText, type PromptPickerModel } from "./usePromptHistory";
 
@@ -155,9 +154,8 @@ export function PromptHistoryCard({ picker, above = false }: { picker: PromptPic
     if (!el || !option) return;
     const o = option.getBoundingClientRect();
     const l = el.getBoundingClientRect();
-    const zoom = zoomFactor();
-    if (o.top < l.top) el.scrollTop -= Math.ceil((l.top - o.top) / zoom);
-    else if (o.bottom > l.bottom) el.scrollTop += Math.ceil((o.bottom - l.bottom) / zoom);
+    if (o.top < l.top) el.scrollTop -= Math.ceil((l.top - o.top));
+    else if (o.bottom > l.bottom) el.scrollTop += Math.ceil((o.bottom - l.bottom));
   }, [active]);
   if (!open) return null;
   const status = listStatusText(list, query);

@@ -85,7 +85,7 @@ describe("watchTerminalTheme", () => {
     cleanup = install();
     const seen: string[] = [];
     const stop = watchTerminalTheme((t) => seen.push(t.background ?? ""));
-    document.documentElement.style.setProperty("--cf-zoom", "1.25");
+    document.documentElement.style.setProperty("--some-length", "1.25");
     await Promise.resolve();
     expect(seen).toEqual([]);
     document.documentElement.classList.add("dark");

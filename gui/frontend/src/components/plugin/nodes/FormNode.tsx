@@ -304,7 +304,7 @@ function MultiDropdown({ f, api, id, invalid, options, disabled }: { f: Field; a
           </span>
         </button>
       </PopoverTrigger>
-      <PopoverContent className="w-[calc(var(--radix-popover-trigger-width)/var(--cf-zoom))] p-1" data-testid="plugin-select-options">
+      <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-1" data-testid="plugin-select-options">
         <div role="group" aria-label={f.label || f.name} className="flex max-h-64 flex-col overflow-y-auto">
           {options.map((o) => (
             <label key={o.key} className={cn("flex min-w-0 cursor-default items-center rounded-sm px-2 py-1.5 hover:bg-cf-control-hover dark:hover:bg-cf-control-hover/50", o.disabled && "pointer-events-none")}>

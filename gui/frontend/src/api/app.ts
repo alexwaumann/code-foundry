@@ -93,14 +93,49 @@ export function onFilesDropped(fn: (drop: FilesDroppedView) => void): () => void
   });
 }
 
+/** The Wails runtime's entry points for a file dragged in from the OS (`window._wails`). */
+export interface NativeDropHooks {
+  handleDragOver?: (x: number, y: number) => void;
+  handlePlatformFileDrop?: (files: string[], x: number, y: number) => void;
+}
+
 /**
- * Tells the Wails host the page zoom in percent, so it keeps the native traffic lights
- * centred on the zoomed title band (gui/trafficlights_darwin.go). No-op without a host.
+ * Makes the runtime's native file drag hooks take the host's positions under the window
+ * zoom. The host sends a drag's position in view points; the runtime looks the drop target
+ * up with elementFromPoint, which takes CSS px, and a CSS px is `zoom()` points, so
+ * unscaled a drop lands on the wrong element or outside the page. The result is rounded:
+ * the host reads the position back as whole numbers and refuses a drop with a fraction.
+ * Returns false while the runtime has not set its hooks yet.
+ */
+export function scaleNativeDrops(hooks: NativeDropHooks | undefined, zoom: () => number): boolean {
+  const over = hooks?.handleDragOver;
+  const drop = hooks?.handlePlatformFileDrop;
+  if (!hooks || !over || !drop) return false;
+  const css = (points: number) => Math.round(points / zoom());
+  hooks.handleDragOver = (x, y) => {
+    over(css(x), css(y));
+  };
+  hooks.handlePlatformFileDrop = (files, x, y) => {
+    drop(files, css(x), css(y));
+  };
+  return true;
+}
+
+/** The window zoom the host last took, as a factor (1 without a host). */
+let hostZoom = 1;
+let dropsScaled = false;
+
+/**
+ * Zooms the window to percent: the host sets the webview's page zoom, keeps the native
+ * traffic lights centred on the zoomed title band and saves the value for the next launch
+ * (gui/app.go SetZoom). No-op without a host.
  */
 export async function setHostZoom(percent: number): Promise<void> {
   if (!(await appInfo())) return;
   try {
     await SetZoom(percent);
+    hostZoom = percent / 100;
+    dropsScaled ||= scaleNativeDrops((window as { _wails?: NativeDropHooks })._wails, () => hostZoom);
   } catch (err: unknown) {
     console.warn("host zoom", err);
   }

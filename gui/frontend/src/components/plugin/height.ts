@@ -1,6 +1,5 @@
 import { createContext, useContext, useLayoutEffect, useState, type RefObject } from "react";
 import type { NodeHeight } from "@/api/plugin";
-import { zoomFactor } from "@/lib/zoom";
 
 /** "fill" never goes below this (unless a fill pane's minHeight says less), however little of its box is left. */
 export const FILL_MIN = 240;
@@ -61,8 +60,7 @@ export function useNodeHeight<A extends number | undefined>(ref: RefObject<HTMLE
     const box = at?.box;
     if (!at || !box) return;
     const measure = () => {
-      // Rects are in viewport px (the page zoom scales them: lib/zoom); the box's sizes are layout px.
-      const top = (el.getBoundingClientRect().top - box.getBoundingClientRect().top) / zoomFactor() + box.scrollTop - box.clientTop;
+      const top = el.getBoundingClientRect().top - box.getBoundingClientRect().top + box.scrollTop - box.clientTop;
       setFilled(fillHeight(box.clientHeight, top, floor, at.bottom));
     };
     measure();
@@ -114,7 +112,7 @@ export function useNarrowerThan(el: HTMLElement | null, px: number): boolean {
   useLayoutEffect(() => {
     if (!el) return;
     const measure = () => {
-      const w = el.getBoundingClientRect().width / zoomFactor();
+      const w = el.getBoundingClientRect().width;
       if (w > 0) setNarrow(w < px);
     };
     measure();

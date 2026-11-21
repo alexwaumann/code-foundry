@@ -93,7 +93,7 @@ export function TabStrip({
     const box = ref.current;
     const el = box?.querySelector<HTMLElement>(`[data-key="${CSS.escape(active)}"]`);
     if (!box || !el || userScrolled.current) return;
-    // The tablist is the tabs' offsetParent (relative): offsetLeft is in its content, unzoomed.
+    // The tablist is the tabs' offsetParent (relative): offsetLeft is in its content.
     const left = scrollLeftToShow(box.scrollLeft, box.clientWidth, el.offsetLeft, el.offsetWidth);
     if (left === box.scrollLeft) return;
     const before = box.scrollLeft;

@@ -1,5 +1,8 @@
 # Page frames under the app's zoom (2026-11-04)
 
+> Superseded 2026-11-20 by `native-zoom.md`: zoom is the webview's page zoom now, and the
+> CSS-zoom handling of pages in frames described here is gone. Kept for the history.
+
 A user below 100% zoom saw a white strip down the right of every page a thread shows.
 
 ## Cause

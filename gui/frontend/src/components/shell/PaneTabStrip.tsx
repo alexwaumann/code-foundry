@@ -6,7 +6,6 @@ import { PANE_HEADER_HEIGHT } from "@/components/window/titleBand";
 import { rowToneDotClasses, statusRegistry } from "@/lib/statusRegistry";
 import { mergeHandlers } from "@/lib/mergeHandlers";
 import { cn } from "@/lib/utils";
-import { zoomFactor } from "@/lib/zoom";
 import { focusTabNow } from "@/shell/commands";
 import { keepPreviewTab } from "@/shell/preview";
 import { closeTabAsked } from "@/shell/closeTab";
@@ -365,11 +364,10 @@ export function PaneTabStrip({ paneId, focused, fullscreen = false }: { paneId: 
     const row = measureRef.current;
     if (!strip || !row) return;
     const measure = () => {
-      const z = zoomFactor();
       const ids = key ? key.split(",") : [];
-      const widths = Array.from(row.children).map((c) => Math.ceil(c.getBoundingClientRect().width / z));
+      const widths = Array.from(row.children).map((c) => Math.ceil(c.getBoundingClientRect().width));
       // The "+" after the last tab keeps its room.
-      const avail = strip.getBoundingClientRect().width / z - 2 * STRIP_PAD - TAB_GAP * widths.length - PLUS_WIDTH - (fullscreen ? EXIT_WIDTH : FULL_WIDTH + COLLAPSE_WIDTH);
+      const avail = strip.getBoundingClientRect().width - 2 * STRIP_PAD - TAB_GAP * widths.length - PLUS_WIDTH - (fullscreen ? EXIT_WIDTH : FULL_WIDTH + COLLAPSE_WIDTH);
       if (!(avail > 0)) return;
       const next = fitTabs({ widths, active: ids.indexOf(active), avail, iconWidth: TAB_ICON_WIDTH });
       setFits((prev) => (prev && sameFits(prev, next) ? prev : next));
@@ -394,12 +392,11 @@ export function PaneTabStrip({ paneId, focused, fullscreen = false }: { paneId: 
     const scroller = scrollerRef.current;
     const el = scroller?.querySelector<HTMLElement>(`[data-testid="shell-tab"][data-tab-id="${active}"]`);
     if (!scroller || !el) return;
-    const z = zoomFactor();
     // Inside its 1px padding, which keeps the tab's focus ring from being cut.
     const [s, t] = [scroller.getBoundingClientRect(), el.getBoundingClientRect()];
-    const [from, to] = [s.left + z, s.right - z];
-    if (t.left < from) scroller.scrollLeft -= (from - t.left) / z;
-    else if (t.right > to) scroller.scrollLeft += (t.right - to) / z;
+    const [from, to] = [s.left + 1, s.right - 1];
+    if (t.left < from) scroller.scrollLeft -= (from - t.left);
+    else if (t.right > to) scroller.scrollLeft += (t.right - to);
   }, [active, key, fits]);
 
   return (
