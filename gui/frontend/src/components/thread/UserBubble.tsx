@@ -200,7 +200,8 @@ function Dot({ children }: { children: string }) {
  * docs/notes/copy-prompt.md); it copies the whole message as plain text (promptCopyText),
  * a folded one's too. With `messageId` (the user's own message in a timeline), a queued one
  * has Cancel and a not sent one Re-send and Cancel at the row's left (MessageActions,
- * docs/notes/cancel-queued-messages.md).
+ * docs/notes/cancel-queued-messages.md), and no Copy while it has them: Cancel hands the
+ * text back to the composer, and a hidden Copy's slot would leave a gap before the caption.
  */
 export const UserBubble = memo(function UserBubble({
   text,
@@ -299,7 +300,7 @@ export const UserBubble = memo(function UserBubble({
       {plain || actions ? (
         <span className="u-meta">
           {actions}
-          {plain && <GutterCopy label="Copy prompt" copied={copied} copy={copy} text={() => plain} testId="thread-copy-prompt" />}
+          {plain && !actions && <GutterCopy label="Copy prompt" copied={copied} copy={copy} text={() => plain} testId="thread-copy-prompt" />}
           {meta}
         </span>
       ) : (
