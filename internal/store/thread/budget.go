@@ -68,8 +68,10 @@ func (r *runner) checkBudget() {
 	st.sd.budget, st.sd.budgetEnded = true, false
 	st.proj.w.add(Item{ID: st.proj.nextID("note"), Kind: KindNote, Text: budgetNoteText(budget)})
 	r.checkStatus()
-	conn := st.conn
+	conn, w := st.conn, st.proj.w
 	go func() {
+		// The budget stops: the user's queued messages are held, not started (cancel.go).
+		holdUserQueued(context.Background(), w, conn, streamControlTimeout, r.m.log.With("thread", r.id))
 		ctx, cancel := context.WithTimeout(context.Background(), streamControlTimeout)
 		defer cancel()
 		if err := controlErr(conn.Interrupt(ctx)); err != nil {

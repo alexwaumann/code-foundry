@@ -10,7 +10,7 @@ import { UserBubble } from "./UserBubble";
 const readAttachment = vi.hoisted(() =>
   vi.fn((path: string) => Promise.resolve(path.endsWith(".pdf") ? { data: new Uint8Array(1536), mimeType: "" } : { data: new Uint8Array([1]), mimeType: "image/png" })),
 );
-vi.mock("@/api/threads", () => ({ readAttachment }));
+vi.mock("@/api/threads", async (importOriginal) => ({ ...(await importOriginal<typeof import("@/api/threads")>()), readAttachment }));
 const pdfSummary = vi.hoisted(() => vi.fn<(file: Blob) => Promise<{ pages: number; thumb: string }>>(() => Promise.resolve({ pages: 2, thumb: "data:image/png;base64,AA==" })));
 const loadPdf = vi.hoisted(() =>
   vi.fn<(file: Blob) => Promise<unknown>>(() => Promise.resolve({ pages: 2, pageSize: () => Promise.resolve({ width: 300, height: 200 }), renderPage: () => Promise.reject(new Error("no canvas")), destroy: () => undefined })),

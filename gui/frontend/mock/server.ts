@@ -104,6 +104,7 @@
  *        not: mock/replies.ts) |
  *        /__mock/thread/mcp-age?id=s-r1&ago=720 (the last MCP check that many seconds ago: mock/mcp.ts) |
  *        /__mock/thread/mcp-servers?id=s-r1&keep=t3-code,github (only those of the six: mock/mcp.ts)
+ *   POST /__mock/thread/steer?do=late[&on=0]       (the next Cancel of a queued steer finds it read by Claude)
  *   POST /__mock/thread/steer?do=hold[&on=0]       (a message sent mid-turn stays queued until do=read or do=drop;
  *        default: Claude reads it 600ms after it lands) | ?id=s-r1&do=read[&item=…][&reply=0] (Claude reads the queued steers
  *        and answers in the same turn, or as the next once the turn ended: /finish first for "too late"; reply=0: no answer, the turn
@@ -1476,6 +1477,12 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       const what = q.get("do") ?? "read";
       if (what === "hold") {
         world.logs.holdSteers = q.get("on") !== "0";
+        json(res, 200, { ok: true });
+        break;
+      }
+      if (what === "late") {
+        // docs/notes/cancel-queued-messages.md: the next Cancel of a queued steer finds it read.
+        world.logs.cancelLate = q.get("on") !== "0";
         json(res, 200, { ok: true });
         break;
       }

@@ -863,6 +863,15 @@ type Store interface {
 	// a turn another thread stopped leaves a resume note for the next message
 	// (resumenote.go).
 	Interrupt(ctx context.Context, id, by string) error
+	// CancelMessage takes back the user's own message itemID that Claude has not read: a
+	// queued one leaves Claude's queue (FAILED_PRECONDITION wrapping "already read by
+	// Claude" when Claude read it first), a not sent one just goes. The item, marked
+	// Cancelled, leaves the log (cancel.go).
+	CancelMessage(ctx context.Context, id, itemID string) (Item, error)
+	// ResendMessage sends the user's own not sent message itemID again as a new message
+	// (like Send) and drops the old one. It returns the new item and the names of the
+	// attachments that were no longer staged and went without.
+	ResendMessage(ctx context.Context, id, itemID string) (Item, []string, error)
 	// SetModel switches the model of a running thread and records it for later
 	// spawns; on a thread that is not running it only records it.
 	SetModel(ctx context.Context, id, model string) (Thread, error)

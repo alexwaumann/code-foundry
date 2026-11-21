@@ -422,6 +422,28 @@ func (c *Conn) Interrupt(ctx context.Context) error {
 	return err
 }
 
+// CancelAsyncMessage takes user message uuid (the uuid it was sent with) out of Claude's
+// queue before Claude reads it (docs/notes/cancel-queued-messages.md). True: it is gone;
+// Claude writes a command_lifecycle "cancelled" for it (on 2.1.284 just before this
+// answer) and never reads it. False: Claude has read it already (it was "started") or
+// does not know it; it runs as usual. Trust the answer, not the timing of the frames.
+// Claude Code 2.1.284 and later answer it.
+func (c *Conn) CancelAsyncMessage(ctx context.Context, uuid string) (bool, error) {
+	raw, err := c.Request(ctx, ControlRequest{"subtype": SubtypeCancelAsyncMessage, "message_uuid": uuid})
+	if err != nil {
+		return false, err
+	}
+	var r struct {
+		Cancelled bool `json:"cancelled"`
+	}
+	if len(raw) > 0 {
+		if err := json.Unmarshal(raw, &r); err != nil {
+			return false, fmt.Errorf("claudestream: cancel_async_message response: %w", err)
+		}
+	}
+	return r.Cancelled, nil
+}
+
 // SetModel switches the model for the next request; "" resets to the session default.
 func (c *Conn) SetModel(ctx context.Context, model string) error {
 	req := ControlRequest{"subtype": SubtypeSetModel}

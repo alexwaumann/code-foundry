@@ -172,7 +172,14 @@ type Item struct {
 	// Unsent: a user_message that was queued when Claude's process ended or dropped it
 	// (closeUnfinished, a "cancelled" lifecycle, a failed delivery): Claude never read it.
 	// Queued is false then; the two never both hold.
-	Unsent     bool
+	Unsent bool
+	// Cancelled: a user_message the user took back before Claude read it (Cancel on a queued
+	// or not sent message) or sent again as a new message (Re-send; cancel.go). Claude never
+	// had it; it is in no turn. Its row stays in thread_items saying so, but the log drops
+	// it at once and never loads it again: no snapshot, read, fork, search or prompt
+	// history has it. Only the ItemUpdated that drops it carries it, so a watcher removes it.
+	// Queued and Unsent are false then.
+	Cancelled  bool
 	Tool       *ToolCall
 	Request    *Request // permission_request and question
 	Turn       *TurnEnd
@@ -331,6 +338,9 @@ type Message struct {
 	Reply Reply
 	// compact: Compact's /compact (compact.go).
 	compact bool
+	// shownAttachments: the attachments the item shows when they differ from Attachments
+	// (what Claude gets): a Re-send keeps a gone attachment on show (cancel.go).
+	shownAttachments []string
 	// answersAsk: the message answers the receiver's open thread ask to its sender (Send
 	// sets it; passup.go answersAsk): it renews the sender's --notify whatever its reply mark.
 	answersAsk bool
@@ -486,6 +496,9 @@ type threadLog struct {
 	// held are the queued messages the row has until Claude does (Setup.Queued): no process
 	// ending stops them being queued (closeUnfinished).
 	held map[string]bool
+	// takingBack: messages a Cancel or Re-send is taking back now; cancelled: the ones that
+	// left the log as cancelled this run (cancel.go).
+	takingBack, cancelled map[string]bool
 	// turnStart is lastTurn's start, read again when turnDirty (turn.go).
 	turnStart time.Time
 	turnDirty bool

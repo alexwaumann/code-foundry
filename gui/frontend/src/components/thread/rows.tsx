@@ -949,6 +949,7 @@ const UserRow = memo(function UserRow({ id, steer, since = "" }: { id: string; s
       readAfter={readAfter ? `+${readAfter}` : ""}
       findItem={it.parentToolUseId === "" ? it.id : undefined}
       foldKey={it.id}
+      messageId={it.parentToolUseId === "" && !it.from ? it.id : undefined}
     />
   );
   if (!it.resumeNote) return msg;

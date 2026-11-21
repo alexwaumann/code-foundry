@@ -218,6 +218,11 @@ export function applyThreadEvent(log: ThreadLog | undefined, ev: ThreadEventView
     case "appended":
     case "updated":
       return putItem(log, ev.item, ev.seq);
+    case "removed": {
+      if (!(ev.itemId in log.byId)) return { ...log, seq: ev.seq };
+      const { [ev.itemId]: _gone, ...byId } = log.byId;
+      return { ...log, seq: ev.seq, byId, order: log.order.filter((x) => x !== ev.itemId) };
+    }
     case "delta": {
       const it = log.byId[ev.itemId];
       if (!it) return { ...log, seq: ev.seq };

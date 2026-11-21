@@ -1,0 +1,19 @@
+{"t":3,"dir":"out","msg":{"type":"control_request","request_id":"cf-1","request":{"subtype":"initialize"}}}
+{"t":3,"dir":"out","msg":{"type":"user","uuid":"363ffd53-ed03-46d1-bfd9-26ed2c1c7ff9","message":{"role":"user","content":[{"type":"text","text":"Use the Bash tool to run `sleep 8` three times, one call at a time: wait for each to finish before the next, never in parallel or in one command. Say nothing between calls. After the third, reply with just DONE."}]},"parent_tool_use_id":null}}
+{"t":425,"dir":"in","msg":{"type":"control_response","response":{"subtype":"success","request_id":"cf-1","response":{}}}}
+{"t":427,"dir":"in","msg":{"type":"command_lifecycle","command_uuid":"363ffd53-ed03-46d1-bfd9-26ed2c1c7ff9","state":"queued"}}
+{"t":428,"dir":"in","msg":{"type":"command_lifecycle","command_uuid":"363ffd53-ed03-46d1-bfd9-26ed2c1c7ff9","state":"started"}}
+{"t":442,"dir":"in","msg":{"type":"system","subtype":"init","model":"claude-haiku-5-5"}}
+{"t":444,"dir":"in","msg":{"type":"system","subtype":"status","status":"requesting"}}
+{"t":1652,"dir":"in","msg":{"type":"assistant","message":{"id":"msg_011ChFEg4NNpM4owfKAwmg6B","model":"claude-haiku-5-5","role":"assistant","content":[{"type":"tool_use","id":"toolu_01LymydbgPgYRVZuwWs65NPS","name":"Bash","input":{"command":"sleep 8","description":"Sleep 8 seconds (first)"},"caller":{"type":"direct"}}]},"parent_tool_use_id":null}}
+{"t":1652,"dir":"out","msg":{"type":"user","uuid":"a7a9e7bb-db77-406c-a7cd-9d433a93093d","message":{"role":"user","content":[{"type":"text","text":"Also reply with the word PINEAPPLE."}]},"parent_tool_use_id":null}}
+{"t":1660,"dir":"in","msg":{"type":"command_lifecycle","command_uuid":"a7a9e7bb-db77-406c-a7cd-9d433a93093d","state":"queued"}}
+{"t":1660,"dir":"out","msg":{"type":"control_request","request_id":"cf-2","request":{"subtype":"cancel_async_message","message_uuid":"a7a9e7bb-db77-406c-a7cd-9d433a93093d"}}}
+{"t":1661,"dir":"out","msg":{"type":"control_request","request_id":"cf-3","request":{"subtype":"interrupt"}}}
+{"t":1661,"dir":"in","msg":{"type":"command_lifecycle","command_uuid":"a7a9e7bb-db77-406c-a7cd-9d433a93093d","state":"cancelled"}}
+{"t":1661,"dir":"in","msg":{"type":"control_response","response":{"subtype":"success","request_id":"cf-2","response":{"cancelled":true}}}}
+{"t":1662,"dir":"in","msg":{"type":"control_response","response":{"subtype":"success","request_id":"cf-3","response":{"still_queued":[]}}}}
+{"t":1665,"dir":"in","msg":{"type":"user","message":{"role":"user","content":[{"type":"tool_result","content":"The user doesn't want to proceed with this tool use. The tool use was rejected (eg. if it was a file edit, the new_string was NOT written to the file). STOP what you are doing and wait for the user to tell you how to proceed.\n\nNote: The user's next message may contain a correction or preference. Pay close attention \u2014 if they explain what went wrong or how they'd prefer you to work, consider saving that to memory for future sessions.","is_error":true,"tool_use_id":"toolu_01LymydbgPgYRVZuwWs65NPS"}]},"parent_tool_use_id":null}}
+{"t":1665,"dir":"in","msg":{"type":"user","message":{"role":"user","content":[{"type":"text","text":"[Request interrupted by user]"}]},"parent_tool_use_id":null}}
+{"t":1667,"dir":"in","msg":{"type":"result","subtype":"error_during_execution","is_error":true,"duration_ms":1237,"num_turns":3,"stop_reason":null,"terminal_reason":"aborted_streaming","total_cost_usd":0.001}}
+{"t":1668,"dir":"in","msg":{"type":"command_lifecycle","command_uuid":"363ffd53-ed03-46d1-bfd9-26ed2c1c7ff9","state":"cancelled"}}

@@ -66,7 +66,7 @@ func TestAllRegistersEveryDomain(t *testing.T) {
 		"thread.rename", "thread.regenerate-name", "thread.fork", "thread.remove", "thread.run-in", "thread.move", "thread.move.open", "thread.checkouts", "thread.placement.check", "thread.prompts", "thread.search", "thread.pin", "thread.archive", "thread.snooze", "thread.snooze.default", "thread.snooze.clear", "thread.snooze.events", "thread.unread", "thread.needs.next",
 		"thread.get", "thread.label", "thread.report", "thread.ask", "thread.pass-up", "thread.budget", "thread.flags", "thread.flag.clear", "thread.restart", "thread.shell.stop", "thread.stop-waiting", "thread.new-like", "thread.workspace", "thread.project.add", "thread.project.remove",
 		"thread.pr.link",
-		"thread.send", "thread.compact", "thread.setup.retry", "thread.setup.cancel", "thread.setup.discard", "thread.respond", "thread.interrupt", "thread.items", "thread.read", "thread.set-model", "thread.set-mode", "thread.set-effort", "thread.wait", "thread.reseed",
+		"thread.send", "thread.compact", "thread.setup.retry", "thread.setup.cancel", "thread.setup.discard", "thread.respond", "thread.interrupt", "thread.message.cancel", "thread.message.resend", "thread.items", "thread.read", "thread.set-model", "thread.set-mode", "thread.set-effort", "thread.wait", "thread.reseed",
 		"thread.subscribe", "thread.unsubscribe", "thread.subscriptions", "thread.look",
 		"thread.mcp", "thread.mcp-reconnect", "view.open.mcp", "view.panel.mcp", "thread.commands", "thread.agents", "thread.agent.open", "thread.agent.up",
 		"git.fetch", "git.pull", "git.push", "pr.create", "pr.open",

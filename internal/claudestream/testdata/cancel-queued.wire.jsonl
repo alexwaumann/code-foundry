@@ -1,0 +1,24 @@
+{"t":8,"dir":"out","msg":{"type":"control_request","request_id":"cf-1","request":{"subtype":"initialize"}}}
+{"t":8,"dir":"out","msg":{"type":"user","uuid":"64886a9d-dab6-4c7c-a287-f13169cd65e3","message":{"role":"user","content":[{"type":"text","text":"Use the Bash tool to run `sleep 8` three times, one call at a time: wait for each to finish before the next, never in parallel or in one command. Say nothing between calls. After the third, reply with just DONE."}]},"parent_tool_use_id":null}}
+{"t":1892,"dir":"in","msg":{"type":"control_response","response":{"subtype":"success","request_id":"cf-1","response":{}}}}
+{"t":1894,"dir":"in","msg":{"type":"command_lifecycle","command_uuid":"64886a9d-dab6-4c7c-a287-f13169cd65e3","state":"queued"}}
+{"t":1896,"dir":"in","msg":{"type":"command_lifecycle","command_uuid":"64886a9d-dab6-4c7c-a287-f13169cd65e3","state":"started"}}
+{"t":1909,"dir":"in","msg":{"type":"system","subtype":"init","model":"claude-haiku-5-5"}}
+{"t":1911,"dir":"in","msg":{"type":"system","subtype":"status","status":"requesting"}}
+{"t":4025,"dir":"in","msg":{"type":"assistant","message":{"id":"msg_011ChFEZ2xM4CwhZE1H6xdS2","model":"claude-haiku-5-5","role":"assistant","content":[{"type":"tool_use","id":"toolu_0142WkmcKuoSSHqT7G8Fjbs1","name":"Bash","input":{"command":"sleep 8","description":"Sleep 8 seconds (first)"},"caller":{"type":"direct"}}]},"parent_tool_use_id":null}}
+{"t":4025,"dir":"out","msg":{"type":"user","uuid":"9a35b213-9f44-45dd-b4ae-90c25e8636a8","message":{"role":"user","content":[{"type":"text","text":"Also reply with the word PINEAPPLE."}]},"parent_tool_use_id":null}}
+{"t":4029,"dir":"in","msg":{"type":"command_lifecycle","command_uuid":"9a35b213-9f44-45dd-b4ae-90c25e8636a8","state":"queued"}}
+{"t":4029,"dir":"out","msg":{"type":"control_request","request_id":"cf-2","request":{"subtype":"cancel_async_message","message_uuid":"9a35b213-9f44-45dd-b4ae-90c25e8636a8"}}}
+{"t":4030,"dir":"in","msg":{"type":"command_lifecycle","command_uuid":"9a35b213-9f44-45dd-b4ae-90c25e8636a8","state":"cancelled"}}
+{"t":4030,"dir":"in","msg":{"type":"control_response","response":{"subtype":"success","request_id":"cf-2","response":{"cancelled":true}}}}
+{"t":12528,"dir":"in","msg":{"type":"user","message":{"role":"user","content":[{"tool_use_id":"toolu_0142WkmcKuoSSHqT7G8Fjbs1","type":"tool_result","content":"(Bash completed with no output)","is_error":false}]},"parent_tool_use_id":null}}
+{"t":12533,"dir":"in","msg":{"type":"system","subtype":"status","status":"requesting"}}
+{"t":13390,"dir":"in","msg":{"type":"assistant","message":{"id":"msg_011ChFEZpGe519788E74CYHe","model":"claude-haiku-5-5","role":"assistant","content":[{"type":"tool_use","id":"toolu_01EVg5dRTYF6crgm3fFBoHdk","name":"Bash","input":{"command":"sleep 8","description":"Sleep 8 seconds (second)"},"caller":{"type":"direct"}}]},"parent_tool_use_id":null}}
+{"t":21743,"dir":"in","msg":{"type":"user","message":{"role":"user","content":[{"tool_use_id":"toolu_01EVg5dRTYF6crgm3fFBoHdk","type":"tool_result","content":"(Bash completed with no output)","is_error":false}]},"parent_tool_use_id":null}}
+{"t":21746,"dir":"in","msg":{"type":"system","subtype":"status","status":"requesting"}}
+{"t":22640,"dir":"in","msg":{"type":"assistant","message":{"id":"msg_011ChFEaVeF27jhTDseKn4Py","model":"claude-haiku-5-5","role":"assistant","content":[{"type":"tool_use","id":"toolu_017jrhpqomnfdX58Dkgqw2id","name":"Bash","input":{"command":"sleep 8","description":"Sleep 8 seconds (third)"},"caller":{"type":"direct"}}]},"parent_tool_use_id":null}}
+{"t":30929,"dir":"in","msg":{"type":"user","message":{"role":"user","content":[{"tool_use_id":"toolu_017jrhpqomnfdX58Dkgqw2id","type":"tool_result","content":"(Bash completed with no output)","is_error":false}]},"parent_tool_use_id":null}}
+{"t":30934,"dir":"in","msg":{"type":"system","subtype":"status","status":"requesting"}}
+{"t":31631,"dir":"in","msg":{"type":"assistant","message":{"id":"msg_011ChFEbAseStjsBnNE5VRgp","model":"claude-haiku-5-5","role":"assistant","content":[{"type":"text","text":"DONE"}]},"parent_tool_use_id":null}}
+{"t":31636,"dir":"in","msg":{"type":"result","subtype":"success","is_error":false,"duration_ms":29739,"num_turns":4,"stop_reason":"end_turn","terminal_reason":"completed","total_cost_usd":0.01144099}}
+{"t":31636,"dir":"in","msg":{"type":"command_lifecycle","command_uuid":"64886a9d-dab6-4c7c-a287-f13169cd65e3","state":"completed"}}

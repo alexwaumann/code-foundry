@@ -63,6 +63,12 @@
 // before its first system/init line until <dir>/turn-<n>.init exists. Both waits end
 // when stdin closes (the rest of the turn is then dropped, as a killed claude would).
 //
+// Queued messages (docs/notes/cancel-queued-messages.md): cancel_async_message writes a
+// command_lifecycle "cancelled" for the message, then answers {"cancelled":true}, the order
+// Claude Code 2.1.284 writes them in (claudestream/testdata/cancel-queued.wire.jsonl). With
+// CF_FAKE_CLAUDE_CANCEL=late it answers {"cancelled":false} and writes nothing else: Claude
+// had read the message.
+//
 // A turn on the way out: with CF_FAKE_CLAUDE_CLOSE_TURN (a duration) the next turn replays
 // that long after stdin closes, as real Claude does while a background agent it waits for
 // ends (it outlives stdin by up to the daemon's CloseTimeout), before any
@@ -345,6 +351,15 @@ func Run(fixture string) int {
 				if msg := mcp.reconnect(name); msg != "" {
 					resp = map[string]any{"subtype": "error", "request_id": m.RequestID, "error": msg}
 				}
+			case "cancel_async_message":
+				if os.Getenv("CF_FAKE_CLAUDE_CANCEL") == "late" {
+					resp["response"] = map[string]any{"cancelled": false}
+					break
+				}
+				uuid, _ := m.Request["message_uuid"].(string)
+				b, _ := json.Marshal(map[string]any{"type": "command_lifecycle", "command_uuid": uuid, "state": "cancelled"})
+				write(string(b))
+				resp["response"] = map[string]any{"cancelled": true}
 			case "interrupt":
 				// Claude withdraws what it asked: the capture carries on (its own
 				// control_cancel_request follows the can_use_tool).

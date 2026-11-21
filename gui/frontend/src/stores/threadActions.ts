@@ -11,7 +11,7 @@
  * switching threads keeps what was typed.
  */
 import { notify } from "@/lib/notify";
-import { isNotFound } from "@/api/errors";
+import { isFailedPrecondition, isNotFound } from "@/api/errors";
 import { stageAttachment } from "@/api/threads";
 import { sendErrorMessage } from "@/api/stream";
 import type { ComposePermission } from "@/lib/compose";
@@ -26,6 +26,7 @@ import { invokeConfirmed, refreshCommands, runCommand, runCommandForResult, useC
 import { addStagedAttachments, clearDraft, findCitation, getDraft, isDraftEmpty, NOTHING_TO_SEND, putCitation, updateDraft } from "./compose";
 import { getUiContext } from "./context";
 import { holdFailedNotice } from "./failedNotice";
+import { focusCiteTarget } from "./cite";
 import { setAnswering } from "./thread";
 
 export const THREAD_COMMANDS = {
@@ -45,6 +46,8 @@ export const THREAD_COMMANDS = {
   send: "thread.send",
   compact: "thread.compact",
   interrupt: "thread.interrupt",
+  cancelMessage: "thread.message.cancel",
+  resendMessage: "thread.message.resend",
   setModel: "thread.set-model",
   setMode: "thread.set-mode",
   respond: "thread.respond",
@@ -273,9 +276,83 @@ export async function editThreadMessage(threadId: string, m: SentMessage): Promi
   return true;
 }
 
+/** Messages a Cancel or Re-send is on its way for: a second press sends nothing. */
+const takingBack = new Set<string>();
+
+/** Whether a Cancel or Re-send of the message is on its way (the bubble disables its controls). */
+export function isTakingBack(itemId: string): boolean {
+  return takingBack.has(itemId);
+}
+
+/** True for the daemon's "Claude read it first" refusal of a Cancel (internal/store/thread cancel.go). */
+function alreadyRead(err: unknown): boolean {
+  return isFailedPrecondition(err) && err instanceof Error && err.message.includes("already read by Claude");
+}
+
 /**
- * Stops the running turn (thread.interrupt); pending requests are withdrawn. Quiet: the
- * timeline's turn header says "Interrupted"; a failure still toasts.
+ * Takes back the user's own message Claude has not read (thread.message.cancel,
+ * docs/notes/cancel-queued-messages.md): queued, it leaves Claude's queue; not sent, it just
+ * goes. The daemon drops it from the timeline, and its text, tags and attachments come back
+ * into the composer the way the failed-prompt notice's Edit puts a message back
+ * (editThreadMessage: after a blank line when there is a draft), focused. Claude read it
+ * first: nothing changes but a quiet notice (the bubble turns into the read steer by itself).
+ */
+export async function cancelThreadMessage(threadId: string, itemId: string, m: SentMessage): Promise<boolean> {
+  if (takingBack.has(itemId)) return false;
+  takingBack.add(itemId);
+  try {
+    const failure = { read: false };
+    const res = await runCommandForResult(THREAD_COMMANDS.cancelMessage, { id: threadId, message: itemId }, { ctx: threadContext(threadId), quiet: true, expected: (err) => (failure.read = alreadyRead(err)) });
+    if (res === null) {
+      if (failure.read) notify({ level: "info", title: "Claude already read your message", id: `read:${itemId}` });
+      return false;
+    }
+    if (await editThreadMessage(threadId, m)) {
+      requestAnimationFrame(() => {
+        focusCiteTarget(threadDraftKey(threadId));
+      });
+    }
+    return true;
+  } finally {
+    takingBack.delete(itemId);
+  }
+}
+
+/** A resend result's gone attachments (ResendThreadMessageResponse.gone_attachments); none when it does not say. */
+export function goneAttachmentsOf(resultJson: string): string[] {
+  try {
+    const r = JSON.parse(resultJson || "{}") as { goneAttachments?: unknown };
+    return Array.isArray(r.goneAttachments) ? r.goneAttachments.filter((x): x is string => typeof x === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Sends a not sent message again (thread.message.resend): the same text, tags and
+ * attachments as a new message, like a send (a stopped thread starts, a working one queues
+ * it), and the old bubble goes. Quiet: the timeline shows it; an attachment no longer staged
+ * is said in a notice (the new bubble draws it dashed).
+ */
+export async function resendNotSentMessage(threadId: string, itemId: string): Promise<boolean> {
+  if (takingBack.has(itemId)) return false;
+  takingBack.add(itemId);
+  try {
+    const res = await runCommandForResult(THREAD_COMMANDS.resendMessage, { id: threadId, message: itemId }, { ctx: threadContext(threadId), quiet: true });
+    if (res === null) return false;
+    const gone = goneAttachmentsOf(res.resultJson);
+    if (gone.length > 0) notify({ level: "info", title: `Sent without ${gone.join(", ")}`, description: `No longer staged: attach ${gone.length > 1 ? "them" : "it"} again` });
+    return true;
+  } finally {
+    takingBack.delete(itemId);
+  }
+}
+
+/**
+ * Stops the running turn (thread.interrupt); pending requests are withdrawn, and the user's
+ * own queued messages become not sent instead of starting as the next turn
+ * (docs/notes/cancel-queued-messages.md). Quiet: the timeline's turn header says
+ * "Interrupted"; a failure still toasts.
  */
 export async function interruptThread(threadId: string): Promise<boolean> {
   return (await runCommandForResult(THREAD_COMMANDS.interrupt, { id: threadId }, { ctx: threadContext(threadId), quiet: true })) !== null;

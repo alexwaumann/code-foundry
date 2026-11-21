@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 )
 
 // Persistence for thread_items (migration 0014). data holds the kind's payload.
@@ -31,6 +32,7 @@ type itemData struct {
 	PlacedAfter   int64        `json:"placed_after,omitempty"`
 	ReadAtMs      int64        `json:"read_at_ms,omitempty"`
 	Unsent        bool         `json:"unsent,omitempty"`
+	Cancelled     bool         `json:"cancelled,omitempty"`
 	Tool          *ToolCall    `json:"tool,omitempty"`
 	Request       *Request     `json:"request,omitempty"`
 	Turn          *TurnEnd     `json:"turn,omitempty"`
@@ -79,7 +81,7 @@ func saveItem(ctx context.Context, db *sql.DB, threadID string, it Item, ix sear
 func writeItem(ctx context.Context, db execer, threadID string, it Item) error {
 	data, err := json.Marshal(itemData{Text: it.Text, Attachments: it.Attachments, Composer: it.ComposerText,
 		Origin: string(it.Origin), WakeTitle: it.WakeTitle, WakeJSON: it.WakeJSON, SentBy: it.SentBy, Relation: it.SenderRelation, Reply: it.Reply, Sent: it.Sent, ResumeNote: it.ResumeNote, SeedPrefix: it.SeedPrefix, MemoryNote: it.MemoryNote,
-		NoteCreatedBy: it.NoteCreatedBy, APIError: it.APIError, Queued: it.Queued, PlacedAfter: it.PlacedAfter, ReadAtMs: millis(it.ReadAt), Unsent: it.Unsent, Tool: it.Tool, Request: it.Request, Turn: it.Turn, Compaction: it.Compaction, HTML: it.HTML, Theme: it.Theme})
+		NoteCreatedBy: it.NoteCreatedBy, APIError: it.APIError, Queued: it.Queued, PlacedAfter: it.PlacedAfter, ReadAtMs: millis(it.ReadAt), Unsent: it.Unsent, Cancelled: it.Cancelled, Tool: it.Tool, Request: it.Request, Turn: it.Turn, Compaction: it.Compaction, HTML: it.HTML, Theme: it.Theme})
 	if err != nil {
 		return fmt.Errorf("thread: encode item %s: %w", it.ID, err)
 	}
@@ -110,10 +112,12 @@ type querier interface {
 }
 
 // loadItems returns a thread's items by ordinal (newThreadLog puts placed messages in
-// their place).
+// their place), without the messages the user cancelled (Item.Cancelled: the row records
+// it; the conversation never had it).
 func loadItems(ctx context.Context, db querier, threadID string) ([]Item, error) {
-	return scanItems(ctx, db, threadID, `SELECT ordinal, item_id, kind, parent_tool_use_id, created_at, updated_at, data
+	items, err := scanItems(ctx, db, threadID, `SELECT ordinal, item_id, kind, parent_tool_use_id, created_at, updated_at, data
 		FROM thread_items WHERE thread_id = ? ORDER BY ordinal`, threadID)
+	return slices.DeleteFunc(items, func(it Item) bool { return it.Cancelled }), err
 }
 
 // scanItems runs query (columns as loadItems') and decodes its rows.
@@ -157,7 +161,7 @@ func decodeItem(itemID string, ordinal int64, kind, parent string, created, upda
 	it.ComposerText = d.Composer
 	it.Origin, it.WakeTitle, it.WakeJSON, it.SentBy = MessageOrigin(d.Origin), d.WakeTitle, d.WakeJSON, d.SentBy
 	it.NoteCreatedBy, it.ResumeNote, it.SeedPrefix, it.MemoryNote = d.NoteCreatedBy, d.ResumeNote, d.SeedPrefix, d.MemoryNote
-	it.Queued, it.PlacedAfter, it.APIError, it.Unsent = d.Queued, d.PlacedAfter, d.APIError, d.Unsent
+	it.Queued, it.PlacedAfter, it.APIError, it.Unsent, it.Cancelled = d.Queued, d.PlacedAfter, d.APIError, d.Unsent, d.Cancelled
 	it.ReadAt = fromMillis(d.ReadAtMs)
 	it.Text, it.Attachments, it.Tool, it.Request, it.Turn, it.Compaction = d.Text, d.Attachments, d.Tool, d.Request, d.Turn, d.Compaction
 	it.HTML, it.Theme = d.HTML, d.Theme

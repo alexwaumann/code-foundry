@@ -146,6 +146,12 @@ const (
 	ThreadServiceRespondProcedure = "/codefoundry.v1.ThreadService/Respond"
 	// ThreadServiceInterruptProcedure is the fully-qualified name of the ThreadService's Interrupt RPC.
 	ThreadServiceInterruptProcedure = "/codefoundry.v1.ThreadService/Interrupt"
+	// ThreadServiceCancelMessageProcedure is the fully-qualified name of the ThreadService's
+	// CancelMessage RPC.
+	ThreadServiceCancelMessageProcedure = "/codefoundry.v1.ThreadService/CancelMessage"
+	// ThreadServiceResendMessageProcedure is the fully-qualified name of the ThreadService's
+	// ResendMessage RPC.
+	ThreadServiceResendMessageProcedure = "/codefoundry.v1.ThreadService/ResendMessage"
 	// ThreadServiceSetModelProcedure is the fully-qualified name of the ThreadService's SetModel RPC.
 	ThreadServiceSetModelProcedure = "/codefoundry.v1.ThreadService/SetModel"
 	// ThreadServiceSetPermissionModeProcedure is the fully-qualified name of the ThreadService's
@@ -432,8 +438,21 @@ type ThreadServiceClient interface {
 	// running has none (FAILED_PRECONDITION).
 	Respond(context.Context, *connect.Request[v1.RespondThreadRequest]) (*connect.Response[v1.RespondThreadResponse], error)
 	// Interrupt stops the running turn; pending requests are withdrawn. A no-op on a
-	// thread that is not running.
+	// thread that is not running. The user's own queued messages are taken out of Claude's
+	// queue first and become not sent (MESSAGE_DELIVERY_UNSENT) instead of starting as the
+	// next turn; other threads' messages and wakes still start at once
+	// (docs/notes/cancel-queued-messages.md).
 	Interrupt(context.Context, *connect.Request[v1.InterruptThreadRequest]) (*connect.Response[v1.InterruptThreadResponse], error)
+	// CancelMessage takes back the user's own message Claude has not read: a queued one
+	// leaves Claude's queue, a not sent one just goes. The item leaves the timeline (its
+	// ThreadItemChange says MESSAGE_DELIVERY_CANCELLED once). FAILED_PRECONDITION when Claude
+	// read it first, it is another thread's or a wake, or the thread is archived;
+	// NOT_FOUND for no such message.
+	CancelMessage(context.Context, *connect.Request[v1.CancelThreadMessageRequest]) (*connect.Response[v1.CancelThreadMessageResponse], error)
+	// ResendMessage sends the user's own not sent message again as a new message (like
+	// Send: it starts a stopped thread, or queues behind a running turn) and drops the old
+	// one as CancelMessage does. FAILED_PRECONDITION for a message that is not "not sent".
+	ResendMessage(context.Context, *connect.Request[v1.ResendThreadMessageRequest]) (*connect.Response[v1.ResendThreadMessageResponse], error)
 	// SetModel switches a running thread's model (from its next request) and records it
 	// for later spawns; on a thread that is not running it only records it.
 	SetModel(context.Context, *connect.Request[v1.SetThreadModelRequest]) (*connect.Response[v1.SetThreadModelResponse], error)
@@ -823,6 +842,18 @@ func NewThreadServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 			connect.WithSchema(threadServiceMethods.ByName("Interrupt")),
 			connect.WithClientOptions(opts...),
 		),
+		cancelMessage: connect.NewClient[v1.CancelThreadMessageRequest, v1.CancelThreadMessageResponse](
+			httpClient,
+			baseURL+ThreadServiceCancelMessageProcedure,
+			connect.WithSchema(threadServiceMethods.ByName("CancelMessage")),
+			connect.WithClientOptions(opts...),
+		),
+		resendMessage: connect.NewClient[v1.ResendThreadMessageRequest, v1.ResendThreadMessageResponse](
+			httpClient,
+			baseURL+ThreadServiceResendMessageProcedure,
+			connect.WithSchema(threadServiceMethods.ByName("ResendMessage")),
+			connect.WithClientOptions(opts...),
+		),
 		setModel: connect.NewClient[v1.SetThreadModelRequest, v1.SetThreadModelResponse](
 			httpClient,
 			baseURL+ThreadServiceSetModelProcedure,
@@ -964,6 +995,8 @@ type threadServiceClient struct {
 	compact           *connect.Client[v1.CompactThreadRequest, v1.CompactThreadResponse]
 	respond           *connect.Client[v1.RespondThreadRequest, v1.RespondThreadResponse]
 	interrupt         *connect.Client[v1.InterruptThreadRequest, v1.InterruptThreadResponse]
+	cancelMessage     *connect.Client[v1.CancelThreadMessageRequest, v1.CancelThreadMessageResponse]
+	resendMessage     *connect.Client[v1.ResendThreadMessageRequest, v1.ResendThreadMessageResponse]
 	setModel          *connect.Client[v1.SetThreadModelRequest, v1.SetThreadModelResponse]
 	setPermissionMode *connect.Client[v1.SetThreadPermissionModeRequest, v1.SetThreadPermissionModeResponse]
 	setEffort         *connect.Client[v1.SetThreadEffortRequest, v1.SetThreadEffortResponse]
@@ -1209,6 +1242,16 @@ func (c *threadServiceClient) Respond(ctx context.Context, req *connect.Request[
 // Interrupt calls codefoundry.v1.ThreadService.Interrupt.
 func (c *threadServiceClient) Interrupt(ctx context.Context, req *connect.Request[v1.InterruptThreadRequest]) (*connect.Response[v1.InterruptThreadResponse], error) {
 	return c.interrupt.CallUnary(ctx, req)
+}
+
+// CancelMessage calls codefoundry.v1.ThreadService.CancelMessage.
+func (c *threadServiceClient) CancelMessage(ctx context.Context, req *connect.Request[v1.CancelThreadMessageRequest]) (*connect.Response[v1.CancelThreadMessageResponse], error) {
+	return c.cancelMessage.CallUnary(ctx, req)
+}
+
+// ResendMessage calls codefoundry.v1.ThreadService.ResendMessage.
+func (c *threadServiceClient) ResendMessage(ctx context.Context, req *connect.Request[v1.ResendThreadMessageRequest]) (*connect.Response[v1.ResendThreadMessageResponse], error) {
+	return c.resendMessage.CallUnary(ctx, req)
 }
 
 // SetModel calls codefoundry.v1.ThreadService.SetModel.
@@ -1534,8 +1577,21 @@ type ThreadServiceHandler interface {
 	// running has none (FAILED_PRECONDITION).
 	Respond(context.Context, *connect.Request[v1.RespondThreadRequest]) (*connect.Response[v1.RespondThreadResponse], error)
 	// Interrupt stops the running turn; pending requests are withdrawn. A no-op on a
-	// thread that is not running.
+	// thread that is not running. The user's own queued messages are taken out of Claude's
+	// queue first and become not sent (MESSAGE_DELIVERY_UNSENT) instead of starting as the
+	// next turn; other threads' messages and wakes still start at once
+	// (docs/notes/cancel-queued-messages.md).
 	Interrupt(context.Context, *connect.Request[v1.InterruptThreadRequest]) (*connect.Response[v1.InterruptThreadResponse], error)
+	// CancelMessage takes back the user's own message Claude has not read: a queued one
+	// leaves Claude's queue, a not sent one just goes. The item leaves the timeline (its
+	// ThreadItemChange says MESSAGE_DELIVERY_CANCELLED once). FAILED_PRECONDITION when Claude
+	// read it first, it is another thread's or a wake, or the thread is archived;
+	// NOT_FOUND for no such message.
+	CancelMessage(context.Context, *connect.Request[v1.CancelThreadMessageRequest]) (*connect.Response[v1.CancelThreadMessageResponse], error)
+	// ResendMessage sends the user's own not sent message again as a new message (like
+	// Send: it starts a stopped thread, or queues behind a running turn) and drops the old
+	// one as CancelMessage does. FAILED_PRECONDITION for a message that is not "not sent".
+	ResendMessage(context.Context, *connect.Request[v1.ResendThreadMessageRequest]) (*connect.Response[v1.ResendThreadMessageResponse], error)
 	// SetModel switches a running thread's model (from its next request) and records it
 	// for later spawns; on a thread that is not running it only records it.
 	SetModel(context.Context, *connect.Request[v1.SetThreadModelRequest]) (*connect.Response[v1.SetThreadModelResponse], error)
@@ -1921,6 +1977,18 @@ func NewThreadServiceHandler(svc ThreadServiceHandler, opts ...connect.HandlerOp
 		connect.WithSchema(threadServiceMethods.ByName("Interrupt")),
 		connect.WithHandlerOptions(opts...),
 	)
+	threadServiceCancelMessageHandler := connect.NewUnaryHandler(
+		ThreadServiceCancelMessageProcedure,
+		svc.CancelMessage,
+		connect.WithSchema(threadServiceMethods.ByName("CancelMessage")),
+		connect.WithHandlerOptions(opts...),
+	)
+	threadServiceResendMessageHandler := connect.NewUnaryHandler(
+		ThreadServiceResendMessageProcedure,
+		svc.ResendMessage,
+		connect.WithSchema(threadServiceMethods.ByName("ResendMessage")),
+		connect.WithHandlerOptions(opts...),
+	)
 	threadServiceSetModelHandler := connect.NewUnaryHandler(
 		ThreadServiceSetModelProcedure,
 		svc.SetModel,
@@ -2105,6 +2173,10 @@ func NewThreadServiceHandler(svc ThreadServiceHandler, opts ...connect.HandlerOp
 			threadServiceRespondHandler.ServeHTTP(w, r)
 		case ThreadServiceInterruptProcedure:
 			threadServiceInterruptHandler.ServeHTTP(w, r)
+		case ThreadServiceCancelMessageProcedure:
+			threadServiceCancelMessageHandler.ServeHTTP(w, r)
+		case ThreadServiceResendMessageProcedure:
+			threadServiceResendMessageHandler.ServeHTTP(w, r)
 		case ThreadServiceSetModelProcedure:
 			threadServiceSetModelHandler.ServeHTTP(w, r)
 		case ThreadServiceSetPermissionModeProcedure:
@@ -2326,6 +2398,14 @@ func (UnimplementedThreadServiceHandler) Respond(context.Context, *connect.Reque
 
 func (UnimplementedThreadServiceHandler) Interrupt(context.Context, *connect.Request[v1.InterruptThreadRequest]) (*connect.Response[v1.InterruptThreadResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ThreadService.Interrupt is not implemented"))
+}
+
+func (UnimplementedThreadServiceHandler) CancelMessage(context.Context, *connect.Request[v1.CancelThreadMessageRequest]) (*connect.Response[v1.CancelThreadMessageResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ThreadService.CancelMessage is not implemented"))
+}
+
+func (UnimplementedThreadServiceHandler) ResendMessage(context.Context, *connect.Request[v1.ResendThreadMessageRequest]) (*connect.Response[v1.ResendThreadMessageResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ThreadService.ResendMessage is not implemented"))
 }
 
 func (UnimplementedThreadServiceHandler) SetModel(context.Context, *connect.Request[v1.SetThreadModelRequest]) (*connect.Response[v1.SetThreadModelResponse], error) {

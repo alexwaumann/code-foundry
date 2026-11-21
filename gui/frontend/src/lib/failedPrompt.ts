@@ -103,7 +103,8 @@ function lineOf(r: Reason): string {
  * apiError, in place of a reply: it is no reply) or some other error item followed the prompt. The
  * status counts only when it changed at or after the prompt (an older failure's status
  * says nothing about a prompt just sent). Subagent items, a wake message (the daemon's, not
- * the user's) and a message Claude has not read yet never qualify; nor does anything while
+ * the user's) and a message Claude has not read yet never qualify; a message never sent is
+ * passed over (its bubble has Re-send and Cancel; the prompt before it may still qualify); nor does anything while
  * prompts are docked, the transcript is gone or the thread's setup did not finish.
  */
 export function failedPrompt(input: FailedPromptInput): FailedPrompt | null {
@@ -137,6 +138,8 @@ export function failedPrompt(input: FailedPromptInput): FailedPrompt | null {
         break;
       case "user": {
         if (it.wake || it.delivery === "queued") return null;
+        // Never sent: its own bubble offers Re-send and Cancel (docs/notes/cancel-queued-messages.md); the notice is for the prompt before it.
+        if (it.delivery === "unsent") break;
         const fresh = status === "error" && input.statusChangedAtMs !== null && it.createdAtMs !== null && input.statusChangedAtMs >= it.createdAtMs;
         const reason = reasonOf(error, apiError, turnFailed, fresh ? input.statusReason : null);
         return reason ? { itemId: it.id, ordinal: it.ordinal, line: lineOf(reason) } : null;
