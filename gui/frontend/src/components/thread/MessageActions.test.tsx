@@ -62,10 +62,10 @@ describe("a message's Cancel and Re-send", () => {
     expect(words()).toEqual([]);
   });
 
-  it("they lead the caption row: before Copy and the caption, with no tooltip", () => {
+  it("they lead the caption row, right before the caption, with no tooltip and no Copy between", () => {
     render(<Bubble delivery="unsent" />);
     const meta = screen.getByTestId("thread-message-actions").closest(".u-meta");
-    expect([...(meta?.children ?? [])].map((k) => k.getAttribute("data-testid"))).toEqual(["thread-message-actions", "thread-copy-prompt", "thread-steer-caption"]);
+    expect([...(meta?.children ?? [])].map((k) => k.getAttribute("data-testid"))).toEqual(["thread-message-actions", "thread-steer-caption"]);
     expect(screen.getByTestId("thread-message-cancel").getAttribute("title")).toBeNull();
   });
 

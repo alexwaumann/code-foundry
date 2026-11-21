@@ -211,6 +211,10 @@ func (m *Manager) CancelMessage(ctx context.Context, id, itemID string) (Item, e
 		if log.wasCancelled(itemID) {
 			got = it
 			got.Queued, got.Unsent, got.Cancelled = false, false, true
+			// The stream's goroutine dropped it and saves its row on its own time. Save it
+			// here too, so the row says cancelled by the time Cancel returns (a daemon
+			// stopping right after must not load it back as queued); the two saves agree.
+			w.save(got)
 		} else {
 			return Item{}, fmt.Errorf("%w: message %s: %w", ErrFailedPrecondition, itemID, errMessageRead)
 		}

@@ -102,7 +102,7 @@ initialize payload, no init frame details, hooks, deltas, rate limits or task fr
 ### GUI
 
 * **Controls** (`MessageActions`): plain text buttons in the caption row, always shown while
-  they apply (not on hover), at the row's left before Copy and the caption: queued has
+  they apply (not on hover), at the row's left right before the caption: queued has
   `Cancel`; not sent has `Re-send` and `Cancel`. No tooltip (the word is the name). Only on the
   user's own message in a timeline (`messageId`: no `from`, no parent tool use). 22px tall,
   like Copy, so the row's height does not change when they go; at the left, so the caption
@@ -131,8 +131,11 @@ initialize payload, no init frame details, hooks, deltas, rate limits or task fr
 
 ## Gotchas
 
-* The copy icon is laid out while hidden (opacity), so there is a 24px gap between the
-  controls and the caption until the bubble is hovered.
+* **No Copy while the controls show.** The copy icon is laid out while hidden (opacity), which
+  left a 24px gap between the controls and the caption until the bubble was hovered; a user
+  disliked the gap. A queued or not sent message has no Copy: Cancel hands its text back to
+  the composer, and Copy comes back once Claude read it. The caption is at the row's right
+  edge, so it does not move when Copy takes the controls' place.
 * A unit test that mocks `@/api/threads` narrowly breaks once a component imports
   `stores/threadActions` (it needs more of that module): spread `importOriginal`.
 * `palette.test.ts` and the Go registry lists (`palette_test.go`, `keybindings_test.go`,
