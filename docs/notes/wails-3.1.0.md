@@ -26,7 +26,7 @@ fix is upstream. The only `dist` difference from beta.34 to 3.1.0 is one line in
 
 * Drag poll timers: stops the poll throwing after vitest tears down jsdom
   (`4cc4efa1d`). It only matters under a test runner.
-* Drag zones under CSS `zoom`: see `ui-zoom.md`. Without it, drags start only from the
+* (Gone with native zoom, `native-zoom.md`.) Drag zones under CSS `zoom`: see `ui-zoom.md`. Without it, drags start only from the
   top-left 1/zoom of each surface.
 
 The patch is keyed by exact version, so every Wails bump renames it. Install fails loudly

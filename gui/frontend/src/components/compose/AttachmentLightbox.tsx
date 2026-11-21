@@ -55,7 +55,7 @@ export function AttachmentLightbox({
         data-kind={kind}
         className={cn(
           "top-1/2 flex min-w-72 -translate-y-1/2 flex-col overflow-hidden bg-cf-surface-overlay/95 p-0",
-          kind === "pdf" ? "w-[calc(90vw/var(--cf-zoom))] max-w-4xl" : "w-auto max-w-[calc(90vw/var(--cf-zoom))]",
+          kind === "pdf" ? "w-[90vw] max-w-4xl" : "w-auto max-w-[90vw]",
         )}
         onCloseAutoFocus={onCloseAutoFocus}
       >
@@ -80,7 +80,7 @@ export function AttachmentLightbox({
           </Tip>
         </div>
         {kind === "pdf" && file && <PdfPages file={file} />}
-        {kind === "image" && url && <img src={url} alt={name} draggable={false} className="mx-auto block h-auto max-h-[calc(85vh/var(--cf-zoom))] w-auto max-w-[calc(90vw/var(--cf-zoom))] object-contain" />}
+        {kind === "image" && url && <img src={url} alt={name} draggable={false} className="mx-auto block h-auto max-h-[85vh] w-auto max-w-[90vw] object-contain" />}
       </DialogContent>
     </Dialog>
   );

@@ -3,7 +3,6 @@ import { createPortal } from "react-dom";
 import { DndContext, PointerSensor, useSensor, useSensors, type Announcements, type DragMoveEvent, type DragStartEvent } from "@dnd-kit/core";
 import { PANE_HEADER_HEIGHT } from "@/components/window/titleBand";
 import { cn } from "@/lib/utils";
-import { zoomFactor } from "@/lib/zoom";
 import { cancelledText, DRAG_INSTRUCTIONS, droppedText, groupText, headerDroppedText, headerOverText, overText, pickedUpText, sourceText, targetText, type DragNames } from "@/shell/drag/announce";
 import { sourceOf } from "@/shell/drag/draggable";
 import { dropPreview, shellDropLayout, type DropLayout } from "@/shell/drag/drop";
@@ -82,7 +81,6 @@ interface Snapshot {
 /** The strips as drawn: each pane's tabs with their extents in the grid's layout px, and their names. */
 function measureStrips(grid: HTMLElement): Record<string, StripTab[]> {
   const g = grid.getBoundingClientRect();
-  const z = zoomFactor();
   const out: Record<string, StripTab[]> = {};
   // A rail's tabs too: their names and count (a rail is one target as a whole, so their places are not used).
   for (const pane of Array.from(grid.querySelectorAll<HTMLElement>('[data-testid="shell-pane"], [data-testid="shell-rail"]'))) {
@@ -92,8 +90,8 @@ function measureStrips(grid: HTMLElement): Record<string, StripTab[]> {
       const r = t.getBoundingClientRect();
       return {
         id: t.dataset.tabId ?? "",
-        x: (r.left - g.left) / z,
-        w: r.width / z,
+        x: (r.left - g.left),
+        w: r.width,
         title: t.querySelector('[data-testid="shell-tab-label"], [data-testid="thread-pane-header-name"]')?.textContent ?? "",
       };
     });
@@ -148,11 +146,10 @@ function snapshot(grid: HTMLElement | null, spaceId: string, row = false): Snaps
     thread: (id) => useThreadsStore.getState().byId[id]?.name || "untitled",
   };
   const g = grid.getBoundingClientRect();
-  const z = zoomFactor();
   const tree = geoTree(layout, spaceId);
   const modes = sceneModes(spaceId, (id) => titles.get(id) || "untitled");
   return {
-    origin: { x: g.left / z, y: g.top / z },
+    origin: { x: g.left, y: g.top },
     // The tree: a drop whose result would not fit the grid is not offered (shell/drag/room.ts).
     scene: { frame, strips, stripHeight: PANE_HEADER_HEIGHT, tree, ...(modes && { modes }) },
     tree,
@@ -249,7 +246,6 @@ function DragGhost() {
   if (!source || !client || !tab) return null;
   const surface = shellSurfaceOf(tab.kind);
   const Icon = surface.icon;
-  const z = zoomFactor();
   return (
     <div
       aria-hidden
@@ -257,7 +253,7 @@ function DragGhost() {
       data-kind={source.kind}
       data-count={count > 1 ? count : undefined}
       className="pointer-events-none fixed z-[60] flex h-7 max-w-64 items-center gap-1.5 rounded-md bg-cf-surface-overlay pr-3 pl-2 text-body-sm text-cf-text shadow-md ring-1 ring-cf-border"
-      style={{ left: client.x / z + 12, top: client.y / z + 10 }}
+      style={{ left: client.x + 12, top: client.y + 10 }}
     >
       <Icon className="size-3.5 shrink-0" aria-hidden />
       <GhostTitle tab={tab} />
@@ -376,8 +372,7 @@ export function ShellDnd({ children }: { children: ReactNode }) {
       useShellDragStore.setState({ client, target: null, preview: null, bar: null });
       return;
     }
-    const z = zoomFactor();
-    const found = dropTarget(s.scene, st.source, { x: client.x / z - s.origin.x, y: client.y / z - s.origin.y });
+    const found = dropTarget(s.scene, st.source, { x: client.x - s.origin.x, y: client.y - s.origin.y });
     // In full screen a tab only moves within its strip (or to a space): a new pane would be out of sight.
     const target = found && fullscreenOn() && found.kind !== "strip" ? null : found;
     if (sameTarget(target, st.target)) {

@@ -159,7 +159,7 @@ function HelpBody() {
           </Button>
         </DialogClose>
       </div>
-      <div className="h-[calc(72vh/var(--cf-zoom))]">
+      <div className="h-[72vh]">
         <TabsContent value="guide" className="h-full">
           <Guide />
         </TabsContent>
@@ -180,7 +180,7 @@ export function HelpOverlay() {
   return (
     <Dialog open={open} onOpenChange={setHelpOpen}>
       <DialogContent
-        className="top-[calc(8vh/var(--cf-zoom))] max-w-3xl"
+        className="top-[8vh] max-w-3xl"
         data-testid="help-overlay"
         onOpenAutoFocus={(e) => {
           // Focus the open tab's scrolling body rather than the first tab (which would

@@ -1,18 +1,35 @@
-import { describe, expect, it } from "vitest";
-import { zoomPx } from "./zoom";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
-describe("zoomPx", () => {
-  const cases: { name: string; value: Parameters<typeof zoomPx>[0]; factor: number; want: unknown }[] = [
-    { name: "undefined stays undefined", value: undefined, factor: 1.25, want: undefined },
-    { name: "a number at 100% is unchanged", value: 6, factor: 1, want: 6 },
-    { name: "a number scales", value: 6, factor: 1.5, want: 9 },
-    { name: "zoomed out", value: 10, factor: 0.9, want: 9 },
-    { name: "a per-side object scales each side", value: { top: 8, left: 4 }, factor: 1.25, want: { top: 10, left: 5 } },
-    { name: "an object at 100% is the same object", value: { bottom: 8 }, factor: 1, want: { bottom: 8 } },
-  ];
-  for (const c of cases) {
-    it(c.name, () => {
-      expect(zoomPx(c.value, c.factor)).toEqual(c.want);
-    });
-  }
+const setHostZoom = vi.hoisted(() => vi.fn(() => Promise.resolve()));
+vi.mock("@/api/app", () => ({ setHostZoom }));
+
+import { useUiStore } from "@/stores/ui";
+import { applyZoom, startZoomSync } from "./zoom";
+
+afterEach(() => {
+  setHostZoom.mockClear();
+  useUiStore.setState({ zoom: 100 });
+});
+
+describe("the window zoom", () => {
+  it("is the host's: the page gets no CSS zoom, only the percent on <html>", () => {
+    applyZoom(125);
+    expect(setHostZoom).toHaveBeenCalledWith(125);
+    expect(document.documentElement.dataset.zoom).toBe("125");
+    expect(document.documentElement.style.zoom).toBeFalsy();
+  });
+
+  it("follows the store: applied on start, then on each change, and not when it stays the same", () => {
+    const onChange = vi.fn();
+    const stop = startZoomSync(onChange);
+    expect(setHostZoom).toHaveBeenLastCalledWith(100);
+    useUiStore.setState({ zoom: 150 });
+    expect(setHostZoom).toHaveBeenLastCalledWith(150);
+    expect(onChange).toHaveBeenCalledTimes(1);
+    useUiStore.setState({ zoom: 150 });
+    expect(setHostZoom).toHaveBeenCalledTimes(2);
+    stop();
+    useUiStore.setState({ zoom: 90 });
+    expect(setHostZoom).toHaveBeenCalledTimes(2);
+  });
 });

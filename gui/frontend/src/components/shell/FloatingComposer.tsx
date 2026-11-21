@@ -5,7 +5,6 @@ import { ThreadContext } from "@/components/thread/context";
 import { ThreadComposer } from "@/components/thread/ThreadComposer";
 import "@/components/thread/thread.css";
 import { cn } from "@/lib/utils";
-import { zoomFactor } from "@/lib/zoom";
 import { clampFloat } from "@/shell/fullscreen";
 import { useThreadName } from "@/shell/useThreadName";
 import { getDraft } from "@/stores/compose";
@@ -145,12 +144,11 @@ export function FloatingComposer({ threadId, paneId }: { threadId: string; paneI
     if (e.button !== 0 || !card || !(pane instanceof HTMLElement)) return;
     // The keyboard stays where it is (the prompt, expanded); the click still comes.
     e.preventDefault();
-    const z = zoomFactor();
     const from = { px: e.clientX, py: e.clientY, x, y };
     const box = card.getBoundingClientRect();
     const area = pane.getBoundingClientRect();
     // Where the card would be with no drag, in the pane's layout px.
-    const spot = { x: (box.left - area.left) / z - x, y: (box.top - area.top) / z - y, w: box.width / z, h: box.height / z };
+    const spot = { x: (box.left - area.left) - x, y: (box.top - area.top) - y, w: box.width, h: box.height };
     const handle = e.currentTarget;
     handle.setPointerCapture(e.pointerId);
     const move = (ev: PointerEvent) => {
@@ -159,7 +157,7 @@ export function FloatingComposer({ threadId, paneId }: { threadId: string; paneI
         dragged.current = true;
         setDragging(true);
       }
-      setFloating(clampFloat({ x: from.x + (ev.clientX - from.px) / z, y: from.y + (ev.clientY - from.py) / z }, spot, { w: area.width / z, h: area.height / z }));
+      setFloating(clampFloat({ x: from.x + (ev.clientX - from.px), y: from.y + (ev.clientY - from.py) }, spot, { w: area.width, h: area.height }));
     };
     const end = () => {
       setDragging(false);

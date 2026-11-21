@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { expectTooltip, infoCardOff, invocations, mockPost, openApp, openTooltip, resetMock, row, setZoom } from "./fixtures";
+import { expectTooltip, infoCardOff, invocations, mockPost, openApp, openTooltip, resetMock, row } from "./fixtures";
 import { activeOfKind, paneWith } from "./shell-surfaces";
 
 /**
@@ -376,36 +376,6 @@ test("the action menu: the gear's blocks, the item hovers as two blocks, arrows 
   // A gear click or Enter on a focused gear opens that action's editor and runs nothing; the
   // item's text runs it: ThreadInfoCard.test.tsx ("the action menu") and GearMenuItem.test.tsx.
 });
-
-for (const zoom of [90, 125]) {
-  test(`at ${String(zoom)}% zoom the row menus sit under their rows at the rows' width`, async ({ page }) => {
-    // Wide enough that the card keeps its 480px of conversation at 125% (it steps aside otherwise).
-    await page.setViewportSize({ width: 1700, height: 900 });
-    await openWithCard(page, "single");
-    await setZoom(page, zoom);
-    const c = card(page);
-    await expect(c).toBeVisible();
-    // An ellipsis menu (measured offsets and width) and a chevron menu (Radix's trigger width).
-    await c.getByTestId("ti-open-in-more").click();
-    await expectUnderRow(page.getByTestId("ti-open-in-menu"), c.getByTestId("ti-open-in"));
-    await page.keyboard.press("Escape");
-    await expect(page.getByTestId("ti-open-in-menu")).toHaveCount(0);
-    await c.getByTestId("ti-project").click();
-    await expectUnderRow(page.getByTestId("ti-project-menu"), c.getByTestId("ti-project"));
-    await page.keyboard.press("Escape");
-    // The gap under the row grows with the zoom, like every menu's.
-    const pr = c.getByTestId("ti-pr").first();
-    await pr.getByTestId("ti-pr-more").click();
-    await expectUnderRow(page.getByTestId("ti-pr-menu"), pr);
-    await expect
-      .poll(async () => {
-        const [m, r] = await Promise.all([box(page.getByTestId("ti-pr-menu")), box(pr)]);
-        return Math.abs(m.y - (r.y + r.height) - 4 * (zoom / 100)) < 1.5;
-      })
-      .toBe(true);
-    await page.keyboard.press("Escape");
-  });
-}
 
 // The Run in items, the other project's action and its run, the pull requests, the Changes
 // fold and Fix's one send: ThreadInfoCard.test.tsx ("nine projects in a workspace").

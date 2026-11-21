@@ -9,14 +9,13 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-function reporter(opts: { zoom?: number; fail?: boolean } = {}) {
+function reporter(opts: { fail?: boolean } = {}) {
   const sent: [number, number][] = [];
   const r = createViewportReporter({
     send: (w, h) => {
       sent.push([w, h]);
       return opts.fail ? Promise.reject(new Error("no daemon")) : Promise.resolve();
     },
-    zoom: () => opts.zoom ?? 1,
     delayMs: 200,
   });
   return { r, sent };
@@ -33,13 +32,6 @@ describe("reporting the pane area's size", () => {
     expect(sent).toEqual([]);
     await vi.advanceTimersByTimeAsync(200);
     expect(sent).toEqual([[1020, 700]]);
-  });
-
-  it("sends layout px: the viewport's size divided by the page zoom", async () => {
-    const { r, sent } = reporter({ zoom: 1.25 });
-    r.report(1500, 1000);
-    await vi.advanceTimersByTimeAsync(200);
-    expect(sent).toEqual([[1200, 800]]);
   });
 
   it("does not send the size it last sent again", async () => {

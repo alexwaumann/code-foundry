@@ -1,6 +1,5 @@
 import { useEffect, useEffectEvent, useRef, useState, type RefObject } from "react";
 import { loadPdf, type PdfDocument } from "@/lib/pdf";
-import { zoomFactor } from "@/lib/zoom";
 import { cn } from "@/lib/utils";
 
 /** The most device pixels per CSS px a page is drawn at: sharp on a Retina screen, not more. */
@@ -44,7 +43,7 @@ function PdfPage({ doc, n, aspect, root }: { doc: PdfDocument; n: number; aspect
     const draw = () => {
       phase = "drawing";
       doc
-        .renderPage(n, el.clientWidth, { canvas: target, pixelRatio: Math.min(MAX_PIXEL_RATIO, window.devicePixelRatio * zoomFactor()) })
+        .renderPage(n, el.clientWidth, { canvas: target, pixelRatio: Math.min(MAX_PIXEL_RATIO, window.devicePixelRatio) })
         .then((c) => {
           if (!live) return;
           setRatio(c.width / c.height);
@@ -143,7 +142,7 @@ export function PdfPages({ file, fill = false, onPages }: { file: Blob; fill?: b
   return (
     <div
       ref={scroller}
-      className={cn("overflow-y-auto p-4", fill ? "min-h-0 flex-1" : "max-h-[calc(85vh/var(--cf-zoom))] min-h-40")}
+      className={cn("overflow-y-auto p-4", fill ? "min-h-0 flex-1" : "max-h-[85vh] min-h-40")}
       data-testid="pdf-pages" data-pages={open?.doc.pages}>
       {failed ? (
         <p className="py-12 text-center text-body text-cf-text-muted">This PDF could not be shown.</p>

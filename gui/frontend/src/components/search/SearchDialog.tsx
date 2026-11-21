@@ -346,7 +346,7 @@ export function SearchDialog({
     ...(watchSearch ? { watchSearch } : {}),
   };
   return (
-    <div className="flex h-[min(620px,calc(86vh/var(--cf-zoom)-2rem))] flex-col" data-testid="search-dialog" data-mode={mode.id} onKeyDownCapture={onKeyDownCapture}>
+    <div className="flex h-[min(620px,calc(86vh-2rem))] flex-col" data-testid="search-dialog" data-mode={mode.id} onKeyDownCapture={onKeyDownCapture}>
       <Body
         query={query}
         dialog={api}

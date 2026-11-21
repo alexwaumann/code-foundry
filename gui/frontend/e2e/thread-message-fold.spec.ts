@@ -216,20 +216,6 @@ test("find: a match under the fold opens the message and shows; closing the bar 
   await expect(box).toHaveAttribute("data-folded", "true");
 });
 
-test("find at 125% zoom: the fold's edge is in zoomed px, so a match under it still opens the message", async ({ page }) => {
-  await openThread(page);
-  await send(page, longMessage(12, "needle under the fold"));
-  await page.evaluate(async () => {
-    const m = await (window as unknown as { __cfModule: (p: string) => Promise<{ useUiStore: { setState: (s: { zoom: number }) => void } }> }).__cfModule("/src/stores/ui.ts");
-    m.useUiStore.setState({ zoom: 125 });
-  });
-  await expect(page.locator("html")).toHaveAttribute("data-zoom", "125");
-  await page.keyboard.press("Meta+f");
-  await page.getByTestId("thread-find-input").fill("needle under");
-  await expect(fold(page, "needle under the fold")).toHaveAttribute("data-folded", "false");
-  await expect.poll(() => currentShows(page)).toBe(true);
-});
-
 test("Go to source: a quote under the fold opens the message and stays open; a selection across the fold has the whole text", async ({ page }) => {
   // Tall enough for the folded message, the reply under it and the next turn, each with its gutter.
   await page.setViewportSize({ width: 1280, height: 1100 });
@@ -262,7 +248,7 @@ test("Go to source: a quote under the fold opens the message and stays open; a s
   await expect(box).toHaveAttribute("data-folded", "false");
 });
 
-test("edge shapes: one long word wraps and folds, a code paste folds, a column of short lines widens to its button; zoom keeps the fold", async ({ page }) => {
+test("edge shapes: one long word wraps and folds, a code paste folds, a column of short lines widens to its button", async ({ page }) => {
   await openThread(page);
   await send(page, `${"x".repeat(9000)} oneword`);
   await expect(fold(page, "oneword")).toHaveAttribute("data-folded", "true");
@@ -278,11 +264,6 @@ test("edge shapes: one long word wraps and folds, a code paste folds, a column o
   const button = await narrow.locator("xpath=..").getByTestId("thread-user-fold-toggle").boundingBox();
   expect(button?.width ?? 0).toBeLessThanOrEqual(bubble?.width ?? 0);
 
-  await page.evaluate(async () => {
-    const m = await (window as unknown as { __cfModule: (p: string) => Promise<{ useUiStore: { setState: (s: { zoom: number }) => void } }> }).__cfModule("/src/stores/ui.ts");
-    m.useUiStore.setState({ zoom: 150 });
-  });
-  await expect(page.locator("html")).toHaveAttribute("data-zoom", "150");
   await expect(narrow).toHaveAttribute("data-folded", "true");
   expect(await narrow.evaluate((b) => (b as HTMLElement).offsetHeight)).toBe(170);
   const tops = await topsDuring(page, narrow, () => narrow.locator("xpath=..").getByTestId("thread-user-fold-toggle").click());

@@ -1,5 +1,8 @@
 # Toasts under page zoom (2026-11-19)
 
+> Superseded 2026-11-20 by `native-zoom.md`: zoom is the webview's page zoom now, and the
+> CSS-zoom handling of toasts described here is gone. Kept for the history.
+
 Bug a user reported: at a page zoom other than 100%, hovering a toast made its contents
 shift, and its buttons could end up outside the card.
 

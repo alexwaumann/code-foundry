@@ -54,19 +54,6 @@ test.describe("size", () => {
     });
   }
 
-  test("the 48px margin holds under page zoom", async ({ page }) => {
-    await page.setViewportSize({ width: 1280, height: 800 });
-    await openApp(page);
-    await page.keyboard.press("Meta+Equal");
-    await expect(page.locator("html")).toHaveAttribute("data-zoom", "110");
-    await openSettings(page);
-    const r = await rect(page);
-    // Viewport px: the margin zooms with the page (48 * 1.1), the sheet stays inside the window.
-    expect(Math.round(r.x)).toBe(53);
-    expect(Math.round(r.y)).toBe(53);
-    expect(Math.round(r.x + r.width)).toBe(1280 - 53);
-    expect(Math.round(r.y + r.height)).toBe(800 - 53);
-  });
 });
 
 test("the gear opens the sheet on General with the search focused; Escape, the backdrop and the gear close it", async ({ page }) => {

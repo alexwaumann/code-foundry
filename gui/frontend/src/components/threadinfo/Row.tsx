@@ -2,7 +2,6 @@ import { isValidElement, useId, useRef, useState, type ComponentProps, type CSSP
 import { ChevronDown, ChevronRight, Ellipsis } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
-import { zoomFactor } from "@/lib/zoom";
 
 /**
  * The thread info card's row (docs/sketches/thread-info v14, docs/notes/thread-info-row-menus.md):
@@ -198,12 +197,9 @@ function rowPlace(button: HTMLElement | null): RowPlace | null {
   if (!button || !row) return null;
   const b = button.getBoundingClientRect();
   const r = row.getBoundingClientRect();
-  // Rects are viewport px; the menu wants layout px: ui/dropdown-menu scales its offsets by
-  // the page zoom and the content zooms back (index.css), so divide once here (lib/zoom).
-  const z = zoomFactor();
   // Radix anchors the menu to its trigger, the button: shift it to the row's left edge and
   // below the row's bottom. The button is centred in its row, so a flip above fits too.
-  return { width: r.width / z, alignOffset: (r.left - b.left) / z, sideOffset: (r.bottom - b.bottom) / z + 4 };
+  return { width: r.width, alignOffset: r.left - b.left, sideOffset: r.bottom - b.bottom + 4 };
 }
 
 /**
@@ -260,8 +256,7 @@ export function Group({ children, testId }: { children: ReactNode; testId: strin
 
 /**
  * A row's menu: the card's full width less 6px each side (the row's own width), under its
- * trigger row (RowMore anchors it to its row the same way). The trigger width Radix gives is
- * viewport px and the content zooms back with the page, so it divides by --cf-zoom.
+ * trigger row (RowMore anchors it to its row the same way).
  *
  * Escape hands the keyboard back to the trigger (the row, or RowMore's button), so Tab goes
  * on from there. Any other close keeps focus where it went: an item may focus what it
@@ -281,7 +276,7 @@ export function RowMenu({
       align="start"
       sideOffset={4}
       className={cn(
-        "w-[calc(var(--radix-dropdown-menu-trigger-width)/var(--cf-zoom))] min-w-0 [&_[data-slot=dropdown-menu-item]]:text-caption [&_[data-slot=dropdown-menu-item]]:text-cf-text",
+        "w-[var(--radix-dropdown-menu-trigger-width)] min-w-0 [&_[data-slot=dropdown-menu-item]]:text-caption [&_[data-slot=dropdown-menu-item]]:text-cf-text",
         className,
       )}
       data-testid={testId}

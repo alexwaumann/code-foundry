@@ -261,8 +261,8 @@ export function stringLiterals(fileName: string, source: string): Literal[] {
 /**
  * The slot-name guard (docs/notes/theme-slots-3-hardening.md): a `cf-*` colour utility
  * (`bg-cf-surface-raised`, `hover:text-cf-warning-text/80`) must name a slot, and a
- * `var(--cf-*)` a slot or a custom property a stylesheet under src declares (`--cf-zoom`,
- * Ember's `--cf-flame-*`). A misspelt or retired slot (`text-cf-sucess`,
+ * `var(--cf-*)` a slot or a custom property a stylesheet under src declares
+ * (Ember's `--cf-flame-*`). A misspelt or retired slot (`text-cf-sucess`,
  * `bg-cf-sidebar-row-active`) resolves to nothing and paints the inherited colour.
  */
 export const SLOT_REF_PATTERNS = {
@@ -279,7 +279,7 @@ export interface SlotRefHit {
   text: string;
 }
 
-/** The `--cf-*` custom properties a stylesheet declares (`--cf-zoom: 1`), outside comments. */
+/** The `--cf-*` custom properties a stylesheet declares (`--cf-flame-ink: …`), outside comments. */
 export function declaredCfProperties(css: string): string[] {
   const src = css.replace(/\/\*[\s\S]*?\*\//g, "");
   return [...src.matchAll(/(?<![\w-])(--cf-[a-z0-9]+(?:-[a-z0-9]+)*)\s*:/g)].map((m) => m[1] ?? "");

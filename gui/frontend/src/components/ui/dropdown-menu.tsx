@@ -3,7 +3,6 @@ import { DropdownMenu as DropdownMenuPrimitive } from "radix-ui"
 import { CheckIcon, ChevronRightIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { itemLeaveWhileClosing } from "@/components/ui/menuItemLeave"
-import { useZoomFactor, zoomPx } from "@/lib/zoom"
 
 function DropdownMenu({ ...props }: React.ComponentProps<typeof DropdownMenuPrimitive.Root>) {
   return <DropdownMenuPrimitive.Root data-slot="dropdown-menu" {...props} />
@@ -18,17 +17,15 @@ function DropdownMenuTrigger({ ...props }: React.ComponentProps<typeof DropdownM
  * passes itself, since nothing outside the full-screen element is drawn.
  */
 function DropdownMenuContent({ className, sideOffset = 4, alignOffset, collisionPadding, container, ...props }: React.ComponentProps<typeof DropdownMenuPrimitive.Content> & { container?: HTMLElement | null }) {
-  // Offsets are viewport px; scale them with the page zoom (lib/zoom.ts).
-  const z = useZoomFactor()
   return (
     <DropdownMenuPrimitive.Portal container={container}>
       <DropdownMenuPrimitive.Content
         data-slot="dropdown-menu-content"
-        sideOffset={zoomPx(sideOffset, z)}
-        alignOffset={zoomPx(alignOffset, z)}
-        collisionPadding={zoomPx(collisionPadding, z)}
+        sideOffset={sideOffset}
+        alignOffset={alignOffset}
+        collisionPadding={collisionPadding}
         className={cn(
-          "z-50 max-h-[calc(var(--radix-dropdown-menu-content-available-height)/var(--cf-zoom))] min-w-[8rem] origin-(--radix-dropdown-menu-content-transform-origin) overflow-x-hidden overflow-y-auto rounded-lg border bg-popover p-1 text-popover-foreground shadow-lg data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95",
+          "z-50 max-h-[var(--radix-dropdown-menu-content-available-height)] min-w-[8rem] origin-(--radix-dropdown-menu-content-transform-origin) overflow-x-hidden overflow-y-auto rounded-lg border bg-popover p-1 text-popover-foreground shadow-lg data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95",
           className
         )}
         {...props}
@@ -134,17 +131,15 @@ function DropdownMenuSubTrigger({ className, inset, children, chevron = true, ..
 }
 
 function DropdownMenuSubContent({ className, sideOffset, alignOffset, collisionPadding, ...props }: React.ComponentProps<typeof DropdownMenuPrimitive.SubContent>) {
-  // Offsets are viewport px; scale them with the page zoom (lib/zoom.ts).
-  const z = useZoomFactor()
   return (
     <DropdownMenuPrimitive.Portal>
       <DropdownMenuPrimitive.SubContent
         data-slot="dropdown-menu-sub-content"
-        sideOffset={zoomPx(sideOffset, z)}
-        alignOffset={zoomPx(alignOffset, z)}
-        collisionPadding={zoomPx(collisionPadding, z)}
+        sideOffset={sideOffset}
+        alignOffset={alignOffset}
+        collisionPadding={collisionPadding}
         className={cn(
-          "z-50 max-h-[calc(var(--radix-dropdown-menu-content-available-height)/var(--cf-zoom))] min-w-[8rem] origin-(--radix-dropdown-menu-content-transform-origin) overflow-x-hidden overflow-y-auto rounded-lg border bg-popover p-1 text-popover-foreground shadow-lg data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95",
+          "z-50 max-h-[var(--radix-dropdown-menu-content-available-height)] min-w-[8rem] origin-(--radix-dropdown-menu-content-transform-origin) overflow-x-hidden overflow-y-auto rounded-lg border bg-popover p-1 text-popover-foreground shadow-lg data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95",
           className
         )}
         {...props}

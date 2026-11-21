@@ -1,5 +1,8 @@
 # The File tab's editor under page zoom
 
+> Superseded 2026-11-20 by `native-zoom.md`: zoom is the webview's page zoom now, and the
+> CSS-zoom handling of the file editor described here is gone. Kept for the history.
+
 Bug (reported by a user): in the File tab's edit mode the selection and the caret were drawn
 off the text on some lines. It showed at any page zoom other than 100% (`appearance.zoom`,
 CSS `zoom` on `<html>`, `ui-zoom.md`), on lines with emoji, ZWJ sequences, variation

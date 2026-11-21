@@ -1,7 +1,6 @@
 import * as React from "react"
 import { Tooltip as TooltipPrimitive } from "radix-ui"
 import { cn } from "@/lib/utils"
-import { useZoomFactor, zoomPx } from "@/lib/zoom"
 
 /**
  * shadcn-style wrapper of Radix Tooltip. Unlike upstream shadcn, Tooltip does not wrap its
@@ -22,15 +21,13 @@ function TooltipTrigger({ ...props }: React.ComponentProps<typeof TooltipPrimiti
 }
 
 function TooltipContent({ className, sideOffset = 6, alignOffset, collisionPadding, children, ...props }: React.ComponentProps<typeof TooltipPrimitive.Content>) {
-  // Offsets are viewport px; scale them with the page zoom (lib/zoom.ts).
-  const z = useZoomFactor()
   return (
     <TooltipPrimitive.Portal>
       <TooltipPrimitive.Content
         data-slot="tooltip-content"
-        sideOffset={zoomPx(sideOffset, z)}
-        alignOffset={zoomPx(alignOffset, z)}
-        collisionPadding={zoomPx(collisionPadding, z)}
+        sideOffset={sideOffset}
+        alignOffset={alignOffset}
+        collisionPadding={collisionPadding}
         className={cn(
           "z-50 rounded-lg border bg-popover text-popover-foreground shadow-lg outline-hidden data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=delayed-open]:animate-in data-[state=delayed-open]:fade-in-0 data-[state=instant-open]:animate-in data-[state=instant-open]:fade-in-0",
           className
@@ -199,7 +196,7 @@ function wanted(el: HTMLElement | null): boolean {
  * wider or taller than its box by more than a pixel. An element that does not clip shows
  * all it holds, however far it reaches.
  *
- * The pixel of slack is the page zoom's (lib/zoom.ts, CSS `zoom` on <html>): away from 100%
+ * The pixel of slack is the page zoom's (lib/zoom.ts): away from 100%
  * WebKit rounds scroll* and client* back to CSS px separately, so text that fits reads a
  * pixel wider and taller than its box (at 110% a Details value: scrollWidth 436 on a
  * clientWidth of 435, scrollHeight 19 on a clientHeight of 18) and the tooltip opened on

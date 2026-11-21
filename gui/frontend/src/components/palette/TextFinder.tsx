@@ -218,7 +218,7 @@ export function TextFinder({
   const project = row && multi ? (names[row.file.projectId] ?? row.file.projectId) : null;
 
   return (
-    <div className="flex h-[min(620px,calc(86vh/var(--cf-zoom)-2rem))] flex-col" data-testid="palette" data-mode="text" onKeyDown={onKeyDown}>
+    <div className="flex h-[min(620px,calc(86vh-2rem))] flex-col" data-testid="palette" data-mode="text" onKeyDown={onKeyDown}>
       <div className="flex h-12 shrink-0 items-center gap-2.5 border-b pr-2.5 pl-4" data-testid="text-header">
         <SearchIcon className="size-4 shrink-0 text-cf-text-muted" aria-hidden />
         <input

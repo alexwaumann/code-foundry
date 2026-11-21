@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { composeProject, freshCopyByDefault, invocations, mockPost, mockUrl, openApp, resetMock, setZoom } from "./fixtures";
+import { composeProject, freshCopyByDefault, invocations, mockPost, mockUrl, openApp, resetMock } from "./fixtures";
 
 // `@` file completion against the mock's SearchFiles (mock/filesystem.ts): each test sets
 // the projects' files with POST /__mock/files; the mock logs "search <project> <query>" per
@@ -195,58 +195,46 @@ test("a second project: files grouped by project, the primary first; tooltips na
 // Enter before the first answer, a slow search (Searching…, hints hidden), Escape before the first answer and a failing search: src/components/compose/useCompletion.test.tsx (keys before and after the answer) and CompletionCard.test.tsx (what the card shows).
 
 // The card hangs under the worktree row, out of flow: it moves neither the composer card
-// nor that row, and its height is capped to the window below it (layout px = viewport px
-// over the zoom). 90% takes 100%'s path (the full card fits either way), so it is left out.
-for (const zoom of [100, 125, 150]) {
-  test(`at ${String(zoom)}%: the file card hangs under the worktree row, moves nothing and fits the window`, async ({ page }) => {
-    await setFiles("repo-cf", MANY);
-    // The window shell's top bar takes 60px of a classic window's height: 1060 is the old 1000.
-    await page.setViewportSize({ width: 1280, height: 1060 });
-    await openApp(page);
-    await setZoom(page, zoom);
-    await expect(page.locator("html")).toHaveCSS("zoom", String(zoom / 100));
-    await composeProject(page);
-    const before = await composerBoxes(page);
-    await page.keyboard.type("@src");
-    await expect(rows(page)).toHaveCount(21);
-    const after = await composerBoxes(page);
-    expect(after).toEqual(before);
-    const pop = await boxOf(page, "completion-card");
-    expect(pop.y).toBeGreaterThanOrEqual(after.row.y + after.row.height);
-    expect(Math.abs(pop.x - after.composer.x)).toBeLessThan(1);
-    expect(Math.abs(pop.width - after.composer.width)).toBeLessThan(1);
-    // The visible bottom: the composer's scrolling section (the pane ends 8px above the window).
-    const section = await boxOf(page, "composer");
-    const bottom = Math.min(page.viewportSize()?.height ?? 0, section.y + section.height);
-    // 16 layout px stay free under it (a pixel of rounding).
-    expect(pop.y + pop.height).toBeLessThanOrEqual(bottom - 16 * (zoom / 100) + 1);
-    const fit = await listFit(page);
-    expect(fit.scrolls).toBe(true);
-    // A 1000px (here 1060px) window has room for the full card at 100%: ~8 rows (15.5rem).
-    // Zoomed in, the same window is shorter in layout px: fewer whole rows.
-    if (zoom <= 100) expect(fit.height).toBe(248);
-    else {
-      // Capped to whole rows (28px each, 8px padding), ending at most a row above the
-      // 16 layout px margin: a missing or doubled zoom division would miss both.
-      expect(fit.height).toBeLessThan(248);
-      expect((fit.height - 8) % 28).toBe(0);
-      expect(pop.y + pop.height).toBeGreaterThan(bottom - (16 + 28) * (zoom / 100) - 1);
-    }
-    expect(fit.whole).toBeGreaterThanOrEqual(1);
+// nor that row, and its height is capped to the window below it.
+test("the file card hangs under the worktree row, moves nothing and fits the window", async ({ page }) => {
+  await setFiles("repo-cf", MANY);
+  // The window shell's top bar takes 60px of a classic window's height: 1060 is the old 1000.
+  await page.setViewportSize({ width: 1280, height: 1060 });
+  await openApp(page);
+  await composeProject(page);
+  const before = await composerBoxes(page);
+  await page.keyboard.type("@src");
+  await expect(rows(page)).toHaveCount(21);
+  const after = await composerBoxes(page);
+  expect(after).toEqual(before);
+  const pop = await boxOf(page, "completion-card");
+  expect(pop.y).toBeGreaterThanOrEqual(after.row.y + after.row.height);
+  expect(Math.abs(pop.x - after.composer.x)).toBeLessThan(1);
+  expect(Math.abs(pop.width - after.composer.width)).toBeLessThan(1);
+  // The visible bottom: the composer's scrolling section (the pane ends 8px above the window).
+  const section = await boxOf(page, "composer");
+  const bottom = Math.min(page.viewportSize()?.height ?? 0, section.y + section.height);
+  // 16px stay free under it (a pixel of rounding).
+  expect(pop.y + pop.height).toBeLessThanOrEqual(bottom - 16 + 1);
+  const fit = await listFit(page);
+  expect(fit.scrolls).toBe(true);
+  // A 1000px (here 1060px) window has room for the full card: ~8 rows (15.5rem). A shorter
+  // window caps it to whole rows: the next test.
+  expect(fit.height).toBe(248);
+  expect(fit.whole).toBeGreaterThanOrEqual(1);
 
-    // Arrowing to the last row scrolls the list only: the composer stays put.
-    await page.keyboard.press("ArrowUp");
-    await expect(rows(page).nth(20)).toHaveAttribute("aria-selected", "true");
-    expect(await composerBoxes(page)).toEqual(before);
-    const last = await rows(page).nth(20).boundingBox();
-    const list = await card(page).getByRole("listbox").boundingBox();
-    expect(last && list && last.y + last.height <= list.y + list.height + 0.5).toBe(true);
+  // Arrowing to the last row scrolls the list only: the composer stays put.
+  await page.keyboard.press("ArrowUp");
+  await expect(rows(page).nth(20)).toHaveAttribute("aria-selected", "true");
+  expect(await composerBoxes(page)).toEqual(before);
+  const last = await rows(page).nth(20).boundingBox();
+  const list = await card(page).getByRole("listbox").boundingBox();
+  expect(last && list && last.y + last.height <= list.y + list.height + 0.5).toBe(true);
 
-    await page.keyboard.press("Escape");
-    await expect(card(page)).toHaveCount(0);
-    expect(await composerBoxes(page)).toEqual(before);
-  });
-}
+  await page.keyboard.press("Escape");
+  await expect(card(page)).toHaveCount(0);
+  expect(await composerBoxes(page)).toEqual(before);
+});
 
 test("a short window shows fewer rows; a taller one all eight; a very short one drops the hints", async ({ page }) => {
   await setFiles("repo-cf", MANY);

@@ -356,9 +356,9 @@ export function NeedsHoverCard({ threadId, requestId = null, anchor, keyboardOpe
       <HoverCardContent
         side={side}
         align={align}
-        // Within the room Radix measures beside the row (screen px, so divided by the page zoom):
-        // at 200% the room right of the sidebar can be under 320 layout px.
-        className="w-max max-w-[min(560px,calc(var(--radix-hover-card-content-available-width)/var(--cf-zoom)))] min-w-[min(320px,calc(var(--radix-hover-card-content-available-width)/var(--cf-zoom)))] overflow-y-auto overscroll-contain p-0 max-h-[min(560px,calc(var(--radix-hover-card-content-available-height)/var(--cf-zoom)))]"
+        // Within the room Radix measures beside the row: at 200% zoom the room right of the
+        // sidebar can be under 320px.
+        className="w-max max-w-[min(560px,var(--radix-hover-card-content-available-width))] min-w-[min(320px,var(--radix-hover-card-content-available-width))] overflow-y-auto overscroll-contain p-0 max-h-[min(560px,var(--radix-hover-card-content-available-height))]"
         data-testid="needs-card"
         data-thread-id={threadId}
         data-anchor={anchor}

@@ -1,5 +1,4 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { zoomFactor } from "@/lib/zoom";
 import { afterRev, runLayoutCommand } from "@/shell/commands";
 import { useFullscreenPane } from "@/shell/fullscreen";
 import { shellFrame } from "@/shell/geometry/rails";
@@ -58,8 +57,7 @@ export function PaneGrid() {
     const measure = () => {
       const r = el.getBoundingClientRect();
       reportViewport(r.width, r.height);
-      const z = zoomFactor();
-      setSize((prev) => (prev && prev.w === r.width / z && prev.h === r.height / z ? prev : { w: r.width / z, h: r.height / z }));
+      setSize((prev) => (prev && prev.w === r.width && prev.h === r.height ? prev : { w: r.width, h: r.height }));
     };
     measure();
     const ro = new ResizeObserver(measure);

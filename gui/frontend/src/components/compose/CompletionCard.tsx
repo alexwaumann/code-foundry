@@ -3,7 +3,6 @@ import { Kbd } from "@/components/ui/kbd";
 import { projectHue } from "@/lib/compose";
 import { pointerMoved } from "@/lib/pointerMotion";
 import { cn } from "@/lib/utils";
-import { zoomFactor } from "@/lib/zoom";
 import { useProjectsStore } from "@/stores/projects";
 import type { Completion, CompletionGroup, CompletionItem } from "./useCompletion";
 import { useFitBelow } from "./useFitBelow";
@@ -64,17 +63,16 @@ export function CompletionCard({ completion, above = false }: { completion: Comp
   const active = show === "list" ? optionId(selected) : "";
   useFitBelow(cardRef, show !== "none", above);
   // Brings the selected row into view by scrolling the list only (scrollIntoView could
-  // scroll the composer's section too). Rects are viewport px, scrollTop layout px; whole
-  // px up, since the list's height is fractional under zoom and clientHeight is rounded.
+  // scroll the composer's section too). Whole px up, since the list's
+  // height is fractional under zoom and clientHeight is rounded.
   useEffect(() => {
     const list = listRef.current;
     const option = active ? document.getElementById(active) : null;
     if (!list || !option) return;
     const o = option.getBoundingClientRect();
     const l = list.getBoundingClientRect();
-    const zoom = zoomFactor();
-    if (o.top < l.top) list.scrollTop -= Math.ceil((l.top - o.top) / zoom);
-    else if (o.bottom > l.bottom) list.scrollTop += Math.ceil((o.bottom - l.bottom) / zoom);
+    if (o.top < l.top) list.scrollTop -= Math.ceil((l.top - o.top));
+    else if (o.bottom > l.bottom) list.scrollTop += Math.ceil((o.bottom - l.bottom));
   }, [active]);
   if (show === "none") return null;
   let index = 0;

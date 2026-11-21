@@ -231,6 +231,10 @@ func (p Paths) DictationModels() string { return filepath.Join(p.home, "dictatio
 // load (gui/windowbg.go). Not under App(): an update replaces that directory.
 func (p Paths) WindowBackground() string { return filepath.Join(p.home, "window-background.json") }
 
+// WindowZoom is the GUI host's copy of appearance.zoom, so the window opens at the last
+// zoom before the page (and the daemon's settings) load (gui/windowzoom.go).
+func (p Paths) WindowZoom() string { return filepath.Join(p.home, "window-zoom.json") }
+
 // WindowFrame is the GUI host's other state file: the window's last position and size,
 // which the next launch reopens in, fitted to the screens then attached
 // (gui/windowframe.go).

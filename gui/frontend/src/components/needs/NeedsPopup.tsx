@@ -247,7 +247,7 @@ function PopupContent({ threadId }: { threadId: string }) {
     <DialogContent
       ref={setRoot}
       size="sheet"
-      className="h-[min(900px,calc(100vh/var(--cf-zoom)-80px))] w-[min(980px,calc(100vw/var(--cf-zoom)-96px))]"
+      className="h-[min(900px,calc(100vh-80px))] w-[min(980px,calc(100vw-96px))]"
       aria-describedby={undefined}
       data-testid="needs-popup"
       data-thread-id={threadId}

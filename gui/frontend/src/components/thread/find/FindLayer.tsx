@@ -1,7 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
 import { matchIndex, matchRows, nearestInItem, rowOrder, startIndex, warmFind, type FindKey, type FindMatch, type FindPlace } from "@/lib/threadFind";
 import { cn } from "@/lib/utils";
-import { zoomFactor } from "@/lib/zoom";
 import { getTimeline } from "@/stores/cite";
 import { getThreadItems, useThreadStore, useThreadSynced } from "@/stores/thread";
 import {
@@ -247,12 +246,10 @@ function ticksOf(threadId: string, matches: readonly FindMatch[], current: FindK
   const order = useThreadStore.getState().logs[threadId]?.order ?? [];
   const rows = matchRows(order, tl.rowKeys(), matches);
   const spots = new Map<number, Tick>();
-  // Client rects are in zoomed px (lib/zoom), offsets in the list in CSS px.
-  const z = zoomFactor();
   const top = scroller.getBoundingClientRect().top;
   matches.forEach((m, i) => {
     const range = painted.get(paintedKey(m));
-    const offset = range ? scroller.scrollTop + (range.getBoundingClientRect().top - top) / z : (tl.rowStart(rows[i] ?? 0) ?? 0);
+    const offset = range ? scroller.scrollTop + (range.getBoundingClientRect().top - top) : (tl.rowStart(rows[i] ?? 0) ?? 0);
     const at = Math.max(0, Math.min(1, offset / total));
     const isCurrent = current?.itemId === m.itemId && current.nth === m.nth;
     // One tick per spot (a quarter of a percent): the current one wins its spot.

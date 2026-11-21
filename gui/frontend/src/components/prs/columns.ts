@@ -53,8 +53,8 @@ export const IMPORTANCE: Record<Section, readonly Column[]> = {
 export const RIGHT: ReadonlySet<Column> = new Set<Column>(["Diff", "Age", "Merged"]);
 
 /**
- * A rem in the table's own px. Page zoom is CSS zoom on <html>, which scales px and rem
- * alike, so a measured clientWidth and a rem stay in this ratio.
+ * A rem in px: the page zoom scales px and rem alike, so a measured clientWidth and a rem
+ * stay in this ratio.
  */
 const REM_PX = 16;
 

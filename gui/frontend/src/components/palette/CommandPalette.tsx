@@ -382,7 +382,7 @@ export function CommandPalette() {
     >
       <DialogContent
         // The Find dialog and the finder's Text mode are wider (about 1000px, clamped to the window) and lay out their own bodies.
-        className={cn("overflow-hidden p-0", page === "search" || textMode ? "w-[min(1000px,calc(100vw/var(--cf-zoom)-2rem))] max-w-none" : "max-w-xl")}
+        className={cn("overflow-hidden p-0", page === "search" || textMode ? "w-[min(1000px,calc(100vw-2rem))] max-w-none" : "max-w-xl")}
         data-region="palette"
         onCloseAutoFocus={(e) => {
           e.preventDefault();

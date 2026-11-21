@@ -145,13 +145,14 @@ test("a recording recorder swallows cmd+k before the global keymap; the new chor
 
 // Hand edits reaching the open page and a file that does not parse: src/components/settings/SettingsPage.test.tsx;
 // density on html[data-density]: src/stores/settings.test.ts.
-test("cmd+= zooms the whole page (CSS zoom on <html>) and saves it; cmd+0 resets", async ({ page }) => {
+test("cmd+= steps the window zoom and saves it; cmd+0 resets", async ({ page }) => {
   await openSettings(page, "appearance");
   await page.keyboard.press("Meta+Equal");
-  await expect(page.locator("html")).toHaveCSS("zoom", "1.1");
+  // The zoom itself is the host's (the webview's page zoom): a browser only records the percent.
+  await expect(page.locator("html")).toHaveAttribute("data-zoom", "110");
   await expect.poll(async () => (await mockSettings()).raw["appearance.zoom"]).toBe("110");
   await page.keyboard.press("Meta+Digit0");
-  await expect(page.locator("html")).toHaveCSS("zoom", "1");
+  await expect(page.locator("html")).toHaveAttribute("data-zoom", "100");
   await expect.poll(async () => (await mockSettings()).raw["appearance.zoom"]).toBeUndefined();
 });
 

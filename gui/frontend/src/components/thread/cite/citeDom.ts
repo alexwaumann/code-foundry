@@ -1,4 +1,3 @@
-import { zoomFactor } from "@/lib/zoom";
 import { findItemSelector } from "../find/findDom";
 
 /**
@@ -198,13 +197,12 @@ export function highlightsSupported(): boolean {
 function overlay(name: CitePaint, rects: readonly DOMRect[]): void {
   document.querySelector(`[data-cite-overlay="${name}"]`)?.remove();
   if (rects.length === 0) return;
-  const z = zoomFactor();
   const host = document.createElement("div");
   host.dataset.citeOverlay = name;
   host.className = "cite-overlay";
   for (const r of rects) {
     const box = document.createElement("div");
-    box.style.cssText = `left:${String(r.left / z)}px;top:${String(r.top / z)}px;width:${String(r.width / z)}px;height:${String(r.height / z)}px`;
+    box.style.cssText = `left:${String(r.left)}px;top:${String(r.top)}px;width:${String(r.width)}px;height:${String(r.height)}px`;
     host.appendChild(box);
   }
   document.body.appendChild(host);

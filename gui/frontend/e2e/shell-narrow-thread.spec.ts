@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { appPath, mockPost, mockUrl, resetMock, setZoom, threadsOpenAsTabs } from "./fixtures";
+import { appPath, mockPost, mockUrl, resetMock, threadsOpenAsTabs } from "./fixtures";
 
 /**
  * A thread's pane narrower than a thread's minimum (docs/notes/shell-24d-spec-differences.md, 2):
@@ -37,8 +37,8 @@ async function narrow(page: Page): Promise<void> {
   await page.setViewportSize({ width: 1400, height: 900 });
   await page.goto(`${appPath}&shell=1`);
   await expect(page.getByTestId("shell-grid")).toBeVisible();
-  await page.setViewportSize({ width: 1100, height: 720 });
-  await setZoom(page, 200);
+  // A 1100x720 window at 200% zoom: 550x360 CSS px.
+  await page.setViewportSize({ width: 550, height: 360 });
   // s-ny-badge asks for a permission: in a pane this short it is one line on the composer.
   await expect(page.getByTestId("thread-pane").getByRole("textbox", { name: "Prompt" })).toBeVisible();
   await still(page);

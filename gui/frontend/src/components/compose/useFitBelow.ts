@@ -1,5 +1,4 @@
 import { useLayoutEffect, type RefObject } from "react";
-import { zoomFactor } from "@/lib/zoom";
 import { useUiStore } from "@/stores/ui";
 
 /** Layout px kept free between the card and the bottom of the visible area. */
@@ -26,8 +25,7 @@ function scrollerOf(el: HTMLElement): HTMLElement | null {
 /**
  * Caps the card's height to the space between its top and the bottom of the visible area
  * (the scroller's box, the window), less a margin, and when that is less than the list's
- * own cap, the list to whole rows (no row cut by the hints). Rects are viewport px;
- * max-heights and offsetHeight are layout px, so the distance is divided by the page zoom.
+ * own cap, the list to whole rows (no row cut by the hints).
  */
 function fit(el: HTMLElement, scroller: HTMLElement | null, above: boolean): void {
   const r = el.getBoundingClientRect();
@@ -35,7 +33,7 @@ function fit(el: HTMLElement, scroller: HTMLElement | null, above: boolean): voi
   // from the top of the visible area down to the card's bottom.
   const top = above ? Math.max(0, scroller ? scroller.getBoundingClientRect().top : 0) : r.top;
   const bottom = above ? r.bottom : Math.min(window.innerHeight, scroller ? scroller.getBoundingClientRect().bottom : Infinity);
-  const space = Math.max(Math.floor((bottom - top) / zoomFactor()) - BOTTOM_MARGIN, MIN_HEIGHT);
+  const space = Math.max(Math.floor(bottom - top) - BOTTOM_MARGIN, MIN_HEIGHT);
   el.toggleAttribute("data-short", space < HINTS_MIN_HEIGHT);
   el.style.maxHeight = `${String(space)}px`;
   const list = el.querySelector<HTMLElement>('[role="listbox"]');
