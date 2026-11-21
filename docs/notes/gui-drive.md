@@ -30,6 +30,13 @@ WKWebView settings. `make gui-drive` runs the real GUI so an agent can look at t
   and only while that PID still runs this checkout's `bin/code-foundry`.
 - Input is synthetic DOM events dispatched in the page. Nothing that goes through AppKit can
   be driven: a Finder file drop, a window drag by the title band, native menus, system dialogs.
+- A drag that a component follows with pointer capture (the pane gutters, the sidebar's
+  resize handle) does not follow `mouse_drag`: the synthetic moves never reach the capturing
+  element. Clicks, hovers, typing and menus do work.
+- A native file drop can be replayed from the point where AppKit hands it to the page, which
+  covers everything but AppKit's own delivery: `window._wails.handleDragEnter()`,
+  `window._wails.handleDragOver(x, y)`, then `window._wails.handlePlatformFileDrop([path], x, y)`
+  in `eval`, with x and y in view points (CSS px times the native zoom).
 - A thrown error in `eval` comes back as a stack without the message; return values instead.
 - Under native zoom `devicePixelRatio` is multiplied by the zoom (2 → 2.5 at 125% on a Retina
   screen) and `innerWidth` is divided by it. Under CSS zoom neither changes.

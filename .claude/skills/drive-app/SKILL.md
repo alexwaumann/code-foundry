@@ -114,6 +114,8 @@ $G shot /tmp/x.png                                              # the window's p
   (printed at start) on every call.
 - Input is synthetic DOM events. What goes through AppKit is out of reach and stays a check
   by hand: a file dropped from Finder, dragging the window by its title band, native menus.
+  So do drags a component follows with pointer capture (pane gutters, the sidebar's edge).
+  A Finder drop can be replayed from where AppKit hands it over (`docs/notes/gui-drive.md`).
 - The window opens on the user's screen and takes focus once. Do not leave it up: stop the
   background task when done (it stops the GUI and its daemon by PID).
 - `shot` needs the window on screen and Screen Recording permission for the terminal.

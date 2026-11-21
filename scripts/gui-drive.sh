@@ -44,7 +44,8 @@ rpc() {
 case "${1:-start}" in
   call)
     load
-    rpc "${2:?usage: gui-drive.sh call TOOL [JSON]}" "${3:-{\}}"
+    args="${3:-}"
+    rpc "${2:?usage: gui-drive.sh call TOOL [JSON]}" "${args:-"{}"}"
     exit
     ;;
   eval)
