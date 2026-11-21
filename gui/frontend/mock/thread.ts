@@ -532,6 +532,16 @@ export class MockThreadLogs {
     this.append(id, this.item(id, { case: "assistantText", value: { text } }, { streaming: true }));
   }
 
+  /**
+   * A tool call that starts running now and keeps running (POST /__mock/thread/tool): the
+   * live turn's running row, or one more of a parallel batch (docs/notes/running-rows.md).
+   * Its item id is its tool_use id, like the daemon's; /finish ends it interrupted.
+   */
+  runTool(id: string, name: string, input: object): void {
+    const toolUseId = `toolu_mock_run_${String(this.log(id).nextOrdinal)}`;
+    this.append(id, this.item(id, { case: "toolCall", value: { toolUseId, name, inputJson: JSON.stringify(input), status: ToolCallStatus.RUNNING } }, { id: toolUseId }));
+  }
+
   /** Text appended to the streaming text item (a delta). */
   delta(id: string, text: string): void {
     const l = this.log(id);

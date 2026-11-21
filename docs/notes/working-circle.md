@@ -31,8 +31,11 @@ once in about 11 s, muted, linear, forever; nothing else moves.
   circle ignores the setting. Same reasoning as the arrival tilt (`docs/notes/arrival-tilt.md`)
   and Ember (`components/ember/ember.css`). Only the dashed circle: spinners
   (`LoaderCircle`/`Loader2`) and other transitions keep their reduced-motion handling.
-- **Only these two things.** Button pending states, loading placeholders, the collapsed work
-  strip's running step and the plugin `running` status keep their spinners.
+- **Only these two things.** Button pending states, loading placeholders and the plugin
+  `running` status keep their spinners. A running row inside a turn (the collapsed work
+  strip's running step, a running tool or Agent row) has no mark of its own since
+  `docs/notes/running-rows.md`: its tool icon in the info tone and its label shimmering.
+  Ember's live work line has the working circle, like a thread's live header.
 
 ## Every dashed circle, decided
 

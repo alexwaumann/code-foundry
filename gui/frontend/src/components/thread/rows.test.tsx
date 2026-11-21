@@ -2,6 +2,7 @@ import { act, cleanup, fireEvent, render, waitFor } from "@testing-library/react
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ThreadItemView } from "@/api/thread";
 import type { ThreadView } from "@/api/threads";
+import { ROW_STAGGER_MS, SHIMMER_PERIOD_MS } from "@/lib/shimmer";
 import { buildRows, buildTurns, decodeTimelineKey, timelineKey } from "@/lib/threadTimeline";
 import { structOf, useThreadStore } from "@/stores/thread";
 import { useThreadsStore } from "@/stores/threads";
@@ -650,7 +651,7 @@ describe("a live tool strip", () => {
     };
   }
 
-  it("collapsed, a running latest step shows the sky spinner, the running tense, its elapsed time and the run's steps", () => {
+  it("collapsed, a running latest step shows its own icon in the info tone, the running tense shimmering, its elapsed time and the run's steps", () => {
     vi.useFakeTimers({ toFake: ["Date", "setInterval", "clearInterval"] });
     vi.setSystemTime(13_000);
     const { c } = live([hi, bash("b1", "ls"), bash("b2", "pwd"), bash("b3", "go test ./...", { status: "running", createdAtMs: 1_000, updatedAtMs: null })]);
@@ -660,9 +661,14 @@ describe("a live tool strip", () => {
     const row = c.querySelector('[data-testid="thread-strip-row"]');
     expect(row?.getAttribute("aria-expanded")).toBe("false");
     expect(row?.getAttribute("data-running")).toBe("true");
-    expect(row?.querySelector(".ico svg")?.getAttribute("class")).toContain("animate-spin");
-    expect(row?.querySelector(".ico svg")?.getAttribute("class")).toContain("t-sky");
+    const icon = row?.querySelector(".ico svg");
+    // The tool's own icon (Bash: a terminal), not a spinner in its place.
+    expect(icon?.getAttribute("class")).toContain("lucide-square-terminal");
+    expect(icon?.getAttribute("class")).toContain("t-sky");
+    expect(icon?.getAttribute("class")).not.toContain("animate-spin");
+    expect(icon?.getAttribute("aria-label")).toBe("Running");
     expect(row?.querySelector(".lbl")?.textContent).toBe("Running go test ./...");
+    expect(row?.querySelector('.lbl > .shimmer[data-shimmer="row"]')?.textContent).toBe("Running go test ./...");
     expect(c.querySelector('[data-testid="thread-strip-meta"]')?.textContent).toBe("12s · 3 steps");
   });
 
@@ -671,7 +677,9 @@ describe("a live tool strip", () => {
     const { c } = live([hi, ...steps]);
     const row = c.querySelector('[data-testid="thread-strip-row"]');
     expect(row?.getAttribute("data-running")).toBeNull();
-    expect(row?.querySelector(".ico svg.animate-spin")).toBeNull();
+    expect(row?.querySelector(".ico svg")?.getAttribute("class")).not.toContain("t-sky");
+    expect(row?.querySelector('[aria-label="Running"]')).toBeNull();
+    expect(row?.querySelector(".shimmer")).toBeNull();
     expect(row?.querySelector(".lbl")?.textContent).toBe("Ran echo 11");
     expect(c.querySelector('[data-testid="thread-strip-meta"]')?.textContent).toBe("12 steps");
   });
@@ -710,6 +718,63 @@ describe("a live tool strip", () => {
     expect(waiting?.getAttribute("data-testid")).toBe("thread-tool");
     expect(waiting?.textContent).toContain("waiting for you");
     expect(waiting?.closest('[data-testid="thread-strip"]')).toBeNull();
+  });
+});
+
+describe("a running row (docs/notes/running-rows.md)", () => {
+  const hi: ThreadItemView = { ...base, id: "u", ordinal: 1, kind: "user", text: "go", attachments: [], composerText: "" };
+  const tool = (id: string, ordinal: number, name: string, input: object, status: "running" | "done"): ThreadItemView => ({
+    ...base,
+    id,
+    ordinal,
+    kind: "tool",
+    toolUseId: id,
+    name,
+    inputJson: JSON.stringify(input),
+    status,
+    output: "",
+    isError: false,
+    resultJson: "",
+  });
+  const rowOf = (c: HTMLElement, name: string) => c.querySelector(`[data-tool="${name}"] [data-testid="thread-tool"]`) as HTMLElement;
+
+  it("in an unfolded live turn: the tool's own icon in the info tone, named Running, its label shimmering, no spinner; a finished row beside it is untouched", () => {
+    const c = show([hi, tool("r", 2, "Read", { file_path: "/w/a.go" }, "done"), tool("b", 3, "Bash", { command: "go test ./..." }, "running")], { working: true });
+    const run = rowOf(c, "Bash");
+    expect(run.getAttribute("data-running")).toBe("true");
+    const icon = run.querySelector(".ico svg");
+    expect(icon?.getAttribute("class")).toContain("lucide-square-terminal");
+    expect(icon?.getAttribute("class")).toContain("t-sky");
+    expect(icon?.getAttribute("role")).toBe("img");
+    expect(icon?.getAttribute("aria-label")).toBe("Running");
+    expect(run.querySelector('.lbl > .shimmer[data-shimmer="row"]')?.textContent).toBe("Running go test ./...");
+    // No mark of its own: nothing spins, nothing at the right end but the facts.
+    expect(c.querySelector(".animate-spin, .lucide-loader-circle")).toBeNull();
+    expect(run.querySelector(".meta svg")).toBeNull();
+    const done = rowOf(c, "Read");
+    expect(done.getAttribute("data-running")).toBeNull();
+    expect(done.querySelector(".ico svg")?.getAttribute("class")).not.toContain("t-sky");
+    expect(done.querySelector(".ico svg")?.getAttribute("aria-hidden")).toBe("true");
+    expect(done.querySelector(".shimmer")).toBeNull();
+  });
+
+  it("a tool waiting for permission is waiting, not running", () => {
+    const c = show(editWaiting("Edit", { file_path: "/w/a.go", old_string: "a", new_string: "b" }), { working: true });
+    const row = rowOf(c, "Edit");
+    expect(row.getAttribute("data-running")).toBeNull();
+    expect(row.querySelector(".shimmer")).toBeNull();
+    expect(row.querySelector('[aria-label="Running"]')).toBeNull();
+  });
+
+  it("tools running in parallel each shimmer, each a step down the wave from the one above", () => {
+    const c = show([hi, tool("a", 2, "Bash", { command: "ruff check ." }, "running"), tool("b", 3, "Bash", { command: "mypy sorts/" }, "running")], { working: true });
+    const shimmers = [...c.querySelectorAll<HTMLElement>('[data-testid="thread-tool"] .shimmer')];
+    expect(shimmers.map((el) => el.textContent)).toEqual(["Running ruff check .", "Running mypy sorts/"]);
+    const delay = (el: HTMLElement | undefined) => -parseInt(el?.style.animationDelay ?? "", 10);
+    // Mounted in one render: the lower row's band is ROW_STAGGER_MS behind (mod the period), give or take the ms between their mounts.
+    const step = (((delay(shimmers[0]) - delay(shimmers[1])) % SHIMMER_PERIOD_MS.row) + SHIMMER_PERIOD_MS.row) % SHIMMER_PERIOD_MS.row;
+    expect(Math.abs(step - ROW_STAGGER_MS)).toBeLessThan(20);
+    expect(shimmers.every((el) => el.style.animationDuration === `${String(SHIMMER_PERIOD_MS.row)}ms`)).toBe(true);
   });
 });
 

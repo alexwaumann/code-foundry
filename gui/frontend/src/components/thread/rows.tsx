@@ -16,7 +16,6 @@ import {
   Lightbulb,
   List,
   ListTodo,
-  LoaderCircle,
   MessageCircleQuestionMark,
   Plug,
   Search,
@@ -35,6 +34,7 @@ import { agentElapsedMs, agentName, parseAgentNote } from "@/lib/agents";
 import { useNow, useNowSelect } from "@/lib/clock";
 import { formatAge, formatDuration, type DurationUnits } from "@/lib/duration";
 import { parseCreatedByNote } from "@/lib/lineage";
+import { ROW_STAGGER_MS } from "@/lib/shimmer";
 import { sentTime } from "@/lib/format";
 import { canonicalModelName } from "@/lib/models";
 import { questionsOf } from "@/lib/threadRequest";
@@ -55,6 +55,7 @@ import { KeepRowContext, TextMarkdownContext, useThreadCtx } from "./context";
 import { LineageNote } from "./LineageNote";
 import { QueuedTag } from "./QueuedTag";
 import { SetupRow } from "./SetupRow";
+import { Shimmer } from "./Shimmer";
 import { AgentOpen } from "./AgentOpen";
 import { ForkFromHereButton } from "./ForkFromHere";
 import { useForkFromTurn } from "./forkFromTurn";
@@ -101,6 +102,7 @@ function toolIcon(name: string): LucideIcon {
 function Row({
   icon: Icon,
   iconClassName,
+  iconLabel,
   label,
   meta,
   expanded,
@@ -109,8 +111,10 @@ function Row({
   data,
 }: {
   icon: LucideIcon;
-  /** The icon's own classes (a running strip's sky spinner). */
+  /** The icon's own classes (a running row's sky tint). */
   iconClassName?: string;
+  /** The icon's accessible name ("Running"); without one the icon is decoration. */
+  iconLabel?: string;
   label: ReactNode;
   meta?: ReactNode;
   /** undefined: the row does not expand. */
@@ -122,7 +126,7 @@ function Row({
   const body = (
     <>
       <span className="ico">
-        <Icon className={iconClassName} aria-hidden />
+        {iconLabel ? <Icon className={iconClassName} role="img" aria-label={iconLabel} /> : <Icon className={iconClassName} aria-hidden />}
       </span>
       <span className="lbl">{label}</span>
       {meta && <span className="meta">{meta}</span>}
@@ -191,6 +195,23 @@ function ToolLabel({ t, tense, cwd }: { t: ToolCallView; tense: Tense; cwd: stri
 /** File edits: while one waits for permission its diff shows, so the user sees what they allow. */
 const EDIT_TOOLS: ReadonlySet<string> = new Set(["Edit", "MultiEdit", "Write", "NotebookEdit"]);
 
+/** A running row's icon: the tool's own, in the info tone, named "Running" (docs/notes/running-rows.md). */
+function runningLook(running: boolean): { iconClassName?: string; iconLabel?: string } {
+  return running ? { iconClassName: "t-sky", iconLabel: "Running" } : {};
+}
+
+/**
+ * A running row's label, shimmering. Its band starts ROW_STAGGER_MS after the item above it
+ * in the log, so tools running in parallel (consecutive items) read as one wave down.
+ */
+function RowShimmer({ ordinal, children }: { ordinal: number; children: ReactNode }) {
+  return (
+    <Shimmer kind="row" offsetMs={ordinal * ROW_STAGGER_MS}>
+      {children}
+    </Shimmer>
+  );
+}
+
 /** A run's elapsed time, live (1 s clock) while it runs. */
 function AgentElapsed({ run }: { run: AgentRunView }) {
   const now = useNow(1000);
@@ -200,11 +221,11 @@ function AgentElapsed({ run }: { run: AgentRunView }) {
 
 /**
  * An Agent call's meta from its run: a "background" chip; while running, the activity
- * after a "·" and the live elapsed time with the spinner (also while the daemon keeps a
- * background call's item running); a failed run's "failed" chip; else the call's own meta
- * ("4 tools · 41s"), or the run's duration when the call has none.
+ * after a "·" and the live elapsed time; a failed run's "failed" chip; else the call's own
+ * meta ("4 tools · 41s"), or the run's duration when the call has none. That it runs is the
+ * row's (its tinted icon and shimmering label), not the meta's.
  */
-function AgentMeta({ run, itemRunning, fallback }: { run: AgentRunView; itemRunning: boolean; fallback: string }) {
+function AgentMeta({ run, fallback }: { run: AgentRunView; fallback: string }) {
   const running = run.status === "running";
   const ended = agentElapsedMs(run, 0);
   return (
@@ -225,7 +246,6 @@ function AgentMeta({ run, itemRunning, fallback }: { run: AgentRunView; itemRunn
         </span>
       )}
       {running ? <AgentElapsed run={run} /> : fallback ? <span>{fallback}</span> : ended !== null && <span>{formatDuration(ended, ELAPSED)}</span>}
-      {(running || itemRunning) && <LoaderCircle className="size-3.5 animate-spin text-cf-info-text" aria-label="Running" />}
     </>
   );
 }
@@ -260,7 +280,7 @@ const ToolRow = memo(function ToolRow({ node }: { node: Extract<WorkNode, { type
       waiting for you
     </span>
   ) : run ? (
-    <AgentMeta run={run} itemRunning={t.status === "running"} fallback={s.meta} />
+    <AgentMeta run={run} fallback={s.meta} />
   ) : (
     <>
       {denied && <span className="chip fail">denied</span>}
@@ -272,22 +292,26 @@ const ToolRow = memo(function ToolRow({ node }: { node: Extract<WorkNode, { type
         </span>
       )}
       {s.meta && <span>{s.meta}</span>}
-      {t.status === "running" && <LoaderCircle className="size-3.5 animate-spin text-cf-info-text" aria-label="Running" />}
     </>
   );
   // A thread's own run opens in the read-only subagent view; a nested one (spawned by
   // another run) has nothing to show there.
   const openable = run !== undefined && run.spawnDepth <= 1;
+  // Running (also while the daemon keeps a background Agent call's item running): the
+  // tool's icon in the info tone and its label shimmering, no mark of its own.
+  const running = !waiting && (t.status === "running" || run?.status === "running");
+  const label = <ToolLabel t={t} tense={tense} cwd={cwd} />;
   return (
     <div className={openable ? "agent-host" : undefined} data-tool={t.name} data-status={t.status}>
       <Row
         icon={toolIcon(t.name)}
-        label={<ToolLabel t={t} tense={tense} cwd={cwd} />}
+        {...runningLook(running)}
+        label={running ? <RowShimmer ordinal={t.ordinal}>{label}</RowShimmer> : label}
         meta={meta}
         expanded={expandable ? open : undefined}
         onToggle={toggle}
         testId="thread-tool"
-        data={{ "data-waiting": waiting ? "true" : undefined }}
+        data={{ "data-waiting": waiting ? "true" : undefined, "data-running": running ? "true" : undefined }}
       />
       {openable && <AgentOpen threadId={threadId} runId={run.id} name={agentName(run)} />}
       {open &&
@@ -673,9 +697,10 @@ function StepElapsed({ from }: { from: number }) {
 }
 
 /**
- * A collapsed strip's one row: the latest step's icon and label (the sky spinner and the
- * running tense while it runs), then its elapsed time while running and the run's step
- * count ("12s · 3 steps"; a finished latest step's own meta is left out: "12 steps").
+ * A collapsed strip's one row: the latest step's icon and label (while it runs, the icon in
+ * the info tone and the label in the running tense, shimmering), then its elapsed time while
+ * running and the run's step count ("12s · 3 steps"; a finished latest step's own meta is
+ * left out: "12 steps").
  */
 function StripLatest({ step, steps, onToggle }: { step: StripStep; steps: number; onToggle: () => void }) {
   const { threadId, cwd } = useThreadCtx();
@@ -684,13 +709,13 @@ function StripLatest({ step, steps, onToggle }: { step: StripStep; steps: number
   const t = it?.kind === "tool" ? it : null;
   const running = t?.status === "running";
   const from = running ? t.createdAtMs : null;
-  const icon = running ? LoaderCircle : step.type === "tool" ? toolIcon(step.name) : step.names[0] === "Read" ? FileText : Search;
+  const icon = step.type === "tool" ? toolIcon(step.name) : step.names[0] === "Read" ? FileText : Search;
   const label = step.type === "group" ? groupLabel(step.names) : t ? <ToolLabel t={t} tense={running ? "running" : "done"} cwd={cwd} /> : null;
   return (
     <Row
       icon={icon}
-      iconClassName={running ? "t-sky animate-spin" : undefined}
-      label={label}
+      {...runningLook(running)}
+      label={running ? <RowShimmer ordinal={t.ordinal}>{label}</RowShimmer> : label}
       meta={
         <span data-testid="thread-strip-meta">
           {from !== null && (
@@ -922,7 +947,7 @@ function Parts({ parts, red }: { parts: readonly string[]; red?: boolean }) {
 }
 
 /**
- * A turn's header line. Live: a sky spinner, then its parts, the first one shimmering, never
+ * A turn's header line. Live: the working circle, then its parts, the first one shimmering, never
  * a button. Finished: its parts behind a chevron whose click folds or unfolds the work below
  * it, plain text with nothing to fold. One component for both, so React keeps the element
  * as the live line turns into the finished one. `what` names it to a screen reader ("turn",
@@ -957,7 +982,7 @@ export function TurnHead({
           {parts.map((p, i) => (
             <span key={i} className="contents">
               {i > 0 && <span className="sep">·</span>}
-              <span className={i === 0 ? "shimmer" : "tabular-nums"}>{p}</span>
+              {i === 0 ? <Shimmer>{p}</Shimmer> : <span className="tabular-nums">{p}</span>}
             </span>
           ))}
         </span>
@@ -988,7 +1013,7 @@ function stepsLabel(steps: number): string {
  * down when open); a click folds or unfolds the turn's work below it, and the header keeps
  * its place on screen (KeepRowContext). Its steps, cost and model are in the turn's gutter.
  * A turn whose fold would hide nothing has a plain line. Live (the turn
- * runs): a sky spinner, "Working" shimmering, the steps so far and the time since the
+ * runs): the working circle, "Working" shimmering, the steps so far and the time since the
  * turn's message, always open. One component for both under one row key, so the live line
  * turns into the finished one in place.
  */
