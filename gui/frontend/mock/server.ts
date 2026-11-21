@@ -93,6 +93,7 @@
  *   POST /__mock/thread?state=permission|question|streaming|idle|…   (the scripted thread s-r1:
  *        mock/thread.ts, every state in its THREAD_STATES); POST /__mock/thread/delta?text=… | /__mock/thread/stream?text=… |
  *        /__mock/thread/finish[?total=1.5&turnCost=1.5&model=claude-sonnet-5] (the turn_end's figures) |
+ *        /__mock/thread/tool?command=…|name=…&input=<json> (a tool call that starts running now, a live turn's running row) |
  *        /__mock/thread/fail-turn[?subtype=error_max_turns] (the next message's turn ends in error
  *        before any text; default error_during_execution);
  *        /__mock/thread/api-error[?text=…] (the next message's turn ends with Claude Code's API-error
@@ -1466,6 +1467,11 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       break;
     case "POST /__mock/thread/stream":
       world.logs.stream(q.get("id") ?? "s-r1", q.get("text") ?? "");
+      json(res, 200, { ok: true });
+      break;
+    case "POST /__mock/thread/tool":
+      // A tool call that starts running now: name (Bash) and its input as JSON, or a Bash command.
+      world.logs.runTool(q.get("id") ?? "s-r1", q.get("name") ?? "Bash", q.has("input") ? (JSON.parse(q.get("input") ?? "{}") as object) : { command: q.get("command") ?? "make check" });
       json(res, 200, { ok: true });
       break;
     case "POST /__mock/thread/delta":

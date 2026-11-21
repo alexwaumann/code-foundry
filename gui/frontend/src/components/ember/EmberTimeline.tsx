@@ -1,10 +1,12 @@
 import { memo, useContext, useMemo, type ReactNode } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { ChevronRight, GitBranch, LoaderCircle, RotateCcw, SquareKanban } from "lucide-react";
+import { ChevronRight, GitBranch, RotateCcw, SquareKanban } from "lucide-react";
 import type { ThreadItemView } from "@/api/thread";
+import { StatusCircle } from "@/components/status/StatusCircle";
 import { ThreadMarkdown } from "@/components/thread/Code";
 import { KeepRowContext, TextMarkdownContext, useThreadCtx } from "@/components/thread/context";
 import { TimelineRowView } from "@/components/thread/rows";
+import { Shimmer } from "@/components/thread/Shimmer";
 import { TimelineList } from "@/components/thread/Timeline";
 import { Tip } from "@/components/ui/tooltip";
 import { useNow } from "@/lib/clock";
@@ -190,8 +192,9 @@ function LiveElapsed({ threadId, ids }: { threadId: string; ids: readonly string
 /**
  * A run of work folded into one line (the turn header's look, thread.css .thead):
  * "Worked for 2m · read 5 files, created 2 threads, updated the board" behind a chevron
- * that opens the run's ordinary rows below it, in place. Live (Ember is on it): a sky
- * spinner, "Working", what it did so far and the time it has taken.
+ * that opens the run's ordinary rows below it, in place. Live (Ember is on it): the working
+ * circle, "Working" shimmering as a thread's live header's does, what it did so far and the
+ * time it has taken.
  */
 const WorkRowView = memo(function WorkRowView({ row }: { row: WorkRow }) {
   const { threadId } = useThreadCtx();
@@ -210,8 +213,8 @@ const WorkRowView = memo(function WorkRowView({ row }: { row: WorkRow }) {
   );
   const body = (
     <>
-      <span className="ico">{row.live ? <LoaderCircle className="t-sky animate-spin" aria-hidden /> : <ChevronRight aria-hidden />}</span>
-      {row.live ? <span className="shimmer">Working</span> : <span>{lead}</span>}
+      <span className="ico">{row.live ? <StatusCircle tone="working" aria-hidden /> : <ChevronRight aria-hidden />}</span>
+      {row.live ? <Shimmer>Working</Shimmer> : <span>{lead}</span>}
       {summary && (
         <>
           <span className="sep">·</span>

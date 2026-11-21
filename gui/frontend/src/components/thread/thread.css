@@ -813,18 +813,29 @@ html[data-thread-width="full"] {
 .cf-thread .thead .sep {
   opacity: 0.5;
 }
+/* The live shimmer (Shimmer.tsx; docs/notes/running-rows.md): a live header's "Working" and
+   a running row's label. A muted-to-text gradient clipped to the glyphs, its position
+   moving: theme tokens only, nothing lays out. Shimmer.tsx sets the duration and the
+   page-clock phase inline; 2s here is the header's, for a bare `.shimmer`. Not gated on
+   prefers-reduced-motion: it says something is running, it is not a transition. */
 @keyframes cf-shimmer {
   to {
     background-position: -200% 0;
   }
 }
-.cf-thread .thead .shimmer {
+.cf-thread .thead .shimmer,
+.cf-thread .row .lbl .shimmer {
   background: linear-gradient(90deg, var(--cf-text-muted) 0%, var(--cf-text) 50%, var(--cf-text-muted) 100%);
   background-size: 200% 100%;
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
   animation: cf-shimmer 2s linear infinite;
+}
+/* A row's label has coloured parts (a bold target, a mono command, muted detail): while it
+   shimmers they all take the band, so the light crosses the whole label as one. */
+.cf-thread .row .lbl .shimmer * {
+  color: transparent;
 }
 /* ---------- a thread's setup (SetupRow): its checklist under the first message, in the
    work log's rows. A step that has not run is dim; git's text sits under a failed line,

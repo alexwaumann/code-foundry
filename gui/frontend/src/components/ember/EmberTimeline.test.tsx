@@ -75,11 +75,11 @@ function setLog(items: ThreadItemView[]): void {
   });
 }
 
-function show() {
+function show(working = false) {
   return render(
     <ThreadContext.Provider value={{ threadId: EMBER_THREAD, cwd: DIR }}>
       <EmberPathPlace>
-        <EmberTimeline threadId={EMBER_THREAD} working={false} bottomInset={0} />
+        <EmberTimeline threadId={EMBER_THREAD} working={working} bottomInset={0} />
       </EmberPathPlace>
     </ThreadContext.Provider>,
   );
@@ -125,6 +125,16 @@ describe("EmberTimeline", () => {
     expect(note).toBeDefined();
     expect(note?.hasAttribute("data-final")).toBe(false);
     expect(note && within(note).queryByTestId("thread-copy-answer")).toBeNull();
+  });
+
+  it("live, its work line is a live turn header's: the working circle and Working shimmering, no spinner", () => {
+    setLog([user("u1", "List the open PRs."), bash("b1", "gh pr list")]);
+    show(true);
+    const work = screen.getByTestId("ember-work");
+    expect(work.hasAttribute("data-live")).toBe(true);
+    expect(work.querySelector('.ico svg[data-status-circle="working"]')?.getAttribute("class")).toContain("animate-status-working");
+    expect(work.querySelector('.shimmer[data-shimmer="head"]')?.textContent).toBe("Working");
+    expect(work.querySelector(".animate-spin, .lucide-loader-circle")).toBeNull();
   });
 
   it("paths in a reply: an absolute one under a project is a chip that opens the File tab; relative ones and git ranges stay code", () => {

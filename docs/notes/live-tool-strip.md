@@ -21,8 +21,9 @@ no new persisted state, no new item kinds in the daemon.
   header's: the header's `stepCount` also counts non-final text and thinking.
 * **Collapsed** (`rows.tsx StripRow` / `StripLatest`): a normal 24px `Row` with the latest
   step's icon and label (`ToolLabel` for a tool or Agent, `groupLabel` for a group).
-  Running: the icon slot holds the sky spinner (`t-sky animate-spin`), the label is in the
-  running tense, and the meta is the elapsed time on the shared 1 s clock and the step
+  Running: the step's own icon in the info tone (`t-sky`) and the label in the running
+  tense, shimmering (`docs/notes/running-rows.md`; a sky spinner took the icon's place until
+  then), and the meta is the elapsed time on the shared 1 s clock and the step
   count ("12s · 3 steps"). Finished latest step: just "12 steps" (its own "ok · 1.3s" is
   left out). Chevron right; a click expands, it never opens the tool detail.
 * **Expanded**: an "N steps" head (lucide `List`, chevron down) over the run's own rows
@@ -65,7 +66,7 @@ no new persisted state, no new item kinds in the daemon.
   thinking first); row key equal to the first node's and present in the finished rows;
   strips on while a request waits (`working` false); finished turns identical with and
   without `strips`, and the flat live turn unchanged without it.
-* `rows.test.tsx`: running latest (spinner, "Running go test ./...", "12s · 3 steps"),
+* `rows.test.tsx`: running latest (tinted icon and shimmer, "Running go test ./...", "12s · 3 steps"),
   finished latest ("Ran echo 11", "12 steps"), expand to the head and members and
   collapse, expanded state surviving a new call (rerender in place), a waiting tool after
   the strip as its own "waiting for you" row.

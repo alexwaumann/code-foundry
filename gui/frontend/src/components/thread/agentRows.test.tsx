@@ -76,25 +76,48 @@ function show(items: ThreadItemView[], agents: AgentRunView[]) {
 const user: ThreadItemView = { ...base, id: "u", ordinal: 1, kind: "user", text: "go", attachments: [], composerText: "" };
 const q = (el: HTMLElement, id: string) => el.querySelector(`[data-testid="${id}"]`);
 
+/**
+ * The Agent row's running look (docs/notes/running-rows.md): its own Bot icon in the info
+ * tone, named "Running", the label shimmering, and no spinner anywhere on the row.
+ */
+function expectRunning(el: HTMLElement) {
+  const row = q(el, "thread-tool") as HTMLElement;
+  expect(row.getAttribute("data-running")).toBe("true");
+  const icon = row.querySelector(".ico svg");
+  expect(icon?.getAttribute("class")).toContain("lucide-bot");
+  expect(icon?.getAttribute("class")).toContain("t-sky");
+  expect(icon?.getAttribute("aria-label")).toBe("Running");
+  expect(row.querySelector('.lbl > .shimmer[data-shimmer="row"]')?.textContent).toBe(row.querySelector(".lbl")?.textContent);
+  expect(row.querySelector(".animate-spin, .lucide-loader-circle")).toBeNull();
+}
+
+function expectNotRunning(el: HTMLElement) {
+  const row = q(el, "thread-tool") as HTMLElement;
+  expect(row.getAttribute("data-running")).toBeNull();
+  expect(row.querySelector(".ico svg")?.getAttribute("class")).not.toContain("t-sky");
+  expect(row.querySelector('[aria-label="Running"]')).toBeNull();
+  expect(row.querySelector(".shimmer")).toBeNull();
+}
+
 describe("Agent rows", () => {
-  it("a running background run: background chip, activity after a ·, live elapsed, spinner; stays a line", () => {
+  it("a running background run: background chip, activity after a ·, live elapsed, the running look; stays a line", () => {
     const el = show([user, agentCall("t1")], [run("a1", { toolUseId: "t1", background: true, activity: "Running go test ./..." })]);
     expect(q(el, "thread-agent-bg")?.textContent).toBe("background");
     expect(q(el, "thread-agent-bg")?.className).toBe("chip bg");
     expect(q(el, "thread-agent-activity")?.textContent).toBe("Running go test ./...");
     expect(q(el, "thread-agent-activity")?.className).toBe("act");
     expect(q(el, "thread-agent-elapsed")?.textContent).toMatch(/^4m 1\ds$/);
-    expect(el.querySelector('[aria-label="Running"]')).not.toBeNull();
+    expectRunning(el);
     // One line: nothing to open while it runs.
     expect(q(el, "thread-tool")?.tagName).toBe("DIV");
     expect(q(el, "thread-tool")?.hasAttribute("aria-expanded")).toBe(false);
     expect(q(el, "thread-agent-failed")).toBeNull();
   });
 
-  it("the meta's order: chip, activity, elapsed, spinner (the activity fills the line between)", () => {
+  it("the meta's order: chip, activity, elapsed (the activity fills the line between), no running mark", () => {
     const el = show([user, agentCall("t1")], [run("a1", { toolUseId: "t1", background: true, activity: "Reading internal/store/thread/agents.go" })]);
     const meta = q(el, "thread-tool")?.querySelector(".meta");
-    expect([...(meta?.children ?? [])].map((c) => c.getAttribute("data-testid") ?? c.getAttribute("aria-label"))).toEqual(["thread-agent-bg", "thread-agent-activity", "thread-agent-elapsed", "Running"]);
+    expect([...(meta?.children ?? [])].map((c) => c.getAttribute("data-testid") ?? c.getAttribute("aria-label"))).toEqual(["thread-agent-bg", "thread-agent-activity", "thread-agent-elapsed"]);
   });
 
   it.each([
@@ -106,9 +129,9 @@ describe("Agent rows", () => {
     expect(q(el, "thread-agent-activity")?.textContent).toBe("Running go vet");
   });
 
-  it("the spinner stays while the run runs even if the call's item says done", () => {
+  it("the running look stays while the run runs even if the call's item says done", () => {
     const el = show([user, agentCall("t1", { status: "done" })], [run("a1", { toolUseId: "t1", background: true })]);
-    expect(el.querySelector('[aria-label="Running"]')).not.toBeNull();
+    expectRunning(el);
   });
 
   // The run's own items (parent_tool_use_id = the call): they belong to the subagent view,
@@ -153,7 +176,7 @@ describe("Agent rows", () => {
     expect(q(el, "thread-agent-report")).toBeNull();
   });
 
-  it("a failed background run: background and failed chips, its duration, no spinner", () => {
+  it("a failed background run: background and failed chips, its duration, not running", () => {
     const el = show(
       [user, agentCall("t1", { status: "error", isError: true, output: "Stopped" })],
       [run("a1", { toolUseId: "t1", background: true, status: "failed", error: "Stopped", durationMs: 63_000, endedAtMs: NOW })],
@@ -161,7 +184,7 @@ describe("Agent rows", () => {
     expect(q(el, "thread-agent-bg")?.textContent).toBe("background");
     expect(q(el, "thread-agent-failed")?.textContent).toBe("failed");
     expect(q(el, "thread-agent-failed")?.className).toBe("chip fail");
-    expect(el.querySelector('[aria-label="Running"]')).toBeNull();
+    expectNotRunning(el);
     expect(q(el, "thread-tool")?.textContent).toContain("1m 3s");
     // The call's own "error" chip gives way to "failed".
     expect(el.querySelectorAll(".chip.fail")).toHaveLength(1);
@@ -174,12 +197,13 @@ describe("Agent rows", () => {
     );
     expect(q(el, "thread-tool")?.textContent).toContain("4 tools · 41s");
     expect(q(el, "thread-agent-activity")).toBeNull();
+    expectNotRunning(el);
   });
 
   it("without a run (an older daemon) the row is as before", () => {
     const el = show([user, agentCall("t1")], []);
     expect(q(el, "thread-agent-bg")).toBeNull();
-    expect(el.querySelector('[aria-label="Running"]')).not.toBeNull();
+    expectRunning(el);
   });
 });
 
