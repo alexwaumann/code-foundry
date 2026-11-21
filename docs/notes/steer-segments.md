@@ -1,5 +1,10 @@
 # Steer segments: a steered turn reads as "Worked for", the steer, "Continued for" (2026-11-20)
 
+> Extended by cancel-queued-messages.md (2026-11-20): a queued bubble's caption row has Cancel,
+> a "not sent" one Re-send and Cancel (at the row's left, before Copy). An interrupt now holds
+> the user's own queued steers as not sent instead of letting Claude start them. A cancelled or
+> re-sent message leaves the log (`Item.Cancelled`, delivery CANCELLED on its one update).
+
 A message sent while a turn runs is a steer: Claude Code queues it, reads it at its next tool
 call (or when the text it is writing ends), and the turn goes on to one turn end and one cost.
 Before this change a folded steered turn read prompt, "Worked for 9m", the steer, the reply: it

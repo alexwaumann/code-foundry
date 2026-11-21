@@ -20,7 +20,11 @@
  *
  * thread.send appends the user message, streams a short reply over ~1 s and ends the turn;
  * thread.interrupt ends a running turn as interrupted and withdraws its pending requests (not a
- * worker's question it passed up to the user, which outlives its turn).
+ * worker's question it passed up to the user, which outlives its turn); the user's own queued
+ * steers become not sent first, like the daemon's hold (docs/notes/cancel-queued-messages.md).
+ * thread.message.cancel takes back the user's own queued or not sent message (it leaves the log:
+ * an update with delivery CANCELLED); POST /__mock/thread/steer?do=late makes the next Cancel
+ * find it read. thread.message.resend sends a not sent one again and drops the old one.
  * thread.respond (and ThreadService.Respond) resolves a request like the daemon: once
  * nothing is pending, an allowed tool runs and Claude carries on, a denied one makes Claude
  * reply to the reason, answers are echoed; then the turn ends. thread.set-effort applies at
@@ -1558,6 +1562,53 @@ export class MockThreadLogs {
     return q.length > 0;
   }
 
+  /** POST /__mock/thread/steer?do=late: the next Cancel finds the message read (Claude read it first), and Claude reads it. */
+  cancelLate = false;
+
+  /** The user's own message Cancel or Re-send may take back (queued or not sent), or why not, like the daemon's (internal/store/thread cancel.go). */
+  private takeBackTarget(id: string, itemId: string, verb: string): ItemInit {
+    const it = this.log(id).items.find((x) => x.id === itemId);
+    if (it?.payload?.case !== "userMessage") throw new CommandError("notfound", `thread ${id} has no message ${itemId}`);
+    const v = it.payload.value;
+    if (v.origin === MessageOrigin.WAKE || v.sentByThreadId) throw new CommandError("unavailable", `failed precondition: message ${itemId} is not yours: only your own messages can be ${verb}ed`);
+    if (v.delivery !== MessageDelivery.QUEUED && v.delivery !== MessageDelivery.UNSENT)
+      throw new CommandError("unavailable", `failed precondition: message ${itemId}: already read by Claude; only a queued or not sent message can be ${verb}ed`);
+    return it;
+  }
+
+  /** The message leaves the log: the one update that says CANCELLED, as the daemon's takeBack. */
+  private takeBack(id: string, it: ItemInit): ItemInit {
+    if (it.payload?.case !== "userMessage") return it;
+    const l = this.log(id);
+    l.items = l.items.filter((x) => x.id !== it.id);
+    l.seq++;
+    const gone = { ...it, payload: { case: "userMessage", value: { ...it.payload.value, queued: false, delivery: MessageDelivery.CANCELLED } } } as ItemInit;
+    this.publish(id, { event: { case: "updated", value: { threadId: id, seq: BigInt(l.seq), item: gone } } });
+    return gone;
+  }
+
+  /** thread.message.cancel: a queued message leaves Claude's queue (unless cancelLate: Claude read it first), a not sent one just goes. */
+  cancelMessage(id: string, itemId: string): ItemInit {
+    const it = this.takeBackTarget(id, itemId, "cancel");
+    if (this.cancelLate && it.payload?.case === "userMessage" && it.payload.value.delivery === MessageDelivery.QUEUED) {
+      this.cancelLate = false;
+      this.readQueued(id, itemId, false);
+      throw new CommandError("unavailable", `failed precondition: message ${itemId}: already read by Claude before it could be cancelled`);
+    }
+    return this.takeBack(id, it);
+  }
+
+  /** thread.message.resend: a not sent message goes again as a new one (a send), and the old one leaves. */
+  resendMessage(id: string, itemId: string): ItemInit {
+    const it = this.takeBackTarget(id, itemId, "re-send");
+    if (it.payload?.case !== "userMessage" || it.payload.value.delivery !== MessageDelivery.UNSENT)
+      throw new CommandError("unavailable", `failed precondition: message ${itemId} is still queued: Claude reads it at its next tool call; cancel it to take it back`);
+    const { text, attachments, composerText } = it.payload.value;
+    const sent = this.send(id, text ?? "", [...(attachments ?? [])], composerText ?? "");
+    this.takeBack(id, it);
+    return sent;
+  }
+
   /**
    * thread.compact, like the daemon's Manager.Compact (internal/store/thread/compact.go):
    * refused unless Claude is at its prompt; a stopped thread starts with it.
@@ -1690,8 +1741,28 @@ export class MockThreadLogs {
         run: (_ctx, a) => {
           this.calls.push(`interrupt ${a.id ?? ""}`);
           this.generation++;
+          // Interrupt stops: the user's queued steers are held, not started (docs/notes/cancel-queued-messages.md).
+          this.dropQueued(a.id ?? "");
           this.finish(a.id ?? "", { interrupted: true });
           return `interrupted thread ${a.id ?? ""}`;
+        },
+      },
+      {
+        cmd: { name: "thread.message.cancel", noPalette: true, title: "Cancel Message", category: "Thread", description: "Take back a message Claude has not read", keybindings: [], args: [{ name: "message", type: ArgType.STRING, required: true, description: "The message" }, id] },
+        when,
+        run: (_ctx, a) => {
+          this.calls.push(`cancel-message ${a.id ?? ""} ${a.message ?? ""}`);
+          const it = this.cancelMessage(a.id ?? "", a.message ?? "");
+          return `cancelled message ${it.id ?? ""} of thread ${a.id ?? ""}`;
+        },
+      },
+      {
+        cmd: { name: "thread.message.resend", noPalette: true, title: "Re-send Message", category: "Thread", description: "Send a not sent message again", keybindings: [], args: [{ name: "message", type: ArgType.STRING, required: true, description: "The message" }, id] },
+        when,
+        run: (_ctx, a) => {
+          this.calls.push(`resend-message ${a.id ?? ""} ${a.message ?? ""}`);
+          const it = this.resendMessage(a.id ?? "", a.message ?? "");
+          return `sent again to thread ${a.id ?? ""} as ${it.id ?? ""}`;
         },
       },
       {

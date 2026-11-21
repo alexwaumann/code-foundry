@@ -11,7 +11,7 @@ function base(o: { parent?: string; at?: number } = {}) {
   return { id: `i${String(n)}`, ordinal: n, parentToolUseId: o.parent ?? "", createdAtMs: o.at ?? T0 + n * 1000, updatedAtMs: null, streaming: false };
 }
 
-const user = (text = "Fix the badge", o: { wake?: boolean; queued?: boolean } = {}): ThreadItemView => ({
+const user = (text = "Fix the badge", o: { wake?: boolean; queued?: boolean; unsent?: boolean } = {}): ThreadItemView => ({
   ...base(),
   kind: "user",
   text,
@@ -19,6 +19,7 @@ const user = (text = "Fix the badge", o: { wake?: boolean; queued?: boolean } = 
   composerText: "",
   ...(o.wake ? { wake: { title: "Thread is idle", json: "{}" } } : {}),
   ...(o.queued ? { delivery: "queued" as const } : {}),
+  ...(o.unsent ? { delivery: "unsent" as const } : {}),
 });
 const text = (t: string, parent = ""): ThreadItemView => ({ ...base({ parent }), kind: "text", text: t });
 const error = (t: string): ThreadItemView => ({ ...base(), kind: "error", text: t });
@@ -105,6 +106,9 @@ describe("failedPrompt", () => {
     ["no prompt at all", () => input([error("Claude did not start: killed")]), null],
     ["a wake message is not the user's", () => input([user("wake", { wake: true }), error("Claude did not start: killed")]), null],
     ["a queued message is still waiting", () => input([user("later", { queued: true }), error("Claude did not start: killed")]), null],
+    // docs/notes/cancel-queued-messages.md: its own bubble has Re-send and Cancel; the notice is about the prompt before it.
+    ["a not sent steer is passed over: Claude had replied to the prompt", () => input([user(), text("Looking now."), user("also this", { unsent: true }), error("Claude stopped unexpectedly (killed)")]), null],
+    ["a not sent steer is passed over: the prompt before it got no reply", () => input([user(), tool(), user("also this", { unsent: true }), error("Claude stopped unexpectedly (killed)")]), STOPPED],
     ["working: Claude starting again", () => input([user(), error("Claude did not start: killed")], { state: "starting" }), null],
     ["working: busy", () => input([user(), error("Claude did not start: killed")], { state: "connected", status: "busy" }), null],
     ["a busy status from a process that is gone means nothing", () => input([user(), error("Claude did not start: killed")], { state: "disconnected", status: "busy" }), DID_NOT_START],

@@ -241,6 +241,8 @@ export type ThreadEventView =
       wakes?: WakeSubscriptionView[];
     }
   | { kind: "appended" | "updated"; threadId: string; seq: number; item: ThreadItemView }
+  /** A message the user cancelled or sent again leaves the thread (docs/notes/cancel-queued-messages.md). */
+  | { kind: "removed"; threadId: string; seq: number; itemId: string }
   | { kind: "delta"; threadId: string; seq: number; itemId: string; ordinal: number; field: "text" | "input"; text: string }
   | ({ kind: "pending" } & ThreadPendingListView)
   /** Watch only: the thread's MCP servers were checked again, or dropped (null: its process ended). */
@@ -306,8 +308,17 @@ function deliveryOf(d: MessageDelivery, queued: boolean, readAtMs: number | null
   return { delivery, ...(delivery === "read" && readAtMs !== null ? { readAtMs } : {}) };
 }
 
-/** The item as a view, or null for a payload this GUI does not know (a newer daemon's). */
+/**
+ * A message the user took back (Cancel) or sent again (Re-send): the daemon drops it from the
+ * thread and says so once, in the update that removes it (docs/notes/cancel-queued-messages.md).
+ */
+function isCancelled(it: ThreadItem): boolean {
+  return it.payload.case === "userMessage" && it.payload.value.delivery === MessageDelivery.CANCELLED;
+}
+
+/** The item as a view, or null for a payload this GUI does not know (a newer daemon's) and for a cancelled message (no view shows it). */
 export function toThreadItemView(it: ThreadItem): ThreadItemView | null {
+  if (isCancelled(it)) return null;
   const base: ItemBase = {
     id: it.id,
     ordinal: Number(it.ordinal),
@@ -419,6 +430,8 @@ export function toThreadEventView(ev: ThreadEvent): ThreadEventView | null {
       };
     case "appended":
     case "updated": {
+      // A cancelled message leaves the log (stores/thread applyThreadEvent).
+      if (e.value.item && isCancelled(e.value.item)) return { kind: "removed", threadId: e.value.threadId, seq: Number(e.value.seq), itemId: e.value.item.id };
       const item = e.value.item ? toThreadItemView(e.value.item) : null;
       return item && { kind: e.case, threadId: e.value.threadId, seq: Number(e.value.seq), item };
     }

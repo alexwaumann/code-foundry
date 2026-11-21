@@ -1,5 +1,9 @@
 # Queued messages: tagged until Claude reads them, then placed where it read them (2026-10-19)
 
+> Changed by cancel-queued-messages.md (2026-11-20): the user can cancel a queued message
+> (Claude Code's `cancel_async_message`), and an interrupt no longer starts the user's own
+> queued messages: they become not sent, with Re-send and Cancel.
+
 > Changed by steer-segments.md (2026-11-20): the GUI draws a queued message as the last row
 > (under anything that arrives while it waits), so a read no longer moves it: it turns solid in
 > place. Its caption replaced the `queued` tag on bubbles. The daemon records `ReadAt` when it
@@ -34,7 +38,9 @@ No `--replay-user-messages` needed:
   `started` right after that result, a turn of its own. That result still says
   `queued_turn_count: 0`, so the count cannot tell whether anything is waiting.
 * Interrupt: the `control_response` lists `still_queued` uuids, and those are started at
-  once.
+  once. (Since cancel-queued-messages.md the daemon first takes the user's own queued
+  messages back with `cancel_async_message`, so an interrupt starts none of them; other
+  threads' messages and wakes still start at once.)
 * The next `system/status` `requesting` lists the read messages in `user_message_uuids`
   (all of the turn's so far). This is a second signal.
 * The JSONL transcript's `queue-operation` `enqueue`/`dequeue`/`remove` lines that E6 cited

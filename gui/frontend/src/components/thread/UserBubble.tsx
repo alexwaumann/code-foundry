@@ -16,6 +16,7 @@ import { type PdfSummary, useAttachment, usePdfSummary } from "@/stores/attachme
 import { useProjectsStore } from "@/stores/projects";
 import { CiteChip } from "./cite/CiteChip";
 import { GutterCopy } from "./GutterCopy";
+import { MessageActions } from "./MessageActions";
 import { MessageFold } from "./MessageFold";
 import { DeliveryWord } from "./QueuedTag";
 
@@ -197,7 +198,9 @@ function Dot({ children }: { children: string }) {
  * With `foldKey` (a message in a timeline) and any text, a Copy sits just left of the time
  * or caption, shown while the bubble or that line is hovered (thread.css `.u-meta`,
  * docs/notes/copy-prompt.md); it copies the whole message as plain text (promptCopyText),
- * a folded one's too.
+ * a folded one's too. With `messageId` (the user's own message in a timeline), a queued one
+ * has Cancel and a not sent one Re-send and Cancel at the row's left (MessageActions,
+ * docs/notes/cancel-queued-messages.md).
  */
 export const UserBubble = memo(function UserBubble({
   text,
@@ -210,6 +213,7 @@ export const UserBubble = memo(function UserBubble({
   testId,
   findItem,
   foldKey,
+  messageId,
 }: {
   text: string;
   composerText: string;
@@ -223,6 +227,8 @@ export const UserBubble = memo(function UserBubble({
   findItem?: string | undefined;
   /** The message's own id, for its fold choice (MessageFold); absent: it does not fold. */
   foldKey?: string | undefined;
+  /** The user's own message's item id: Cancel and Re-send while Claude has not read it. Absent: another thread's message, or outside a timeline. */
+  messageId?: string | undefined;
 }) {
   const pieces = useMemo(() => parseUserMessage(text, composerText, attachments), [text, composerText, attachments]);
   const inline = useMemo(() => inlineAttachmentPaths(pieces), [pieces]);
@@ -269,6 +275,7 @@ export const UserBubble = memo(function UserBubble({
   ) : (
     <span className="when">{time}</span>
   );
+  const actions = messageId !== undefined && waiting !== null ? <MessageActions itemId={messageId} delivery={waiting} sent={{ text, composerText, attachments }} /> : null;
   return (
     <div className={cn("u", small && "small", steer && "steer")} data-testid={testId ?? (steer ? "thread-steer" : "thread-user")} data-delivery={delivery}>
       {extra.length > 0 && (
@@ -289,9 +296,10 @@ export const UserBubble = memo(function UserBubble({
           )}
         </div>
       )}
-      {plain ? (
+      {plain || actions ? (
         <span className="u-meta">
-          <GutterCopy label="Copy prompt" copied={copied} copy={copy} text={() => plain} testId="thread-copy-prompt" />
+          {actions}
+          {plain && <GutterCopy label="Copy prompt" copied={copied} copy={copy} text={() => plain} testId="thread-copy-prompt" />}
           {meta}
         </span>
       ) : (
