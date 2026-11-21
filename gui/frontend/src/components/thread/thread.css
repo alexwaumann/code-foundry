@@ -532,9 +532,11 @@ html[data-thread-width="full"] {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
-/* A turn's opening message; a steer (sent mid-turn) sizes its bubble with utilities
-   (UserBubble), which these unlayered rules would otherwise beat. */
-.cf-thread .u:not(.steer) .bubble {
+/* A turn's opening message; a smaller one (a steer, or a message still queued or never
+   read, docs/notes/steer-segments.md) sizes its bubble with utilities (UserBubble), which
+   these unlayered rules would otherwise beat. A steer's margins are its own; a queued
+   prompt-to-be keeps a prompt's, so turning into one moves only its size. */
+.cf-thread .u:not(.small) .bubble {
   max-width: 80%;
   border-radius: 16px;
   padding: 9px 14px;
@@ -543,6 +545,18 @@ html[data-thread-width="full"] {
 }
 .cf-thread .u.steer {
   margin: 10px 0 12px;
+}
+.cf-thread .u .sep {
+  opacity: 0.5;
+}
+/* A message Claude has not read yet, or never read (UserBubble `delivery`,
+   docs/notes/steer-segments.md): a dotted accent border and the bubble dimmed. Only the
+   border's style and colour and the opacity change, so turning solid when Claude reads it
+   moves nothing. A state, not a transition: no animation, no fade. */
+.cf-thread .u .bubble.queued {
+  border-style: dotted;
+  border-color: color-mix(in oklab, var(--cf-accent) 70%, transparent);
+  opacity: 0.7;
 }
 .cf-thread .when {
   font-size: 11px;

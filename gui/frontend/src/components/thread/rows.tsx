@@ -26,7 +26,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import type { AgentRunView } from "@/api/agents";
-import type { ThreadItemView, ToolCallView, WakeView } from "@/api/thread";
+import type { DeliveryView, ThreadItemView, ToolCallView, WakeView } from "@/api/thread";
 import { CopyIcon } from "@/components/copy/CopyButton";
 import { StatusCircle } from "@/components/status/StatusCircle";
 import { Tip } from "@/components/ui/tooltip";
@@ -782,7 +782,7 @@ export function WorkNodeView({ node }: { node: WorkNode }) {
     case "system":
       return <SystemNoteRow id={node.id} />;
     case "steer":
-      return <UserRow id={node.id} steer />;
+      return <UserRow id={node.id} steer since={node.since} />;
     case "strip":
       return <StripRow node={node} />;
     case "html":
@@ -803,12 +803,13 @@ const WAKE_ICONS: Readonly<Record<WakeTone, { icon: LucideIcon; cls: string; lab
  * note per wake, several when the daemon sent a batch of thread wakes as one message
  * (docs/notes/orch-wakes-content.md).
  */
-function WakeNotes({ wake, atMs, queued }: { wake: WakeView; atMs: number | null; queued: boolean }) {
+function WakeNotes({ wake, atMs, delivery }: { wake: WakeView; atMs: number | null; delivery: DeliveryView | undefined }) {
   const lines = useMemo(() => wakeLines(wake), [wake]);
+  const waiting = delivery === "queued" || delivery === "unsent" ? delivery : null;
   return (
     <>
       {lines.map((line, i) => (
-        <WakeNoteRow key={i} line={line} atMs={atMs} queued={queued && i === 0} />
+        <WakeNoteRow key={i} line={line} atMs={atMs} waiting={i === 0 ? waiting : null} />
       ))}
     </>
   );
@@ -818,10 +819,10 @@ function WakeNotes({ wake, atMs, queued }: { wake: WakeView; atMs: number | null
  * A wake drawn as a lineage note instead of a bubble (docs/notes/agents-3-lineage-gui.md):
  * the tone's icon, "Woken by <thread>: idle, finished", the report's summary, the age, and
  * the payload as a JSON block once expanded. The thread's name is a link while it exists
- * (its current name; the payload's otherwise); an action run's name is plain text. `queued`:
- * Claude has not read the wake yet (QueuedTag), on a batch's first line only.
+ * (its current name; the payload's otherwise); an action run's name is plain text. `waiting`:
+ * Claude has not read the wake yet, or never did (QueuedTag), on a batch's first line only.
  */
-function WakeNoteRow({ line, atMs, queued }: { line: WakeLine; atMs: number | null; queued: boolean }) {
+function WakeNoteRow({ line, atMs, waiting }: { line: WakeLine; atMs: number | null; waiting: "queued" | "unsent" | null }) {
   const { threadId } = useThreadCtx();
   const exists = useThreadsStore((s) => line.threadId !== "" && line.threadId in s.byId);
   const current = useThreadsStore((s) => (line.threadId ? (s.byId[line.threadId]?.name ?? "") : ""));
@@ -869,7 +870,7 @@ function WakeNoteRow({ line, atMs, queued }: { line: WakeLine; atMs: number | nu
           </Tip>
         </>
       )}
-      {queued && <QueuedTag />}
+      {waiting && <QueuedTag unsent={waiting === "unsent"} />}
     </LineageNote>
   );
 }
@@ -893,16 +894,37 @@ function ResumeNoteRow({ note }: { note: string }) {
 }
 
 /**
+ * When a turn's work started (epoch ms): its opening message's time (`since`, the header's),
+ * or the setup's end when that came later (the first turn's work starts then); null when
+ * unknown or `on` is false (nothing subscribed).
+ */
+function useTurnStart(threadId: string, since: string, on: boolean): number | null {
+  const sent = useThreadStore((s) => (on && since ? (s.logs[threadId]?.byId[since]?.createdAtMs ?? null) : null));
+  const setupEnd = useThreadsStore((s) => (on ? (s.byId[threadId]?.setup?.endedAtMs ?? null) : null));
+  return sent !== null && setupEnd !== null ? Math.max(sent, setupEnd) : sent;
+}
+
+/** A stretch's length for a header or a caption ("3m 10s", "0s" under 50ms); "" when unknown. */
+function spanText(ms: number | null): string {
+  return ms === null ? "" : tookText(Math.max(0, ms)) || "0s";
+}
+
+/**
  * A user message: a turn's opening bubble, or a steer's smaller one inside the turn; a wake
  * message is a note either way, and a message from another thread that is neither this
- * thread's lead nor its worker a From row (FromRow, docs/notes/other-thread-lines.md).
+ * thread's lead nor its worker a From row (FromRow, docs/notes/other-thread-lines.md). A
+ * steer Claude read says how far into the turn (`since`: the turn's start item, as the
+ * header's) it read it: "steered · +3m 10s · 14:15" (docs/notes/steer-segments.md).
  */
-const UserRow = memo(function UserRow({ id, steer }: { id: string; steer?: boolean }) {
+const UserRow = memo(function UserRow({ id, steer, since = "" }: { id: string; steer?: boolean; since?: string | undefined }) {
   const { threadId } = useThreadCtx();
   const it = useThreadItem(threadId, id);
+  const readAt = it?.kind === "user" && it.delivery === "read" ? it.readAtMs : undefined;
+  const start = useTurnStart(threadId, since, steer === true && readAt !== undefined);
   if (it?.kind !== "user") return null;
+  const readAfter = readAt !== undefined && start !== null ? spanText(readAt - start) : "";
   const msg = it.wake ? (
-    <WakeNotes wake={it.wake} atMs={it.createdAtMs} queued={it.queued === true} />
+    <WakeNotes wake={it.wake} atMs={it.createdAtMs} delivery={it.delivery} />
   ) : it.from?.relation === "other" ? (
     <FromRow
       id={it.id}
@@ -913,7 +935,8 @@ const UserRow = memo(function UserRow({ id, steer }: { id: string; steer?: boole
       attachments={it.attachments}
       createdAtMs={it.createdAtMs}
       steer={steer}
-      queued={it.queued === true}
+      queued={it.delivery === "queued"}
+      unsent={it.delivery === "unsent"}
     />
   ) : (
     <UserBubble
@@ -922,7 +945,8 @@ const UserRow = memo(function UserRow({ id, steer }: { id: string; steer?: boole
       attachments={it.attachments}
       createdAtMs={it.createdAtMs}
       steer={steer}
-      queued={it.queued === true}
+      delivery={it.delivery}
+      readAfter={readAfter ? `+${readAfter}` : ""}
       findItem={it.parentToolUseId === "" ? it.id : undefined}
       foldKey={it.id}
     />
@@ -1016,42 +1040,48 @@ function stepsLabel(steps: number): string {
  * runs): the working circle, "Working" shimmering, the steps so far and the time since the
  * turn's message, always open. One component for both under one row key, so the live line
  * turns into the finished one in place.
+ *
+ * A turn split at steers (`row.seg`, docs/notes/steer-segments.md) has one per stretch:
+ * "Worked for 3m 10s" over the first, "Continued for 2m 41s" over each after a steer, from
+ * the times Claude read them (the daemon's clock, as the messages' times); the last one runs
+ * to the turn_end's arrival, and an interrupted or failed turn says so there. Live, only the last
+ * stretch's is: its steps and the time since the steer above it.
  */
 const HeaderRow = memo(function HeaderRow({ row }: { row: Extract<TimelineRow, { type: "header" }> }) {
   const { threadId } = useThreadCtx();
   const keep = useContext(KeepRowContext);
-  const live = row.id === "";
+  const { live, seg } = row;
   const it = useThreadItem(threadId, row.id);
-  const sent = useThreadStore((s) => (live && row.since ? (s.logs[threadId]?.byId[row.since]?.createdAtMs ?? null) : null));
-  // The first turn's work starts when the setup ends, not when its message was sent.
-  const setupEnd = useThreadsStore((s) => (live ? (s.byId[threadId]?.setup?.endedAtMs ?? null) : null));
-  const start = sent !== null && setupEnd !== null ? Math.max(sent, setupEnd) : sent;
+  const start = useTurnStart(threadId, row.since, live || seg !== undefined);
   // A finished turn's header is fixed: only the live one ticks.
   const now = useNowSelect(1000, (n) => (live ? n : 0));
+  const from = seg?.from ?? start;
   if (live) {
     const parts = ["Working"];
     if (row.steps > 0) parts.push(stepsLabel(row.steps));
-    if (start !== null) parts.push(formatDuration(now - start, ELAPSED));
+    if (from !== null) parts.push(formatDuration(now - from, ELAPSED));
     return <TurnHead live parts={parts} />;
   }
-  if (it?.kind !== "turnEnd") return null;
-  const took = tookText(it.durationMs);
+  const toggle = () => {
+    keep(row.key);
+    setTurnFolded(threadId, seg?.fold ?? row.turn, !row.folded);
+  };
+  const end = it?.kind === "turnEnd" ? it : undefined;
+  if (seg && seg.to !== null) {
+    // A stretch before a steer: it ended when Claude read the steer.
+    const took = spanText(from === null ? null : seg.to - from);
+    const what = seg.index === 0 ? "Worked" : "Continued";
+    return <TurnHead parts={[took ? `${what} for ${took}` : what]} folded={row.folded} foldable={row.foldable} onToggle={toggle} />;
+  }
+  if (!end) return null;
+  // The last stretch of a split turn: from the read to the turn's end, both on the daemon's clock
+  // (Claude's duration_ms starts a little after the message's time, so it is the gutter's total only).
+  const took = seg ? spanText(seg.from === null || end.createdAtMs === null ? null : end.createdAtMs - seg.from) : tookText(end.durationMs);
   // An API failure ends with is_error and subtype success (docs/notes/api-error-reply-flag.md): no "(success)".
-  const failedAs = it.subtype && it.subtype !== "success" ? ` (${it.subtype.replace(/_/g, " ")})` : "";
-  const what = it.interrupted ? "Interrupted" : it.isError ? `Failed${failedAs}` : "Worked";
-  const parts = [took ? `${what}${it.interrupted || it.isError ? " after" : " for"} ${took}` : what];
-  return (
-    <TurnHead
-      parts={parts}
-      red={it.isError}
-      folded={row.folded}
-      foldable={row.foldable}
-      onToggle={() => {
-        keep(row.key);
-        setTurnFolded(threadId, row.turn, !row.folded);
-      }}
-    />
-  );
+  const failedAs = end.subtype && end.subtype !== "success" ? ` (${end.subtype.replace(/_/g, " ")})` : "";
+  const what = end.interrupted ? "Interrupted" : end.isError ? `Failed${failedAs}` : seg ? "Continued" : "Worked";
+  const parts = [took ? `${what}${end.interrupted || end.isError ? " after" : " for"} ${took}` : what];
+  return <TurnHead parts={parts} red={end.isError} folded={row.folded} foldable={row.foldable} onToggle={toggle} />;
 });
 
 /**
@@ -1074,6 +1104,9 @@ const GutterRow = memo(function GutterRow({ row }: { row: Extract<TimelineRow, {
   const shown = row.latest || active || copied || fork.held;
   const end = it?.kind === "turnEnd" ? it : undefined;
   const info: string[] = [];
+  // A turn split at steers: its headers say each stretch, the gutter the whole (docs/notes/steer-segments.md).
+  const total = row.split && end ? tookText(end.durationMs) : "";
+  if (total) info.push(`${total} total`);
   // A turn of a worker run has no header: its steps count is its fold toggle (lib/workerRuns).
   const toggle = row.fold === "folded" || row.fold === "open";
   if (row.steps > 0 && !toggle) info.push(stepsLabel(row.steps));

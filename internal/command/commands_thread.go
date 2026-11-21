@@ -630,9 +630,13 @@ func FormatThreadItems(snap *v1.ThreadItemsSnapshot, full bool) string {
 				// What Claude got before the text (orch-child-context.md); --json has it too.
 				body += "\n" + indent + "    " + line(n)
 			}
-			if u.GetQueued() {
+			switch {
+			case u.GetQueued():
 				// Claude reads it at its next tool call (docs/notes/orch-queued-placement.md).
 				body += " (queued)"
+			case u.GetDelivery() == v1.MessageDelivery_MESSAGE_DELIVERY_UNSENT:
+				// Its process ended before Claude read it (docs/notes/steer-segments.md).
+				body += " (not sent)"
 			}
 			for _, a := range u.GetAttachments() {
 				kind := "image"

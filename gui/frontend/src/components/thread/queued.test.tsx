@@ -69,7 +69,7 @@ describe("the log's order", () => {
   });
 
   it("moves a message when an update places it", () => {
-    let log = logOf([user("u1", 1), text("m1", 2), user("u2", 3, { queued: true }), bash("A", 4)]);
+    let log = logOf([user("u1", 1), text("m1", 2), user("u2", 3, { delivery: "queued" }), bash("A", 4)]);
     expect(log?.order).toEqual(["u1", "m1", "u2", "A"]);
     const placed: ThreadEventView = { kind: "updated", threadId: "s", seq: 2, item: user("u2", 3, { placedAfter: 4 }) };
     log = applyThreadEvent(log, placed);
@@ -78,18 +78,22 @@ describe("the log's order", () => {
 });
 
 describe("a queued message", () => {
-  it("is tagged queued under its bubble, with what the tag means in a tooltip", () => {
-    const log = logOf([user("u1", 1), text("m1", 2), user("u2", 3, { queued: true })]);
+  it("is captioned queued under its dotted bubble, drawn last under what arrived after it", () => {
+    const log = logOf([user("u1", 1), text("m1", 2), user("u2", 3, { delivery: "queued" }), bash("A", 4)]);
     const c = show(log as ThreadLog);
     const steer = c.querySelector('[data-testid="thread-steer"]');
-    const tag = steer?.querySelector('[data-testid="thread-queued"]');
-    expect(tag?.textContent).toBe("queued");
-    expect(tag?.className).toContain("text-caption");
+    const word = steer?.querySelector('[data-testid="thread-queued"]');
+    expect(word?.textContent).toBe("queued");
+    expect(word?.closest('[data-testid="thread-steer-caption"]')?.className).toContain("text-caption");
+    expect(steer?.querySelector(".bubble")?.classList.contains("queued")).toBe(true);
+    expect(steer?.getAttribute("data-delivery")).toBe("queued");
     expect(c.querySelectorAll('[data-testid="thread-queued"]')).toHaveLength(1);
+    // The tool call that arrived while it waited is above it.
+    expect(steer?.previousElementSibling?.textContent).toContain("sleep 4");
   });
 
   it("loses the tag once read, and sits above what answers it", () => {
-    let log = logOf([user("u1", 1), text("m1", 2), user("u2", 3, { queued: true }), bash("A", 4)]);
+    let log = logOf([user("u1", 1), text("m1", 2), user("u2", 3, { delivery: "queued" }), bash("A", 4)]);
     log = applyThreadEvent(log, { kind: "updated", threadId: "s", seq: 2, item: user("u2", 3, { placedAfter: 4 }) });
     log = applyThreadEvent(log, { kind: "appended", threadId: "s", seq: 3, item: text("answer", 5) });
     const c = show(log as ThreadLog);
@@ -99,7 +103,7 @@ describe("a queued message", () => {
   });
 
   it("a queued wake is tagged on its note", () => {
-    const log = logOf([user("u1", 1), text("m1", 2), user("w", 3, { wake, queued: true })]);
+    const log = logOf([user("u1", 1), text("m1", 2), user("w", 3, { wake, delivery: "queued" })]);
     const c = show(log as ThreadLog);
     expect(c.querySelector('[data-testid="thread-wake-note"] [data-testid="thread-queued"]')).not.toBeNull();
   });

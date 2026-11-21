@@ -5,7 +5,12 @@
  *
  * - a turn is a user message and what follows it up to its turn_end; a message the
  *   user sends while the turn runs (a steer: Claude picks it up mid-turn, and the turn ends
- *   with one turn_end) stays inside it as a steer row, which never folds;
+ *   with one turn_end) stays inside it as a steer row, which never folds. A message Claude
+ *   has not read yet (queued) is drawn last, under anything that arrives while it waits,
+ *   which is where the daemon places it once read, so the read moves nothing. A turn with
+ *   steers of the user's that Claude read (and the daemon says when) is split at each:
+ *   "Worked for 3m 10s", the steer, "Continued for 5m 58s", each header folding its own
+ *   stretch of work (`segments`, docs/notes/steer-segments.md);
  * - consecutive reads and searches fold into one group row ("Read 3 files, searched code
  *   2 times"); thinking between them is absorbed; consecutive thinking items merge;
  * - a subagent's items (parent_tool_use_id) nest under its Agent tool row;
@@ -58,6 +63,14 @@ export interface TimelineItem {
   from?: string;
   /** A user message's time (epoch ms); absent for other kinds or when unknown. */
   at?: number;
+  /**
+   * What became of a user message that waited in Claude Code's queue (api/thread
+   * DeliveryView): "queued" until Claude reads it, "read", "unsent" when it never did.
+   * Absent for one taken in at once and for other kinds.
+   */
+  delivery?: Delivery;
+  /** A read message's time of reading (epoch ms); absent when unknown (an older daemon's). */
+  readAt?: number;
   /** A text that is only the "nothing for the user" marker (lib/workerRuns isNothingNew). */
   quiet?: boolean;
   /**
@@ -67,6 +80,9 @@ export interface TimelineItem {
    */
   sent?: string;
 }
+
+/** What became of a queued user message (api/thread DeliveryView). */
+export type Delivery = "queued" | "read" | "unsent";
 
 /** Tools whose consecutive calls fold into one "Read 3 files, searched code 2 times" row. */
 export const EXPLORE_TOOLS: ReadonlySet<string> = new Set(["Read", "Grep", "Glob", "LS", "NotebookRead"]);
@@ -91,9 +107,11 @@ export type WorkNode =
   | { type: "note"; key: string; id: string; kind: "error" | "compaction" | "commandOutput" }
   /**
    * A user message sent while the turn ran (a steer); it stays visible when the turn folds.
-   * `from` and `at`: its sender and time, as TimelineItem's (lib/workerRuns).
+   * `from` and `at`: its sender and time, as TimelineItem's (lib/workerRuns). `delivery`
+   * and `readAt` as TimelineItem's. `since`: the item the turn's time counts from (as the
+   * header's), for "+3m 10s" in a read steer's caption; set by buildRows.
    */
-  | { type: "steer"; key: string; id: string; from?: string; at?: number }
+  | { type: "steer"; key: string; id: string; from?: string; at?: number; delivery?: Delivery; readAt?: number; since?: string }
   /**
    * A system note (an item of kind "note"): on its own line between turns, or in the open
    * turn it arrived in. `sent` and `at`: a sent-message note's, as TimelineItem's
@@ -159,6 +177,16 @@ export type TimelineRow =
       finals: string[];
       /** Live: the item the elapsed time counts from (the turn's last opening message, else its first item); "" when none. */
       since: string;
+      /** The running form ("Working · 3 steps · 1m 12s"); of a split turn, only its last stretch's header. */
+      live: boolean;
+      /**
+       * One stretch of a turn split at its read steers (docs/notes/steer-segments.md); absent
+       * for a turn that is not split. `fold`: its fold key (the turn's key for the first, so
+       * the find bar and a fork keep working on it). `from`: when the steer above it was read
+       * (null for the first: the turn's start, `since`). `to`: when the next steer was read
+       * (null for the last: the turn's end, or now while it runs).
+       */
+      seg?: { index: number; fold: string; from: number | null; to: number | null };
     }
   | {
       /**
@@ -178,6 +206,8 @@ export type TimelineRow =
       reply: string;
       /** The thread's latest turn: its contents show at rest; an older turn's only while it is hovered or has the keyboard. */
       latest: boolean;
+      /** The turn was split at steers: the gutter says its whole length ("9m 08s total"). */
+      split?: true;
       /**
        * A turn of a run this thread's workers started (lib/workerRuns), whose header is not
        * shown: its fold state, the steps count being its toggle ("none": nothing to fold).
@@ -254,6 +284,11 @@ export interface TimelineTurn {
   body: WorkNode[];
   /** The turn_end item; "" while the turn runs. */
   end: string;
+  /**
+   * Its opening messages all wait in Claude Code's queue (sent as the previous turn ended:
+   * Claude starts them as this turn once it reads them): no header yet, not live.
+   */
+  waiting?: true;
 }
 
 function isWorkTool(it: TimelineItem): boolean {
@@ -336,7 +371,7 @@ export function workNodes(list: readonly TimelineItem[], children: ReadonlyMap<s
         break;
       case "user":
         // Only a steer reaches here (buildTurns keeps a turn's opening messages apart).
-        out.push({ type: "steer", key: it.id, id: it.id, ...sender(it) });
+        out.push({ type: "steer", key: it.id, id: it.id, ...sender(it), ...(it.delivery ? { delivery: it.delivery } : {}), ...(it.readAt !== undefined ? { readAt: it.readAt } : {}) });
         break;
       case "turnEnd":
         break;
@@ -422,14 +457,30 @@ function isForkNote(it: TimelineItem): boolean {
   return it.id.startsWith("note-fork-");
 }
 
-/** The last item that is not a system note, if any. */
+/** The last item that is not a system note or a message Claude never read, if any. */
 function lastWork(items: readonly TimelineItem[]): TimelineItem | undefined {
-  for (let i = items.length - 1; i >= 0; i--) if (items[i]?.kind !== "note") return items[i];
+  for (let i = items.length - 1; i >= 0; i--) {
+    const it = items[i];
+    if (it && it.kind !== "note" && it.delivery !== "unsent") return it;
+  }
   return undefined;
 }
 
+/**
+ * The items with the messages Claude has not read yet last (in their order): it reads
+ * them at its next tool call, so whatever arrives while they wait goes above them. The
+ * daemon places a message it read after the newest item that is not queued, which is the
+ * row it is already drawn under, so the read moves nothing (docs/notes/steer-segments.md).
+ */
+export function queuedLast<T extends { kind: string; delivery?: Delivery }>(items: readonly T[]): readonly T[] {
+  const queued = items.filter((it) => it.kind === "user" && it.delivery === "queued");
+  if (queued.length === 0) return items;
+  return [...items.filter((it) => !(it.kind === "user" && it.delivery === "queued")), ...queued];
+}
+
 /** The thread's items (top level, in order) as turns. */
-export function buildTurns(items: readonly TimelineItem[]): TimelineTurn[] {
+export function buildTurns(all: readonly TimelineItem[]): TimelineTurn[] {
+  const items = queuedLast(all);
   // Nest subagent items under their Agent call when the thread has it.
   const agentIds = new Set(items.filter((it) => it.kind === "tool" && AGENT_TOOLS.has(it.name)).map((it) => it.toolUseId));
   const children = new Map<string, TimelineItem[]>();
@@ -453,10 +504,22 @@ export function buildTurns(items: readonly TimelineItem[]): TimelineTurn[] {
     const body = workNodes(cur.items, children, permissions);
     markFinal(body);
     const own = cur.user.filter((u) => u in senders);
-    turns.push({ key: cur.key, user: cur.user, ...(own.length > 0 ? { senders: Object.fromEntries(own.map((u) => [u, senders[u] ?? {}])) } : {}), body, end: cur.end });
+    const waiting = cur.user.length > 0 && cur.items.length === 0 && cur.end === "" && cur.user.every((u) => queued.has(u));
+    turns.push({ key: cur.key, user: cur.user, ...(own.length > 0 ? { senders: Object.fromEntries(own.map((u) => [u, senders[u] ?? {}])) } : {}), body, end: cur.end, ...(waiting ? { waiting: true as const } : {}) });
     cur = null;
   };
+  const queued = new Set(top.flatMap((it) => (it.kind === "user" && it.delivery === "queued" ? [it.id] : [])));
   for (const it of top) {
+    if (it.kind === "user" && it.delivery === "unsent") {
+      // Claude never read it (its process ended first): no part of a turn. It stays inside
+      // the turn it was sent in, which it does not split, or alone where no turn is open.
+      if (cur && (cur.user.length > 0 || holdsTurn(cur))) cur.items.push(it);
+      else {
+        close();
+        turns.push({ key: it.id, user: [], body: workNodes([it], children, permissions), end: "" });
+      }
+      continue;
+    }
     if (it.kind === "user") {
       // Sent while the turn runs (it has work and no turn_end yet): a steer. Claude picks
       // it up mid-turn and the turn ends with one turn_end, so it stays in the turn's
@@ -513,14 +576,15 @@ function stepCount(body: readonly WorkNode[]): number {
 }
 
 /**
- * The turn whose fold hides an item's row (a question or tool row of its top-level work, a
- * finished turn's text before its reply), by turn key; "" when no fold hides it (the reply,
- * a running turn's text, a steer, a page show). The find bar and the cite layer unfold it.
+ * The fold that hides an item's row (a question or tool row of its top-level work, a
+ * finished turn's text before its reply): its turn's key, or of a turn split at steers its
+ * stretch's (segmentFoldKey); "" when no fold hides it (the reply, a running turn's text, a
+ * steer, a page show). The find bar and the cite layer unfold it.
  */
 export function foldingTurn(turns: readonly TimelineTurn[], itemId: string): string {
   for (const t of turns) {
     const reply = turnReply(t);
-    if (t.body.some((n) => foldsAway(n, reply) && "id" in n && n.id === itemId)) return t.key;
+    for (const s of segments(t.body)) if (s.nodes.some((n) => foldsAway(n, reply) && "id" in n && n.id === itemId)) return segmentFoldKey(t.key, s.steer);
   }
   return "";
 }
@@ -556,12 +620,46 @@ export function defaultFolded(turn: TimelineTurn): boolean {
 }
 
 /**
- * A system note's turn of its own (buildTurns), or pages shown between turns (isAside): no
- * user message, no turn_end, no header; no turn runs there, so the live header goes after it.
+ * A system note's turn of its own (buildTurns), pages shown between turns (isAside), or a
+ * message Claude never read with no turn open: no user message, no turn_end, no header; no
+ * turn runs there, so the live header goes after it.
  */
 function isNoteTurn(t: TimelineTurn): boolean {
   if (t.user.length > 0 || t.end !== "" || t.body.length === 0) return false;
-  return (t.body.length === 1 && t.body[0]?.type === "system") || t.body.every((n) => n.type === "html" || n.type === "theme");
+  return (t.body.length === 1 && t.body[0]?.type === "system") || t.body.every((n) => n.type === "html" || n.type === "theme") || t.body.every((n) => n.type === "steer");
+}
+
+/** Whether a steer splits its turn: the user's own, read, and the daemon said when. */
+function splits(n: WorkNode): n is Extract<WorkNode, { type: "steer" }> & { readAt: number } {
+  return n.type === "steer" && !n.from && n.delivery === "read" && n.readAt !== undefined;
+}
+
+/** One stretch of a turn's work: from its start or a read steer (`steer`) to the next one. */
+export interface TurnSegment {
+  /** The read steer it starts with; null for the first. */
+  steer: (Extract<WorkNode, { type: "steer" }> & { readAt: number }) | null;
+  /** Its work, text and the rest, the steer left out. */
+  nodes: WorkNode[];
+}
+
+/**
+ * A turn's body split at the user's steers that Claude read (`splits`): one segment when
+ * none, the whole body (docs/notes/steer-segments.md). Steers by another thread, wakes,
+ * queued messages, ones Claude never read and ones from before the read time was kept stay
+ * inside their segment, as rows that never fold.
+ */
+export function segments(body: readonly WorkNode[]): TurnSegment[] {
+  const out: TurnSegment[] = [{ steer: null, nodes: [] }];
+  for (const n of body) {
+    if (splits(n)) out.push({ steer: n, nodes: [] });
+    else out[out.length - 1]?.nodes.push(n);
+  }
+  return out;
+}
+
+/** A segment's fold key: the turn's for the first (what the find bar and a fork unfold), else the turn's and its steer's. */
+export function segmentFoldKey(turnKey: string, steer: { id: string } | null): string {
+  return steer ? `${turnKey}>${steer.id}` : turnKey;
 }
 
 /** The rows to lay out, top to bottom: per turn its user message(s), its header, its work (minus what the fold hides). */
@@ -574,27 +672,52 @@ export function buildRows(turns: readonly TimelineTurn[], opts: TimelineOptions)
   const working = opts.working && !noClaude;
   // The open turn while the thread works; none when the last turn ended (nothing runs
   // after a turn_end) or is a system note (Claude starts a turn that has no item yet).
-  const live = working && last && last.end === "" && !isNoteTurn(last) ? last : undefined;
+  const live = working && last && last.end === "" && !isNoteTurn(last) && !last.waiting ? last : undefined;
   // The open turn the thread is on (also while a request waits): its work runs as strips.
-  const stripped = opts.strips && last && last.end === "" && !isNoteTurn(last) ? last : undefined;
+  const stripped = opts.strips && last && last.end === "" && !isNoteTurn(last) && !last.waiting ? last : undefined;
   // A turn end with no Claude behind it is a setup's that stopped, in a retry's first moments too.
   const finished = (t: TimelineTurn) => t.end !== "" && !noClaude;
   // The thread's latest turn: the last one with a header. Its gutter shows at rest, unless it still runs (it has none then).
   let latest: TimelineTurn | undefined;
   for (const t of turns) if (finished(t) || t === live) latest = t;
   turns.forEach((t) => {
-    const folded = t.end !== "" && (opts.fold(t.key) ?? (opts.deferred?.(t.end) ? false : defaultFolded(t)));
     const reply = turnReply(t);
     for (const u of t.user) rows.push({ type: "user", key: u, id: u, ...t.senders?.[u] });
     const steps = stepCount(t.body);
-    if (finished(t) || t === live) {
-      const finals = t.body.flatMap((n) => (n.type === "text" && n.final ? [n.id] : []));
-      const foldable = t.body.some((n) => foldsAway(n, reply));
-      rows.push({ type: "header", key: `h:${t.key}`, id: t.end, turn: t.key, folded, steps, foldable, finals, since: t.user[t.user.length - 1] ?? t.key });
-    }
-    if (t === stripped) rows.push(...stripRuns(t.body));
-    else for (const n of t.body) if (!folded || !foldsAway(n, reply)) rows.push(n);
-    if (finished(t)) rows.push({ type: "gutter", key: `f:${t.key}`, id: t.end, turn: t.key, steps, reply: (reply ?? []).join("\n"), latest: t === latest });
+    const headed = finished(t) || t === live;
+    const since = t.user[t.user.length - 1] ?? t.key;
+    // A turn with a header splits at the user's steers Claude read (one segment otherwise):
+    // a header per stretch, each folding its own work; only the last one's can be live. The
+    // turn a request blocks (no live header) keeps its settled stretches' headers.
+    const segs = headed || t === stripped ? segments(t.body) : [{ steer: null, nodes: t.body }];
+    const split = segs.length > 1;
+    const byDefault = t.end !== "" && (opts.deferred?.(t.end) ? false : defaultFolded(t));
+    segs.forEach((s, i) => {
+      const last = i === segs.length - 1;
+      const isLive = t === live && last;
+      if (s.steer) rows.push({ ...s.steer, since });
+      const fold = segmentFoldKey(t.key, s.steer);
+      // A finished turn's stretches fold by default; a running turn's settled ones only when the user folds them.
+      const folded = !isLive && (t.end !== "" || split) && (opts.fold(fold) ?? byDefault);
+      if (headed || !last) {
+        const nodes = split ? s.nodes : t.body;
+        rows.push({
+          type: "header",
+          key: s.steer ? `h:${t.key}:${s.steer.id}` : `h:${t.key}`,
+          id: t.end,
+          turn: t.key,
+          folded,
+          steps: split ? stepCount(nodes) : steps,
+          foldable: nodes.some((n) => foldsAway(n, reply)),
+          finals: last ? t.body.flatMap((n) => (n.type === "text" && n.final ? [n.id] : [])) : [],
+          since,
+          live: isLive,
+          ...(split ? { seg: { index: i, fold, from: s.steer?.readAt ?? null, to: segs[i + 1]?.steer?.readAt ?? null } } : {}),
+        });
+      }
+      for (const n of t === stripped ? stripRuns(s.nodes) : s.nodes) if (!folded || !foldsAway(n, reply)) rows.push(n.type === "steer" ? { ...n, since } : n);
+    });
+    if (finished(t)) rows.push({ type: "gutter", key: `f:${t.key}`, id: t.end, turn: t.key, steps, reply: (reply ?? []).join("\n"), latest: t === latest, ...(split ? { split: true as const } : {}) });
   });
   // Under the first message, or at the end for a thread without one (made with no prompt).
   if (setup !== "") {
@@ -602,7 +725,7 @@ export function buildRows(turns: readonly TimelineTurn[], opts: TimelineOptions)
     rows.splice(first < 0 ? rows.length : first + 1, 0, { type: "setup", key: SETUP_FOLD_KEY, folded: opts.fold(SETUP_FOLD_KEY) ?? true });
   }
   // Working with no turn to head (an empty thread starting, a fork's note): a live header alone.
-  if (working && (!last || isNoteTurn(last))) rows.push({ type: "header", key: "h:", id: "", turn: "", folded: false, steps: 0, foldable: false, finals: [], since: "" });
+  if (working && (!last || isNoteTurn(last))) rows.push({ type: "header", key: "h:", id: "", turn: "", folded: false, steps: 0, foldable: false, finals: [], since: "", live: true });
   return linkRepeatShows(rows);
 }
 
@@ -740,12 +863,14 @@ const SEP = "\u0001";
 
 /** One string per item with what the timeline depends on, so a shallow-equal list means "same rows". */
 export function timelineKey(it: TimelineItem): string {
-  return [it.id, it.kind, it.name, it.parentToolUseId, it.toolUseId, it.toolStatus, it.requestState, it.streaming ? "1" : "", it.page ?? "", it.from ?? "", it.at === undefined ? "" : String(it.at), it.quiet ? "1" : "", it.sent ?? ""].join(SEP);
+  return [it.id, it.kind, it.name, it.parentToolUseId, it.toolUseId, it.toolStatus, it.requestState, it.streaming ? "1" : "", it.page ?? "", it.from ?? "", it.at === undefined ? "" : String(it.at), it.quiet ? "1" : "", it.sent ?? "", it.delivery ?? "", it.readAt === undefined ? "" : String(it.readAt)].join(SEP);
 }
 
 export function decodeTimelineKey(k: string): TimelineItem {
-  const [id = "", kind = "text", name = "", parentToolUseId = "", toolUseId = "", toolStatus = "", requestState = "", streaming = "", page = "", from = "", at = "", quiet = "", sent = ""] = k.split(SEP);
+  const [id = "", kind = "text", name = "", parentToolUseId = "", toolUseId = "", toolStatus = "", requestState = "", streaming = "", page = "", from = "", at = "", quiet = "", sent = "", delivery = "", readAt = ""] = k.split(SEP);
   return {
+    ...(delivery ? { delivery: delivery as Delivery } : {}),
+    ...(readAt ? { readAt: Number(readAt) } : {}),
     ...(sent ? { sent } : {}),
     ...(quiet ? { quiet: true } : {}),
     ...(from ? { from } : {}),

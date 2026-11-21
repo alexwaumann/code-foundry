@@ -138,7 +138,7 @@ describe("a long user message's fold", () => {
 
   it.each([
     { name: "a steer", props: { steer: true } },
-    { name: "a queued message", props: { queued: true } },
+    { name: "a queued message", props: { delivery: "queued" as const } },
     { name: "a subagent's prompt", props: { testId: "subagent-prompt" } },
   ])("$name folds like any message", ({ props }) => {
     render(<Bubble {...props} />);

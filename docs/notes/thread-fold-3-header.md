@@ -1,5 +1,9 @@
 # Thread fold 3: the turn header at the top, copy on the answer
 
+> Changed by steer-segments.md (2026-11-20): a turn split at steers has a header per stretch;
+> the first keeps `h:<turn key>`, a later one is `h:<turn key>:<steer id>`, and only the last
+> stretch's header can be live (the row's `live` flag, not `id === ""`).
+
 > Changed by turn-gutter.md (2026-11-19): a finished header now says only how long the turn
 > took ("Worked for 4m 8s"); its steps, cost and model, and the Copy that sat on the
 > answer, moved to a fixed-height gutter row under the turn. The rest of this note holds.

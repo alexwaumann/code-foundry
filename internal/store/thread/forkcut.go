@@ -257,7 +257,7 @@ func conversational(it Item) bool {
 	}
 	switch it.Kind {
 	case KindUserMessage:
-		return !it.Queued
+		return !it.Queued && !it.Unsent
 	case KindAssistantText, KindThinking, KindToolCall:
 		return true
 	}

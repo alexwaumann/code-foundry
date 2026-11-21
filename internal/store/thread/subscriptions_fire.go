@@ -595,8 +595,8 @@ func lastTurn(items []Item) (started, ended time.Time, text string) {
 		}
 		switch it.Kind {
 		case KindUserMessage:
-			if it.Queued {
-				continue // not read yet: no part of a turn
+			if it.Queued || it.Unsent {
+				continue // not read (yet): no part of a turn
 			}
 			if !inTurn {
 				started, ended, inTurn = it.CreatedAt, time.Time{}, true

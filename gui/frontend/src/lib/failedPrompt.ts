@@ -136,7 +136,7 @@ export function failedPrompt(input: FailedPromptInput): FailedPrompt | null {
         if (!it.interrupted && (it.isError || shortSubtype(it.subtype) !== "")) turnFailed ??= it.subtype;
         break;
       case "user": {
-        if (it.wake || it.queued) return null;
+        if (it.wake || it.delivery === "queued") return null;
         const fresh = status === "error" && input.statusChangedAtMs !== null && it.createdAtMs !== null && input.statusChangedAtMs >= it.createdAtMs;
         const reason = reasonOf(error, apiError, turnFailed, fresh ? input.statusReason : null);
         return reason ? { itemId: it.id, ordinal: it.ordinal, line: lineOf(reason) } : null;

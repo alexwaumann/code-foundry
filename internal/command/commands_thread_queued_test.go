@@ -20,6 +20,7 @@ func TestThreadReadQueued(t *testing.T) {
 		{"queued wake", thread.Item{ID: "w", Kind: thread.KindUserMessage, Text: "wake", Origin: thread.OriginWake, WakeTitle: "Thread s2 is idle: finished.", Queued: true},
 			"#2 wake: Thread s2 is idle: finished. (queued)"},
 		{"read message", thread.Item{ID: "u2", Kind: thread.KindUserMessage, Text: "status?"}, "#2 you: status?"},
+		{"never read", thread.Item{ID: "u2", Kind: thread.KindUserMessage, Text: "status?", Unsent: true}, "#2 you: status? (not sent)"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

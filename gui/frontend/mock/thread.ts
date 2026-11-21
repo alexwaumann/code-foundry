@@ -35,6 +35,7 @@ import { timestampFromDate } from "@bufbuild/protobuf/wkt";
 import { ArgType, type UiContext } from "../src/gen/codefoundry/v1/command_pb";
 import { ThreadStatus } from "../src/gen/codefoundry/v1/thread_lifecycle_pb";
 import {
+  MessageDelivery,
   MessageOrigin,
   ThreadAgentStatus,
   ThreadItemDelta_Field,
@@ -273,6 +274,7 @@ export class MockThreadLogs {
     this.calls = [];
     this.failTurn = "";
     this.apiError = "";
+    this.holdSteers = false;
     this.generation++;
   }
 
@@ -537,9 +539,9 @@ export class MockThreadLogs {
    * live turn's running row, or one more of a parallel batch (docs/notes/running-rows.md).
    * Its item id is its tool_use id, like the daemon's; /finish ends it interrupted.
    */
-  runTool(id: string, name: string, input: object): void {
+  runTool(id: string, name: string, input: object, done = false): void {
     const toolUseId = `toolu_mock_run_${String(this.log(id).nextOrdinal)}`;
-    this.append(id, this.item(id, { case: "toolCall", value: { toolUseId, name, inputJson: JSON.stringify(input), status: ToolCallStatus.RUNNING } }, { id: toolUseId }));
+    this.append(id, this.item(id, { case: "toolCall", value: { toolUseId, name, inputJson: JSON.stringify(input), status: done ? ToolCallStatus.DONE : ToolCallStatus.RUNNING } }, { id: toolUseId }));
   }
 
   /** Text appended to the streaming text item (a delta). */
@@ -583,8 +585,10 @@ export class MockThreadLogs {
         this.update(id, { ...x, payload: { case: "toolCall", value: { ...x.payload.value, status: ToolCallStatus.ERROR, isError: true, output: "Interrupted" } } } as ItemInit);
       }
     }
-    const lastUser = [...l.items].reverse().find((x) => x.payload?.case === "userMessage");
-    const started = lastUser?.createdAt ? Number(lastUser.createdAt.seconds) * 1000 : Date.now();
+    // The turn's opening message: the first message after the previous turn_end (a steer is none).
+    const lastEnd = l.items.findLastIndex((x) => x.payload?.case === "turnEnd");
+    const opening = l.items.slice(lastEnd + 1).find((x) => x.payload?.case === "userMessage" && x.payload.value.delivery !== MessageDelivery.QUEUED);
+    const started = opening?.createdAt ? Number(opening.createdAt.seconds) * 1000 + Math.floor((opening.createdAt.nanos ?? 0) / 1e6) : Date.now();
     const prevCost = [...l.items].reverse().find((x) => x.payload?.case === "turnEnd");
     const cost = opts.total ?? (prevCost?.payload?.case === "turnEnd" ? (prevCost.payload.value.costUsd ?? 0) : 0) + 0.04;
     const turnCostUsd = opts.turnCost ?? 0.04;
@@ -1475,17 +1479,26 @@ export class MockThreadLogs {
   /**
    * thread.send: the user message at once, then a short streamed reply and the turn's end.
    * A stopped thread starts first, like the daemon's Send: the reply waits for Claude.
-   * Sent while a turn runs it is a steer, like the daemon's: the message lands inside the
-   * turn (the text streaming at the moment completes first), Claude replies to it in the
-   * same turn, and one turn_end ends it.
+   * Sent while a turn runs it is a steer, like the daemon's (docs/notes/steer-segments.md):
+   * the message lands queued, and Claude reads it 600ms later (or when POST
+   * /__mock/thread/steer?do=read says, after do=hold): the text streaming at that moment
+   * completes, the message is placed after the newest item that is not queued and marked
+   * read, and Claude replies to it in the same turn (or, once the turn ended, as the next).
    */
   send(id: string, text: string, attachments: string[], composerText = ""): ItemInit {
     // Like the daemon's: nothing is recorded for a thread whose transcript is gone.
     this.world.refuseTranscriptMissing(id);
     const held = this.world.heldBySetup(id, { text, attachments, composerText });
     if (held) return this.append(id, this.item(id, { case: "userMessage", value: { text, attachments, composerText, queued: true } }));
-    if (this.world.statusOf(id) === ThreadStatus.BUSY) {
-      for (const x of this.log(id).items) if (x.streaming) this.update(id, { ...x, streaming: false, updatedAt: timestampFromDate(new Date()) });
+    if (this.world.statusOf(id) === ThreadStatus.BUSY && this.world.isConnected(id)) {
+      const msg = this.append(id, this.item(id, { case: "userMessage", value: { text, attachments, composerText, queued: true, delivery: MessageDelivery.QUEUED } }));
+      if (!this.holdSteers) {
+        const gen = this.generation;
+        setTimeout(() => {
+          if (gen === this.generation) this.readQueued(id, msg.id ?? "");
+        }, 600);
+      }
+      return msg;
     }
     const msg = this.append(id, this.item(id, { case: "userMessage", value: { text, attachments, composerText } }));
     if (this.world.isConnected(id)) this.reply(id);
@@ -1496,6 +1509,53 @@ export class MockThreadLogs {
       });
     }
     return msg;
+  }
+
+  /** POST /__mock/thread/steer?do=hold: a message sent mid-turn stays queued until do=read or do=drop. */
+  holdSteers = false;
+
+  /** The steers still queued (a setup's held messages are not: they wait for Claude to start). */
+  private queuedSteers(id: string, itemId = ""): ItemInit[] {
+    return this.log(id).items.filter((x) => x.payload?.case === "userMessage" && x.payload.value.delivery === MessageDelivery.QUEUED && (itemId === "" || x.id === itemId));
+  }
+
+  /**
+   * A queued message read (READ, with the time) or never read (UNSENT), like the daemon's
+   * consume (internal/store/thread/queued.go): it moves after the newest item that is not
+   * queued, where the GUI already draws it.
+   */
+  private settleQueued(id: string, it: ItemInit, delivery: MessageDelivery): void {
+    if (it.payload?.case !== "userMessage") return;
+    const now = new Date();
+    let anchor = 0n;
+    for (const x of this.log(id).items) {
+      const waiting = x.payload?.case === "userMessage" && x.payload.value.queued === true;
+      if (x.id !== it.id && !waiting && (x.ordinal ?? 0n) > anchor) anchor = x.ordinal ?? 0n;
+    }
+    const value = { ...it.payload.value, queued: false, delivery, ...(delivery === MessageDelivery.READ ? { readAt: timestampFromDate(now) } : {}) };
+    this.update(id, { ...it, updatedAt: timestampFromDate(now), ...(anchor > (it.ordinal ?? 0n) ? { placedAfter: anchor } : {}), payload: { case: "userMessage", value } } as ItemInit);
+  }
+
+  /**
+   * Claude reads the queued steers (all, or `itemId`): the text it was writing completes,
+   * each is placed and marked read, and it answers them, in the same turn while it runs or
+   * as the next turn when the turn ended first (too late); with `answer` false it only reads
+   * them, the turn going on as scripted (/tool, /stream, /finish). False when none is queued.
+   */
+  readQueued(id: string, itemId = "", answer = true): boolean {
+    const q = this.queuedSteers(id, itemId);
+    if (q.length === 0) return false;
+    for (const x of this.log(id).items) if (x.streaming) this.update(id, { ...x, streaming: false, updatedAt: timestampFromDate(new Date()) });
+    for (const it of q) this.settleQueued(id, it, MessageDelivery.READ);
+    if (answer) this.reply(id);
+    return true;
+  }
+
+  /** Claude never reads the queued steers: its process ended, or it dropped them (UNSENT). */
+  dropQueued(id: string): boolean {
+    const q = this.queuedSteers(id);
+    for (const it of q) this.settleQueued(id, it, MessageDelivery.UNSENT);
+    return q.length > 0;
   }
 
   /**

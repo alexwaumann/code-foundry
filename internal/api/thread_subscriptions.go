@@ -68,7 +68,25 @@ func userMessageToProto(it thread.Item) *v1.UserMessageItem {
 	if it.Origin == thread.OriginWake {
 		p.Origin, p.WakeTitle, p.WakeJson = v1.MessageOrigin_MESSAGE_ORIGIN_WAKE, it.WakeTitle, it.WakeJSON
 	}
+	p.Delivery = deliveryOf(it)
+	if p.Delivery == v1.MessageDelivery_MESSAGE_DELIVERY_READ {
+		p.ReadAt = timestamp(it.ReadAt)
+	}
 	return p
+}
+
+// deliveryOf is what became of a message that waited in Claude Code's queue
+// (docs/notes/steer-segments.md); UNSPECIFIED for one never queued.
+func deliveryOf(it thread.Item) v1.MessageDelivery {
+	switch {
+	case it.Queued:
+		return v1.MessageDelivery_MESSAGE_DELIVERY_QUEUED
+	case it.Unsent:
+		return v1.MessageDelivery_MESSAGE_DELIVERY_UNSENT
+	case !it.ReadAt.IsZero():
+		return v1.MessageDelivery_MESSAGE_DELIVERY_READ
+	}
+	return v1.MessageDelivery_MESSAGE_DELIVERY_UNSPECIFIED
 }
 
 // Subscribe makes a wake subscription.

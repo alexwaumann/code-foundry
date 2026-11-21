@@ -1,5 +1,9 @@
 # Thread fold 2: a message sent mid-turn stays inside its turn
 
+> Changed by steer-segments.md (2026-11-20): a steer the user sent and Claude read now splits
+> its turn: a header per stretch ("Worked for", "Continued for"), each with its own fold; its
+> caption is "steered · +3m 10s · 14:12". Still one turn, one turn_end, one gutter.
+
 > Changed by turn-gutter.md (2026-11-19): the footer is long gone (thread-fold-3); a
 > folded turn now shows only its reply, and its gutter carries Copy and the turn's info.
 

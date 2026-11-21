@@ -11,8 +11,9 @@ import (
 // works is not read at once: Claude Code queues it and reads it at its next tool call, or
 // once the reply it is writing ends. Its item goes into the log when it arrives (the
 // sender sees the send land) marked Queued; when the stream says Claude read it, the flag
-// clears and the item moves to that point (PlacedAfter), so it sits above the text that
-// answers it instead of above a reply that never saw it.
+// clears, ReadAt records when, and the item moves to that point (PlacedAfter), so it sits
+// above the text that answers it instead of above a reply that never saw it. One Claude
+// never reads (its process ended, or it dropped it) is Unsent and placed the same way.
 //
 // The signal (Claude Code 2.1.303, stream-json, probed for this change): every user
 // message gets command_lifecycle frames keyed by its uuid (our item id): "queued" when it
@@ -55,10 +56,12 @@ func (t *threadLog) reorderLocked() {
 	}
 }
 
-// consume clears the Queued flag of message id: Claude read it (place) or never will
-// (!place). Placed, it moves after the newest item that is not itself queued, when that
-// came after it. False when id is no queued item.
-func (t *threadLog) consume(id string, place bool) (Item, bool) {
+// consume clears the Queued flag of message id: Claude read it (read: ReadAt is now) or
+// never will (!read: Unsent). Either way it moves after the newest item that is not itself
+// queued, when that came after it: the GUI draws a queued message as the last row
+// (docs/notes/steer-segments.md), so that is where it already is and nothing moves. False
+// when id is no queued item.
+func (t *threadLog) consume(id string, read bool) (Item, bool) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	i, ok := t.byID[id]
@@ -67,18 +70,21 @@ func (t *threadLog) consume(id string, place bool) (Item, bool) {
 	}
 	it := cloneItem(t.items[i])
 	it.Queued = false
-	if place {
-		var anchor int64
-		for j, x := range t.items {
-			if j != i && !x.Queued && x.Ordinal > anchor {
-				anchor = x.Ordinal
-			}
-		}
-		if anchor > it.Ordinal {
-			it.PlacedAfter = anchor
+	var anchor int64
+	for j, x := range t.items {
+		if j != i && !x.Queued && x.Ordinal > anchor {
+			anchor = x.Ordinal
 		}
 	}
+	if anchor > it.Ordinal {
+		it.PlacedAfter = anchor
+	}
 	it.UpdatedAt = t.now()
+	if read {
+		it.ReadAt = it.UpdatedAt
+	} else {
+		it.Unsent = true
+	}
 	t.items[i] = it
 	t.noteHandledLocked(it) // read now (or never: dropped, it waits on no turn)
 	if it.PlacedAfter > 0 {
@@ -89,8 +95,8 @@ func (t *threadLog) consume(id string, place bool) (Item, bool) {
 }
 
 // consume applies threadLog.consume and persists the item.
-func (w itemWriter) consume(id string, place bool) (Item, bool) {
-	it, ok := w.log.consume(id, place)
+func (w itemWriter) consume(id string, read bool) (Item, bool) {
+	it, ok := w.log.consume(id, read)
 	if ok {
 		w.save(it)
 	}
@@ -116,6 +122,6 @@ func (p *projector) queueEvent(ev claudestream.Event) {
 	}
 	// No safety net at a result: a message that arrives while Claude ends its reply is
 	// not counted in the result's queued_turn_count (0) and starts the next turn right
-	// after it. A flag that never sees its signal clears when the process ends
+	// after it. A flag that never sees its signal turns into Unsent when the process ends
 	// (closeUnfinished).
 }

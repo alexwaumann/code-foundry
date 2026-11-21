@@ -29,6 +29,8 @@ type itemData struct {
 	APIError      bool         `json:"api_error,omitempty"`
 	Queued        bool         `json:"queued,omitempty"`
 	PlacedAfter   int64        `json:"placed_after,omitempty"`
+	ReadAtMs      int64        `json:"read_at_ms,omitempty"`
+	Unsent        bool         `json:"unsent,omitempty"`
 	Tool          *ToolCall    `json:"tool,omitempty"`
 	Request       *Request     `json:"request,omitempty"`
 	Turn          *TurnEnd     `json:"turn,omitempty"`
@@ -77,7 +79,7 @@ func saveItem(ctx context.Context, db *sql.DB, threadID string, it Item, ix sear
 func writeItem(ctx context.Context, db execer, threadID string, it Item) error {
 	data, err := json.Marshal(itemData{Text: it.Text, Attachments: it.Attachments, Composer: it.ComposerText,
 		Origin: string(it.Origin), WakeTitle: it.WakeTitle, WakeJSON: it.WakeJSON, SentBy: it.SentBy, Relation: it.SenderRelation, Reply: it.Reply, Sent: it.Sent, ResumeNote: it.ResumeNote, SeedPrefix: it.SeedPrefix, MemoryNote: it.MemoryNote,
-		NoteCreatedBy: it.NoteCreatedBy, APIError: it.APIError, Queued: it.Queued, PlacedAfter: it.PlacedAfter, Tool: it.Tool, Request: it.Request, Turn: it.Turn, Compaction: it.Compaction, HTML: it.HTML, Theme: it.Theme})
+		NoteCreatedBy: it.NoteCreatedBy, APIError: it.APIError, Queued: it.Queued, PlacedAfter: it.PlacedAfter, ReadAtMs: millis(it.ReadAt), Unsent: it.Unsent, Tool: it.Tool, Request: it.Request, Turn: it.Turn, Compaction: it.Compaction, HTML: it.HTML, Theme: it.Theme})
 	if err != nil {
 		return fmt.Errorf("thread: encode item %s: %w", it.ID, err)
 	}
@@ -155,7 +157,8 @@ func decodeItem(itemID string, ordinal int64, kind, parent string, created, upda
 	it.ComposerText = d.Composer
 	it.Origin, it.WakeTitle, it.WakeJSON, it.SentBy = MessageOrigin(d.Origin), d.WakeTitle, d.WakeJSON, d.SentBy
 	it.NoteCreatedBy, it.ResumeNote, it.SeedPrefix, it.MemoryNote = d.NoteCreatedBy, d.ResumeNote, d.SeedPrefix, d.MemoryNote
-	it.Queued, it.PlacedAfter, it.APIError = d.Queued, d.PlacedAfter, d.APIError
+	it.Queued, it.PlacedAfter, it.APIError, it.Unsent = d.Queued, d.PlacedAfter, d.APIError, d.Unsent
+	it.ReadAt = fromMillis(d.ReadAtMs)
 	it.Text, it.Attachments, it.Tool, it.Request, it.Turn, it.Compaction = d.Text, d.Attachments, d.Tool, d.Request, d.Turn, d.Compaction
 	it.HTML, it.Theme = d.HTML, d.Theme
 	it.SenderRelation, it.Reply, it.Sent = d.Relation, d.Reply, d.Sent

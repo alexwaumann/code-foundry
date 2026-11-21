@@ -2793,6 +2793,8 @@ export class World {
     s.settleIn = 0;
     // A stop while starting: the queued reply never comes (the daemon drops it with the process).
     s.onReady = [];
+    // A steer Claude had not read yet never will be (closeUnfinished: Unsent).
+    this.logs.dropQueued(id);
     s.lastActivityAt = new Date();
     this.publishThread(s);
   }

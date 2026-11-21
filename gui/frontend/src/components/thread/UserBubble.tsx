@@ -1,5 +1,6 @@
 import { memo, useMemo, useState } from "react";
-import { ArrowDown, FileText, ImageIcon } from "lucide-react";
+import { FileText, ImageIcon } from "lucide-react";
+import type { DeliveryView } from "@/api/thread";
 import { AttachmentLightbox } from "@/components/compose/AttachmentLightbox";
 import { ChipFace, PdfTile } from "@/components/compose/attachmentFaces";
 import { TAG_ACCENT, tagClass } from "@/components/compose/tagStyle";
@@ -16,7 +17,7 @@ import { useProjectsStore } from "@/stores/projects";
 import { CiteChip } from "./cite/CiteChip";
 import { GutterCopy } from "./GutterCopy";
 import { MessageFold } from "./MessageFold";
-import { QueuedTag } from "./QueuedTag";
+import { DeliveryWord } from "./QueuedTag";
 
 /** The image chip's accent: green, the success token. */
 const IMAGE_ACCENT = "[--chip-accent:var(--cf-success)]";
@@ -172,12 +173,25 @@ function PrChip({ slug, number }: { slug: string; number: number }) {
   );
 }
 
+/** A caption part after the first: "·" then it, as the gutter's separators. */
+function Dot({ children }: { children: string }) {
+  return (
+    <>
+      <span className="sep">·</span>
+      <span>{children}</span>
+    </>
+  );
+}
+
 /**
  * A user message: a right-aligned bubble with the composer's tags (from the composer text
  * the item carries, lib/userMessage) and citations (cite/CiteChip), attachments (images and PDFs) the text does not
  * refer to as tiles above it, and the time under it. `steer`: a message sent while the
- * turn ran (lib/threadTimeline): a smaller bubble inside the turn, "sent mid-turn · 14:12"
- * under it. `queued`: Claude has not read it yet (QueuedTag after the time). With `foldKey`,
+ * turn ran (lib/threadTimeline): a smaller bubble inside the turn, "steered · +3m 10s · 14:12"
+ * under it (`readAfter`: how far into the turn Claude read it, "" when unknown).
+ * `delivery` (docs/notes/steer-segments.md): "queued" while Claude has not read it, "unsent"
+ * when it never did: the smaller bubble with a dotted border, dimmed, captioned "queued ·
+ * 14:12" or "not sent · 14:12" (DeliveryWord), wherever it sits. With `foldKey`,
  * long text folds (MessageFold), in a steer or queued message too: where it sits does not
  * make a long paste any shorter. Without, it shows whole (the search preview, the theme gallery).
  * With `foldKey` (a message in a timeline) and any text, a Copy sits just left of the time
@@ -191,7 +205,8 @@ export const UserBubble = memo(function UserBubble({
   attachments,
   createdAtMs,
   steer = false,
-  queued = false,
+  delivery,
+  readAfter = "",
   testId,
   findItem,
   foldKey,
@@ -201,7 +216,8 @@ export const UserBubble = memo(function UserBubble({
   attachments: readonly string[];
   createdAtMs: number | null;
   steer?: boolean;
-  queued?: boolean;
+  delivery?: DeliveryView | undefined;
+  readAfter?: string;
   testId?: string;
   /** The item id the find bar searches the bubble's text under (components/thread/find); absent: not searched (a subagent's prompt). */
   findItem?: string | undefined;
@@ -240,23 +256,21 @@ export const UserBubble = memo(function UserBubble({
       })}
     </>
   );
-  // The time (a steer's caption) and a queued message's tag.
-  const meta = steer ? (
-    <span className="text-caption inline-flex items-center gap-1 tabular-nums" data-testid="thread-steer-caption">
-      <ArrowDown className="size-3" aria-hidden />
-      {["sent mid-turn", sentTime(createdAtMs)].filter(Boolean).join(" · ")}
-      {queued && <QueuedTag />}
-    </span>
-  ) : queued ? (
-    <span className="inline-flex items-center gap-1.5">
-      <span className="when">{sentTime(createdAtMs)}</span>
-      <QueuedTag />
+  // Waiting for Claude, or never read: the queued look, wherever it sits (a steer, or the next turn's prompt to be).
+  const waiting = delivery === "queued" || delivery === "unsent" ? delivery : null;
+  const small = steer || waiting !== null;
+  const time = sentTime(createdAtMs);
+  const meta = small ? (
+    <span className="text-caption inline-flex items-center gap-1.5 tabular-nums" data-testid="thread-steer-caption">
+      {waiting ? <DeliveryWord delivery={waiting} /> : <span>steered</span>}
+      {!waiting && readAfter && <Dot>{readAfter}</Dot>}
+      {time && <Dot>{time}</Dot>}
     </span>
   ) : (
-    <span className="when">{sentTime(createdAtMs)}</span>
+    <span className="when">{time}</span>
   );
   return (
-    <div className={cn("u", steer && "steer")} data-testid={testId ?? (steer ? "thread-steer" : "thread-user")}>
+    <div className={cn("u", small && "small", steer && "steer")} data-testid={testId ?? (steer ? "thread-steer" : "thread-user")} data-delivery={delivery}>
       {extra.length > 0 && (
         <ul className="flex flex-wrap justify-end gap-2" aria-label="Attached files">
           {extra.map((p) => (
@@ -265,7 +279,7 @@ export const UserBubble = memo(function UserBubble({
         </ul>
       )}
       {pieces.length > 0 && (
-        <div className={cn("bubble selectable", steer && "max-w-[72%] rounded-lg px-3 py-1.5 text-body-sm")}>
+        <div className={cn("bubble selectable", small && "max-w-[72%] rounded-lg px-3 py-1.5 text-body-sm", waiting && "queued")}>
           {foldKey === undefined ? (
             body
           ) : (

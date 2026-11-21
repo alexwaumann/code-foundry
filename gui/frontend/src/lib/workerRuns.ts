@@ -307,7 +307,7 @@ export function workerRuns(rows: TimelineRow[], ctx: RunContext): TimelineRow[] 
     let last = out.length - 1;
     while (last >= 0 && out[last]?.type !== "gutter") last--;
     const g = out[last];
-    if (g?.type === "gutter" && !out.slice(last + 1).some((r) => r.type === "header" && r.id === "")) out[last] = { ...g, latest: true };
+    if (g?.type === "gutter" && !out.slice(last + 1).some((r) => r.type === "header" && r.live)) out[last] = { ...g, latest: true };
   }
   return out;
 }

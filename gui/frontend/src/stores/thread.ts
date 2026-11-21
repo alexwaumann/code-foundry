@@ -845,7 +845,9 @@ export function structOf(it: ThreadItemView): Parameters<typeof timelineKey>[0] 
     requestState: req?.state ?? "",
     streaming: it.streaming,
     page: it.kind === "html" ? inlinePage(it).abs : "",
-    ...(it.kind === "user" ? { from: senderOf(it), ...(it.createdAtMs !== null ? { at: it.createdAtMs } : {}) } : {}),
+    ...(it.kind === "user"
+      ? { from: senderOf(it), ...(it.createdAtMs !== null ? { at: it.createdAtMs } : {}), ...(it.delivery ? { delivery: it.delivery } : {}), ...(it.readAtMs !== undefined ? { readAt: it.readAtMs } : {}) }
+      : {}),
     ...(it.kind === "text" && !it.streaming && isNothingNew(it.text) ? { quiet: true } : {}),
     ...(it.kind === "note" && sentDescOf(it.sent) ? { sent: sentDescOf(it.sent), ...(it.createdAtMs !== null ? { at: it.createdAtMs } : {}) } : {}),
   };

@@ -1,5 +1,12 @@
 # Queued messages: tagged until Claude reads them, then placed where it read them (2026-10-19)
 
+> Changed by steer-segments.md (2026-11-20): the GUI draws a queued message as the last row
+> (under anything that arrives while it waits), so a read no longer moves it: it turns solid in
+> place. Its caption replaced the `queued` tag on bubbles. The daemon records `ReadAt` when it
+> consumes the message, and a message the process ended or dropped before Claude read it is
+> `Unsent` (placed like a read one) instead of silently unqueued: "No position, flag cleared"
+> below no longer holds.
+
 From the orchestration battle test of 2026-10-19 (`/tmp/cf-exp2/results/REPORT.md` item
 A8; E6 §4.1 and §3 "steering a busy child", E2 minor 7). A message or wake that arrived
 while a thread worked was recorded where it arrived, but Claude Code only reads it at its

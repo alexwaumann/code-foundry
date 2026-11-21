@@ -38,12 +38,16 @@ func result(queuedTurns int) string {
 }
 
 // queuedLabel names an item for TestQueuedPlacement: a message by its id (with "*" while
-// queued), a tool call by its tool_use id, text by its text, a turn end as "end".
+// queued, "!" once Claude never read it), a tool call by its tool_use id, text by its
+// text, a turn end as "end".
 func queuedLabel(it Item) string {
 	switch it.Kind {
 	case KindUserMessage:
 		if it.Queued {
 			return it.ID + "*"
+		}
+		if it.Unsent {
+			return it.ID + "!"
 		}
 		return it.ID
 	case KindToolCall:
@@ -71,6 +75,8 @@ func TestQueuedPlacement(t *testing.T) {
 		mid   []string
 		// placed: the message ids that moved (PlacedAfter set).
 		placed []string
+		// read: the message ids with a ReadAt (Claude read them after a wait).
+		read []string
 	}{
 		{
 			name: "arrives while Claude writes, read at the next tool call",
@@ -79,6 +85,7 @@ func TestQueuedPlacement(t *testing.T) {
 			midAt: 4, mid: []string{"u1", "Running it", "u2*", "A"},
 			want:   []string{"u1", "Running it", "A", "u2", "answer to u2", "end"},
 			placed: []string{"u2"},
+			read:   []string{"u2"},
 		},
 		{
 			name: "arrives during a tool call, read right after it: already in place",
@@ -86,6 +93,7 @@ func TestQueuedPlacement(t *testing.T) {
 				replyText("m2", "answer to u2"), result(0)},
 			midAt: 3, mid: []string{"u1", "A", "u2*"},
 			want: []string{"u1", "A", "u2", "answer to u2", "end"},
+			read: []string{"u2"},
 		},
 		{
 			name: "arrives during the final reply, read when it ends: same turn",
@@ -94,6 +102,7 @@ func TestQueuedPlacement(t *testing.T) {
 			midAt: 4, mid: []string{"u1", "A", "u2*", "the story"},
 			want:   []string{"u1", "A", "the story", "u2", "answer to u2", "end"},
 			placed: []string{"u2"},
+			read:   []string{"u2"},
 		},
 		{
 			name: "a wake is placed like a message",
@@ -101,6 +110,7 @@ func TestQueuedPlacement(t *testing.T) {
 				lifecycle("w1", "started"), replyText("m2", "the child is done"), result(0)},
 			want:   []string{"u1", "Waiting on the child", "A", "w1", "the child is done", "end"},
 			placed: []string{"w1"},
+			read:   []string{"w1"},
 		},
 		{
 			name: "read after the turn's result: the next turn",
@@ -110,6 +120,7 @@ func TestQueuedPlacement(t *testing.T) {
 			midAt: 4, mid: []string{"u1", "done", "u2*", "end"},
 			want:   []string{"u1", "done", "end", "u2", "answer to u2", "end"},
 			placed: []string{"u2"},
+			read:   []string{"u2"},
 		},
 		{
 			name: "two queued messages read together keep their order",
@@ -117,6 +128,7 @@ func TestQueuedPlacement(t *testing.T) {
 				toolUse("m1b", "B"), toolResult("B"), lifecycle("u2", "started"), lifecycle("u3", "started"), replyText("m2", "both"), result(0)},
 			want:   []string{"u1", "A", "still on it", "B", "u2", "u3", "both", "end"},
 			placed: []string{"u2", "u3"},
+			read:   []string{"u2", "u3"},
 		},
 		{
 			name: "the requesting status is a signal too",
@@ -124,6 +136,7 @@ func TestQueuedPlacement(t *testing.T) {
 				requesting("u1", "u2"), replyText("m2", "answer"), result(0)},
 			want:   []string{"u1", "Running it", "A", "u2", "answer", "end"},
 			placed: []string{"u2"},
+			read:   []string{"u2"},
 		},
 		{
 			name:  "a message sent while idle is never queued",
@@ -131,9 +144,10 @@ func TestQueuedPlacement(t *testing.T) {
 			want:  []string{"u1", "hi", "end"},
 		},
 		{
-			name:  "cancelled: unqueued where it is",
-			steps: []string{"idle:u1", replyText("m1", "Running it"), "send:u2", toolUse("m1", "A"), lifecycle("u2", "cancelled"), toolResult("A")},
-			want:  []string{"u1", "Running it", "u2", "A"},
+			name:   "cancelled: never read, placed where it was drawn (last)",
+			steps:  []string{"idle:u1", replyText("m1", "Running it"), "send:u2", toolUse("m1", "A"), lifecycle("u2", "cancelled"), toolResult("A")},
+			want:   []string{"u1", "Running it", "A", "u2!"},
+			placed: []string{"u2"},
 		},
 		{
 			name:  "no signal yet at the end of the turn: still queued",
@@ -193,6 +207,20 @@ func TestQueuedPlacement(t *testing.T) {
 			if !slices.Equal(placedIDs, tt.placed) {
 				t.Errorf("placed = %v, want %v", placedIDs, tt.placed)
 			}
+			// Read ones record when (the update's time), persisted; nothing else has one.
+			var readIDs []string
+			for _, it := range snap {
+				if it.ReadAt.IsZero() {
+					continue
+				}
+				readIDs = append(readIDs, it.ID)
+				if !it.ReadAt.Equal(it.UpdatedAt) || !saved[it.ID].ReadAt.Equal(it.ReadAt) {
+					t.Errorf("%s read at %v (updated %v, saved %v)", it.ID, it.ReadAt, it.UpdatedAt, saved[it.ID].ReadAt)
+				}
+			}
+			if !slices.Equal(readIDs, tt.read) {
+				t.Errorf("read = %v, want %v", readIDs, tt.read)
+			}
 			byOrd := slices.SortedFunc(slices.Values(snap), func(a, b Item) int { return int(a.Ordinal - b.Ordinal) })
 			reloaded := newThreadLog("s", bus.New(), time.Now, byOrd).snapshot().Items
 			if !slices.EqualFunc(reloaded, snap, func(a, b Item) bool { return a.ID == b.ID }) {
@@ -202,16 +230,50 @@ func TestQueuedPlacement(t *testing.T) {
 	}
 }
 
-// A run that ends with a message still queued leaves it unqueued where it is: Claude
-// never read it.
-func TestCloseUnfinishedUnqueues(t *testing.T) {
-	log := newThreadLog("s", bus.New(), time.Now, nil)
-	w := itemWriter{log: log, save: func(Item) {}}
-	w.add(Item{ID: "u1", Kind: KindUserMessage, Text: "go"})
-	w.add(Item{ID: "u2", Kind: KindUserMessage, Text: "status?", Queued: true})
-	closeUnfinished(w, "the thread's process ended")
-	if it, _ := log.get("u2"); it.Queued || it.PlacedAfter != 0 {
-		t.Errorf("u2 after close: queued %v placed after %d", it.Queued, it.PlacedAfter)
+// A run that ends with a message still queued marks it Unsent: Claude never read it. It
+// moves after what was written while it waited (where the GUI drew it, as the last row);
+// one the row still holds for the next process (Setup.Queued) stays queued.
+func TestCloseUnfinishedMarksUnsent(t *testing.T) {
+	tests := []struct {
+		name   string
+		after  bool // an item was written after the message
+		held   bool
+		want   []string
+		placed bool
+	}{
+		{name: "the last item: stays", want: []string{"u1", "u2!"}},
+		{name: "written after: moves under it", after: true, want: []string{"u1", "A", "u2!"}, placed: true},
+		{name: "held for the next process: still queued", held: true, want: []string{"u1", "u2*"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			log := newThreadLog("s", bus.New(), time.Now, nil)
+			saved := map[string]Item{}
+			w := itemWriter{log: log, save: func(it Item) { saved[it.ID] = it }}
+			w.add(Item{ID: "u1", Kind: KindUserMessage, Text: "go"})
+			if tt.held {
+				log.holdQueued("u2")
+			}
+			w.add(Item{ID: "u2", Kind: KindUserMessage, Text: "status?", Queued: true})
+			if tt.after {
+				w.add(Item{ID: "A", Kind: KindToolCall, Tool: &ToolCall{ToolUseID: "A", Status: ToolRunning}})
+			}
+			closeUnfinished(w, "the thread's process ended")
+			var got []string
+			for _, it := range log.snapshot().Items {
+				got = append(got, queuedLabel(it))
+			}
+			if !slices.Equal(got, tt.want) {
+				t.Errorf("log = %v, want %v", got, tt.want)
+			}
+			it, _ := log.get("u2")
+			if (it.PlacedAfter > 0) != tt.placed || !it.ReadAt.IsZero() {
+				t.Errorf("u2 placed after %d, read at %v", it.PlacedAfter, it.ReadAt)
+			}
+			if !tt.held && !saved["u2"].Unsent {
+				t.Errorf("u2 saved %+v, not unsent", saved["u2"])
+			}
+		})
 	}
 }
 
@@ -224,11 +286,19 @@ func TestForkKeepsPlacedOrder(t *testing.T) {
 		{ID: "u2", Ordinal: 2, Kind: KindUserMessage, PlacedAfter: 3},
 		{ID: "t", Ordinal: 4, Kind: KindAssistantText},
 	}
+	read := time.UnixMilli(1_700_000_000_000)
+	parent[2].ReadAt = read
+	parent = append(parent, Item{ID: "u3", Ordinal: 5, Kind: KindUserMessage, Unsent: true}, Item{ID: "u4", Ordinal: 6, Kind: KindUserMessage, Queued: true})
 	got := forkItems(parent, "note", "Forked", time.Now())
-	for i, want := range []string{"u1", "A", "u2", "t", "note"} {
-		if got[i].ID != want || got[i].Ordinal != int64(i+1) || got[i].PlacedAfter != 0 {
+	for i, want := range []string{"u1", "A", "u2", "t", "u3", "u4", "note"} {
+		if got[i].ID != want || got[i].Ordinal != int64(i+1) || got[i].PlacedAfter != 0 || got[i].Queued {
 			t.Errorf("fork item %d = %s #%d placed after %d, want %s #%d", i, got[i].ID, got[i].Ordinal, got[i].PlacedAfter, want, i+1)
 		}
+	}
+	// History keeps when Claude read a message, and that it never read one; one still
+	// queued in the parent is never read in the copy.
+	if !got[2].ReadAt.Equal(read) || !got[4].Unsent || !got[5].Unsent || got[2].Unsent {
+		t.Errorf("fork: u2 read at %v unsent %v, u3 unsent %v, u4 unsent %v", got[2].ReadAt, got[2].Unsent, got[4].Unsent, got[5].Unsent)
 	}
 }
 
@@ -260,8 +330,8 @@ func TestSendWhileWorkingIsQueued(t *testing.T) {
 	if _, err := re.m.Archive(re.ctx(), s.ID, true); err != nil {
 		t.Fatal(err)
 	}
-	re.waitItems(s.ID, "the message unqueued at the process end", func(items []Item) bool {
+	re.waitItems(s.ID, "the message marked never read at the process end", func(items []Item) bool {
 		i := slices.IndexFunc(items, func(x Item) bool { return x.ID == it.ID })
-		return i >= 0 && !items[i].Queued
+		return i >= 0 && !items[i].Queued && items[i].Unsent && items[i].ReadAt.IsZero()
 	})
 }
