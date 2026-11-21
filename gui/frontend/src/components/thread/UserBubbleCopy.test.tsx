@@ -107,15 +107,14 @@ describe("a user message's Copy", () => {
   });
 
   it.each([
-    { name: "a steer", steer: true, queued: false, line: ["thread-copy-prompt", "thread-steer-caption"] },
-    { name: "a queued steer", steer: true, queued: true, line: ["thread-copy-prompt", "thread-steer-caption"] },
-    { name: "a queued message", steer: false, queued: true, line: ["thread-copy-prompt", "inline-flex items-center gap-1.5"] },
-  ])("$name has it before its caption, on the same line", ({ steer, queued, line }) => {
-    render(<Bubble steer={steer} queued={queued} />);
-    expect(metaLine()).toEqual(line);
-    const meta = copyBtn()?.closest(".u-meta");
-    expect(meta?.querySelector('[data-testid="thread-queued"]') !== null).toBe(queued);
-    if (steer) expect(screen.getByTestId("thread-steer-caption").textContent).toContain("sent mid-turn");
+    { name: "a steer", steer: true, delivery: undefined, word: "steered" },
+    { name: "a queued steer", steer: true, delivery: "queued" as const, word: "queued" },
+    { name: "a queued message", steer: false, delivery: "queued" as const, word: "queued" },
+    { name: "a message never sent", steer: true, delivery: "unsent" as const, word: "not sent" },
+  ])("$name has it before its caption, on the same line", ({ steer, delivery, word }) => {
+    render(<Bubble steer={steer} delivery={delivery} />);
+    expect(metaLine()).toEqual(["thread-copy-prompt", "thread-steer-caption"]);
+    expect(screen.getByTestId("thread-steer-caption").textContent).toMatch(new RegExp(`^${word}·`));
   });
 
   it("a message with only attachments has none, and its time stands alone", () => {

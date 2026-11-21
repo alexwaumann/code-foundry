@@ -544,6 +544,18 @@ html[data-thread-width="full"] {
 .cf-thread .u.steer {
   margin: 10px 0 12px;
 }
+.cf-thread .u .sep {
+  opacity: 0.5;
+}
+/* A message Claude has not read yet, or never read (UserBubble `delivery`,
+   docs/notes/steer-segments.md): a dotted accent border and the bubble dimmed. Only the
+   border's style and colour and the opacity change, so turning solid when Claude reads it
+   moves nothing. A state, not a transition: no animation, no fade. */
+.cf-thread .u .bubble.queued {
+  border-style: dotted;
+  border-color: color-mix(in oklab, var(--cf-accent) 70%, transparent);
+  opacity: 0.7;
+}
 .cf-thread .when {
   font-size: 11px;
   color: var(--cf-text-muted);

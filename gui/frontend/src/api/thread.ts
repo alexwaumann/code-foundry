@@ -8,6 +8,7 @@
  */
 import { timestampDate } from "@bufbuild/protobuf/wkt";
 import {
+  MessageDelivery,
   MessageOrigin,
   ThreadItemDelta_Field,
   ThreadRequestState,
@@ -148,7 +149,10 @@ export type ThreadItemView = ItemBase &
      * wake: set when the daemon sent it for a wake subscription (docs/notes/agents-4-wake.md), not the user.
      * resumeNote: the line Claude got before the text after something other than the user stopped its previous turn
      * (the budget stop, another thread's interrupt, an app restart; docs/notes/orch-child-context.md).
-     * queued: set while Claude has not read it yet (sent while it worked; docs/notes/orch-queued-placement.md).
+     * delivery: what became of a message that waited in Claude Code's queue (docs/notes/orch-queued-placement.md,
+     * steer-segments.md): "queued" while Claude has not read it yet (sent while it worked), "read" (readAtMs says
+     * when, absent from an older daemon's item), "unsent" (Claude's process ended or dropped it before it read
+     * it); absent for a message Claude took in at once.
      * from: set when another thread sent it with thread send: who, what it is to this thread, and its reply mark
      * (docs/notes/thread-reply-mark.md).
      */
@@ -159,7 +163,8 @@ export type ThreadItemView = ItemBase &
         composerText: string;
         wake?: WakeView;
         resumeNote?: string;
-        queued?: true;
+        delivery?: DeliveryView;
+        readAtMs?: number;
         from?: MessageFromView;
       }
     /**
@@ -285,6 +290,22 @@ function toRequestView(r: ThreadRequestItem): ThreadRequestView {
   };
 }
 
+/** What became of a user message that waited in Claude Code's queue (docs/notes/steer-segments.md). */
+export type DeliveryView = "queued" | "read" | "unsent";
+
+const deliveries: Partial<Record<MessageDelivery, DeliveryView>> = {
+  [MessageDelivery.QUEUED]: "queued",
+  [MessageDelivery.READ]: "read",
+  [MessageDelivery.UNSENT]: "unsent",
+};
+
+/** A user message's delivery fields: `queued` alone says so too (an older daemon's item). */
+function deliveryOf(d: MessageDelivery, queued: boolean, readAtMs: number | null): { delivery?: DeliveryView; readAtMs?: number } {
+  const delivery = deliveries[d] ?? (queued ? "queued" : undefined);
+  if (!delivery) return {};
+  return { delivery, ...(delivery === "read" && readAtMs !== null ? { readAtMs } : {}) };
+}
+
 /** The item as a view, or null for a payload this GUI does not know (a newer daemon's). */
 export function toThreadItemView(it: ThreadItem): ThreadItemView | null {
   const base: ItemBase = {
@@ -307,7 +328,7 @@ export function toThreadItemView(it: ThreadItem): ThreadItemView | null {
         composerText: p.value.composerText,
         ...(p.value.origin === MessageOrigin.WAKE ? { wake: { title: p.value.wakeTitle, json: p.value.wakeJson } } : {}),
         ...(p.value.resumeNote ? { resumeNote: p.value.resumeNote } : {}),
-        ...(p.value.queued ? { queued: true as const } : {}),
+        ...deliveryOf(p.value.delivery, p.value.queued, ms(p.value.readAt)),
         ...fromOf(p.value),
       };
     case "assistantText":

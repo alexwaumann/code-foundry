@@ -369,7 +369,7 @@ describe("a message sent mid-turn (a steer)", () => {
     { ...base, id: "t2", ordinal: 4, kind: "tool", toolUseId: "t2", name: "Bash", inputJson: '{"command":"sleep 2"}', status: "done", output: "", isError: false, resultJson: "" },
   ];
 
-  it("is a smaller bubble inside the turn with “sent mid-turn · <time>” under it, and stays below the header when the turn folds", () => {
+  it("is a smaller bubble inside the turn with “steered · <time>” under it (no read time: no split), and stays below the header when the turn folds", () => {
     const c = show([...steered, { ...base, id: "a", ordinal: 5, kind: "text", text: "hi" }, turnEndItem()]);
     expect(c.querySelectorAll('[data-testid="thread-user"]')).toHaveLength(1);
     const steer = c.querySelector('[data-testid="thread-steer"]');
@@ -379,8 +379,7 @@ describe("a message sent mid-turn (a steer)", () => {
     expect(bubble?.className).toContain("rounded-lg");
     const caption = steer?.querySelector('[data-testid="thread-steer-caption"]');
     expect(caption?.className).toContain("text-caption");
-    expect(caption?.textContent).toMatch(/^sent mid-turn · \d\d:12/);
-    expect(caption?.querySelector("svg")).not.toBeNull();
+    expect(caption?.textContent).toMatch(/^steered·\d\d:12/);
     // Folded: the work is gone, the steer and the answer stay; one header for the turn, above the steer.
     expect(c.textContent).not.toContain("sleep");
     expect(c.querySelector('[data-testid="thread-text"]')?.textContent).toContain("hi");

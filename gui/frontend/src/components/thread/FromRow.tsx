@@ -29,6 +29,7 @@ export function FromRow({
   createdAtMs,
   steer = false,
   queued = false,
+  unsent = false,
 }: {
   id: string;
   fromId: string;
@@ -39,6 +40,8 @@ export function FromRow({
   createdAtMs: number | null;
   steer?: boolean;
   queued?: boolean;
+  /** Claude never read it (its process ended first; docs/notes/steer-segments.md). */
+  unsent?: boolean;
 }) {
   const { threadId } = useThreadCtx();
   const open = useRowExpanded(threadId, id, false);
@@ -88,7 +91,7 @@ export function FromRow({
         <span className="ago text-caption" data-testid="thread-from-time">
           {sentTime(createdAtMs)}
         </span>
-        {queued && <QueuedTag />}
+        {(queued || unsent) && <QueuedTag unsent={unsent} />}
         <ChevronRight className="chev" aria-hidden />
       </div>
       {open && (

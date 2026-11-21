@@ -18,7 +18,7 @@ const user = (text = "Fix the badge", o: { wake?: boolean; queued?: boolean } = 
   attachments: [],
   composerText: "",
   ...(o.wake ? { wake: { title: "Thread is idle", json: "{}" } } : {}),
-  ...(o.queued ? { queued: true as const } : {}),
+  ...(o.queued ? { delivery: "queued" as const } : {}),
 });
 const text = (t: string, parent = ""): ThreadItemView => ({ ...base({ parent }), kind: "text", text: t });
 const error = (t: string): ThreadItemView => ({ ...base(), kind: "error", text: t });

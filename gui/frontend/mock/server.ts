@@ -103,6 +103,10 @@
  *        not: mock/replies.ts) |
  *        /__mock/thread/mcp-age?id=s-r1&ago=720 (the last MCP check that many seconds ago: mock/mcp.ts) |
  *        /__mock/thread/mcp-servers?id=s-r1&keep=t3-code,github (only those of the six: mock/mcp.ts)
+ *   POST /__mock/thread/steer?do=hold[&on=0]       (a message sent mid-turn stays queued until do=read or do=drop;
+ *        default: Claude reads it 600ms after it lands) | ?id=s-r1&do=read[&item=…] (Claude reads the queued steers
+ *        and answers in the same turn, or as the next once the turn ended: /finish first for "too late") |
+ *        ?id=s-r1&do=drop (Claude never reads them: "not sent"; /thread/stop does it too)
  *   POST /__mock/thread/retry?id=s-r1&in=20&attempt=3&max=10&status=429&error=rate_limit | ?id=…&clear=1
  *        (Claude Code is retrying an API error: Thread.retry; clear ends it)
  *   POST /__mock/terminal/exit?id=t-s1-shell&code=1[&keep=1]   (the process exits; keep=1: a
@@ -1465,6 +1469,20 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
         json(res, 404, { error: err instanceof Error ? err.message : String(err) });
       }
       break;
+    case "POST /__mock/thread/steer": {
+      // docs/notes/steer-segments.md: hold queued steers, then read or drop them.
+      const what = q.get("do") ?? "read";
+      if (what === "hold") {
+        world.logs.holdSteers = q.get("on") !== "0";
+        json(res, 200, { ok: true });
+        break;
+      }
+      const id = q.get("id") ?? "s-r1";
+      const done = what === "drop" ? world.logs.dropQueued(id) : what === "read" ? world.logs.readQueued(id, q.get("item") ?? "") : null;
+      if (done === null) json(res, 400, { error: "do must be hold, read or drop" });
+      else json(res, done ? 200 : 404, { ok: done });
+      break;
+    }
     case "POST /__mock/thread/stream":
       world.logs.stream(q.get("id") ?? "s-r1", q.get("text") ?? "");
       json(res, 200, { ok: true });

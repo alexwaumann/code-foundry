@@ -157,7 +157,7 @@ export function Timeline({
   const turnOf = useMemo(() => rowTurns(rows), [rows]);
   // The live header's message, the start of the turn's elapsed time (rows.tsx HeaderRow).
   const since = useMemo(() => {
-    const live = rows.find((r) => r.type === "header" && r.id === "");
+    const live = rows.find((r) => r.type === "header" && r.live);
     return live?.type === "header" ? live.since : "";
   }, [rows]);
   useLayoutEffect(() => {
