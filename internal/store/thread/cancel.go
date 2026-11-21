@@ -159,7 +159,8 @@ var errMessageRead = errors.New("already read by Claude")
 
 // takeBackTarget is message itemID of thread id when the user may take it back: their
 // own message, not read. The thread's log, the item, and the refusal otherwise.
-func (m *Manager) takeBackTarget(ctx context.Context, id, itemID, verb string) (*threadLog, Item, error) {
+// verb names the act ("cancel"), done its past participle ("cancelled").
+func (m *Manager) takeBackTarget(ctx context.Context, id, itemID, verb, done string) (*threadLog, Item, error) {
 	if itemID == "" {
 		return nil, Item{}, fmt.Errorf("%w: a message id is required", ErrInvalidArgument)
 	}
@@ -179,18 +180,18 @@ func (m *Manager) takeBackTarget(ctx context.Context, id, itemID, verb string) (
 	case it.Kind != KindUserMessage || it.ParentToolUseID != "":
 		return nil, Item{}, fmt.Errorf("%w: item %s of thread %s is not a message you sent", ErrInvalidArgument, itemID, id)
 	case it.Origin == OriginWake:
-		return nil, Item{}, fmt.Errorf("%w: message %s is a wake, not yours: only your own messages can be %sed", ErrFailedPrecondition, itemID, verb)
+		return nil, Item{}, fmt.Errorf("%w: message %s is a wake, not yours: only your own messages can be %s", ErrFailedPrecondition, itemID, done)
 	case it.SentBy != "":
-		return nil, Item{}, fmt.Errorf("%w: message %s was sent by thread %s, not by you: only your own messages can be %sed", ErrFailedPrecondition, itemID, it.SentBy, verb)
+		return nil, Item{}, fmt.Errorf("%w: message %s was sent by thread %s, not by you: only your own messages can be %s", ErrFailedPrecondition, itemID, it.SentBy, done)
 	case !it.Queued && !it.Unsent:
-		return nil, Item{}, fmt.Errorf("%w: message %s: %w; only a queued or not sent message can be %sed", ErrFailedPrecondition, itemID, errMessageRead, verb)
+		return nil, Item{}, fmt.Errorf("%w: message %s: %w; only a queued or not sent message can be %s", ErrFailedPrecondition, itemID, errMessageRead, done)
 	}
 	return log, it, nil
 }
 
 // CancelMessage implements Store.
 func (m *Manager) CancelMessage(ctx context.Context, id, itemID string) (Item, error) {
-	log, it, err := m.takeBackTarget(ctx, id, itemID, "cancel")
+	log, it, err := m.takeBackTarget(ctx, id, itemID, "cancel", "cancelled")
 	if err != nil {
 		return Item{}, err
 	}
@@ -279,7 +280,7 @@ func (m *Manager) cancelQueued(ctx context.Context, id string, log *threadLog, i
 
 // ResendMessage implements Store.
 func (m *Manager) ResendMessage(ctx context.Context, id, itemID string) (Item, []string, error) {
-	log, it, err := m.takeBackTarget(ctx, id, itemID, "re-send")
+	log, it, err := m.takeBackTarget(ctx, id, itemID, "re-send", "re-sent")
 	if err != nil {
 		return Item{}, nil, err
 	}

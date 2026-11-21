@@ -1566,13 +1566,13 @@ export class MockThreadLogs {
   cancelLate = false;
 
   /** The user's own message Cancel or Re-send may take back (queued or not sent), or why not, like the daemon's (internal/store/thread cancel.go). */
-  private takeBackTarget(id: string, itemId: string, verb: string): ItemInit {
+  private takeBackTarget(id: string, itemId: string, done: string): ItemInit {
     const it = this.log(id).items.find((x) => x.id === itemId);
     if (it?.payload?.case !== "userMessage") throw new CommandError("notfound", `thread ${id} has no message ${itemId}`);
     const v = it.payload.value;
-    if (v.origin === MessageOrigin.WAKE || v.sentByThreadId) throw new CommandError("unavailable", `failed precondition: message ${itemId} is not yours: only your own messages can be ${verb}ed`);
+    if (v.origin === MessageOrigin.WAKE || v.sentByThreadId) throw new CommandError("unavailable", `failed precondition: message ${itemId} is not yours: only your own messages can be ${done}`);
     if (v.delivery !== MessageDelivery.QUEUED && v.delivery !== MessageDelivery.UNSENT)
-      throw new CommandError("unavailable", `failed precondition: message ${itemId}: already read by Claude; only a queued or not sent message can be ${verb}ed`);
+      throw new CommandError("unavailable", `failed precondition: message ${itemId}: already read by Claude; only a queued or not sent message can be ${done}`);
     return it;
   }
 
@@ -1589,7 +1589,7 @@ export class MockThreadLogs {
 
   /** thread.message.cancel: a queued message leaves Claude's queue (unless cancelLate: Claude read it first), a not sent one just goes. */
   cancelMessage(id: string, itemId: string): ItemInit {
-    const it = this.takeBackTarget(id, itemId, "cancel");
+    const it = this.takeBackTarget(id, itemId, "cancelled");
     if (this.cancelLate && it.payload?.case === "userMessage" && it.payload.value.delivery === MessageDelivery.QUEUED) {
       this.cancelLate = false;
       this.readQueued(id, itemId, false);
@@ -1600,7 +1600,7 @@ export class MockThreadLogs {
 
   /** thread.message.resend: a not sent message goes again as a new one (a send), and the old one leaves. */
   resendMessage(id: string, itemId: string): ItemInit {
-    const it = this.takeBackTarget(id, itemId, "re-send");
+    const it = this.takeBackTarget(id, itemId, "re-sent");
     if (it.payload?.case !== "userMessage" || it.payload.value.delivery !== MessageDelivery.UNSENT)
       throw new CommandError("unavailable", `failed precondition: message ${itemId} is still queued: Claude reads it at its next tool call; cancel it to take it back`);
     const { text, attachments, composerText } = it.payload.value;
