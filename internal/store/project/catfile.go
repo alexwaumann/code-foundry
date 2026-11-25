@@ -270,12 +270,10 @@ func (p *catFilePool) readCommitFile(ctx context.Context, repoDir, commonDir, co
 			return ierr
 		}
 		if info.missing {
-			if w.partialClone {
-				// In a partial clone, a missing promisor object is indistinguishable from
-				// an absent path in cat-file --batch-command; fall back to GitHub REST.
-				return nil
-			}
-			notFound, ok = true, true
+			// Always confirm absence via ls-tree fallback rather than inferring from
+			// config alone: a partial clone configured via extensions.partialClone or an
+			// included/global config reports missing blobs identically to absent paths.
+			fallback = true
 			return nil
 		}
 		switch info.kind {
@@ -304,7 +302,7 @@ func (p *catFilePool) readCommitFile(ctx context.Context, repoDir, commonDir, co
 	if err != nil {
 		return nil, false, false, false, false, false, err
 	}
-	return contents, truncated, binary, notFound, ok, false, nil
+	return contents, truncated, binary, notFound, ok, fallback, nil
 }
 
 // withWorker acquires an idle worker (or spawns one), runs fn with ctx cancellation and
@@ -620,8 +618,8 @@ func (p *catFilePool) spawn(repoDir, commonDir string) (*catFileWorker, error) {
 	}, nil
 }
 
-// isPartialClone reports whether the repository at commonDir has a promisor remote
-// configured (a partial clone, e.g. --filter=blob:none or --filter=tree:0).
+// isPartialClone reports whether the repository at commonDir has a promisor remote or
+// extensions.partialClone configured (e.g. --filter=blob:none or --filter=tree:0).
 func isPartialClone(commonDir string) bool {
 	if commonDir == "" {
 		return false
@@ -630,7 +628,8 @@ func isPartialClone(commonDir string) bool {
 	if err != nil {
 		return false
 	}
-	return bytes.Contains(bytes.ToLower(cfg), []byte("promisor"))
+	low := bytes.ToLower(cfg)
+	return bytes.Contains(low, []byte("promisor")) || bytes.Contains(low, []byte("partialclone"))
 }
 
 // kill terminates the worker's process group unless close has already started. Because

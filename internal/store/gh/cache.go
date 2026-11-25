@@ -155,8 +155,13 @@ func (c cache) saveDetail(ctx context.Context, slug string, d PullRequestDetail)
 	return nil
 }
 
-// diffDBCacheMax caps the number of pull request diffs persisted in gh_pr_diffs.
-const diffDBCacheMax = 32
+const (
+	// diffDBCacheMax caps the number of pull request diffs persisted in gh_pr_diffs.
+	diffDBCacheMax = 32
+	// diffDBMaxBytes skips persisting diffs over 1 MiB so worst-case SQLite growth stays
+	// bounded (~32 MiB max instead of 128 MiB).
+	diffDBMaxBytes = 1 << 20
+)
 
 func (c cache) loadPRDiff(ctx context.Context, slug string, number int) (PullRequestDiff, bool, error) {
 	var d PullRequestDiff

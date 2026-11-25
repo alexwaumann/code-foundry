@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"cmp"
 	"context"
+	"os"
 	"path"
+	"path/filepath"
 	"slices"
 	"strings"
 
@@ -89,7 +91,21 @@ func (g *Git) matchingGitProjects(slug string) []localRepo {
 	return repos
 }
 
+// isShallowRepo reports whether the repository has a non-empty shallow file. In a
+// shallow clone `git merge-base` can still exit 0 with an older ancestor instead of the
+// true merge base, producing a wrong diff, so LocalDiff falls back to GitHub REST.
+func isShallowRepo(commonDir string) bool {
+	if commonDir == "" {
+		return false
+	}
+	fi, err := os.Stat(filepath.Join(commonDir, "shallow"))
+	return err == nil && fi.Size() > 0
+}
+
 func (g *Git) localDiffIn(ctx context.Context, r localRepo, baseSHA, headSHA string, maxBytes int) ([]byte, bool, bool) {
+	if isShallowRepo(r.commonDir) {
+		return nil, false, false
+	}
 	if !g.commitsPresent(ctx, r, baseSHA, headSHA) {
 		return nil, false, false
 	}
@@ -101,9 +117,19 @@ func (g *Git) localDiffIn(ctx context.Context, r localRepo, baseSHA, headSHA str
 	if !isSHA(mergeBase) {
 		return nil, false, false
 	}
+	// Pin diff config and evaluate attributes against the empty tree (--attr-source, git >= 2.40)
+	// so repo .gitattributes (e.g. `-diff` on generated dist files) and user ~/.gitconfig
+	// settings never diverge from GitHub's v3.diff output.
 	args := []string{
+		"--attr-source=" + emptyTree,
 		"-c", "diff.renames=true",
+		"-c", "diff.renameLimit=0",
+		"-c", "diff.interHunkContext=0",
+		"-c", "diff.suppressBlankEmpty=false",
+		"-c", "diff.indentHeuristic=true",
+		"-c", "core.quotePath=true",
 		"diff",
+		"-O", os.DevNull,
 		"--no-ext-diff",
 		"--no-color",
 		"--no-textconv",
@@ -112,6 +138,7 @@ func (g *Git) localDiffIn(ctx context.Context, r localRepo, baseSHA, headSHA str
 		"--dst-prefix=b/",
 		"-M",
 		"-U3",
+		"--full-index",
 		"--submodule=short",
 		"--ignore-submodules=none",
 		mergeBase,

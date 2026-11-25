@@ -307,6 +307,58 @@ func TestLocalPRShallowCloneFallback(t *testing.T) {
 	if _, _, ok := h.store.LocalDiff(ctx, "acme/shallow", oldBase, head, 4<<20); ok {
 		t.Error("LocalDiff past shallow boundary returned ok=true, want ok=false")
 	}
+	// Even when both SHAs exist inside a shallow clone (merge-base would exit 0),
+	// LocalDiff must return ok=false so shallow history cannot produce a wrong merge-base diff.
+	if _, _, ok := h.store.LocalDiff(ctx, "acme/shallow", head, head, 4<<20); ok {
+		t.Error("LocalDiff in shallow repo returned ok=true, want ok=false")
+	}
+}
+
+func TestLocalPRDiffIgnoresGitAttributesMinusDiff(t *testing.T) {
+	ctx := ctx20(t)
+	root, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	repo := filepath.Join(root, "repo")
+	if err := os.MkdirAll(repo, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	git(t, repo, "init", "-q", "-b", "main")
+	git(t, repo, "config", "user.name", "t")
+	git(t, repo, "config", "user.email", "t@t")
+	setGitHubOrigin(t, repo, "acme/attrs")
+
+	// Mark generated files as `-diff` in .gitattributes (like internal/pagelib/dist/**).
+	if err := os.MkdirAll(filepath.Join(repo, "dist"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, filepath.Join(repo, ".gitattributes"), "dist/** -diff\n")
+	writeFile(t, filepath.Join(repo, "dist/bundle.js"), "console.log('v1');\n")
+	git(t, repo, "add", ".")
+	git(t, repo, "commit", "-q", "-m", "base")
+	base := headSHAOf(t, repo)
+
+	writeFile(t, filepath.Join(repo, "dist/bundle.js"), "console.log('v2');\n")
+	git(t, repo, "add", ".")
+	git(t, repo, "commit", "-q", "-m", "update bundle")
+	head := headSHAOf(t, repo)
+
+	h := startHarness(t, "", Options{AllowedRoot: root})
+	if _, err := h.store.Register(ctx, repo); err != nil {
+		t.Fatal(err)
+	}
+	diff, truncated, ok := h.store.LocalDiff(ctx, "acme/attrs", base, head, 4<<20)
+	if !ok || truncated {
+		t.Fatalf("LocalDiff = (ok=%v, truncated=%v), want (true, false)", ok, truncated)
+	}
+	got := string(diff)
+	if strings.Contains(got, "Binary files") {
+		t.Fatalf("LocalDiff honored .gitattributes -diff instead of matching GitHub:\n%s", got)
+	}
+	if !strings.Contains(got, "-console.log('v1');") || !strings.Contains(got, "+console.log('v2');") {
+		t.Fatalf("LocalDiff missing text hunk for dist/bundle.js:\n%s", got)
+	}
 }
 
 func mustRun(t *testing.T, dir string, args ...string) []byte {

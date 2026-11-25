@@ -114,11 +114,13 @@ func (s *Store) PullRequestDiff(ctx context.Context, slug string, number int, re
 				return PullRequestDiff{}, err
 			}
 		}
-		if row, found, err := s.cache.loadPRDiff(ctx, k.slug, k.number); err != nil {
-			s.log.Warn("gh diff cache read failed", "slug", k.slug, "number", k.number, "err", err)
-		} else if found && row.HeadSHA == head && row.BaseSHA == base {
-			s.prFiles.putDiff(k, row)
-			return row, nil
+		if IsCommitSHA(base) && IsCommitSHA(head) {
+			if row, found, err := s.cache.loadPRDiff(ctx, k.slug, k.number); err != nil {
+				s.log.Warn("gh diff cache read failed", "slug", k.slug, "number", k.number, "err", err)
+			} else if found && row.HeadSHA == head && row.BaseSHA == base {
+				s.prFiles.putDiff(k, row)
+				return row, nil
+			}
 		}
 	}
 	rr, ok := s.opts.Runner.(RawRESTRunner)
@@ -135,7 +137,7 @@ func (s *Store) PullRequestDiff(ctx context.Context, slug string, number int, re
 		body := trimDiffLines(res.Body, res.Truncated)
 		d := PullRequestDiff{Diff: string(body), HeadSHA: head, BaseSHA: base, Truncated: res.Truncated, FetchedAt: s.opts.Now()}
 		s.prFiles.putDiff(k, d)
-		if head != "" {
+		if IsCommitSHA(head) && IsCommitSHA(base) && len(d.Diff) <= diffDBMaxBytes {
 			if err := s.cache.savePRDiff(ctx, k.slug, k.number, d); err != nil {
 				s.log.Warn("gh diff cache write failed", "slug", k.slug, "number", k.number, "err", err)
 			}
