@@ -183,8 +183,12 @@ type Store struct {
 	searchAsID  string // node id of Options.SearchAs
 	cycle       cycleStats
 
-	wake     chan struct{}
-	sleepDet *sleepDetector
+	wake        chan struct{}
+	sleepDet    *sleepDetector
+	warmCtx     context.Context
+	warmCancel  context.CancelFunc
+	warmClosing bool
+	warmWG      sync.WaitGroup
 }
 
 var _ Service = (*Store)(nil)
@@ -235,6 +239,7 @@ func New(ctx context.Context, opts Options) (*Store, error) {
 		return nil, errors.New("gh: Options.DB is required")
 	}
 	opts.setDefaults()
+	warmCtx, warmCancel := context.WithCancel(context.Background())
 	s := &Store{
 		opts:        opts,
 		log:         opts.Log,
@@ -249,6 +254,8 @@ func New(ctx context.Context, opts Options) (*Store, error) {
 		appearing:   map[string]bool{},
 		failingKey:  map[string]string{},
 		wake:        make(chan struct{}, 1),
+		warmCtx:     warmCtx,
+		warmCancel:  warmCancel,
 	}
 	s.initWakeDetector()
 	now := opts.Now()
@@ -576,11 +583,13 @@ func (s *Store) nudge() {
 	}
 }
 
-// Run is the worker loop: the only goroutine that talks to GitHub. It returns nil when
-// ctx is cancelled.
+// Run is the paced worker loop that executes all GitHub GraphQL/REST jobs (aside from
+// best-effort connection pre-warming in keepwarm.go). It returns nil when ctx is cancelled,
+// closing any runnerCloser (HTTPRunner) and draining in-flight warm-ups before returning.
 func (s *Store) Run(ctx context.Context) error {
 	s.log.Info("gh poller started",
 		"min_gap", s.opts.MinGap.String(), "poll_interval", s.config().PollInterval.String())
+	defer s.shutdownRunner()
 	timer := time.NewTimer(time.Hour)
 	defer timer.Stop()
 	wakeTicks, stopWake := s.startWakeMonitor()

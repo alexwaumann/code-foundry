@@ -93,9 +93,14 @@ func (s *Store) PresenceChanged(from, to Presence) {
 		}
 	}
 	next := s.pollNext.Sub(now)
+	shouldWarm := to == PresenceForeground && to > from &&
+		!idle && s.stopped == nil && !s.authBad && s.pausedLocked() == nil
 	s.mu.Unlock()
 	s.log.Info("gh poll tier", "from", from.String(), "to", to.String(), "interval", interval.String(),
 		"poll_soon", soon, "next_in", max(0, next).Round(time.Second).String())
+	if shouldWarm {
+		s.warmConnection()
+	}
 	if to > from {
 		s.nudge()
 	}
