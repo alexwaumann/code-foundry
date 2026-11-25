@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/url"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/alexwaumann/code-foundry/internal/store/gh"
@@ -21,13 +22,20 @@ func (t target) label() string {
 }
 
 // resolveRemote is resolve for operations that talk to a remote: a worktree of a
-// local-only repository fails with ErrNoRemote before any operation is recorded.
-func (m *Manager) resolveRemote(worktreePath string) (target, error) {
-	t, err := m.resolve(worktreePath)
-	if err == nil && IsLocalOnly(t.project) {
+// local-only repository fails with ErrNoRemote before any git probe or operation is
+// recorded.
+func (m *Manager) resolveRemote(worktreePath string, needBranch bool) (target, error) {
+	t, wt, found, err := m.resolvePath(worktreePath)
+	if err != nil {
+		return target{}, err
+	}
+	if IsLocalOnly(t.project) {
 		return target{}, fmt.Errorf("%s: %w", t.project.Name, ErrNoRemote)
 	}
-	return t, err
+	if needBranch {
+		m.resolveBranch(&t, wt, found)
+	}
+	return t, nil
 }
 
 // Fetch implements Store: `git fetch --prune`, or `git fetch --prune -- <remote>
@@ -37,7 +45,7 @@ func (m *Manager) Fetch(ctx context.Context, o FetchOptions) (Op, error) {
 	if err != nil {
 		return Op{}, err
 	}
-	t, err := m.resolveRemote(o.WorktreePath)
+	t, err := m.resolveRemote(o.WorktreePath, o.Branch == "")
 	if err != nil {
 		return Op{}, err
 	}
@@ -45,7 +53,7 @@ func (m *Manager) Fetch(ctx context.Context, o FetchOptions) (Op, error) {
 	if o.Branch != "" {
 		title = "Fetch " + o.Remote + "/" + o.Branch
 	}
-	return m.submit(ctx, KindFetch, title, t, true, func(ctx context.Context, x *run) (string, string, error) {
+	return m.submit(ctx, KindFetch, title, t, postOp{refresh: refreshProject}, func(ctx context.Context, x *run) (string, string, error) {
 		res, err := x.git(ctx, args...)
 		if err != nil {
 			return "", "", err
@@ -101,7 +109,7 @@ func validRefPart(s string) bool {
 // Pull implements Store: `git pull --ff-only`, or `--rebase`. A rebase that stops on
 // conflicts is aborted so the worktree is left as it was.
 func (m *Manager) Pull(ctx context.Context, o PullOptions) (Op, error) {
-	t, err := m.resolveRemote(o.WorktreePath)
+	t, err := m.resolveRemote(o.WorktreePath, o.Title == "")
 	if err != nil {
 		return Op{}, err
 	}
@@ -111,7 +119,7 @@ func (m *Manager) Pull(ctx context.Context, o PullOptions) (Op, error) {
 		title, mode = "Pull --rebase "+t.label(), "--rebase"
 	}
 	title = cmp.Or(o.Title, title)
-	return m.submit(ctx, KindPull, title, t, true, func(ctx context.Context, x *run) (string, string, error) {
+	return m.submit(ctx, KindPull, title, t, postOp{refresh: refreshProject}, func(ctx context.Context, x *run) (string, string, error) {
 		res, err := x.git(ctx, "pull", mode)
 		if err == nil {
 			return pullSummary(res.Combined, o.Rebase), "", nil
@@ -138,7 +146,7 @@ func (x *run) rebaseInProgress(ctx context.Context) bool {
 
 // Push implements Store.
 func (m *Manager) Push(ctx context.Context, o PushOptions) (Op, error) {
-	t, err := m.resolveRemote(o.WorktreePath)
+	t, err := m.resolveRemote(o.WorktreePath, true)
 	if err != nil {
 		return Op{}, err
 	}
@@ -146,17 +154,35 @@ func (m *Manager) Push(ctx context.Context, o PushOptions) (Op, error) {
 	if o.ForceWithLease {
 		title = "Force-push " + t.label()
 	}
-	return m.submit(ctx, KindPush, title, t, true, func(ctx context.Context, x *run) (string, string, error) {
+	post := postOp{
+		refresh:       refreshPush,
+		notifyGH:      true,
+		githubSlug:    t.project.GitHubSlug,
+		defaultBranch: t.project.DefaultBranch,
+	}
+	return m.submit(ctx, KindPush, title, t, post, func(ctx context.Context, x *run) (string, string, error) {
 		branch, err := x.branch(ctx)
 		if err != nil {
 			return "", "", err
 		}
+		x.resolvedBranch = branch
 		return x.push(ctx, branch, o.ForceWithLease)
 	})
 }
 
-// branch returns the checked-out branch, failing on a detached HEAD.
+// branch returns the checked-out branch, failing on a detached HEAD. It reads .git/HEAD
+// directly (0 subprocesses) and only falls back to `git symbolic-ref` when HEAD cannot
+// be parsed directly.
 func (x *run) branch(ctx context.Context) (string, error) {
+	if ctx.Err() != nil {
+		return "", ctx.Err()
+	}
+	if b, attached, ok := readHeadBranch(x.dir); ok {
+		if !attached {
+			return "", &opError{summary: "HEAD is detached: check out a branch first"}
+		}
+		return b, nil
+	}
 	out, ok := x.probe(ctx, "symbolic-ref", "--quiet", "--short", "HEAD")
 	switch {
 	case ctx.Err() != nil:
@@ -203,12 +229,18 @@ func (x *run) push(ctx context.Context, branch string, force bool) (string, stri
 // `gh pr create`. An existing pull request for the branch counts as success and
 // returns its URL.
 func (m *Manager) CreatePR(ctx context.Context, o CreatePROptions) (Op, error) {
-	t, err := m.resolveRemote(o.WorktreePath)
+	t, err := m.resolveRemote(o.WorktreePath, true)
 	if err != nil {
 		return Op{}, err
 	}
 	slug := t.project.GitHubSlug
-	return m.submit(ctx, KindPRCreate, "Create PR for "+t.label(), t, true, func(ctx context.Context, x *run) (string, string, error) {
+	post := postOp{
+		refresh:       refreshPush,
+		notifyGH:      true,
+		githubSlug:    slug,
+		defaultBranch: t.project.DefaultBranch,
+	}
+	return m.submit(ctx, KindPRCreate, "Create PR for "+t.label(), t, post, func(ctx context.Context, x *run) (string, string, error) {
 		ghBin, err := m.gh()
 		if err != nil {
 			return "", "", err
@@ -217,6 +249,7 @@ func (m *Manager) CreatePR(ctx context.Context, o CreatePROptions) (Op, error) {
 		if err != nil {
 			return "", "", err
 		}
+		x.resolvedBranch = branch
 		title := strings.TrimSpace(o.Title)
 		if title == "" {
 			res, err := x.git(ctx, "log", "-1", "--format=%s")
@@ -259,20 +292,35 @@ func (m *Manager) CreatePR(ctx context.Context, o CreatePROptions) (Op, error) {
 	})
 }
 
-// OpenPR implements Store: find the branch's pull request with gh and open it in the
-// default browser.
+// OpenPR implements Store: find the branch's pull request in the GitHub cache (0ms
+// latency, no gh subprocess) when available, falling back to `gh pr view` on a cache
+// miss, and open it in the default browser.
 func (m *Manager) OpenPR(ctx context.Context, worktreePath string) (Op, error) {
-	t, err := m.resolveRemote(worktreePath)
+	t, err := m.resolveRemote(worktreePath, true)
 	if err != nil {
 		return Op{}, err
 	}
 	slug := t.project.GitHubSlug
-	return m.submit(ctx, KindPROpen, "Open PR for "+t.label(), t, false, func(ctx context.Context, x *run) (string, string, error) {
-		ghBin, err := m.gh()
+	return m.submit(ctx, KindPROpen, "Open PR for "+t.label(), t, postOp{}, func(ctx context.Context, x *run) (string, string, error) {
+		branch, err := x.branch(ctx)
 		if err != nil {
 			return "", "", err
 		}
-		branch, err := x.branch(ctx)
+		x.resolvedBranch = branch
+		if m.opts.GitHub != nil && slug != "" {
+			if u, num, ok := m.opts.GitHub.OpenBranchPR(slug, branch); ok && u != "" {
+				n := strconv.Itoa(num)
+				if num <= 0 {
+					_, n = findPRURL(u)
+				}
+				x.note("# cached open pull request #%s: %s", n, u)
+				if _, err := x.exec(ctx, Cmd{Name: m.opts.Open, Args: []string{u}}); err != nil {
+					return "", u, err
+				}
+				return "opened pull request #" + n, u, nil
+			}
+		}
+		ghBin, err := m.gh()
 		if err != nil {
 			return "", "", err
 		}
@@ -298,7 +346,7 @@ func (m *Manager) OpenPR(ctx context.Context, worktreePath string) (Op, error) {
 // OpenEditor implements Store: the worktree, or o.File (at o.Line where the editor
 // takes one; editorArgs), in the configured editor, or with o.App in that app.
 func (m *Manager) OpenEditor(ctx context.Context, o OpenOptions) (Op, error) {
-	t, err := m.resolve(o.WorktreePath)
+	t, err := m.resolve(o.WorktreePath, false)
 	if err != nil {
 		return Op{}, err
 	}
@@ -312,7 +360,7 @@ func (m *Manager) OpenEditor(ctx context.Context, o OpenOptions) (Op, error) {
 			return Op{}, err
 		}
 		p := cmp.Or(file, t.path)
-		return m.submit(ctx, KindOpenEditor, "Open "+filepath.Base(p)+" in "+app.Name, t, false, func(ctx context.Context, x *run) (string, string, error) {
+		return m.submit(ctx, KindOpenEditor, "Open "+filepath.Base(p)+" in "+app.Name, t, postOp{}, func(ctx context.Context, x *run) (string, string, error) {
 			if _, err := x.exec(ctx, Cmd{Name: m.opts.Open, Args: []string{"-b", app.BundleID, p}}); err != nil {
 				return "", "", err
 			}
@@ -337,7 +385,7 @@ func (m *Manager) OpenEditor(ctx context.Context, o OpenOptions) (Op, error) {
 	default:
 		argv = withPath(argv, t.path)
 	}
-	return m.submit(ctx, KindOpenEditor, "Open "+what+" in editor", t, false, func(ctx context.Context, x *run) (string, string, error) {
+	return m.submit(ctx, KindOpenEditor, "Open "+what+" in editor", t, postOp{}, func(ctx context.Context, x *run) (string, string, error) {
 		if err != nil {
 			x.note("%v", err)
 			return "", "", &opError{summary: err.Error()}
@@ -360,7 +408,7 @@ func editorName(argv []string) string {
 
 // Reveal implements Store: `open -R <path>` selects the worktree, or o.File, in Finder.
 func (m *Manager) Reveal(ctx context.Context, o OpenOptions) (Op, error) {
-	t, err := m.resolve(o.WorktreePath)
+	t, err := m.resolve(o.WorktreePath, false)
 	if err != nil {
 		return Op{}, err
 	}
@@ -369,7 +417,7 @@ func (m *Manager) Reveal(ctx context.Context, o OpenOptions) (Op, error) {
 		return Op{}, err
 	}
 	p := cmp.Or(file, t.path)
-	return m.submit(ctx, KindReveal, "Open "+filepath.Base(p)+" in Finder", t, false, func(ctx context.Context, x *run) (string, string, error) {
+	return m.submit(ctx, KindReveal, "Open "+filepath.Base(p)+" in Finder", t, postOp{}, func(ctx context.Context, x *run) (string, string, error) {
 		if _, err := x.exec(ctx, Cmd{Name: m.opts.Open, Args: []string{"-R", p}}); err != nil {
 			return "", "", err
 		}
@@ -385,7 +433,7 @@ func (m *Manager) OpenURL(ctx context.Context, rawURL string) (Op, error) {
 		return Op{}, fmt.Errorf("%w: %q is not an http(s) URL", ErrInvalidArgument, rawURL)
 	}
 	s := u.String()
-	return m.submit(ctx, KindOpenURL, "Open "+s, target{}, false, func(ctx context.Context, x *run) (string, string, error) {
+	return m.submit(ctx, KindOpenURL, "Open "+s, target{}, postOp{}, func(ctx context.Context, x *run) (string, string, error) {
 		if _, err := x.exec(ctx, Cmd{Dir: "/", Name: m.opts.Open, Args: []string{s}}); err != nil {
 			return "", s, err
 		}

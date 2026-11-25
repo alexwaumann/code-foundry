@@ -211,3 +211,16 @@ type Projects interface {
 }
 
 var _ Projects = project.Store(nil)
+
+// GitHub is the optional bridge from gitops to the GitHub store. It lets OpenPR
+// answer immediately from cached pull requests without spawning gh, and lets Push
+// and CreatePR trigger an immediate poll for the branch's pull requests and checks.
+type GitHub interface {
+	// OpenBranchPR returns the URL and number of an open pull request whose head
+	// is branch in slug ("owner/name"), from the in-memory cache (no network or CLI).
+	// ok is false on a cache miss.
+	OpenBranchPR(slug, branch string) (url string, number int, ok bool)
+	// NotifyBranchChanged tells the GitHub store that branch in slug was just
+	// pushed or had a pull request created, so it watches the branch and polls promptly.
+	NotifyBranchChanged(ctx context.Context, slug, branch string)
+}
