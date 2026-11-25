@@ -16,6 +16,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -339,10 +340,10 @@ func (r *HTTPRunner) send(ctx context.Context, method, u string, body []byte, to
 func (r *HTTPRunner) sendOnce(ctx context.Context, method, u string, body []byte, tok string, o sendOpts, allowRetry bool) (httpResult, error, bool) {
 	cctx, cancel := context.WithTimeout(ctx, r.opts.Timeout)
 	defer cancel()
-	var reused, gotFirstByte bool
+	var reused, gotFirstByte atomic.Bool
 	cctx = httptrace.WithClientTrace(cctx, &httptrace.ClientTrace{
-		GotConn:              func(i httptrace.GotConnInfo) { reused = i.Reused },
-		GotFirstResponseByte: func() { gotFirstByte = true },
+		GotConn:              func(i httptrace.GotConnInfo) { reused.Store(i.Reused) },
+		GotFirstResponseByte: func() { gotFirstByte.Store(true) },
 	})
 	var rd io.Reader
 	if body != nil {
@@ -371,16 +372,16 @@ func (r *HTTPRunner) sendOnce(ctx context.Context, method, u string, body []byte
 		if cerr := ctx.Err(); cerr != nil {
 			return httpResult{}, fmt.Errorf("github request: %w", cerr), false
 		}
-		if allowRetry && resp == nil && r.shouldRetryConnReset(o.idempotent, reused, gotFirstByte, r.opts.Now(), err) {
+		if allowRetry && resp == nil && r.shouldRetryConnReset(o.idempotent, reused.Load(), gotFirstByte.Load(), r.opts.Now(), err) {
 			r.opts.Log.Debug("github http retrying read after connection reset",
-				"method", method, "path", req.URL.Path, "reused_conn", reused, "err", err)
+				"method", method, "path", req.URL.Path, "reused_conn", reused.Load(), "err", err)
 			return httpResult{}, nil, true
 		}
 		return httpResult{}, fmt.Errorf("%w: %w", ErrNetwork, err), false
 	}
 	h := resp.Header
 	r.opts.Log.Debug("github http", "method", method, "path", req.URL.Path, "status", resp.StatusCode,
-		"dur", r.opts.Now().Sub(start).Round(time.Millisecond).String(), "reused_conn", reused,
+		"dur", r.opts.Now().Sub(start).Round(time.Millisecond).String(), "reused_conn", reused.Load(),
 		"proto", resp.Proto, "bytes", len(b),
 		"rl_resource", h.Get("X-Ratelimit-Resource"), "rl_remaining", h.Get("X-Ratelimit-Remaining"))
 	res := httpResult{status: resp.StatusCode, header: h, body: b}

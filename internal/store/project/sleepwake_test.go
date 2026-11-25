@@ -120,3 +120,28 @@ func TestWakeRefreshesLiveProject(t *testing.T) {
 		t.Errorf("rev_parse_delta = %d, want >= 1 (base refresh on wake)", revParseDelta)
 	}
 }
+
+func TestTierSchedBackwardClockJump(t *testing.T) {
+	t0 := time.Date(2026, 11, 25, 10, 0, 0, 0, time.UTC)
+	s := newTierSched(tier{live: 5 * time.Minute, idle: 15 * time.Minute}, t0)
+	s.ran("p1", t0)
+
+	// Wall clock stepped back 2 hours (wall-only clock, no monotonic reading): must NOT
+	// stall waiting 2 hours for the wall clock to catch up.
+	steppedBack := t0.Add(-2 * time.Hour)
+	if !s.due("p1", true, steppedBack) {
+		t.Fatalf("due = false after backward wall clock jump, want true")
+	}
+	if w := s.wait([]string{"p1"}, func(string) bool { return true }, steppedBack); w != 0 {
+		t.Fatalf("wait = %v after backward wall clock jump, want 0", w)
+	}
+
+	// With real monotonic readings attached, backward wall jump preserves monotonic elapsed.
+	realStart := time.Now()
+	s2 := newTierSched(tier{live: 5 * time.Minute, idle: 15 * time.Minute}, realStart)
+	s2.ran("p1", realStart)
+	// Still works across normal sleep when wall advances ahead of monotonic (stripped).
+	if !s2.due("p1", true, realStart.Round(0).Add(6*time.Minute)) {
+		t.Fatalf("due = false after 6m wall jump, want true")
+	}
+}

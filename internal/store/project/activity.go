@@ -76,11 +76,27 @@ func (s *tierSched) lastRun(id string) time.Time {
 	return s.seed
 }
 
-// due reports whether project id, live or not, is due at now (compared on the wall clock
-// so sleep advances elapsed intervals on macOS where monotonic time pauses).
+// elapsedSince returns how much time has elapsed between last and now, taking the larger
+// of wall-clock delta (so system sleep advances intervals on macOS/Linux where monotonic
+// time pauses) and monotonic delta (so a backward wall-clock jump does not stall tiers).
+// If both are negative (a backward jump on a wall-only clock with no monotonic reading),
+// ok is false and callers treat the item as due immediately rather than stalling.
+func elapsedSince(last, now time.Time) (time.Duration, bool) {
+	elapsed := max(now.Round(0).Sub(last.Round(0)), now.Sub(last))
+	if elapsed < 0 {
+		return 0, false
+	}
+	return elapsed, true
+}
+
+// due reports whether project id, live or not, is due at now.
 func (s *tierSched) due(id string, live bool, now time.Time) bool {
 	last := s.lastRun(id)
-	return last.IsZero() || !now.Round(0).Before(last.Round(0).Add(s.tier.every(live)))
+	if last.IsZero() {
+		return true
+	}
+	elapsed, ok := elapsedSince(last, now)
+	return !ok || elapsed >= s.tier.every(live)
 }
 
 // ran records a run (or an attempt) of id at at.
@@ -104,13 +120,16 @@ func (s *tierSched) forget(ids []string) {
 // negative.
 func (s *tierSched) wait(ids []string, live func(string) bool, now time.Time) time.Duration {
 	w := s.tier.live
-	nowWall := now.Round(0)
 	for _, id := range ids {
 		last := s.lastRun(id)
 		if last.IsZero() {
 			return 0
 		}
-		w = min(w, last.Round(0).Add(s.tier.every(live(id))).Sub(nowWall))
+		elapsed, ok := elapsedSince(last, now)
+		if !ok {
+			return 0
+		}
+		w = min(w, s.tier.every(live(id))-elapsed)
 	}
 	return max(w, 0)
 }

@@ -18,53 +18,51 @@ import (
 
 func TestSleepJump(t *testing.T) {
 	tests := []struct {
-		name         string
-		wallDelta    time.Duration
-		monoDelta    time.Duration
-		tickInterval time.Duration
-		fromTick     bool
-		wantJump     bool
-		wantDur      time.Duration
+		name      string
+		wallDelta time.Duration
+		monoDelta time.Duration
+		wantJump  bool
+		wantDur   time.Duration
 	}{
 		{
 			name: "normal awake tick", wallDelta: 5 * time.Second, monoDelta: 5 * time.Second,
-			tickInterval: 5 * time.Second, fromTick: true, wantJump: false,
+			wantJump: false,
 		},
 		{
 			name: "small NTP forward drift below skew threshold", wallDelta: 7 * time.Second, monoDelta: 5 * time.Second,
-			tickInterval: 5 * time.Second, fromTick: true, wantJump: false,
+			wantJump: false,
 		},
 		{
 			name: "NTP backward step never triggers", wallDelta: -30 * time.Second, monoDelta: 5 * time.Second,
-			tickInterval: 5 * time.Second, fromTick: true, wantJump: false,
+			wantJump: false,
 		},
 		{
 			name: "macOS sleep mono paused on tick", wallDelta: 5*time.Minute + 2*time.Second, monoDelta: 2 * time.Second,
-			tickInterval: 5 * time.Second, fromTick: true, wantJump: true, wantDur: 5 * time.Minute,
+			wantJump: true, wantDur: 5 * time.Minute,
 		},
 		{
 			name: "macOS sleep mono paused before tick (opportunistic skew)", wallDelta: 30 * time.Second, monoDelta: 1 * time.Second,
-			tickInterval: 5 * time.Second, fromTick: false, wantJump: true, wantDur: 29 * time.Second,
+			wantJump: true, wantDur: 29 * time.Second,
 		},
 		{
 			name: "exact skew threshold triggers", wallDelta: 15 * time.Second, monoDelta: 5 * time.Second,
-			tickInterval: 5 * time.Second, fromTick: false, wantJump: true, wantDur: 10 * time.Second,
+			wantJump: true, wantDur: 10 * time.Second,
 		},
 		{
-			name: "tick wall overrun without mono skew", wallDelta: 25 * time.Second, monoDelta: 25 * time.Second,
-			tickInterval: 5 * time.Second, fromTick: true, wantJump: true, wantDur: 20 * time.Second,
+			name: "busy worker slow tick without mono skew never triggers", wallDelta: 30 * time.Second, monoDelta: 30 * time.Second,
+			wantJump: false,
 		},
 		{
-			name: "non-tick with equal wall and mono does not trigger", wallDelta: 5 * time.Minute, monoDelta: 5 * time.Minute,
-			tickInterval: 5 * time.Second, fromTick: false, wantJump: false,
+			name: "long equal wall and mono does not trigger", wallDelta: 5 * time.Minute, monoDelta: 5 * time.Minute,
+			wantJump: false,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotDur, gotJump := sleepJump(tt.wallDelta, tt.monoDelta, tt.tickInterval, tt.fromTick)
+			gotDur, gotJump := sleepJump(tt.wallDelta, tt.monoDelta)
 			if gotJump != tt.wantJump || gotDur != tt.wantDur {
-				t.Errorf("sleepJump(%v, %v, %v, %v) = (%v, %v), want (%v, %v)",
-					tt.wallDelta, tt.monoDelta, tt.tickInterval, tt.fromTick, gotDur, gotJump, tt.wantDur, tt.wantJump)
+				t.Errorf("sleepJump(%v, %v) = (%v, %v), want (%v, %v)",
+					tt.wallDelta, tt.monoDelta, gotDur, gotJump, tt.wantDur, tt.wantJump)
 			}
 		})
 	}
@@ -73,9 +71,9 @@ func TestSleepJump(t *testing.T) {
 func TestSleepDetectorNoDoubleFire(t *testing.T) {
 	t0 := time.Date(2026, 11, 25, 10, 0, 0, 0, time.UTC)
 	cur := wakeSample{wall: t0, mono: t0}
-	det := newSleepDetector(5*time.Second, func() wakeSample { return cur })
+	det := newSleepDetector(func() wakeSample { return cur })
 
-	// Normal awake checkSkew does not fire and does not eat a later tick overrun.
+	// Normal awake checkSkew does not fire.
 	cur = wakeSample{wall: t0.Add(3 * time.Second), mono: t0.Add(3 * time.Second)}
 	if _, ok := det.checkSkew(); ok {
 		t.Fatal("unexpected wake while awake")
@@ -92,13 +90,68 @@ func TestSleepDetectorNoDoubleFire(t *testing.T) {
 		t.Fatalf("checkTick double-fired after checkSkew: jump=%v", jump)
 	}
 
-	// Non-skew wall jump (monotonic advanced too): checkSkew ignores it, checkTick catches it.
-	cur = wakeSample{wall: cur.wall.Add(2 * time.Minute), mono: cur.mono.Add(2 * time.Minute)}
+	// Slow awake period (equal wall and mono advance, e.g. busy worker executing a 30s
+	// timeout) must NOT trigger wake on either checkSkew or checkTick.
+	cur = wakeSample{wall: cur.wall.Add(30 * time.Second), mono: cur.mono.Add(30 * time.Second)}
 	if _, ok := det.checkSkew(); ok {
 		t.Fatal("checkSkew triggered without skew")
 	}
-	if jump, ok := det.checkTick(); !ok || jump != 2*time.Minute-5*time.Second {
-		t.Fatalf("checkTick = (%v, %v), want (%v, true)", jump, ok, 2*time.Minute-5*time.Second)
+	if jump, ok := det.checkTick(); ok {
+		t.Fatalf("checkTick falsely triggered on busy worker without skew: jump=%v", jump)
+	}
+}
+
+func TestBusyWorkerDoesNotTriggerWakeOrClearBackoff(t *testing.T) {
+	t0 := time.Date(2026, 11, 25, 10, 0, 0, 0, time.UTC)
+	var mu sync.Mutex
+	cur := wakeSample{wall: t0, mono: t0}
+	now := t0
+
+	runner := &dropperFakeRunner{fakeRunner: &fakeRunner{}}
+	opts := testOptions(openTestDB(t), runner, nil)
+	opts.Now = func() time.Time {
+		mu.Lock()
+		defer mu.Unlock()
+		return now
+	}
+	opts.wake = &wakeConfig{
+		sample: func() wakeSample {
+			mu.Lock()
+			defer mu.Unlock()
+			return cur
+		},
+	}
+	s, err := New(context.Background(), opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Simulate active network backoff after consecutive timeouts.
+	s.mu.Lock()
+	s.pauseUntil = t0.Add(2 * time.Minute)
+	s.pauseErr = ErrNetwork
+	s.globalFailures = 4
+	s.mu.Unlock()
+
+	// Advance both wall and monotonic clocks by 30s (e.g., Store.Run was busy executing a
+	// 30s timeout, NOT asleep).
+	mu.Lock()
+	cur = wakeSample{wall: t0.Add(30 * time.Second), mono: t0.Add(30 * time.Second)}
+	now = cur.wall
+	mu.Unlock()
+
+	s.checkWakeTick()
+
+	if drops := runner.drops.Load(); drops != 0 {
+		t.Fatalf("CloseIdleConnections called %d times on busy tick, want 0", drops)
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.globalFailures != 4 {
+		t.Fatalf("globalFailures = %d, want 4 (must not reset without sleep skew)", s.globalFailures)
+	}
+	if s.pauseUntil.IsZero() || !errors.Is(s.pauseErr, ErrNetwork) {
+		t.Fatalf("network pause was cleared on busy tick: pauseUntil=%v pauseErr=%v", s.pauseUntil, s.pauseErr)
 	}
 }
 

@@ -23,15 +23,14 @@ var _ ConnectionDropper = (*HTTPRunner)(nil)
 // Sleep/wake detection and recovery parameters.
 const (
 	// wakeCheckInterval is how often Store.Run checks the wall clock against monotonic
-	// time (and elapsed wall time since the previous tick) to detect system sleep/wake.
+	// time to detect system sleep/wake.
 	wakeCheckInterval = 5 * time.Second
 	// sleepSkewThreshold is the minimum wall-clock jump ahead of monotonic time
-	// (wallDelta - monoDelta) treated as a sleep/wake transition. On macOS, monotonic
-	// time (mach_absolute_time) pauses during sleep while wall time advances.
+	// (wallDelta - monoDelta) treated as a sleep/wake transition. Go's monotonic clock
+	// pauses during system sleep on both macOS and Linux while wall time advances; using
+	// skew alone guarantees a busy worker executing a slow 30s request never reads as a
+	// wake and never resets network backoff.
 	sleepSkewThreshold = 10 * time.Second
-	// sleepTickMargin is how far past wakeCheckInterval a heartbeat tick's wall delta
-	// must jump to be treated as sleep even if monotonic time did not pause.
-	sleepTickMargin = 15 * time.Second
 	// wakeGraceWindow is how long after a detected wake a read-only request on even a
 	// newly dialed connection gets one retry on a pre-response connection reset/EOF.
 	wakeGraceWindow = 15 * time.Second
@@ -58,42 +57,34 @@ type wakeConfig struct {
 
 // sleepJump reports whether the transition (wallDelta, monoDelta) indicates a sleep/wake
 // jump, returning the estimated sleep duration. Backward wall-clock jumps (NTP step-back)
-// never trigger.
-func sleepJump(wallDelta, monoDelta, tickInterval time.Duration, fromTick bool) (time.Duration, bool) {
+// and normal awake elapsed time (wallDelta == monoDelta, e.g. a busy worker executing a
+// slow HTTP call) never trigger.
+func sleepJump(wallDelta, monoDelta time.Duration) (time.Duration, bool) {
 	if skew := wallDelta - monoDelta; skew >= sleepSkewThreshold {
 		return skew, true
-	}
-	if fromTick && tickInterval > 0 && wallDelta >= tickInterval+sleepTickMargin {
-		return wallDelta - tickInterval, true
 	}
 	return 0, false
 }
 
-// sleepDetector tracks clock samples to detect macOS sleep/wake transitions. Safe for
-// concurrent use from the worker loop and interactive callers.
+// sleepDetector tracks clock samples to detect macOS/Linux sleep/wake transitions. Safe
+// for concurrent use from the worker loop and interactive callers.
 type sleepDetector struct {
-	mu           sync.Mutex
-	tickInterval time.Duration
-	sample       func() wakeSample
-	last         wakeSample
+	mu     sync.Mutex
+	sample func() wakeSample
+	last   wakeSample
 }
 
-func newSleepDetector(tickInterval time.Duration, sample func() wakeSample) *sleepDetector {
-	if tickInterval <= 0 {
-		tickInterval = wakeCheckInterval
-	}
+func newSleepDetector(sample func() wakeSample) *sleepDetector {
 	if sample == nil {
 		sample = systemWakeSample
 	}
 	return &sleepDetector{
-		tickInterval: tickInterval,
-		sample:       sample,
-		last:         sample(),
+		sample: sample,
+		last:   sample(),
 	}
 }
 
-// checkTick evaluates both monotonic-vs-wall skew and tick wall-clock overrun, advancing
-// the baseline sample on every tick.
+// checkTick evaluates monotonic-vs-wall skew and advances the baseline sample.
 func (d *sleepDetector) checkTick() (time.Duration, bool) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
@@ -101,20 +92,19 @@ func (d *sleepDetector) checkTick() (time.Duration, bool) {
 	wallDelta := cur.wall.Sub(d.last.wall)
 	monoDelta := cur.mono.Sub(d.last.mono)
 	d.last = cur
-	return sleepJump(wallDelta, monoDelta, d.tickInterval, true)
+	return sleepJump(wallDelta, monoDelta)
 }
 
 // checkSkew opportunistically detects monotonic-vs-wall skew (e.g. a user click arriving
 // immediately after lid-open before the heartbeat tick fires). It advances the baseline
-// only when a jump is detected so a subsequent tick does not double-fire or miss a
-// tick-overrun sleep.
+// only when a jump is detected so a subsequent tick does not double-fire.
 func (d *sleepDetector) checkSkew() (time.Duration, bool) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	cur := d.sample()
 	wallDelta := cur.wall.Sub(d.last.wall)
 	monoDelta := cur.mono.Sub(d.last.mono)
-	jump, ok := sleepJump(wallDelta, monoDelta, d.tickInterval, false)
+	jump, ok := sleepJump(wallDelta, monoDelta)
 	if ok {
 		d.last = cur
 	}
@@ -122,13 +112,11 @@ func (d *sleepDetector) checkSkew() (time.Duration, bool) {
 }
 
 func (s *Store) initWakeDetector() {
-	var tickInterval time.Duration
 	var sample func() wakeSample
 	if s.opts.wake != nil {
-		tickInterval = s.opts.wake.tickInterval
 		sample = s.opts.wake.sample
 	}
-	s.sleepDet = newSleepDetector(tickInterval, sample)
+	s.sleepDet = newSleepDetector(sample)
 }
 
 func (s *Store) startWakeMonitor() (<-chan time.Time, func()) {
