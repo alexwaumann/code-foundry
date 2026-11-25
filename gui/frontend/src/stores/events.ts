@@ -1,13 +1,12 @@
 import { create } from "zustand";
 import { daemon, invalidateOnTransportError } from "@/api/endpoint";
-import { reportClientState, watchEvents, type EventView } from "@/api/events";
-import { listProjects } from "@/api/project";
+import { reportClientState, watchEvents, type EventEnvelope, type EventView } from "@/api/events";
 import { listThreads } from "@/api/threads";
 import { errorMessage, HEARTBEAT_MS, isAbort, onPageStateChange, runStream, type StreamStatus } from "@/api/stream";
-import { listTerminals } from "@/api/terminal";
+import type { TerminalView } from "@/api/terminal";
 import { applyActionEvent, useActionsStore } from "./actions";
 import { onActionRunFinished } from "./actionActions";
-import { applyGhEvent } from "./gh";
+import { applyGhEvent, invalidateWatchedGhOnReconnect } from "./gh";
 import { applyGitOpsEvent } from "./gitops";
 import { useHealthStore } from "./health";
 import { applyIntent } from "./intents";
@@ -21,11 +20,11 @@ import { raiseArrivalToasts } from "./notificationToasts";
 import { applySearchActivity } from "./searchActivity";
 import { applyThemeEvent } from "./themes";
 import { onPluginEvent } from "./plugins";
-import { applyProjectEvent, replaceProjects, useProjectsStore } from "./projects";
+import { applyProjectEvent, useProjectsStore } from "./projects";
 import { applyRetiredUsage, applyThreadListEvent, replaceThreads, useThreadsStore } from "./threads";
 import { applySettingsSnapshot, loadSettingsSchema } from "./settings";
 import { onSkillEpoch } from "./skill";
-import { applyTerminalEvent, replaceTerminals, useTerminalsStore } from "./terminals";
+import { applyTerminalEvent, useTerminalsStore } from "./terminals";
 import { applyThreadSourceEvent, prunePageModals, pruneThreadLogs } from "./thread";
 import { applyUpdateEvent } from "./update";
 import { applyWorkspaceEvent, useWorkspacesStore } from "./workspaces";
@@ -56,7 +55,7 @@ type Handlers = { [S in EventView["source"]]: (event: Extract<EventView, { sourc
  */
 const handlers: Handlers = {
   project: (ev) => {
-    useProjectsStore.setState((s) => applyProjectEvent(s, ev));
+    useProjectsStore.setState((s) => ({ ...applyProjectEvent(s, ev), loaded: s.loaded || ev.kind === "snapshot" }));
     applyProjectEventToDetails(ev);
   },
   workspace: (ev) => {
@@ -64,7 +63,7 @@ const handlers: Handlers = {
   },
   terminal: (ev) => {
     // Where a terminal shows is the layout's (its tab, the quick terminal): the daemon places it.
-    useTerminalsStore.setState((s) => applyTerminalEvent(s, ev));
+    useTerminalsStore.setState((s) => ({ ...applyTerminalEvent(s, ev), loaded: true }));
   },
   threadList: (ev) => {
     // A snapshot is the whole list, even if List failed transiently.
@@ -75,6 +74,11 @@ const handlers: Handlers = {
       error: null,
       epoch: ev.kind === "snapshot" ? s.epoch + 1 : s.epoch,
     }));
+    // Terminal snapshots precede threadList in EventService.Watch: with zero terminals no
+    // terminal event is emitted, so threadList snapshot marks terminals loaded too.
+    if (ev.kind === "snapshot" && !useTerminalsStore.getState().loaded) {
+      useTerminalsStore.setState({ loaded: true });
+    }
     // A removed thread's items go with it.
     if (ev.kind === "removed" || ev.kind === "snapshot") pruneThreadLogs((id) => id in useThreadsStore.getState().byId);
     // A removed or archived thread's open page modal closes (session state; stores/thread.ts pageModals).
@@ -165,10 +169,12 @@ export async function reconcileThreads(signal: AbortSignal): Promise<void> {
 }
 
 /**
- * Keeps every slice in sync over one EventService.Watch. On each (re)connect the
- * per-service List calls run alongside the stream (events are buffered until they
- * resolve), so a reconnect reconciles removals the stream's snapshot cannot express
- * (terminal.proto has no snapshot message).
+ * Keeps every slice in sync over one EventService.Watch. On initial connect the stream's
+ * snapshots populate projects, workspaces, terminals and threads without redundant List
+ * RPCs. Reconnects pass the highest received `(seq, epoch)` so short blips replay missed
+ * events incrementally; if the daemon restarted or the hub log wrapped and fell back to
+ * snapshots (`seq === 0n`), terminal removals are reconciled from the snapshot burst and
+ * watched gh details/branch lists are invalidated so nothing stays stale.
  *
  * An observer (the shot window's page check, docs/notes/page-self-check.md) keeps only the
  * slices a page's bridge reads (dispatchObserved), as a client the daemon counts as no
@@ -178,16 +184,111 @@ export function startEventSync({ observer = false }: { observer?: boolean } = {}
   // Counted in ticks, not by the clock: a Mac waking from sleep is not a silent stream.
   let delivered = false;
   let quietTicks = 0;
-  const stop = runStream<EventView>({
-    open: (signal) => watchEvents(signal, daemon, observer),
-    onConnect: async (signal) => {
-      // The schema carries the model registry; a restarted daemon may have a new one.
+  // Resume cursor across reconnects (reset cleanly on daemon restart or snapshot fallback).
+  let lastSeq = 0n;
+  let lastEpoch = "";
+  let hadConnected = false;
+  // Per-attempt snapshot reconciliation state.
+  let reconnecting = false;
+  let attemptFirstEvent = true;
+  let attemptSawLive = false;
+  let lastEnvelopeSeq = 0n;
+  let snapshotTerminals: Set<string> | null = null;
+  let ghSnapshotInvalidated = false;
+
+  let schemaLoadedEpoch: string | null = null;
+
+  const onEnvelope = (meta: EventEnvelope): void => {
+    if (meta.epoch) {
+      if (meta.epoch !== lastEpoch) {
+        if (lastEpoch) {
+          // Daemon restarted: reset seq and reload schema (model registry may have changed).
+          lastSeq = 0n;
+        }
+        lastEpoch = meta.epoch;
+      }
+      if (schemaLoadedEpoch !== meta.epoch) {
+        schemaLoadedEpoch = meta.epoch;
+        void loadSettingsSchema();
+      }
+    } else if (schemaLoadedEpoch === null) {
+      schemaLoadedEpoch = "";
       void loadSettingsSchema();
-      const [projects, terminals] = await Promise.all([listProjects(daemon, signal), listTerminals(daemon, signal), reconcileThreads(signal)]);
-      useProjectsStore.setState({ ...replaceProjects(projects), loaded: true });
-      useTerminalsStore.setState((s) => ({ ...replaceTerminals(s, terminals), loaded: true }));
+    }
+    if (meta.isHeartbeat) {
+      // A resume-at-head heartbeat confirms the attempt resumed without snapshot fallback;
+      // clear attemptFirstEvent so a later mid-stream seq-0 resync is never treated as a
+      // full reconnect fallback that would wipe terminals.
+      attemptFirstEvent = false;
+      return;
+    }
+    lastEnvelopeSeq = meta.seq;
+    if (meta.seq > 0n) {
+      attemptSawLive = true;
+      ghSnapshotInvalidated = false;
+    } else if (reconnecting && attemptFirstEvent) {
+      // Reconnect fell back to full snapshots (log wrapped or daemon restarted): reset seq
+      // and collect terminal snapshot IDs to prune any terminals that exited while disconnected.
+      lastSeq = 0n;
+      snapshotTerminals = new Set<string>();
+    }
+    attemptFirstEvent = false;
+  };
+
+  const deliver = observer ? dispatchObserved : dispatchEvent;
+  const onEvent = (ev: EventView): void => {
+    hadConnected = true;
+    if (snapshotTerminals !== null) {
+      if (ev.source === "terminal" && ev.event.kind === "updated") {
+        snapshotTerminals.add(ev.event.terminal.id);
+      } else if (ev.source === "threadList" && ev.event.kind === "snapshot") {
+        // Terminal snapshot events always precede threadList snapshot in EventService.Watch.
+        const keep = snapshotTerminals;
+        snapshotTerminals = null;
+        useTerminalsStore.setState((s) => {
+          const kept = s.order.filter((id) => keep.has(id));
+          if (kept.length === s.order.length && s.loaded) return s;
+          const byId: Record<string, TerminalView> = {};
+          for (const id of kept) {
+            const t = s.byId[id];
+            if (t) byId[id] = t;
+          }
+          return { byId, order: kept, loaded: true };
+        });
+      }
+    }
+    deliver(ev);
+    // Advance the resume cursor only after delivery succeeded so a throwing handler does
+    // not skip the event on reconnect.
+    if (lastEnvelopeSeq > lastSeq) lastSeq = lastEnvelopeSeq;
+    // A full gh snapshot on reconnect (or after a mid-stream gh drop resync) invalidates
+    // viewer, dashboard and repo activity via its events, but not watched PR details or
+    // branch lists; invalidate those once per gh snapshot burst so they do not wait 60s-5m.
+    if (ev.source === "gh") {
+      if (lastEnvelopeSeq === 0n && (reconnecting || attemptSawLive) && !ghSnapshotInvalidated) {
+        ghSnapshotInvalidated = true;
+        invalidateWatchedGhOnReconnect();
+      }
+    } else {
+      ghSnapshotInvalidated = false;
+    }
+  };
+
+  const stop = runStream<EventView>({
+    open: (signal) => {
+      reconnecting = hadConnected;
+      attemptFirstEvent = true;
+      attemptSawLive = false;
+      lastEnvelopeSeq = 0n;
+      snapshotTerminals = null;
+      ghSnapshotInvalidated = false;
+      return watchEvents(signal, daemon, observer, {
+        sinceSeq: lastSeq,
+        sinceEpoch: lastEpoch,
+        onEnvelope,
+      });
     },
-    onEvent: observer ? dispatchObserved : dispatchEvent,
+    onEvent,
     onStatus: (stream, err) => {
       if (stream === "connecting" || stream === "retrying") delivered = false;
       useEventsStore.setState({ stream, streamError: err ?? null });

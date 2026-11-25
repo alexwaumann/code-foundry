@@ -12,6 +12,7 @@ import { CommitBand } from "./CommitBand";
 import { CommitList } from "./CommitList";
 import { commitsHeight, commitsShown, leaveCommit, listSides, viewCommit } from "./commits";
 import { CompareBar } from "./CompareBar";
+import { compareLogCache, compareWorktreeCache, invalidateWorktreeDiffCaches } from "./diffCaches";
 import { DiffFile } from "./DiffFile";
 import { FileList } from "./FileList";
 import { buildFileRows, diffTitle, inProject, listPace, pickRow, shortRef, sourceLabel, type FileRow } from "./files";
@@ -30,27 +31,34 @@ function Comparison({ tabId, tabTitle, target }: { tabId: string; tabTitle: stri
   const compare = useMemo<CompareTarget>(() => ({ projectId: project, worktree, base, head }), [project, worktree, base, head]);
   const paths = target.paths ?? NO_PATHS;
   const [pace, setPace] = useState(REFRESH_DEBOUNCE_MS);
-  const read = useTabRead<CompareView>([project, worktree, sourceParam(base), sourceParam(head), ...paths].join("\u0000"), async (signal) => {
-    const start = performance.now();
-    const view = await compareWorktree(compare, paths, undefined, signal);
-    setPace(listPace(performance.now() - start));
-    return view;
-  });
+  // A commit does not change, so only Refresh reads it again.
+  const inCommit = target.commit !== undefined;
+  const read = useTabRead<CompareView>(
+    [project, worktree, sourceParam(base), sourceParam(head), ...paths].join("\u0000"),
+    async (signal) => {
+      const start = performance.now();
+      const view = await compareWorktree(compare, paths, undefined, signal);
+      setPace(listPace(performance.now() - start));
+      return view;
+    },
+    { cache: compareWorktreeCache, mode: inCommit ? "fresh" : "revalidate" },
+  );
   // The Commits section's list, of the sides the tab had before a commit took them.
   const showCommits = commitsShown(target);
   const sides = listSides(target);
-  const log = useTabRead<CompareLogView | null>([project, worktree, sourceParam(sides.base), sourceParam(sides.head), String(showCommits)].join("\u0000"), async (signal) =>
-    showCommits ? listCompareCommits({ projectId: project, worktree, ...sides }, undefined, signal) : null,
+  const log = useTabRead<CompareLogView | null>(
+    [project, worktree, sourceParam(sides.base), sourceParam(sides.head), String(showCommits)].join("\u0000"),
+    async (signal) => (showCommits ? listCompareCommits({ projectId: project, worktree, ...sides }, undefined, signal) : null),
+    { cache: compareLogCache, mode: "revalidate" },
   );
   const { reload: readList } = read;
   const { reload: readLog } = log;
   const reload = useCallback(() => {
+    invalidateWorktreeDiffCaches(project, worktree);
     readList();
     readLog();
-  }, [readList, readLog]);
+  }, [project, worktree, readList, readLog]);
   const throttled = useThrottled(reload, pace, read.loading);
-  // A commit does not change, so only Refresh reads it again.
-  const inCommit = target.commit !== undefined;
   const later = useCallback(() => {
     if (!inCommit) throttled();
   }, [inCommit, throttled]);

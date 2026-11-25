@@ -188,26 +188,52 @@ async function sendClientState(): Promise<void> {
   }
 }
 
+/** Envelope metadata from one EventService.Watch message. */
+export interface EventEnvelope {
+  /** Daemon-wide sequence number: 0n for snapshots and heartbeats, > 0n for live/replayed events. */
+  seq: bigint;
+  /** Daemon instance epoch (changes on daemon restart). */
+  epoch: string;
+  isHeartbeat: boolean;
+}
+
+/** Optional resume cursor and envelope hook for watchEvents. */
+export interface WatchEventsOptions {
+  /** Resume after this seq under sinceEpoch; 0n starts fresh with snapshots. */
+  sinceSeq?: bigint;
+  sinceEpoch?: string;
+  /** Called for every message received from the daemon before mapping. */
+  onEnvelope?: (meta: EventEnvelope) => void;
+}
+
 /**
  * Opens EventService.Watch (all sources) as a GUI client with the page's visibility and
  * focus and yields mapped events and HEARTBEAT for heartbeats. An observer (the shot
  * window's page check: docs/notes/page-self-check.md) watches as a client the daemon does
  * not count as a window, and reports no visibility or focus.
  */
-export async function* watchEvents(signal: AbortSignal, conn: DaemonConnection = daemon, observer = false): AsyncGenerator<EventView | Heartbeat> {
+export async function* watchEvents(
+  signal: AbortSignal,
+  conn: DaemonConnection = daemon,
+  observer = false,
+  opts?: WatchEventsOptions,
+): AsyncGenerator<EventView | Heartbeat> {
   const c = await conn.client(EventService);
   const me: Watching = { id: newClientId(), conn, reported: pageClientState() };
   if (!observer) watching = me;
   try {
     let first = !observer;
-    const as = observer ? { clientKind: ClientKind.CLI } : { clientKind: ClientKind.GUI, clientId: me.id, ...me.reported };
+    const resume = opts?.sinceSeq && opts.sinceSeq > 0n ? { sinceSeq: opts.sinceSeq, ...(opts.sinceEpoch ? { sinceEpoch: opts.sinceEpoch } : {}) } : {};
+    const as = observer ? { clientKind: ClientKind.CLI, ...resume } : { clientKind: ClientKind.GUI, clientId: me.id, ...me.reported, ...resume };
     for await (const ev of c.watch(as, { signal })) {
       if (first) {
         // The daemon has registered the stream: catch up on a change made while it opened.
         first = false;
         void reportClientState();
       }
-      if (ev.event.case === "heartbeat") {
+      const isHeartbeat = ev.event.case === "heartbeat";
+      opts?.onEnvelope?.({ seq: ev.seq, epoch: ev.epoch, isHeartbeat });
+      if (isHeartbeat) {
         yield HEARTBEAT;
         continue;
       }

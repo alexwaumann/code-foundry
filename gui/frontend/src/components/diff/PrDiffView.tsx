@@ -3,7 +3,7 @@ import { ChevronDown, ExternalLink, FileDiff, FileX, GitCompare, RefreshCw, Tria
 import { isTooLargeMessage, tooLargeText } from "@/api/prDiff";
 import { FileEmptyState, FileLoading, NoticeBar } from "@/components/files/states";
 import { CopyPathAction, FileHeader, HeaderAction, WrapToggle } from "@/components/files/FileHeader";
-import { parsePrDiff, type PrDiffFile, type PrDiffModel } from "@/components/pr/diffModel";
+import { cachedParsePrDiff, type PrDiffFile, type PrDiffModel } from "@/components/pr/diffModel";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tip } from "@/components/ui/tooltip";
@@ -138,7 +138,7 @@ function Loaded({ tabId, target, rail, height, base, head, url, review }: { tabI
   const detailHead = pullRequestDetailResource.store((s) => s.entries[key]?.data?.pullRequest.headSha ?? "");
   const headRepo = pullRequestDetailResource.store((s) => s.entries[key]?.data?.pullRequest.headRepoSlug ?? "");
   const data = entry?.data ?? null;
-  const model = useMemo<PrDiffModel | null>(() => (data ? parsePrDiff(data.diff, data.headSha) : null), [data]);
+  const model = useMemo<PrDiffModel | null>(() => (data ? cachedParsePrDiff(key, data.diff, data.headSha) : null), [key, data]);
   const sha = data?.headSha || detailHead;
   const loader = useMemo(() => pullRequestFileLoader(target.slug, headRepo, sha), [target.slug, headRepo, sha]);
   const rows = useMemo(() => (model ? prFileRows(model) : []), [model]);

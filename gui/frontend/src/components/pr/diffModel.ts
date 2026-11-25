@@ -99,6 +99,43 @@ export function parsePrDiff(text: string, cacheKey: string): PrDiffModel {
   return { files: rows, added, deleted };
 }
 
+/** Bounded LRU cache size for parsed pull request diff models. */
+export const PR_DIFF_MODEL_CACHE_MAX = 8;
+
+interface CachedPrDiffModel {
+  diff: string;
+  model: PrDiffModel;
+}
+
+const prDiffModelCache = new Map<string, CachedPrDiffModel>();
+
+/**
+ * Returns a cached parsed PrDiffModel keyed by `(prKey, headSha)` and verified against the
+ * diff text, parsing on miss and evicting least-recently-used entries past PR_DIFF_MODEL_CACHE_MAX.
+ */
+export function cachedParsePrDiff(prKey: string, text: string, headSha: string): PrDiffModel {
+  const cacheKey = `${prKey}\u0000${headSha}`;
+  const hit = prDiffModelCache.get(cacheKey);
+  if (hit && hit.diff === text) {
+    prDiffModelCache.delete(cacheKey);
+    prDiffModelCache.set(cacheKey, hit);
+    return hit.model;
+  }
+  const model = parsePrDiff(text, headSha);
+  if (hit) prDiffModelCache.delete(cacheKey);
+  prDiffModelCache.set(cacheKey, { diff: text, model });
+  if (prDiffModelCache.size > PR_DIFF_MODEL_CACHE_MAX) {
+    const oldest = prDiffModelCache.keys().next().value;
+    if (oldest !== undefined) prDiffModelCache.delete(oldest);
+  }
+  return model;
+}
+
+/** Clears the parsed PR diff model LRU cache (tests). */
+export function clearPrDiffModelCache(): void {
+  prDiffModelCache.clear();
+}
+
 const splitLines = (s: string): string[] => (s === "" ? [] : s.split(SPLIT_WITH_NEWLINES));
 
 /** A hunk side's first line index: a zero-length side ("-5,0") sits after line 5, i.e. at index 5. */

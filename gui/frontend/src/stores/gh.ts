@@ -1,7 +1,7 @@
 import { notify } from "@/lib/notify";
 import { create } from "zustand";
 import { invokeCommand } from "@/api/command";
-import { getBranchPullRequests, getDashboard, getPullRequestDetail, getRepoActivity, getViewer, type GhEventView } from "@/api/gh";
+import { getBranchPullRequests, getDashboard, getPullRequestDetail, getRepoActivity, getViewer, type GhEventView, type ProjectPullRequestsView, type PullRequestView } from "@/api/gh";
 import { errorMessage } from "@/api/stream";
 import { getUiContext } from "./context";
 import { createResource, useResource } from "./resource";
@@ -140,6 +140,116 @@ export const pullRequestDetailResource = createResource(
   { keepAliveMs: PULL_REQUEST_DETAIL_KEEPALIVE_MS, abortOnRelease: true },
 );
 
+/**
+ * Replaces the PR matching `targetKey` in `list`; returns `list` unchanged when absent.
+ * Never downgrades a locally overlaid "merged" PR back to "open" from a lagging poll event.
+ */
+function patchPrList(list: PullRequestView[], targetKey: string, next: PullRequestView): PullRequestView[] {
+  const idx = list.findIndex((p) => pullRequestKey(p.repoSlug, p.number) === targetKey);
+  if (idx === -1) return list;
+  const cur = list[idx];
+  if (cur?.state === "merged" && next.state === "open") return list;
+  const out = list.slice();
+  out[idx] = next;
+  return out;
+}
+
+function patchProjectList(list: ProjectPullRequestsView | undefined, targetKey: string, next: PullRequestView): ProjectPullRequestsView | undefined {
+  if (!list) return list;
+  const pullRequests = patchPrList(list.pullRequests, targetKey, next);
+  return pullRequests === list.pullRequests ? list : { ...list, pullRequests };
+}
+
+/**
+ * Patches matching PR rows in-place across dashboard, branch PR lists, and PR detail
+ * caches when `pull_request_changed` arrives, without triggering extra unary RPCs or
+ * cancelling any in-flight refresh.
+ */
+function patchPullRequestInCaches(repoSlug: string, number: number, headRef: string, pr: PullRequestView): void {
+  if (pr.partial) return;
+  const slug = pr.repoSlug || repoSlug;
+  const num = pr.number || number;
+  if (!slug || !num) return;
+  const patched: PullRequestView = pr.repoSlug && pr.number && (pr.headRef || !headRef) ? pr : { ...pr, repoSlug: slug, number: num, headRef: pr.headRef || headRef };
+  const targetKey = pullRequestKey(slug, num);
+
+  // 1. Dashboard lists (authored, reviewRequested, reviewed, recentlyMerged, projectOpen, projectMerged).
+  const dashEntries = dashboardResource.store.getState().entries;
+  let dashChanged = false;
+  const nextDashEntries = { ...dashEntries };
+  for (const [key, entry] of Object.entries(dashEntries)) {
+    const d = entry.data;
+    if (!d) continue;
+    const authored = patchPrList(d.authored, targetKey, patched);
+    const reviewRequested = patchPrList(d.reviewRequested, targetKey, patched);
+    const reviewed = patchPrList(d.reviewed, targetKey, patched);
+    const recentlyMerged = patchPrList(d.recentlyMerged, targetKey, patched);
+    const projectOpen = patchProjectList(d.projectOpen, targetKey, patched);
+    const projectMerged = patchProjectList(d.projectMerged, targetKey, patched);
+    if (
+      authored !== d.authored ||
+      reviewRequested !== d.reviewRequested ||
+      reviewed !== d.reviewed ||
+      recentlyMerged !== d.recentlyMerged ||
+      projectOpen !== d.projectOpen ||
+      projectMerged !== d.projectMerged
+    ) {
+      nextDashEntries[key] = {
+        ...entry,
+        data: {
+          ...d,
+          authored,
+          reviewRequested,
+          reviewed,
+          recentlyMerged,
+          ...(projectOpen ? { projectOpen } : {}),
+          ...(projectMerged ? { projectMerged } : {}),
+        },
+      };
+      dashChanged = true;
+    }
+  }
+  if (dashChanged) dashboardResource.store.setState({ entries: nextDashEntries });
+
+  // 2. Branch pull request lists holding this PR.
+  const branchEntries = branchPullRequestsResource.store.getState().entries;
+  let branchChanged = false;
+  const nextBranchEntries = { ...branchEntries };
+  for (const [key, entry] of Object.entries(branchEntries)) {
+    const b = entry.data;
+    if (!b) continue;
+    const pullRequests = patchPrList(b.pullRequests, targetKey, patched);
+    if (pullRequests !== b.pullRequests) {
+      nextBranchEntries[key] = { ...entry, data: { ...b, pullRequests } };
+      branchChanged = true;
+    }
+  }
+  if (branchChanged) branchPullRequestsResource.store.setState({ entries: nextBranchEntries });
+
+  // 3. Cached pull request detail: update pullRequest in-place while keeping comments/commits/reviews,
+  // never downgrading an overlaid "merged" PR back to "open".
+  const detailEntries = pullRequestDetailResource.store.getState().entries;
+  const detailEntry = detailEntries[targetKey];
+  if (detailEntry?.data && !(detailEntry.data.pullRequest.state === "merged" && patched.state === "open")) {
+    pullRequestDetailResource.store.setState({
+      entries: {
+        ...detailEntries,
+        [targetKey]: { ...detailEntry, data: { ...detailEntry.data, pullRequest: patched } },
+      },
+    });
+  }
+}
+
+/**
+ * Invalidates currently watched branch PR lists and PR details when EventService.Watch
+ * reconnects with a full gh snapshot (could not resume via since_seq) or after a gh
+ * source drop resync, so watched views refresh immediately instead of waiting 60s-5m.
+ */
+export function invalidateWatchedGhOnReconnect(): void {
+  branchPullRequestsResource.invalidate(() => true);
+  pullRequestDetailResource.invalidate(() => true);
+}
+
 /** Routes one gh notification to the views it affects. */
 export function applyGhEvent(ev: GhEventView): void {
   switch (ev.kind) {
@@ -159,6 +269,9 @@ export function applyGhEvent(ev: GhEventView): void {
       break;
     case "pullRequestDetail":
       pullRequestDetailResource.invalidate(pullRequestKey(ev.repoSlug, ev.number));
+      break;
+    case "pullRequestChanged":
+      patchPullRequestInCaches(ev.repoSlug, ev.number, ev.headRef, ev.pullRequest);
       break;
   }
 }

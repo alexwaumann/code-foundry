@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { openFileInPanel } from "@/stores/filePanel";
 import { useCodeViewStore } from "@/stores/codeView";
 import { sourceParam } from "@/surfaces/diffTarget";
+import { compareFileCache } from "./diffCaches";
 import { sameSides, type FileRow } from "./files";
 import { useIndexChanges, useStatusChanges } from "./useStatusChanges";
 
@@ -85,13 +86,24 @@ export function DiffFile({ target, row, listed, compared, onRefresh, live = true
   const key = [projectId, worktree, sourceParam(base), sourceParam(head), row.path, row.oldPath].join("\u0000");
   // A read that answers what the last one did keeps its answer, so nothing is parsed or drawn
   // again: a lockfile's parse and render block the window for seconds, on every unrelated save.
-  const last = useRef<CompareFileSidesView | null>(null);
-  const read = useTabRead<CompareFileSidesView>(key, async (signal) => {
-    const next = await getCompareFile(target, row.path, row.oldPath, undefined, signal);
-    if (last.current && sameSides(last.current, next)) return last.current;
-    last.current = next;
-    return next;
-  });
+  const last = useRef<{ key: string; sides: CompareFileSidesView | null }>({ key: "", sides: null });
+  // Live comparisons (working tree / staged) render cached sides immediately while revalidating
+  // so edits whose line counts stayed unchanged are never missed on file revisit; immutable
+  // commit comparisons skip the RPC on a fresh cache hit.
+  const read = useTabRead<CompareFileSidesView>(
+    key,
+    async (signal) => {
+      const prev = last.current.key === key ? last.current.sides : (compareFileCache.peek(key)?.data ?? null);
+      const next = await getCompareFile(target, row.path, row.oldPath, undefined, signal);
+      if (prev && sameSides(prev, next)) {
+        last.current = { key, sides: prev };
+        return prev;
+      }
+      last.current = { key, sides: next };
+      return next;
+    },
+    { cache: compareFileCache, mode: live ? "revalidate" : "fresh" },
+  );
   const { reload } = read;
   const throttled = useThrottled(reload, undefined, read.loading);
   const later = useCallback(() => {

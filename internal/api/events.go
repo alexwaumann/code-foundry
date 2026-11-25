@@ -238,8 +238,9 @@ func (h *Events) Watch(ctx context.Context, req *connect.Request[v1.WatchEventsR
 			beat.Reset()
 			return stream.Send(ev)
 		},
-		beat:  beat.C(),
-		flush: true,
+		beat:            beat.C(),
+		flush:           true,
+		resumeHeartbeat: req.Msg.GetClientKind() == v1.ClientKind_CLIENT_KIND_GUI,
 	})
 }
 
@@ -256,6 +257,10 @@ type streamOut struct {
 	beat <-chan time.Time
 	// flush sends a nil event when the first snapshots were empty.
 	flush bool
+	// resumeHeartbeat sends a StreamHeartbeat (with Epoch) instead of a nil flush when a
+	// GUI stream resumes with since_seq and zero missed events, so it knows immediately
+	// that the resume succeeded instead of waiting for the next HeartbeatInterval.
+	resumeHeartbeat bool
 }
 
 // stream is Watch's loop over srcs (see Watch), sending to out until ctx ends or the
@@ -320,7 +325,11 @@ func (h *Events) stream(ctx context.Context, srcs []eventSource, since uint64, o
 	// Flush response headers now if nothing was sent: clients block until they arrive,
 	// and the first live event may be a long way off.
 	if sent == 0 && out.flush {
-		if err := out.send(v1.EventSource_EVENT_SOURCE_UNSPECIFIED, nil, false); err != nil {
+		if out.resumeHeartbeat && resumed {
+			if err := sendOwn(v1.EventSource_EVENT_SOURCE_UNSPECIFIED, &v1.Event{Event: &v1.Event_Heartbeat{Heartbeat: &v1.StreamHeartbeat{}}}, false); err != nil {
+				return err
+			}
+		} else if err := out.send(v1.EventSource_EVENT_SOURCE_UNSPECIFIED, nil, false); err != nil {
 			return err
 		}
 	}

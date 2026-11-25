@@ -8,6 +8,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { cn } from "@/lib/utils";
 import { sameSource, sourceParam } from "@/surfaces/diffTarget";
 import { useTabRead } from "@/components/files/useTabRead";
+import { refsReadCache } from "./diffCaches";
 import { refChoices } from "./sources";
 
 /** One choice of a picker. */
@@ -28,7 +29,7 @@ function Choice({ source, label, note, value, onPick }: { source: CompareSource;
 }
 
 function Refs({ projectId, query, value, onPick }: { projectId: string; query: string; value: CompareSource; onPick: (s: CompareSource) => void }) {
-  const read = useTabRead(projectId, (signal) => listRefs(projectId, undefined, signal));
+  const read = useTabRead(projectId, (signal) => listRefs(projectId, undefined, signal), { cache: refsReadCache, mode: "revalidate" });
   const refs = useMemo(() => refChoices(read.data?.refs ?? [], query), [read.data, query]);
   return (
     <CommandGroup heading="Refs">
