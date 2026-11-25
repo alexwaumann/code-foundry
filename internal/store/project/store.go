@@ -136,6 +136,10 @@ type projectState struct {
 	base atomic.Pointer[projectBase]
 	// wts is guarded by Git.mu; reconcile and CreateWorktree add slots, reconcile removes them.
 	wts map[string]*wtSlot
+	// hydrated is true when Start loaded cached state from SQLite; cleared on the first
+	// live reconcile so subscribers always observe a post-reconcile ProjectUpdated.
+	// Guarded by Git.mu.
+	hydrated bool
 }
 
 // statusDiskStamp snapshots .git/index right before `git status` runs so CompareWorktree
@@ -222,6 +226,11 @@ type Git struct {
 	// catFiles pools persistent `git cat-file --batch-command` workers when running with
 	// ExecRunner (nil when a custom test Runner is injected).
 	catFiles *catFilePool
+	// directMeta reads .git/config and refs directly in Go when running with ExecRunner
+	// (nil when a custom test Runner is injected).
+	directMeta *directGitMeta
+	// snapCache persists cold-start project snapshots to SQLite asynchronously.
+	snapCache *snapshotCache
 	// compareCache holds bounded LRUs for immutable compare queries and openCompare reuse.
 	compareCache *compareCaches
 	// refsCache caches ListRefs per project until invalidated by mutations or FSEvents.
@@ -272,6 +281,7 @@ func Start(ctx context.Context, opts Options) (*Git, error) {
 	g.compareCache = newCompareCaches()
 	if er, ok := execRunnerOf(g.runner); ok {
 		g.catFiles = newCatFilePool(er, g.now)
+		g.directMeta = &directGitMeta{env: er.env}
 	}
 	metas, err := g.load(ctx)
 	if err != nil {
@@ -285,6 +295,7 @@ func Start(ctx context.Context, opts Options) (*Git, error) {
 	if g.made, err = g.loadMade(ctx); err != nil {
 		return nil, err
 	}
+	g.hydrateSnapshots(ctx)
 
 	ctx, g.cancel = context.WithCancel(context.WithoutCancel(ctx))
 	g.sched = newScheduler(ctx, cmp.Or(opts.Workers, DefaultWorkers), g.runJob)
@@ -320,6 +331,7 @@ func Start(ctx context.Context, opts Options) (*Git, error) {
 		g.wg.Go(func() { g.tierLoop(ctx, "poll", s, t.live, g.pollNudge, nil, g.poll) })
 	}
 	g.wg.Go(func() { g.runWakeMonitor(ctx) })
+	g.snapCache = newSnapshotCache(g.db, g.log, g.now, defaultCacheFlushDelay, g.buildCachedProject)
 
 	g.commit(nil)
 	for _, m := range metas {
@@ -360,6 +372,9 @@ func (g *Git) Close() error {
 	g.touch.close()
 	g.sched.close()
 	g.wg.Wait()
+	if g.snapCache != nil {
+		g.snapCache.close()
+	}
 	if g.catFiles != nil {
 		g.catFiles.close()
 	}
@@ -705,6 +720,7 @@ func (g *Git) Unregister(ctx context.Context, id string) error {
 	}
 	g.compareCache.forgetProject(id)
 	g.refsCache.forget(id)
+	g.snapCache.forget(id)
 	g.forgetDetails(id)
 	g.fetches.forget(id)
 	g.log.Info("project unregistered", "id", id)
@@ -926,6 +942,7 @@ func (g *Git) registerCreatedWorktree(ctx context.Context, st *projectState, m *
 
 	g.fs.sync(ctx)
 	g.commit(projectUpdated(m.ID))
+	g.snapCache.markDirty(m.ID)
 	if st.base.Load() == nil || fetched {
 		if err := g.sched.wait(ctx, jobKey{kind: jobBase, projectID: m.ID}); err != nil {
 			rollback()
@@ -1378,6 +1395,8 @@ func (g *Git) reconcile(ctx context.Context, id string) {
 	if metaChanged {
 		st.meta.Store(&next)
 	}
+	firstPublish := st.hydrated
+	st.hydrated = false
 	var want map[string]watchTarget
 	switch {
 	case next.Error != "":
@@ -1407,7 +1426,7 @@ func (g *Git) reconcile(ctx context.Context, id string) {
 	// round trip to the watcher's goroutine.
 	g.fs.sync(ctx)
 
-	if metaChanged || setChanged {
+	if metaChanged || setChanged || firstPublish {
 		g.commit(func(s *Snapshot) []Event {
 			var evs []Event
 			for _, p := range removed {
@@ -1415,6 +1434,9 @@ func (g *Git) reconcile(ctx context.Context, id string) {
 			}
 			return append(evs, projectUpdated(id)(s)...)
 		})
+	}
+	if next.Error == "" && (metaChanged || setChanged) {
+		g.snapCache.markDirty(id)
 	}
 	if next.Git {
 		g.sched.requestPrio(jobKey{kind: jobBase, projectID: id}, prioLow)
@@ -1446,6 +1468,28 @@ func (g *Git) inspect(ctx context.Context, m *projectMeta) ([]listedWorktree, er
 		listed = append(listed, l)
 	}
 
+	g.inspectRepoMeta(ctx, m, listed[0].Branch)
+	return listed, nil
+}
+
+// inspectRepoMeta populates m.Remotes, m.OriginURL, m.GitHubSlug, and m.DefaultBranch,
+// using direct .git/config + ref reading when available and falling back to git on any
+// edge case or custom Runner.
+func (g *Git) inspectRepoMeta(ctx context.Context, m *projectMeta, mainBranch string) {
+	if g.directMeta != nil {
+		if res := g.directMeta.readRepoMeta(m.Path, mainBranch); res.remotesOK {
+			m.Remotes = res.remotes
+			m.OriginURL = res.originURL
+			m.GitHubSlug = parseGitHubSlug(m.OriginURL)
+			if res.branchOK {
+				m.DefaultBranch = res.defaultBranch
+				return
+			}
+			m.DefaultBranch = g.defaultBranchFromGit(ctx, m.Path, mainBranch, slices.Contains(m.Remotes, "origin"))
+			return
+		}
+	}
+
 	// One `git remote` per reconcile; origin's URL is read only when origin exists. A
 	// failed listing keeps the previous remotes rather than reporting a local-only project.
 	listedRemotes := true
@@ -1465,14 +1509,22 @@ func (g *Git) inspect(ctx context.Context, m *projectMeta) ([]listedWorktree, er
 	}
 	m.GitHubSlug = parseGitHubSlug(m.OriginURL)
 	hasOrigin := !listedRemotes || slices.Contains(m.Remotes, "origin")
-	m.DefaultBranch = g.defaultBranch(ctx, m.Path, listed[0].Branch, hasOrigin)
-	return listed, nil
+	m.DefaultBranch = g.defaultBranch(ctx, m.Path, mainBranch, hasOrigin)
 }
 
 // defaultBranch is origin/HEAD's target with an origin remote, else (no origin) the
 // branch HEAD of the main worktree dir names; then main or master if they exist
 // locally, else the main worktree's branch, else "main".
 func (g *Git) defaultBranch(ctx context.Context, dir, mainBranch string, hasOrigin bool) string {
+	if g.directMeta != nil {
+		if b, ok := g.directMeta.readDefaultBranch(dir, mainBranch, hasOrigin); ok {
+			return b
+		}
+	}
+	return g.defaultBranchFromGit(ctx, dir, mainBranch, hasOrigin)
+}
+
+func (g *Git) defaultBranchFromGit(ctx context.Context, dir, mainBranch string, hasOrigin bool) string {
 	if hasOrigin {
 		if out, err := g.runner.Run(ctx, dir, "symbolic-ref", "--quiet", "refs/remotes/origin/HEAD"); err == nil {
 			if b := parseOriginHead(out); b != "" {
@@ -1583,6 +1635,9 @@ func (g *Git) status(ctx context.Context, projectID, path string) {
 		// Linked worktrees never emit periodic unchanged WorktreeUpdated wakeups.
 		if prev.Status.RefreshedAt.IsZero() {
 			g.commit(nil)
+			if err == nil {
+				g.snapCache.markDirty(projectID)
+			}
 		} else if next.IsMain && g.publishedBefore(projectID, path, now.Add(-republishAfter)) {
 			g.commit(func(s *Snapshot) []Event {
 				if w, ok := s.Worktree(projectID, path); ok {
@@ -1590,6 +1645,9 @@ func (g *Git) status(ctx context.Context, projectID, path string) {
 				}
 				return nil
 			})
+			if err == nil {
+				g.snapCache.markDirty(projectID)
+			}
 		}
 		return
 	}
@@ -1601,6 +1659,9 @@ func (g *Git) status(ctx context.Context, projectID, path string) {
 		}
 		return nil
 	})
+	if err == nil {
+		g.snapCache.markDirty(projectID)
+	}
 }
 
 // republishAfter is how stale the main worktree's published RefreshedAt may get while
