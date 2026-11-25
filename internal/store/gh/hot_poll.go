@@ -181,9 +181,9 @@ func (s *Store) hasEligibleHot(now time.Time) bool {
 	return len(candidates) > 0
 }
 
-// eligibleHotIDs returns up to maxHotPRs unique GraphQL node IDs of eligible hot PRs,
+// eligibleHotTargets returns up to maxHotPRs unique eligible hot PR candidates,
 // ordered most recently touched first.
-func (s *Store) eligibleHotIDs(now time.Time) []string {
+func (s *Store) eligibleHotTargets(now time.Time) []hotCandidate {
 	leases := s.hot.active(now)
 	if len(leases) == 0 {
 		return nil
@@ -207,17 +207,31 @@ func (s *Store) eligibleHotIDs(now time.Time) []string {
 		}
 		return cmp.Compare(a.key.number, b.key.number)
 	})
-	ids := make([]string, 0, min(len(candidates), maxHotPRs))
+	out := make([]hotCandidate, 0, min(len(candidates), maxHotPRs))
 	seen := make(map[string]bool, min(len(candidates), maxHotPRs))
 	for _, cand := range candidates {
 		if seen[cand.id] {
 			continue
 		}
 		seen[cand.id] = true
-		ids = append(ids, cand.id)
-		if len(ids) >= maxHotPRs {
+		out = append(out, cand)
+		if len(out) >= maxHotPRs {
 			break
 		}
+	}
+	return out
+}
+
+// eligibleHotIDs returns up to maxHotPRs unique GraphQL node IDs of eligible hot PRs,
+// ordered most recently touched first.
+func (s *Store) eligibleHotIDs(now time.Time) []string {
+	targets := s.eligibleHotTargets(now)
+	if len(targets) == 0 {
+		return nil
+	}
+	ids := make([]string, len(targets))
+	for i, t := range targets {
+		ids[i] = t.id
 	}
 	return ids
 }
@@ -354,6 +368,21 @@ func hotMergeabilityResolved(p PullRequest, h hotNode) bool {
 		(p.MergeStateStatus == "UNKNOWN" && h.MergeStateStatus != "" && h.MergeStateStatus != "UNKNOWN")
 }
 
+// hotMetaOnlyRegressedToUnknown reports whether h differs from p solely by GitHub
+// temporarily dropping resolved mergeability/mergeStateStatus back to UNKNOWN (e.g.
+// after a base-branch push without bumping updatedAt). Keep the resolved copy intact
+// rather than triggering a PullRequestFull that flickers the panel to UNKNOWN.
+func hotMetaOnlyRegressedToUnknown(p PullRequest, h hotNode) bool {
+	if fingerprintMoved(p, h.fp) || p.Draft != h.Draft {
+		return false
+	}
+	mergeRegressed := p.Mergeable != h.Mergeable && h.Mergeable == MergeableUnknown
+	stateRegressed := p.MergeStateStatus != h.MergeStateStatus && h.MergeStateStatus == "UNKNOWN"
+	mergeOK := p.Mergeable == h.Mergeable || mergeRegressed
+	stateOK := p.MergeStateStatus == h.MergeStateStatus || stateRegressed
+	return (mergeRegressed || stateRegressed) && mergeOK && stateOK
+}
+
 type hotChange struct {
 	key         fullKey
 	stale       bool
@@ -412,6 +441,8 @@ func (c *fullCache) applyHotAt(nodes []hotNode, fpSeq uint64, now time.Time) (ch
 			e.d.PullRequest.Checks = h.fp.Checks
 			e.checksStale = true
 			changes = append(changes, hotChange{key: k, checksStale: true, pr: e.d.PullRequest, fp: h.fp})
+		case hotMetaOnlyRegressedToUnknown(e.d.PullRequest, h):
+			// Avoid flickering a resolved entry back to UNKNOWN while GitHub recomputes.
 		case hotMoved(e.d.PullRequest, h):
 			e.stale, e.checksStale = true, false
 			if fpSeq > 0 {
@@ -435,12 +466,17 @@ func (s *Store) hotPoll(ctx context.Context) {
 		return
 	}
 	start := s.opts.Now()
-	ids := s.eligibleHotIDs(start)
-	if len(ids) == 0 {
+	targets := s.eligibleHotTargets(start)
+	if len(targets) == 0 {
 		s.mu.Lock()
 		s.hotNext = time.Time{}
+		s.hotFailures = 0
 		s.mu.Unlock()
 		return
+	}
+	ids := make([]string, len(targets))
+	for i, t := range targets {
+		ids[i] = t.id
 	}
 	data, fpSeq, hotStart, err := s.callMeta(ctx, queryPullRequestHot, map[string]any{"ids": ids})
 	if ctx.Err() != nil {
@@ -461,7 +497,7 @@ func (s *Store) hotPoll(ctx context.Context) {
 			s.log.Warn("gh hot poll partial errors", "err", e)
 		}
 	}
-	s.applyHotPoll(nodes, fpSeq, hotStart, start, len(ids))
+	s.applyHotPoll(targets, nodes, partial == nil, fpSeq, hotStart, start)
 }
 
 func (s *Store) hotPollFailed(err error) {
@@ -484,16 +520,26 @@ func (s *Store) hotPollFailed(err error) {
 	}
 }
 
-func (s *Store) applyHotPoll(nodes []hotNode, fpSeq uint64, hotStart, start time.Time, asked int) {
+func (s *Store) applyHotPoll(targets []hotCandidate, nodes []hotNode, complete bool, fpSeq uint64, hotStart, start time.Time) {
 	now := s.opts.Now()
 	snap := s.Snapshot()
 	fps := make([]prFingerprint, 0, len(nodes))
+	returnedIDs := make(map[string]bool, len(nodes))
 	for _, n := range nodes {
+		returnedIDs[n.fp.ID] = true
 		fps = append(fps, n.fp)
 		if n.fp.State != PullRequestOpen && n.fp.Repo != "" && n.fp.Number > 0 {
 			s.hot.drop(fullKey{n.fp.Repo, n.fp.Number})
 			if localSlug := snap.LocalRepo(n.fp.Repo); localSlug != n.fp.Repo {
 				s.hot.drop(fullKey{localSlug, n.fp.Number})
+			}
+		}
+	}
+	if complete {
+		// Drop deleted or transferred PRs (null nodes) so we do not re-poll them until lease expiry.
+		for _, t := range targets {
+			if !returnedIDs[t.id] {
+				s.hot.drop(t.key)
 			}
 		}
 	}
@@ -533,7 +579,7 @@ func (s *Store) applyHotPoll(nodes []hotNode, fpSeq uint64, hotStart, start time
 	}
 	next := s.hotNext.Sub(end)
 	s.mu.Unlock()
-	s.log.Debug("gh hot poll", "asked", asked, "returned", len(nodes), "changed", len(changes),
+	s.log.Debug("gh hot poll", "asked", len(targets), "returned", len(nodes), "changed", len(changes),
 		"dur", end.Sub(start).Round(time.Millisecond).String(),
 		"next_in", max(0, next).Round(time.Second).String())
 }

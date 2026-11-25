@@ -43,12 +43,17 @@ query PullRequestHot($ids: [ID!]!) {
 * `Store.hot` (`hotPRs`) holds a bounded map (`hotLeaseMax = fullCacheMax = 64`) of
   `fullKey -> hotLease{until, touchedAt, mutatedAt}`:
   * **`FullPullRequest`** refreshes a PR's lease (`DefaultHotLease = 5m`, preserving any
-    existing `mutatedAt`), or drops it immediately if the PR is not open.
+    existing `mutatedAt`), or drops it immediately if the PR is not open. Note: a panel left
+    open on a single quiet CI job with zero state changes for longer than 5 minutes lets its
+    lease expire and falls back cleanly to the regular 60 s poll (until the next change
+    triggers a re-read), preventing forgotten tabs from fast-polling indefinitely.
   * **Local mutations** (`patchFull` / `invalidateFull`) refresh the lease AND stamp
     `mutatedAt = now` (for `DefaultHotMutateWindow = 2m`) so CI spinning up right after a
     ready-for-review toggle, reopen, checkbox edit, or comment is caught within 15 s even
     before `Checks.State` flips to `PENDING`. Mutations that close or merge a PR drop it
     from `Store.hot` immediately.
+  * **Deleted / transferred PRs**: if a complete `PullRequestHot` response (no partial
+    errors) omits an asked node ID (`null` node), its hot lease is dropped immediately.
 * A leased PR is eligible for `PullRequestHot` **only** when **all** of the following hold:
   1. Its lease has not expired (`now < lease.until`).
   2. It has a cached entry in `Store.full` with non-empty node `ID`, `State == OPEN`, and
@@ -126,14 +131,20 @@ query PullRequestHot($ids: [ID!]!) {
 
 * **Idle / background / no-GUI / settled PRs**: **0 req/hr** (0 points/hr).
 * **Active foreground hot PRs** (`PollInterval = 60s`, `HotPollInterval = 15s`, skip window `3s`):
-  * A 60 s poll cycle resets `hotNext = t + 15s`, yielding at most **3** `PullRequestHot`
-    queries per 60 s cycle (at `+15s`, `+30s`, `+45s`; the `+60s` slot is suppressed by the
-    3 s anti-duplication window in favor of the regular `Poll`).
-  * Cost per query is **1 GraphQL point** regardless of whether 1 or 8 PRs are hot.
-  * Sustained worst-case overhead (continuously watching hot PRs in foreground for a full
-    hour): **3 req/min** (0.15% of GitHub's 2,000 GraphQL pts/min secondary limit) and
-    **180 pts/hr** (3.6% of GitHub's 5,000 pts/hr primary budget), on top of 60 pts/hr for
-    the regular poll = **240 pts/hr** total (4.8% of primary budget).
+  * On a healthy 60 s poll cadence, `applyPoll` resets `hotNext = t + 15s`, yielding at most
+    **3** `PullRequestHot` queries per 60 s cycle (at `+15s`, `+30s`, `+45s`; the `+60s`
+    slot is suppressed by the 3 s anti-duplication window in favor of the regular `Poll`),
+    or **180 `PullRequestHot` pts/hr**.
+  * If `PollInterval` is longer than 60 s or the regular poll is backing off, the true
+    `PullRequestHot` ceiling is **4 req/min = 240 pts/hr** (4.8% of GitHub's 5,000 pts/hr
+    primary budget; 0.20% of the 2,000 pts/min secondary limit), regardless of whether 1 or
+    8 PRs are hot (cost is 1 point per batch).
+  * Including induced panel refreshes (`checks.graphql` or `PullRequestFull`, up to 1 per
+    detected hot-poll change per open panel), a realistic sustained worst case with
+    continuously changing CI in the foreground for a full hour is roughly
+    `60 (Poll) + 240 (PullRequestHot) + 240 (induced refreshes) ≈ 540 pts/hr` (~10.8% of
+    GitHub's 5,000 pts/hr primary budget), bounded by `DefaultHotLease` (5 m) and paused at
+    `MinRemaining = 200`.
 * **Runaway ceiling**: because `jobHotPoll` runs on the primary worker at `MinGap` (1 s) and
   never spends `gapAllowance` tokens, the global runaway bound proven in
   `docs/notes/perf-gh-read-lane.md` (**<= 3,368 req/hr** at 0.2 s RTT, paused at

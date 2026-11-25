@@ -623,6 +623,7 @@ func TestHotPollAntiDuplication(t *testing.T) {
 	})
 
 	t.Run("full poll resets hotNext to now + HotPollInterval", func(t *testing.T) {
+		clk := &testClock{}
 		g, _ := changeDrivenWorld()
 		g.edit("PR_a", func(p *PullRequest) {
 			p.Checks = CheckRollup{State: RollupPending, Total: 2, Pending: 2}
@@ -631,27 +632,101 @@ func TestHotPollAntiDuplication(t *testing.T) {
 		b := bus.New()
 		polled := bus.Subscribe[Polled](b, 16)
 		s := startHotStore(t, f, b, func(o *Options) {
-			o.HotPollInterval = 120 * time.Millisecond
+			o.Now = clk.now
+			o.MinGap = time.Millisecond
+			o.HotPollInterval = 15 * time.Second
 			o.PollInterval = time.Hour
 		})
 		if _, err := s.FullPullRequest(ctx, "o/r", 1, false); err != nil {
 			t.Fatal(err)
 		}
-		// Wait ~80ms so hotNext is only ~40ms away, then trigger a full poll.
-		time.Sleep(80 * time.Millisecond)
+		// Advance clock 10s so hotNext is only 5s away, then run a full poll.
+		clk.advance(10 * time.Second)
+		pollStart := clk.now()
 		if err := s.Refresh(ctx, ""); err != nil {
 			t.Fatal(err)
 		}
 		<-polled.C()
+		pollEnd := clk.now()
 
-		// Right after the full poll, hotNext was reset to +120ms, so 0 hot polls for 60ms.
-		hotAfterPoll := f.count("PullRequestHot")
-		time.Sleep(60 * time.Millisecond)
-		if got := f.count("PullRequestHot"); got != hotAfterPoll {
-			t.Fatalf("PullRequestHot fired right after Poll: before=%d after=%d", hotAfterPoll, got)
+		// Regular poll must have pushed hotNext forward to [pollStart+15s, pollEnd+15s] (not +5s).
+		s.mu.Lock()
+		gotHotNext := s.hotNext
+		s.mu.Unlock()
+		if gotHotNext.Before(pollStart.Add(15*time.Second)) || gotHotNext.After(pollEnd.Add(15*time.Second)) {
+			t.Fatalf("hotNext after regular poll = %v, want in [%v, %v]",
+				gotHotNext, pollStart.Add(15*time.Second), pollEnd.Add(15*time.Second))
 		}
-		// After the full 120ms window elapses, hot poll fires normally.
-		waitFor(t, "hot poll after reset interval", func() bool { return f.count("PullRequestHot") > hotAfterPoll })
+		if got := f.count("PullRequestHot"); got != 0 {
+			t.Fatalf("PullRequestHot fired during regular poll reset: got %d, want 0", got)
+		}
+	})
+
+	t.Run("resolved to UNKNOWN mergeability regression does not stale entry", func(t *testing.T) {
+		var c fullCache
+		now := time.Now()
+		k := fullKey{"o/r", 1}
+		d := FullPullRequest{
+			PullRequest: PullRequest{
+				ID:               "PR_a",
+				Repo:             "o/r",
+				Number:           1,
+				State:            PullRequestOpen,
+				HeadSHA:          "sha1",
+				UpdatedAt:        now,
+				Checks:           CheckRollup{State: RollupSuccess, Total: 1, Passed: 1},
+				Mergeable:        MergeableMergeable,
+				MergeStateStatus: "CLEAN",
+			},
+			FetchedAt: now,
+		}
+		c.putWithSeq(k, d, 5)
+		regressed := hotNode{
+			fp: prFingerprint{
+				ID:        "PR_a",
+				Repo:      "o/r",
+				Number:    1,
+				State:     PullRequestOpen,
+				HeadSHA:   "sha1",
+				UpdatedAt: now,
+				Checks:    CheckRollup{State: RollupSuccess, Total: 1, Passed: 1},
+			},
+			Mergeable:        MergeableUnknown,
+			MergeStateStatus: "UNKNOWN",
+		}
+		changes, closed := c.applyHotAt([]hotNode{regressed}, 10, now.Add(time.Second))
+		if len(changes) != 0 || len(closed) != 0 {
+			t.Fatalf("resolved->UNKNOWN regression produced changes=%v closed=%v, want none", changes, closed)
+		}
+		e, ok := c.entry(k)
+		if !ok || e.stale || e.checksStale {
+			t.Fatalf("entry = %+v (ok=%v), want fresh and not stale", e, ok)
+		}
+	})
+
+	t.Run("null node drops hot lease so deleted PR is not re-polled", func(t *testing.T) {
+		clk := &testClock{}
+		g, _ := changeDrivenWorld()
+		g.edit("PR_a", func(p *PullRequest) {
+			p.Checks = CheckRollup{State: RollupPending, Total: 2, Pending: 2}
+		})
+		f := (&fakeRunner{}).serve(g)
+		s := startHotStore(t, f, nil, func(o *Options) {
+			o.Now = clk.now
+			o.HotPollInterval = DefaultHotPollInterval
+		})
+		if _, err := s.FullPullRequest(ctx, "o/r", 1, false); err != nil {
+			t.Fatal(err)
+		}
+		targets := s.eligibleHotTargets(clk.now())
+		if len(targets) != 1 {
+			t.Fatalf("eligible targets before null node = %v, want 1", targets)
+		}
+		// Simulate complete response returning [null] (decoded as 0 nodes).
+		s.applyHotPoll(targets, nil, true, 10, clk.now(), clk.now())
+		if got := s.eligibleHotIDs(clk.now()); len(got) != 0 {
+			t.Fatalf("eligible IDs after null node = %v, want empty", got)
+		}
 	})
 }
 
