@@ -206,6 +206,11 @@ func (s *Store) runPollProjectsNow(ctx context.Context) {
 	if !p.FetchedAt.IsZero() && now.Sub(p.FetchedAt) < cfg.PollInterval {
 		return
 	}
+	// Run with scheduled semantics so admit calls letWaitingIn between PollProjects and
+	// its detail batches, yielding to any user-waited PR open/action immediately.
+	prevScheduled := s.scheduled
+	s.scheduled = true
+	defer func() { s.scheduled = prevScheduled }()
 	s.pollProjects(ctx, cfg)
 	if ctx.Err() != nil {
 		return

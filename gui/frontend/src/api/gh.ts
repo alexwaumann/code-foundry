@@ -553,15 +553,26 @@ export async function getBranchPullRequests(
   return { pullRequests: r.pullRequests.map(toPullRequestView), fetchedAtMs: ms(r.fetchedAt), lastError: r.lastError };
 }
 
+export interface BranchPullRequestsBatchEntry extends BranchPullRequestsView {
+  repoSlug?: string;
+  headRef?: string;
+}
+
 export async function getBranchesPullRequests(
   branches: readonly BranchPullRequestsQuery[],
   conn: DaemonConnection = daemon,
   signal?: AbortSignal,
-): Promise<BranchPullRequestsView[]> {
+): Promise<BranchPullRequestsBatchEntry[]> {
   if (branches.length === 0) return [];
   const c = await conn.client(GhService);
   const r = await c.getBranchesPullRequests({ branches: branches.map((b) => ({ repoSlug: b.repoSlug, headRef: b.headRef })) }, { signal });
-  return r.entries.map((e) => ({ pullRequests: e.pullRequests.map(toPullRequestView), fetchedAtMs: ms(e.fetchedAt), lastError: e.lastError }));
+  return r.entries.map((e) => ({
+    repoSlug: e.repoSlug,
+    headRef: e.headRef,
+    pullRequests: e.pullRequests.map(toPullRequestView),
+    fetchedAtMs: ms(e.fetchedAt),
+    lastError: e.lastError,
+  }));
 }
 
 // ---- Pull request detail panel ------------------------------------------------------

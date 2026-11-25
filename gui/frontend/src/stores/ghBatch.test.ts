@@ -1,12 +1,13 @@
+import { Code, ConnectError } from "@connectrpc/connect";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { BranchPullRequestsQuery, BranchPullRequestsView, DashboardView } from "@/api/gh";
+import type { BranchPullRequestsBatchEntry, BranchPullRequestsQuery, BranchPullRequestsView, DashboardView } from "@/api/gh";
 
 const calls = vi.hoisted(() => ({
   single: [] as { slug: string; head: string; signal?: AbortSignal }[],
   batch: [] as { branches: readonly BranchPullRequestsQuery[]; signal?: AbortSignal }[],
   dashboard: [] as boolean[],
   singleImpl: null as ((slug: string, head: string, signal?: AbortSignal) => Promise<BranchPullRequestsView>) | null,
-  batchImpl: null as ((branches: readonly BranchPullRequestsQuery[], signal?: AbortSignal) => Promise<BranchPullRequestsView[]>) | null,
+  batchImpl: null as ((branches: readonly BranchPullRequestsQuery[], signal?: AbortSignal) => Promise<BranchPullRequestsBatchEntry[]>) | null,
 }));
 
 vi.mock("@/api/gh", async (orig) => ({
@@ -152,6 +153,35 @@ describe("branch pull requests microtask batcher", () => {
     c2.abort();
     await expect(p2).rejects.toThrow(/aborted/i);
     expect(seenSignal?.aborted).toBe(true);
+  });
+
+  it("matches keyed batch responses by (repoSlug, headRef) so a short response never shifts siblings", async () => {
+    calls.batchImpl = () =>
+      Promise.resolve([{ repoSlug: "acme/b", headRef: "b2", pullRequests: [], fetchedAtMs: 2000, lastError: "ok-b2" }]);
+
+    const c1 = new AbortController();
+    const c2 = new AbortController();
+    const p1 = loadBranchPullRequests(branchKey("acme/a", "b1"), c1.signal);
+    const p2 = loadBranchPullRequests(branchKey("acme/b", "b2"), c2.signal);
+    await expect(p1).rejects.toThrow(/missing branch pull requests entry/i);
+    await expect(p2).resolves.toMatchObject({ lastError: "ok-b2" });
+  });
+
+  it("falls back to single reads when a batch fails with InvalidArgument so one bad key does not fail siblings", async () => {
+    calls.batchImpl = () => Promise.reject(new ConnectError("bad slug", Code.InvalidArgument));
+    calls.singleImpl = (slug, head) =>
+      slug === "bad"
+        ? Promise.reject(new ConnectError("invalid repo", Code.InvalidArgument))
+        : Promise.resolve({ pullRequests: [], fetchedAtMs: 3000, lastError: `${slug}@${head}` });
+
+    const c1 = new AbortController();
+    const c2 = new AbortController();
+    const p1 = loadBranchPullRequests(branchKey("bad", "feat"), c1.signal);
+    const p2 = loadBranchPullRequests(branchKey("acme/good", "feat"), c2.signal);
+    await expect(p1).rejects.toThrow(/invalid repo/i);
+    await expect(p2).resolves.toMatchObject({ lastError: "acme/good@feat" });
+    expect(calls.batch).toHaveLength(1);
+    expect(calls.single).toHaveLength(2);
   });
 });
 

@@ -330,8 +330,8 @@ describe("gh mapping", () => {
       conn,
     );
     expect(got).toHaveLength(2);
-    expect(got[0]).toMatchObject({ fetchedAtMs: 2000, lastError: "", pullRequests: [{ repoSlug: "o/r", number: 7, state: "open" }] });
-    expect(got[1]).toEqual({ pullRequests: [], fetchedAtMs: null, lastError: "not found" });
+    expect(got[0]).toMatchObject({ repoSlug: "o/r", headRef: "feat", fetchedAtMs: 2000, lastError: "", pullRequests: [{ repoSlug: "o/r", number: 7, state: "open" }] });
+    expect(got[1]).toEqual({ repoSlug: "o/s", headRef: "fix", pullRequests: [], fetchedAtMs: null, lastError: "not found" });
     expect(await getBranchesPullRequests([], conn)).toEqual([]);
   });
 

@@ -10,8 +10,15 @@ import { fresher } from "@/components/sidebar/linkedPrTag";
 import { pullRequestKey } from "@/stores/gh";
 import { readiness, type Readiness, type ReadinessRow, type RowId } from "./readiness";
 
-/** The dashboard's lists, all of them: a pull request opened from any of them finds its row. */
-export const dashboardLists = (d: DashboardView): readonly (readonly PullRequestView[])[] => [d.authored, d.reviewRequested, d.reviewed, d.recentlyMerged, d.projectOpen.pullRequests, d.projectMerged.pullRequests];
+/**
+ * The dashboard's lists for seeding a PR panel header while its detail is on its way.
+ * Project-wide lists are included only when live (Pull Requests page / bridge subscribed)
+ * so a frozen list from an earlier visit never seeds a stale title/state.
+ */
+export const dashboardLists = (d: DashboardView, includeProjects = false): readonly (readonly PullRequestView[])[] =>
+  includeProjects
+    ? [d.authored, d.reviewRequested, d.reviewed, d.recentlyMerged, d.projectOpen.pullRequests, d.projectMerged.pullRequests]
+    : [d.authored, d.reviewRequested, d.reviewed, d.recentlyMerged];
 
 /**
  * The freshest row of key (pullRequestKey) in the lists: one pull request can sit in two, the

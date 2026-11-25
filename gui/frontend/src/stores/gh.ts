@@ -1,3 +1,4 @@
+import { Code, ConnectError } from "@connectrpc/connect";
 import { notify } from "@/lib/notify";
 import { create } from "zustand";
 import { invokeCommand } from "@/api/command";
@@ -8,6 +9,7 @@ import {
   getPullRequestDetail,
   getRepoActivity,
   getViewer,
+  type BranchPullRequestsBatchEntry,
   type BranchPullRequestsView,
   type GhEventView,
   type ProjectPullRequestsView,
@@ -101,6 +103,9 @@ export const PROJECTS_WATCH_KEEPALIVE_MS = 5 * 60_000;
 let projectsWatchers = 0;
 let projectsTimer: ReturnType<typeof setInterval> | null = null;
 
+/** Whether any mounted view (Pull Requests page or page bridge) is keeping Snapshot.Projects live. */
+export const isProjectsWatched = (): boolean => projectsWatchers > 0;
+
 /** Key: DASHBOARD_KEY. The viewer's pull request lists in every repository (GhService.GetDashboard). */
 export const dashboardResource = createResource((_key, signal) => getDashboard(undefined, signal, { watchProjects: projectsWatchers > 0 }));
 
@@ -191,31 +196,55 @@ function flushBranchReads(): void {
   }
 
   const single = unique.length === 1 ? unique[0] : undefined;
-  const req = single
-    ? getBranchPullRequests(single.slug, single.head, undefined, batchCtl.signal).then((v) => [v])
+  const req: Promise<BranchPullRequestsBatchEntry[]> = single
+    ? getBranchPullRequests(single.slug, single.head, undefined, batchCtl.signal).then((v) => [{ ...v, repoSlug: single.slug, headRef: single.head }])
     : getBranchesPullRequests(
         unique.map((u) => ({ repoSlug: u.slug, headRef: u.head })),
         undefined,
         batchCtl.signal,
       );
 
+  const settleGroup = (group: { slug: string; head: string; waiters: PendingBranchRead[] }, entry: BranchPullRequestsView | undefined) => {
+    for (const w of group.waiters) {
+      if (w.aborted || w.signal.aborted) continue;
+      if (entry) w.resolve(entry);
+      else w.reject(new Error(`missing branch pull requests entry for ${group.slug}@${group.head}`));
+    }
+  };
+
   void req
     .then((entries) => {
+      const keyed = entries.every((e) => e.repoSlug !== undefined && e.headRef !== undefined);
+      const byKey = keyed ? new Map(entries.map((e) => [branchKey((e.repoSlug ?? "").toLowerCase(), e.headRef ?? ""), e])) : null;
       for (let i = 0; i < unique.length; i++) {
         const group = unique[i];
-        const entry = entries[i];
         if (!group) continue;
-        for (const w of group.waiters) {
-          if (w.aborted || w.signal.aborted) continue;
-          if (entry) w.resolve(entry);
-          else w.reject(new Error(`missing branch pull requests entry for ${group.slug}@${group.head}`));
-        }
+        const entry = byKey ? byKey.get(branchKey(group.slug.toLowerCase(), group.head)) : entries[i];
+        settleGroup(group, entry);
       }
     })
     .catch((err: unknown) => {
+      // If one bad key caused InvalidArgument for the whole batch, isolate the bad key by
+      // falling back to individual reads so sibling branches still load cleanly.
+      if (!single && err instanceof ConnectError && err.code === Code.InvalidArgument && !batchCtl.signal.aborted) {
+        return Promise.all(
+          unique.map((group) =>
+            getBranchPullRequests(group.slug, group.head, undefined, batchCtl.signal)
+              .then((v) => {
+                settleGroup(group, v);
+              })
+              .catch((singleErr: unknown) => {
+                for (const w of group.waiters) {
+                  if (!w.aborted && !w.signal.aborted) w.reject(singleErr);
+                }
+              }),
+          ),
+        );
+      }
       for (const w of raw) {
         if (!w.aborted && !w.signal.aborted) w.reject(err);
       }
+      return undefined;
     })
     .finally(detachListeners);
 }
