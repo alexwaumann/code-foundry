@@ -241,7 +241,7 @@ func (s *Store) BranchPullRequests(ctx context.Context, slug, head string) (Bran
 		}
 		if ok {
 			s.branches.setIfAbsent(k, st)
-			s.summaries.putBranch(s.Snapshot(), key, st.PullRequests, time.Time{})
+			s.summaries.putBranch(s.Snapshot(), key, st.PullRequests)
 		}
 	}
 	now := s.opts.Now()

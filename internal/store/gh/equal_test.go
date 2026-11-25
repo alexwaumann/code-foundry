@@ -1,6 +1,7 @@
 package gh
 
 import (
+	"reflect"
 	"testing"
 	"time"
 )
@@ -130,4 +131,123 @@ func TestTypedEqualityMatchesSameJSON(t *testing.T) {
 			t.Error("thread resolved change not detected")
 		}
 	})
+}
+
+// TestTypedEqualityCoversAllFields uses reflection to guard against future struct fields
+// being silently ignored by equal.go's typed equality helpers. Every exported field on
+// each covered struct must either be detected by its helper or appear in its explicit
+// ignore set.
+func TestTypedEqualityCoversAllFields(t *testing.T) {
+	t1 := time.Date(2026, 11, 20, 12, 0, 0, 0, time.UTC)
+
+	var distinctValue func(typ reflect.Type) reflect.Value
+	distinctValue = func(typ reflect.Type) reflect.Value {
+		switch typ.Kind() {
+		case reflect.Bool:
+			return reflect.ValueOf(true).Convert(typ)
+		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+			return reflect.ValueOf(int64(7)).Convert(typ)
+		case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+			return reflect.ValueOf(uint64(7)).Convert(typ)
+		case reflect.String:
+			return reflect.ValueOf("changed").Convert(typ)
+		case reflect.Struct:
+			if typ == reflect.TypeOf(time.Time{}) {
+				return reflect.ValueOf(t1)
+			}
+			v := reflect.New(typ).Elem()
+			for i := range typ.NumField() {
+				f := typ.Field(i)
+				if !f.IsExported() {
+					continue
+				}
+				v.Field(i).Set(distinctValue(f.Type))
+			}
+			return v
+		case reflect.Slice:
+			s := reflect.MakeSlice(typ, 1, 1)
+			s.Index(0).Set(distinctValue(typ.Elem()))
+			return s
+		default:
+			t.Fatalf("unsupported field kind %s (%s) in reflection guard", typ.Kind(), typ)
+			return reflect.Value{}
+		}
+	}
+
+	checkStruct := func(t *testing.T, name string, base any, equal func(a, b any) bool, ignored map[string]bool) {
+		t.Helper()
+		t.Run(name, func(t *testing.T) {
+			typ := reflect.TypeOf(base)
+			for i := range typ.NumField() {
+				f := typ.Field(i)
+				if !f.IsExported() {
+					continue
+				}
+				mut := reflect.New(typ).Elem()
+				mut.Set(reflect.ValueOf(base))
+				mut.Field(i).Set(distinctValue(f.Type))
+				same := equal(base, mut.Interface())
+				if ignored[f.Name] {
+					if !same {
+						t.Errorf("%s.%s is listed as ignored, yet equality reported a difference", name, f.Name)
+					}
+				} else if same {
+					t.Errorf("%s.%s was mutated but typed equality still reported equal (update equal.go or ignore list)", name, f.Name)
+				}
+			}
+		})
+	}
+
+	checkStruct(t, "Dashboard", Dashboard{},
+		func(a, b any) bool { return sameDashboard(a.(Dashboard), b.(Dashboard)) },
+		map[string]bool{"FetchedAt": true})
+	checkStruct(t, "MonthlyStats", MonthlyStats{},
+		func(a, b any) bool { return sameStats(a.(MonthlyStats), b.(MonthlyStats)) },
+		map[string]bool{"FetchedAt": true, "ClosedAt": true})
+	checkStruct(t, "MonthCount", MonthCount{},
+		func(a, b any) bool { return a.(MonthCount) == b.(MonthCount) },
+		nil)
+	checkStruct(t, "BranchCI", BranchCI{},
+		func(a, b any) bool { return sameBranchCI(a.(BranchCI), b.(BranchCI)) },
+		map[string]bool{"FetchedAt": true})
+	checkStruct(t, "ProjectPullRequests", ProjectPullRequests{},
+		func(a, b any) bool { return sameProjects(a.(ProjectPullRequests), b.(ProjectPullRequests)) },
+		map[string]bool{"FetchedAt": true})
+	checkStruct(t, "ProjectList", ProjectList{},
+		func(a, b any) bool {
+			return sameProjects(ProjectPullRequests{Open: a.(ProjectList)}, ProjectPullRequests{Open: b.(ProjectList)})
+		},
+		map[string]bool{"Query": true, "WebQuery": true})
+	checkStruct(t, "PullRequest", PullRequest{},
+		func(a, b any) bool { return samePullRequestValue(a.(PullRequest), b.(PullRequest)) },
+		nil)
+	checkStruct(t, "FullPullRequest", FullPullRequest{},
+		func(a, b any) bool { return sameFull(a.(FullPullRequest), b.(FullPullRequest)) },
+		map[string]bool{"FetchedAt": true, "LastError": true, "FetchFailed": true, "Refreshing": true})
+	checkStruct(t, "Review", Review{},
+		func(a, b any) bool { return sameReviews([]Review{a.(Review)}, []Review{b.(Review)}) },
+		nil)
+	checkStruct(t, "CheckRun", CheckRun{},
+		func(a, b any) bool { return sameCheckRuns([]CheckRun{a.(CheckRun)}, []CheckRun{b.(CheckRun)}) },
+		nil)
+	checkStruct(t, "Reviewer", Reviewer{},
+		func(a, b any) bool { return sameReviewers([]Reviewer{a.(Reviewer)}, []Reviewer{b.(Reviewer)}) },
+		nil)
+	checkStruct(t, "Commit", Commit{},
+		func(a, b any) bool { return sameCommits([]Commit{a.(Commit)}, []Commit{b.(Commit)}) },
+		nil)
+	checkStruct(t, "Comment", Comment{},
+		func(a, b any) bool { return sameComments([]Comment{a.(Comment)}, []Comment{b.(Comment)}) },
+		nil)
+	checkStruct(t, "ReviewThread", ReviewThread{},
+		func(a, b any) bool {
+			return sameReviewThreads([]ReviewThread{a.(ReviewThread)}, []ReviewThread{b.(ReviewThread)})
+		},
+		nil)
+	checkStruct(t, "Label", Label{},
+		func(a, b any) bool { return a.(Label) == b.(Label) },
+		nil)
+	checkStruct(t, "CheckRollup", CheckRollup{},
+		func(a, b any) bool { return a.(CheckRollup) == b.(CheckRollup) },
+		nil)
 }

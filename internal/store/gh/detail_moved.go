@@ -71,8 +71,7 @@ func (d *movedDetails) writtenSince(k fullKey, fetched time.Time) bool {
 
 // markMovedDetails is the poll's hook: every pull request whose fingerprint moved from
 // what the store held (or that it did not hold) gets its cached PullRequest detail
-// marked. Check-count-only ticks while CI stays PENDING patch the in-memory detail in
-// place instead of marking it moved.
+// marked so PullRequest() refetches fresh check-run rows (backing plugin pr.checks facts).
 func (s *Store) markMovedDetails(fps []prFingerprint, known map[string]PullRequest) {
 	now := s.opts.Now()
 	snap := s.Snapshot()
@@ -80,17 +79,10 @@ func (s *Store) markMovedDetails(fps []prFingerprint, known map[string]PullReque
 		if f.Repo == "" || f.Number <= 0 {
 			continue
 		}
-		k := fullKey{f.Repo, f.Number}
-		localSlug := snap.LocalRepo(f.Repo)
-		if prev, ok := known[f.ID]; ok && pendingCheckCountsOnly(prev, f) {
-			s.prDetails.patchChecks(k, f.Checks)
-			if localSlug != f.Repo {
-				s.prDetails.patchChecks(fullKey{localSlug, f.Number}, f.Checks)
-			}
-			continue
-		} else if !ok || fingerprintMoved(prev, f) {
+		if prev, ok := known[f.ID]; !ok || fingerprintMoved(prev, f) {
+			k := fullKey{f.Repo, f.Number}
 			s.moved.mark(k, now, s.opts.DetailTTL)
-			if localSlug != f.Repo {
+			if localSlug := snap.LocalRepo(f.Repo); localSlug != f.Repo {
 				s.moved.mark(fullKey{localSlug, f.Number}, now, s.opts.DetailTTL)
 			}
 		}

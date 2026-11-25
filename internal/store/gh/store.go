@@ -252,8 +252,8 @@ func New(ctx context.Context, opts Options) (*Store, error) {
 	s.loadActivity(ctx, snap)
 	s.loadOwners(ctx)
 	s.snap.Store(snap)
-	s.summaries.putDashboard(snap, snap.Dashboard, time.Time{})
-	s.summaries.putProjects(snap, snap.Projects, time.Time{})
+	s.summaries.putDashboard(snap, snap.Dashboard)
+	s.summaries.putProjects(snap, snap.Projects)
 	// A recent poll in the cache (with the viewer's id, which stats need) waits out its
 	// interval, so restarts do not poll in a burst.
 	s.pollNext = now
@@ -425,7 +425,7 @@ func (s *Store) PullRequest(ctx context.Context, slug string, number int) (PullR
 func (s *Store) cachedPullRequestDetail(k fullKey) (d PullRequestDetail, ok, fromMem bool) {
 	d, ok = s.prDetails.get(k)
 	fromMem = ok
-	if e, hasFull := s.full.entry(k); hasFull && !e.stale && !e.written && e.d.LastError == "" {
+	if e, hasFull := s.full.entry(k); hasFull && !e.stale && !e.checksStale && !e.written && !e.d.ChecksTruncated && e.d.LastError == "" {
 		fromFull := PullRequestDetail{
 			PullRequest: e.d.PullRequest,
 			Checks:      e.d.Checks,

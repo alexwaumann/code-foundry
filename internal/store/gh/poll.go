@@ -366,6 +366,7 @@ func (s *Store) applyPoll(ctx context.Context, cfg Config, plan *pollPlan, res *
 			}
 		}
 	}
+	s.summaries.putFingerprints(snap, fps, s.opts.Now())
 	s.staleFullDetails(fps)        // cached detail panels: what moved goes stale, the rest is confirmed (pr_detail.go)
 	s.markMovedDetails(fps, known) // and PullRequest's cached copies (detail_moved.go)
 	var need []prFingerprint
@@ -514,7 +515,7 @@ func (s *Store) applyPoll(ctx context.Context, cfg Config, plan *pollPlan, res *
 			changed := !had || prev.FetchedAt.IsZero() || prev.LastError != st.LastError || !samePullRequestsStrictNil(prev.PullRequests, st.PullRequests)
 			s.branches.set(k, st)
 			if st.LastError == "" {
-				s.summaries.putBranch(s.Snapshot(), rp.slug, st.PullRequests, now)
+				s.summaries.putBranch(s.Snapshot(), rp.slug, st.PullRequests)
 			}
 			if changed {
 				branchUpdates = append(branchUpdates, branchUpdate{k, st})
@@ -570,7 +571,7 @@ func (s *Store) applyPoll(ctx context.Context, cfg Config, plan *pollPlan, res *
 		if res.Sections[sectionMerged].Err == nil {
 			okDash.RecentlyMerged = newDash.RecentlyMerged
 		}
-		s.summaries.putDashboard(snapNow, okDash, now)
+		s.summaries.putDashboard(snapNow, okDash)
 	}
 
 	// Stats rows are written whenever stats were fetched: their times schedule them

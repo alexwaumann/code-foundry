@@ -161,7 +161,7 @@ func (s *Store) markMerged(k fullKey) {
 	})
 	if moved {
 		snap := s.Snapshot()
-		s.summaries.putDashboard(snap, snap.Dashboard, time.Time{})
+		s.summaries.putDashboard(snap, snap.Dashboard)
 		s.log.Info("gh merge shown before the searches have it", "pr", k.String())
 		publish(s, DashboardUpdated{FetchedAt: snap.Dashboard.FetchedAt})
 	}

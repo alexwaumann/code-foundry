@@ -175,53 +175,92 @@ func TestSQLiteHydrationFingerprintValidation(t *testing.T) {
 		}
 	})
 
-	t.Run("prMatchesPollSummary checks every field", func(t *testing.T) {
+	t.Run("prMatchesFingerprint checks every fingerprint field", func(t *testing.T) {
 		t0 := time.Date(2026, 11, 1, 12, 0, 0, 0, time.UTC)
 		base := PullRequest{
 			ID: "PR_1", Number: 1, Repo: "o/r", State: PullRequestOpen, UpdatedAt: t0, HeadSHA: "h1",
-			Draft: false, ReviewDecision: ReviewRequired, Mergeable: MergeableMergeable,
-			MergeStateStatus: "CLEAN", Comments: 2, Reviews: 1,
 			Checks: CheckRollup{State: RollupSuccess, Total: 3, Passed: 3},
 		}
-		if !prMatchesPollSummary(base, base, true) {
+		fp := prFingerprint{
+			ID: "PR_1", Number: 1, Repo: "o/r", State: PullRequestOpen, UpdatedAt: t0, HeadSHA: "h1",
+			HasChecks: true, Checks: base.Checks,
+		}
+		if !prMatchesFingerprint(base, fp) {
 			t.Fatal("identical open PR did not match")
 		}
 		mutations := []struct {
 			name string
-			fn   func(*PullRequest)
+			fn   func(*prFingerprint)
 		}{
-			{"ID", func(p *PullRequest) { p.ID = "PR_other" }},
-			{"UpdatedAt", func(p *PullRequest) { p.UpdatedAt = t0.Add(time.Second) }},
-			{"HeadSHA", func(p *PullRequest) { p.HeadSHA = "h2" }},
-			{"State", func(p *PullRequest) { p.State = PullRequestClosed }},
-			{"Draft", func(p *PullRequest) { p.Draft = true }},
-			{"Checks", func(p *PullRequest) { p.Checks.Passed = 2 }},
-			{"ReviewDecision", func(p *PullRequest) { p.ReviewDecision = ReviewApproved }},
-			{"Comments", func(p *PullRequest) { p.Comments = 3 }},
-			{"Reviews", func(p *PullRequest) { p.Reviews = 2 }},
-			{"Mergeable", func(p *PullRequest) { p.Mergeable = MergeableConflicting }},
-			{"MergeStateStatus", func(p *PullRequest) { p.MergeStateStatus = "DIRTY" }},
-			{"Partial", func(p *PullRequest) { p.Partial = true }},
+			{"ID", func(f *prFingerprint) { f.ID = "PR_other" }},
+			{"UpdatedAt", func(f *prFingerprint) { f.UpdatedAt = t0.Add(time.Second) }},
+			{"HeadSHA", func(f *prFingerprint) { f.HeadSHA = "h2" }},
+			{"State", func(f *prFingerprint) { f.State = PullRequestClosed }},
+			{"Checks", func(f *prFingerprint) { f.Checks.Passed = 2 }},
 		}
 		for _, tc := range mutations {
 			t.Run(tc.name, func(t *testing.T) {
-				polled := base
-				tc.fn(&polled)
-				if prMatchesPollSummary(base, polled, true) {
+				m := fp
+				tc.fn(&m)
+				if prMatchesFingerprint(base, m) {
 					t.Errorf("%s change still matched", tc.name)
 				}
 			})
 		}
-		// Open PR without checks cannot be validated.
-		if prMatchesPollSummary(base, base, false) {
+		// Open PR without checks in fingerprint cannot be validated.
+		noChecks := fp
+		noChecks.HasChecks = false
+		if prMatchesFingerprint(base, noChecks) {
 			t.Error("open PR matched without checks")
 		}
-		// Merged PR: PullRequestSummary omits open-only fields; should still match.
+		// Merged PR without checks in fingerprint still matches.
 		cachedMerged := base
 		cachedMerged.State = PullRequestMerged
-		polledMerged := PullRequest{ID: "PR_1", Number: 1, Repo: "o/r", State: PullRequestMerged, UpdatedAt: t0, HeadSHA: "h1"}
-		if !prMatchesPollSummary(cachedMerged, polledMerged, false) {
-			t.Error("merged PR did not match summary-only polled copy")
+		fpMerged := prFingerprint{ID: "PR_1", Number: 1, Repo: "o/r", State: PullRequestMerged, UpdatedAt: t0, HeadSHA: "h1"}
+		if !prMatchesFingerprint(cachedMerged, fpMerged) {
+			t.Error("merged PR did not match summary-only fingerprint")
+		}
+	})
+
+	t.Run("failed detail fetch after updatedAt move does not validate stale SQLite row", func(t *testing.T) {
+		g, _ := changeDrivenWorld()
+		g.setBody("PR_a", "v1")
+		db := openTestDB(t)
+		clk := &testClock{}
+		f := (&fakeRunner{}).serve(g)
+		opts := testOptions(db, f, nil)
+		opts.Now = clk.now
+		s := startStore(t, opts)
+		if err := s.Track("o/r"); err != nil {
+			t.Fatal(err)
+		}
+		pollOnce(t, s, f)
+		if _, err := s.FullPullRequest(ctx, "o/r", 1, false); err != nil {
+			t.Fatal(err)
+		}
+		// Evict from memory, move UpdatedAt on GitHub, and make PullRequestDetails fail
+		// so resolveFingerprints carries the old Dashboard copy forward while the live
+		// fingerprint carries the new UpdatedAt.
+		s.full.mu.Lock()
+		delete(s.full.m, fullKey{"o/r", 1})
+		s.full.mu.Unlock()
+		clk.advance(time.Minute)
+		g.edit("PR_a", func(p *PullRequest) { p.UpdatedAt = p.UpdatedAt.Add(time.Minute) })
+		g.failNext("PullRequestDetails", fmt.Errorf("transient detail failure"))
+		pollOnce(t, s, f)
+		// Clear moved mark to prove fingerprint validation itself rejects the stale row.
+		s.moved.mu.Lock()
+		s.moved.m = nil
+		s.moved.mu.Unlock()
+
+		before := f.count("PullRequestFull")
+		d, err := s.FullPullRequest(ctx, "o/r", 1, false)
+		if err != nil || !d.Refreshing {
+			t.Fatalf("after UpdatedAt move + failed detail batch: refreshing=%v err=%v; want stale", d.Refreshing, err)
+		}
+		settleWorker(t, s)
+		if n := f.count("PullRequestFull") - before; n != 1 {
+			t.Errorf("PullRequestFull fetches = %d, want 1", n)
 		}
 	})
 }
@@ -296,8 +335,8 @@ func TestPendingCheckCountsPatchedInPlace(t *testing.T) {
 				t.Errorf("keys=%v stale=%v; want %d keys stale=%v", keys, e.stale, tt.wantKeys, tt.wantStale)
 			}
 			if !tt.wantStale {
-				if e.d.PullRequest.Checks != next.Checks || !e.confirmed.Equal(now) {
-					t.Errorf("in-place patch: checks=%+v confirmed=%v; want %+v at %v", e.d.PullRequest.Checks, e.confirmed, next.Checks, now)
+				if e.d.PullRequest.Checks != next.Checks || !e.checksStale {
+					t.Errorf("checks-only patch: checks=%+v checksStale=%v; want %+v checksStale=true", e.d.PullRequest.Checks, e.checksStale, next.Checks)
 				}
 			}
 		})
@@ -332,7 +371,7 @@ func TestPendingCICheckTicksAvoidFullRefetchUntilSettle(t *testing.T) {
 	}
 	drain(events)
 	fullBefore := f.count("PullRequestFull")
-	prBefore := f.count("PullRequest")
+	checksBefore := f.count("Checks")
 
 	for i := 2; i <= 6; i++ {
 		clk.advance(30 * time.Second)
@@ -343,30 +382,35 @@ func TestPendingCICheckTicksAvoidFullRefetchUntilSettle(t *testing.T) {
 		if got := drain(events); got != 1 {
 			t.Fatalf("tick %d: PullRequestDetailUpdated = %d, want 1", i, got)
 		}
+		// Immediate stale-first read carries the patched summary counts and triggers a
+		// lightweight checks.graphql refresh (not PullRequestFull) to update check rows.
 		d, err := s.FullPullRequest(ctx, "o/r", 1, false)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if d.Refreshing || d.PullRequest.Checks.Passed != i || d.PullRequest.Checks.Pending != 12-i {
+		if !d.Refreshing || d.PullRequest.Checks.Passed != i || d.PullRequest.Checks.Pending != 12-i {
 			t.Errorf("tick %d: refreshing=%v checks=%+v", i, d.Refreshing, d.PullRequest.Checks)
 		}
-		pd, err := s.PullRequest(ctx, "o/r", 1)
+		settleWorker(t, s)
+		drain(events)
+		// After checks.graphql settles, individual check rows are fresh and Refreshing is false.
+		d2, err := s.FullPullRequest(ctx, "o/r", 1, false)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if pd.PullRequest.Checks.Passed != i {
-			t.Errorf("tick %d PullRequest checks = %+v", i, pd.PullRequest.Checks)
+		wantCheck := fmt.Sprintf("ci-%d-of-12", i)
+		if d2.Refreshing || len(d2.Checks) == 0 || d2.Checks[0].Name != wantCheck {
+			t.Errorf("tick %d post-checks: refreshing=%v checks=%+v, want %s", i, d2.Refreshing, d2.Checks, wantCheck)
 		}
 	}
-	settleWorker(t, s)
 	if n := f.count("PullRequestFull") - fullBefore; n != 0 {
 		t.Errorf("pending CI ticks sent %d PullRequestFull fetches, want 0", n)
 	}
-	if n := f.count("PullRequest") - prBefore; n != 0 {
-		t.Errorf("pending CI ticks sent %d PullRequest fetches, want 0", n)
+	if n := f.count("Checks") - checksBefore; n != 5 {
+		t.Errorf("pending CI ticks sent %d lightweight Checks fetches, want 5", n)
 	}
 
-	// Once CI settles to SUCCESS, both FullPullRequest and PullRequest refetch.
+	// Once CI settles to SUCCESS, FullPullRequest refetches full detail.
 	clk.advance(30 * time.Second)
 	g.edit("PR_a", func(p *PullRequest) {
 		p.Checks = CheckRollup{State: RollupSuccess, Total: 12, Passed: 12}

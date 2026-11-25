@@ -54,6 +54,7 @@ type reviewerCache struct {
 	mu    sync.Mutex
 	repos map[string]*repoAssignableEntry
 	prs   map[fullKey]*prReviewersEntry
+	prGen map[fullKey]uint64
 	seq   uint64
 }
 
@@ -114,9 +115,18 @@ func (c *reviewerCache) pr(k fullKey, now time.Time) (author string, requested [
 	return e.author, slices.Clone(e.requested), true
 }
 
-func (c *reviewerCache) putPR(k fullKey, author string, requested []ReviewerCandidate, now time.Time) {
+func (c *reviewerCache) prGeneration(k fullKey) uint64 {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	return c.prGen[k]
+}
+
+func (c *reviewerCache) putPR(k fullKey, gen uint64, author string, requested []ReviewerCandidate, now time.Time) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.prGen[k] != gen {
+		return // invalidated while the fetch was in flight
+	}
 	if c.prs == nil {
 		c.prs = map[fullKey]*prReviewersEntry{}
 	}
@@ -146,6 +156,10 @@ func (c *reviewerCache) putPR(k fullKey, author string, requested []ReviewerCand
 func (c *reviewerCache) invalidatePR(k fullKey) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	if c.prGen == nil {
+		c.prGen = map[fullKey]uint64{}
+	}
+	c.prGen[k]++
 	delete(c.prs, k)
 }
 

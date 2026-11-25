@@ -217,7 +217,7 @@ func (g *fakeGitHub) respond(op, doc string, vars map[string]any) (json.RawMessa
 			data[a] = map[string]any{"object": map[string]any{"oid": r.sha,
 				"statusCheckRollup": map[string]any{"state": string(r.rollup.State), "contexts": ctx}}}
 		}
-	case "PullRequestFull", "ReviewerCandidates", "RevertPullRequest":
+	case "PullRequestFull", "ReviewerCandidates", "RevertPullRequest", "Checks":
 		g.detailOp(op, vars, data, &errs) // fakegithub_detail_test.go
 	case "MergePullRequest":
 		g.mergeOp(vars, data, &errs) // fakegithub_merge_test.go

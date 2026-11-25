@@ -72,6 +72,39 @@ func (g *fakeGitHub) detailOp(op string, vars map[string]any, data map[string]an
 		*errs = append(*errs, map[string]any{"type": "NOT_FOUND", "path": []any{alias}, "message": msg})
 	}
 	switch op {
+	case "Checks":
+		owner, name, ref := vars["owner"].(string), vars["name"].(string), vars["ref"].(string)
+		slug := strings.ToLower(owner + "/" + name)
+		var matched *PullRequest
+		for _, p := range g.prs {
+			if strings.ToLower(p.Repo) == slug && p.HeadSHA == ref {
+				matched = p
+				break
+			}
+		}
+		if matched == nil {
+			data["repository"] = map[string]any{"object": nil}
+			return
+		}
+		ctxMap := rollupJSONMap(matched.Checks)["contexts"].(map[string]any)
+		ctxMap["nodes"] = []any{
+			map[string]any{
+				"__typename": "CheckRun",
+				"name":       fmt.Sprintf("ci-%d-of-%d", matched.Checks.Passed, matched.Checks.Total),
+				"status":     "IN_PROGRESS",
+				"conclusion": "",
+			},
+		}
+		ctxMap["pageInfo"] = map[string]any{"hasNextPage": false, "endCursor": ""}
+		data["repository"] = map[string]any{
+			"object": map[string]any{
+				"oid": matched.HeadSHA,
+				"statusCheckRollup": map[string]any{
+					"state":    string(matched.Checks.State),
+					"contexts": ctxMap,
+				},
+			},
+		}
 	case "PullRequestFull":
 		owner, name, number := vars["owner"].(string), vars["name"].(string), vars["number"].(int)
 		p := g.findPR(owner, name, number)

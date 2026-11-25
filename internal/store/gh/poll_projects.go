@@ -223,6 +223,7 @@ func (s *Store) pollProjects(ctx context.Context, cfg Config) {
 			}
 		}
 	}
+	s.summaries.putFingerprints(s.Snapshot(), fps, s.opts.Now())
 	s.staleFullDetails(fps)
 	s.markMovedDetails(fps, known)
 	for _, f := range fps {
@@ -303,11 +304,7 @@ func (s *Store) setProjects(ctx context.Context, next ProjectPullRequests) {
 		moved = !n.Projects.FetchedAt.Equal(next.FetchedAt)
 		n.Projects = next
 	})
-	if moved && next.LastError == "" && !next.FetchedAt.IsZero() {
-		s.summaries.putProjects(s.Snapshot(), next, next.FetchedAt)
-	} else {
-		s.summaries.putProjects(s.Snapshot(), next, time.Time{})
-	}
+	s.summaries.putProjects(s.Snapshot(), next)
 	if changed {
 		if err := s.cache.saveActivity(ctx, activityProjects, next.FetchedAt, next); err != nil {
 			s.log.Warn("gh cache write failed", "err", err)

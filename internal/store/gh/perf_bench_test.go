@@ -199,8 +199,8 @@ func TestPerfMeasurements(t *testing.T) {
 			}
 			settleWorker(t, s)
 		}
-		t.Logf("METRIC pending_ci_5_ticks: graphql_PullRequestFull=%d final_passed=%d final_pending=%d",
-			f.count("PullRequestFull")-before, last.PullRequest.Checks.Passed, last.PullRequest.Checks.Pending)
+		t.Logf("METRIC pending_ci_5_ticks: graphql_PullRequestFull=%d graphql_Checks=%d final_passed=%d final_pending=%d",
+			f.count("PullRequestFull")-before, f.count("Checks"), last.PullRequest.Checks.Passed, last.PullRequest.Checks.Pending)
 	})
 
 	t.Run("get_pull_request_cache_hit", func(t *testing.T) {

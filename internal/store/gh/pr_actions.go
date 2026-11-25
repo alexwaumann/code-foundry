@@ -63,6 +63,7 @@ func (s *Store) ReviewerCandidates(ctx context.Context, slug string, number int,
 		}
 		fetchAll := !repoCached
 		doSearch := query != "" && (!repoCached || repoTruncated)
+		gen := s.reviewers.prGeneration(k)
 		vars := reviewerCandidatesVarsWith(owner, name, k.number, query, fetchAll, doSearch)
 		data, err := s.call(ctx, queryReviewerCandidates, vars)
 		if err != nil && !isPartial(err) {
@@ -77,7 +78,7 @@ func (s *Store) ReviewerCandidates(ctx context.Context, slug string, number int,
 			s.reviewers.putRepo(k.slug, dec.allUsers, dec.allTruncated, fetchedAt)
 			repoUsers, repoTruncated, repoCached = dec.allUsers, dec.allTruncated, true
 		}
-		s.reviewers.putPR(k, dec.author, dec.requested, fetchedAt)
+		s.reviewers.putPR(k, gen, dec.author, dec.requested, fetchedAt)
 		if query != "" && !doSearch && repoCached && !repoTruncated {
 			return localReviewerCandidates(dec.author, dec.requested, repoUsers, query), nil
 		}
