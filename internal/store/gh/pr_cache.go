@@ -237,8 +237,9 @@ func prMatchesFingerprint(cached PullRequest, fp prFingerprint) bool {
 }
 
 type detailEntry struct {
-	d   PullRequestDetail
-	seq uint64
+	d        PullRequestDetail
+	seq      uint64
+	fetchSeq uint64
 }
 
 // detailCache is the bounded in-memory PullRequestDetail cache for Store.PullRequest.
@@ -249,26 +250,34 @@ type detailCache struct {
 	seq uint64
 }
 
-func (c *detailCache) get(k fullKey) (PullRequestDetail, bool) {
+func (c *detailCache) getWithSeq(k fullKey) (PullRequestDetail, uint64, bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	e, ok := c.m[k]
 	if !ok {
-		return PullRequestDetail{}, false
+		return PullRequestDetail{}, 0, false
 	}
 	c.seq++
 	e.seq = c.seq
-	return clonePullRequestDetail(e.d), true
+	return clonePullRequestDetail(e.d), e.fetchSeq, true
 }
 
 func (c *detailCache) put(k fullKey, d PullRequestDetail) {
+	c.putWithSeq(k, d, 0)
+}
+
+func (c *detailCache) putWithSeq(k fullKey, d PullRequestDetail, fetchSeq uint64) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.m == nil {
 		c.m = map[fullKey]*detailEntry{}
 	}
+	// Never let a late response from an older request overwrite a strictly newer fetch.
+	if old, ok := c.m[k]; ok && fetchSeq > 0 && old.fetchSeq > fetchSeq {
+		return
+	}
 	c.seq++
-	c.m[k] = &detailEntry{d: clonePullRequestDetail(d), seq: c.seq}
+	c.m[k] = &detailEntry{d: clonePullRequestDetail(d), seq: c.seq, fetchSeq: fetchSeq}
 	for len(c.m) > detailCacheMax {
 		var oldest fullKey
 		var minSeq uint64
@@ -283,6 +292,25 @@ func (c *detailCache) put(k fullKey, d PullRequestDetail) {
 		}
 		delete(c.m, oldest)
 	}
+}
+
+// newerThan reports whether k has an in-memory detail fetched after fpSeq that already
+// reflects or supersedes the poll fingerprint f. Equal UpdatedAt requires matching the
+// fingerprint because check-run/rollup changes do not bump UpdatedAt.
+func (c *detailCache) newerThan(k fullKey, fpSeq uint64, f prFingerprint) bool {
+	if fpSeq == 0 {
+		return false
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	e, ok := c.m[k]
+	if !ok || e.fetchSeq <= fpSeq {
+		return false
+	}
+	if e.d.PullRequest.UpdatedAt.After(f.UpdatedAt) {
+		return true
+	}
+	return e.d.PullRequest.UpdatedAt.Equal(f.UpdatedAt) && prMatchesFingerprint(e.d.PullRequest, f)
 }
 
 func clonePullRequestDetail(d PullRequestDetail) PullRequestDetail {

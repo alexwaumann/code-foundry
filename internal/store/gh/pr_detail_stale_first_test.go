@@ -371,7 +371,9 @@ func TestAbandon(t *testing.T) {
 
 // A client that moved on before its read started costs GitHub nothing.
 func TestAbandonedReadSendsNothing(t *testing.T) {
-	w := newStaleWorld(t, nil)
+	// Pin single-lane queuing so the second read waits behind the first; read_lane_test.go
+	// covers abandoning a queued read when both the primary worker and read lane are busy.
+	w := newStaleWorld(t, func(o *Options) { o.disableReadLane = true })
 	before := w.f.count("PullRequestFull")
 	release := w.holdGitHub()
 	defer release()

@@ -103,12 +103,13 @@ func TestFullPullRequestSQLiteRowStartsStale(t *testing.T) {
 	}
 }
 
-// Jobs coalesce only while queued. A read submitted while the same fetch is running
+// A read submitted while the same fetch is running coalesces onto the in-flight job and
 // gets that fetch's result instead of sending a second request.
 func TestFullPullRequestReusesInFlightFetch(t *testing.T) {
 	g, _ := changeDrivenWorld()
 	gate := make(chan struct{})
-	var once sync.Once
+	var once, closeGate sync.Once
+	defer closeGate.Do(func() { close(gate) })
 	f := &fakeRunner{}
 	f.setDoc(func(op, doc string, vars map[string]any) (json.RawMessage, error) {
 		if op == "PullRequestFull" {
@@ -136,12 +137,13 @@ func TestFullPullRequestReusesInFlightFetch(t *testing.T) {
 		return f.inflight == 1
 	})
 	second := read(true) // even a refresh: the running fetch started after it was asked for
-	waitFor(t, "the second read queued", func() bool {
+	key := (&job{kind: jobFunc, id: fullJobID(fullKey{"o/r", 1})}).key()
+	waitFor(t, "the second read joined the in-flight fetch", func() bool {
 		s.mu.Lock()
 		defer s.mu.Unlock()
-		return len(s.queue) == 1
+		return len(s.queue) == 1 || (s.inflight[key] != nil && len(s.inflight[key].waiters) == 2)
 	})
-	close(gate)
+	closeGate.Do(func() { close(gate) })
 	a, b := <-first, <-second
 	if a.err != nil || b.err != nil || !a.d.FetchedAt.Equal(b.d.FetchedAt) {
 		t.Errorf("results: %v %v, fetched %v vs %v", a.err, b.err, a.d.FetchedAt, b.d.FetchedAt)

@@ -181,15 +181,28 @@ func (s *Store) PublishOwners(ctx context.Context) ([]PublishOwner, error) {
 // orgPolicy reads an organization's repository creation policy with REST GET
 // /orgs/{org}. known is false when the response has no policy fields (the viewer is
 // not an owner) or the request failed; transient is true for a failure worth retrying
-// (anything but not found or permission denied). Worker goroutine only.
+// (anything but not found or permission denied). Runs on the worker or read lane.
 func (s *Store) orgPolicy(ctx context.Context, rr RESTRunner, org string) (allowed []string, known, transient bool) {
 	if err := s.admit(ctx, true); err != nil {
 		return nil, false, true
 	}
+	onReadLane := isReadLane(ctx)
 	start := s.opts.Now()
+	if !onReadLane {
+		s.beginPrimaryRead()
+	}
 	body, err := rr.REST(ctx, "orgs/"+url.PathEscape(org), nil)
-	s.lastEnd = s.opts.Now()
-	s.log.Debug("gh request", "rest", "orgs/"+org, "dur", s.lastEnd.Sub(start).Round(time.Millisecond).String(), "err", err)
+	end := s.opts.Now()
+	if !onReadLane {
+		s.endPrimaryRead(end)
+	} else {
+		s.recordLastEnd(end)
+	}
+	attrs := []any{"rest", "orgs/" + org, "dur", end.Sub(start).Round(time.Millisecond).String(), "err", err}
+	if onReadLane {
+		attrs = append(attrs, "lane", "read")
+	}
+	s.log.Debug("gh request", attrs...)
 	if err != nil {
 		if isAuthOrNetwork(err) {
 			s.noteResult(ctx, err, nil)

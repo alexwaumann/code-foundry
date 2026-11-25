@@ -222,16 +222,29 @@ func trimDiffLines(body []byte, truncated bool) []byte {
 }
 
 // restRaw sends one paced raw REST GET and applies its global effects (auth state,
-// rate-limit and network pauses), like restWrite. Worker goroutine only.
+// rate-limit and network pauses), like restWrite. Runs on the worker or read lane.
 func (s *Store) restRaw(ctx context.Context, rr RawRESTRunner, p string, params map[string]string, accept string, limit int64) (RawResponse, error) {
 	if err := s.admit(ctx, true); err != nil {
 		return RawResponse{}, err
 	}
+	onReadLane := isReadLane(ctx)
 	start := s.opts.Now()
+	if !onReadLane {
+		s.beginPrimaryRead()
+	}
 	res, err := rr.RESTRaw(ctx, p, params, accept, limit)
-	s.lastEnd = s.opts.Now()
-	s.log.Debug("gh request", "rest", p, "accept", accept, "bytes", len(res.Body), "truncated", res.Truncated,
-		"dur", s.lastEnd.Sub(start).Round(time.Millisecond).String(), "err", err)
+	end := s.opts.Now()
+	if !onReadLane {
+		s.endPrimaryRead(end)
+	} else {
+		s.recordLastEnd(end)
+	}
+	attrs := []any{"rest", p, "accept", accept, "bytes", len(res.Body), "truncated", res.Truncated,
+		"dur", end.Sub(start).Round(time.Millisecond).String(), "err", err}
+	if onReadLane {
+		attrs = append(attrs, "lane", "read")
+	}
+	s.log.Debug("gh request", attrs...)
 	s.noteResult(ctx, err, nil)
 	return res, err
 }

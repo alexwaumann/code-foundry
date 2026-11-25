@@ -314,8 +314,9 @@ func (s *Store) restWrite(ctx context.Context, rw RESTWriter, method, path strin
 	}
 	start := s.opts.Now()
 	res, err := rw.RESTWrite(ctx, method, path, body)
-	s.lastEnd = s.opts.Now()
-	s.log.Debug("gh request", "rest", method+" "+path, "dur", s.lastEnd.Sub(start).Round(time.Millisecond).String(), "err", err)
+	end := s.opts.Now()
+	s.recordLastEnd(end)
+	s.log.Debug("gh request", "rest", method+" "+path, "dur", end.Sub(start).Round(time.Millisecond).String(), "err", err)
 	s.noteResult(ctx, err, nil)
 	return res, err
 }

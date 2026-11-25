@@ -177,6 +177,7 @@ func (s *Store) WatchProjects() {
 	_ = s.submitBackground(&job{
 		kind: jobFunc,
 		id:   "poll_projects",
+		read: true,
 		run: func(ctx context.Context) (any, error) {
 			s.runPollProjectsNow(ctx)
 			return nil, nil
@@ -260,7 +261,7 @@ func (s *Store) pollProjects(ctx context.Context, cfg Config) {
 		failed(err)
 		return
 	}
-	data, err := s.callDoc(ctx, queryPollProjects, doc, vars)
+	data, fpSeq, pollStart, err := s.callDocMeta(ctx, queryPollProjects, doc, vars)
 	if isRefused(err) {
 		return // a job let in just now brought the pause on: as above
 	}
@@ -306,9 +307,9 @@ func (s *Store) pollProjects(ctx context.Context, cfg Config) {
 			}
 		}
 	}
-	s.summaries.putFingerprints(s.Snapshot(), fps, s.opts.Now())
-	s.staleFullDetails(fps)
-	s.markMovedDetails(fps, known)
+	s.summaries.putFingerprints(s.Snapshot(), fps, pollStart)
+	s.staleFullDetails(fps, known, fpSeq)
+	s.markMovedDetails(fps, known, fpSeq)
 	for _, f := range fps {
 		k, ok := known[f.ID]
 		if _, dash := held[f.ID]; dash && fingerprintNeedsDetail(k, ok, f) || !dash && s.needsDetail(k, ok, f) {
