@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -46,12 +47,18 @@ func execRunnerOf(r Runner) (ExecRunner, bool) {
 	return ExecRunner{}, false
 }
 
+// errCatFileUnsupported signals that the host git binary rejected `--batch-command -Z`
+// (e.g. git < 2.41 such as older Apple Git 2.39), so the pool disables itself and callers
+// fall back to `ls-tree` + `cat-file blob`.
+var errCatFileUnsupported = errors.New("project: git cat-file --batch-command -Z unsupported")
+
 // catFilePool manages bounded, idle-reaped `git cat-file --batch-command -Z` workers
 // keyed by repository directory.
 type catFilePool struct {
 	runner      ExecRunner
 	idleTimeout time.Duration
 	now         func() time.Time
+	disabled    atomic.Bool
 
 	mu        sync.Mutex
 	closed    bool
@@ -78,6 +85,8 @@ type catFileWorker struct {
 	stdinPipe    io.WriteCloser
 	stdin        *bufio.Writer
 	stdout       *bufio.Reader
+	stderr       *cappedBuffer
+	served       bool
 	idleSince    time.Time
 
 	mu      sync.Mutex
@@ -101,6 +110,12 @@ func (b *cappedBuffer) Write(p []byte) (int, error) {
 	return len(p), nil
 }
 
+func (b *cappedBuffer) String() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.String()
+}
+
 func newCatFilePool(runner ExecRunner, now func() time.Time) *catFilePool {
 	if now == nil {
 		now = time.Now
@@ -117,6 +132,9 @@ func newCatFilePool(runner ExecRunner, now func() time.Time) *catFilePool {
 // the caller should fall back to ls-tree + cat-file via g.runner.Run (for partial clones
 // where missing promisor objects need git's stderr to produce objectsMissing).
 func (p *catFilePool) readRevSide(ctx context.Context, repoDir, commonDir, rev, file string) (v FileVersion, fallback bool, err error) {
+	if p.disabled.Load() {
+		return FileVersion{}, true, nil
+	}
 	if err := ctx.Err(); err != nil {
 		return FileVersion{}, false, err
 	}
@@ -153,6 +171,9 @@ func (p *catFilePool) readRevSide(ctx context.Context, repoDir, commonDir, rev, 
 			return nil
 		}
 	})
+	if errors.Is(err, errCatFileUnsupported) {
+		return FileVersion{}, true, nil
+	}
 	return v, fallback, err
 }
 
@@ -160,6 +181,9 @@ func (p *catFilePool) readRevSide(ctx context.Context, repoDir, commonDir, rev, 
 // the object was reported missing and the caller should fall back to g.runner.Run so
 // partial-clone or missing-object errors are reported accurately.
 func (p *catFilePool) readBlobByOID(ctx context.Context, repoDir, commonDir, oid string) (v FileVersion, fallback bool, err error) {
+	if p.disabled.Load() {
+		return FileVersion{}, true, nil
+	}
 	if err := ctx.Err(); err != nil {
 		return FileVersion{}, false, err
 	}
@@ -183,15 +207,32 @@ func (p *catFilePool) readBlobByOID(ctx context.Context, repoDir, commonDir, oid
 		v = bv
 		return nil
 	})
+	if errors.Is(err, errCatFileUnsupported) {
+		return FileVersion{}, true, nil
+	}
 	return v, fallback, err
 }
 
-// withWorker acquires an idle worker (or spawns one), runs fn with ctx cancellation wired
-// to kill the worker, retries once on a broken pooled worker, and returns healthy workers
-// to the pool.
+// withWorker acquires an idle worker (or spawns one), runs fn with ctx cancellation and
+// DefaultGitTimeout wired to kill the worker, retries once on a fresh worker if a pooled
+// worker died, and falls back (disabling the pool) when the host git rejects
+// `--batch-command -Z` (exit 129).
 func (p *catFilePool) withWorker(ctx context.Context, repoDir, commonDir string, fn func(*catFileWorker) error) error {
+	if _, hasDeadline := ctx.Deadline(); !hasDeadline {
+		timeout := p.runner.Timeout
+		if timeout == 0 {
+			timeout = DefaultGitTimeout
+		}
+		if timeout > 0 {
+			var cancel context.CancelFunc
+			ctx, cancel = context.WithTimeout(ctx, timeout)
+			defer cancel()
+		}
+	}
 	for attempt := range 2 {
-		w, reused, err := p.acquire(repoDir, commonDir)
+		// On retry after a dead pooled worker, always spawn fresh rather than popping
+		// another potentially dead idle worker.
+		w, reused, err := p.acquire(repoDir, commonDir, attempt == 0)
 		if err != nil {
 			return err
 		}
@@ -199,10 +240,13 @@ func (p *catFilePool) withWorker(ctx context.Context, repoDir, commonDir string,
 		fnErr := fn(w)
 		stopped := stop()
 		if fnErr == nil && stopped && ctx.Err() == nil {
+			w.served = true
 			p.release(w)
 			return nil
 		}
-		w.close()
+		// Close stdin before killing if the process may have already exited on its own
+		// (e.g. git < 2.41 rejecting `-Z` with exit 129), so we observe its real exit code.
+		waitErr := w.closeAndWait(!reused && !w.served && stopped && ctx.Err() == nil)
 		if ctxErr := ctx.Err(); ctxErr != nil {
 			return ctxErr
 		}
@@ -213,27 +257,42 @@ func (p *catFilePool) withWorker(ctx context.Context, repoDir, commonDir string,
 			// A pooled worker died (broken pipe / EOF); retry once with a fresh worker.
 			continue
 		}
+		if !reused && !w.served && isCatFileUnsupported(waitErr, w.stderr.String()) {
+			p.disabled.Store(true)
+			return errCatFileUnsupported
+		}
 		return fnErr
 	}
 	return nil
 }
 
-func (p *catFilePool) acquire(repoDir, commonDir string) (w *catFileWorker, reused bool, err error) {
+func isCatFileUnsupported(waitErr error, stderr string) bool {
+	var ee *exec.ExitError
+	if errors.As(waitErr, &ee) && ee.ExitCode() == 129 {
+		return true
+	}
+	low := strings.ToLower(stderr)
+	return strings.Contains(low, "unknown option") || strings.Contains(low, "unknown switch") || strings.Contains(low, "usage: git cat-file")
+}
+
+func (p *catFilePool) acquire(repoDir, commonDir string, allowReuse bool) (w *catFileWorker, reused bool, err error) {
 	p.mu.Lock()
 	if p.closed {
 		p.mu.Unlock()
 		return nil, false, context.Canceled
 	}
-	if repo := p.repos[repoDir]; repo != nil && len(repo.idle) > 0 {
-		last := len(repo.idle) - 1
-		w = repo.idle[last]
-		repo.idle[last] = nil
-		repo.idle = repo.idle[:last]
-		if len(repo.idle) == 0 {
-			delete(p.repos, repoDir)
+	if allowReuse {
+		if repo := p.repos[repoDir]; repo != nil && len(repo.idle) > 0 {
+			last := len(repo.idle) - 1
+			w = repo.idle[last]
+			repo.idle[last] = nil
+			repo.idle = repo.idle[:last]
+			if len(repo.idle) == 0 {
+				delete(p.repos, repoDir)
+			}
+			p.mu.Unlock()
+			return w, true, nil
 		}
-		p.mu.Unlock()
-		return w, true, nil
 	}
 	p.mu.Unlock()
 	w, err = p.spawn(repoDir, commonDir)
@@ -435,7 +494,8 @@ func (p *catFilePool) spawn(repoDir, commonDir string) (*catFileWorker, error) {
 	// Own process group / session matching ExecRunner: no controlling terminal and clean
 	// group kill on shutdown or cancellation.
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
-	cmd.Stderr = &cappedBuffer{max: catFileStderrCap}
+	stderr := &cappedBuffer{max: catFileStderrCap}
+	cmd.Stderr = stderr
 
 	stdinPipe, err := cmd.StdinPipe()
 	if err != nil {
@@ -462,6 +522,7 @@ func (p *catFilePool) spawn(repoDir, commonDir string) (*catFileWorker, error) {
 		stdinPipe:    stdinPipe,
 		stdin:        bufio.NewWriterSize(stdinPipe, 4<<10),
 		stdout:       bufio.NewReaderSize(stdoutPipe, 64<<10),
+		stderr:       stderr,
 	}, nil
 }
 
@@ -494,19 +555,44 @@ func (w *catFileWorker) kill() {
 // close terminates the worker's process group, closes stdin, and reaps the child so no
 // zombie processes are ever left behind.
 func (w *catFileWorker) close() {
+	_ = w.closeAndWait(false)
+}
+
+// closeAndWait closes stdin and reaps the child. When graceful is true, stdin is closed
+// first with a brief grace timer before sending SIGKILL so a worker that already exited
+// (such as git < 2.41 returning exit 129) reports its actual exit status rather than SIGKILL.
+func (w *catFileWorker) closeAndWait(graceful bool) error {
 	w.mu.Lock()
 	if w.closing {
 		w.mu.Unlock()
-		return
+		return nil
 	}
 	w.closing = true
-	if !w.killed {
+	if !graceful && !w.killed {
 		w.killed = true
 		_ = killGroup(w.pid)
 	}
 	w.mu.Unlock()
 	_ = w.stdinPipe.Close()
-	_ = w.cmd.Wait()
+	var killTimer *time.Timer
+	if graceful {
+		killTimer = time.AfterFunc(250*time.Millisecond, func() {
+			w.mu.Lock()
+			if !w.killed {
+				w.killed = true
+				_ = killGroup(w.pid)
+			}
+			w.mu.Unlock()
+		})
+	}
+	err := w.cmd.Wait()
+	if killTimer != nil {
+		killTimer.Stop()
+	}
+	w.mu.Lock()
+	w.killed = true
+	w.mu.Unlock()
+	return err
 }
 
 // info runs `info <spec>\0` and parses the NUL-terminated response header.

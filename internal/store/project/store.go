@@ -25,11 +25,13 @@ const (
 	DefaultWorkers       = 4
 	DefaultDebounce      = 300 * time.Millisecond
 	DefaultFetchInterval = 2 * time.Minute
-	// DefaultTreeDebounce is longer than DefaultDebounce: a dev server or build
-	// writing continuously costs at most one `git status` per second per worktree.
+	// DefaultTreeDebounce is the file-tree coalescing window for idle worktrees: a dev
+	// server or build writing continuously costs at most one `git status` per second per
+	// idle worktree. Active worktrees default to DefaultActiveTreeDebounce.
 	DefaultTreeDebounce = time.Second
 	// DefaultActiveTreeDebounce is the tree coalescing window for an active worktree
-	// (one with a live thread or watched detail) when Options.TreeDebounce is not set.
+	// (one with a live thread or watched detail) when Options.TreeDebounce is not set
+	// (at most ~3.3 `git status` runs/s under continuous writes).
 	DefaultActiveTreeDebounce = 300 * time.Millisecond
 	// DefaultPollInterval is a backstop: the FSEvents stream and thread Touch/TouchNow
 	// see live edits, so the live backstop poll runs every 5 min (and IdlePollInterval
@@ -134,12 +136,10 @@ type projectState struct {
 	wts map[string]*wtSlot
 }
 
-// statusDiskStamp snapshots .git/index and the worktree root right before `git status`
-// runs so CompareWorktree can tell whether Status.Conflicted / Status.Untracked are still
-// current without spawning redundant `git ls-files` processes.
+// statusDiskStamp snapshots .git/index right before `git status` runs so CompareWorktree
+// can tell whether Status.Conflicted is still current without spawning `git ls-files --unmerged`.
 type statusDiskStamp struct {
 	index fileStamp
-	root  fileStamp
 }
 
 // wtSlot is one worktree's snapshot slot, written only by its status job (and seeded
@@ -355,13 +355,6 @@ func (g *Git) Close() error {
 	}
 	g.compareCache.clear()
 	return nil
-}
-
-// hasPendingStatus reports whether a status refresh is already debounced, queued, or
-// running for the worktree at path.
-func (g *Git) hasPendingStatus(projectID, path string) bool {
-	k := jobKey{kind: jobStatus, projectID: projectID, path: path}
-	return g.deb.hasPending(k) || g.treeDeb.hasPending(k) || g.touch.hasPending(k) || g.sched.hasPending(k)
 }
 
 // Snapshot implements Store.
@@ -1115,7 +1108,7 @@ func (g *Git) ListRefs(ctx context.Context, projectID string) (Refs, error) {
 	if err := requireGit(m); err != nil {
 		return Refs{}, err
 	}
-	if cached, gen, ok := g.refsCache.get(projectID); ok {
+	if cached, gen, ok := g.refsCache.get(projectID, g.now()); ok {
 		return cached, nil
 	} else {
 		out, err := g.runner.Run(ctx, m.Path, "for-each-ref", refsFormat, "refs/heads", "refs/remotes")
@@ -1135,7 +1128,7 @@ func (g *Git) ListRefs(ctx context.Context, projectID string) (Refs, error) {
 			refs.DefaultRef = "origin/" + def
 		}
 		if g.project(projectID) == st {
-			g.refsCache.put(projectID, gen, refs)
+			g.refsCache.put(projectID, gen, refs, g.now())
 		}
 		return refs, nil
 	}
@@ -1513,12 +1506,11 @@ func (g *Git) status(ctx context.Context, projectID, path string) {
 	gitDir := slot.gitDir
 	g.mu.RUnlock()
 
-	// Snapshot index and root dir stamps before `git status` runs so any concurrent
-	// modification invalidates the stamp instead of hiding a race.
+	// Snapshot .git/index right before `git status` runs so any concurrent modification
+	// invalidates the stamp instead of hiding a race.
 	var preStamp statusDiskStamp
 	if gitDir != "" {
 		preStamp.index = statStamp(filepath.Join(gitDir, "index"))
-		preStamp.root = statStamp(path)
 	}
 
 	out, err := g.runner.Run(ctx, path, statusArgs...)

@@ -226,14 +226,6 @@ func (s *scheduler) work(ctx context.Context, run func(context.Context, jobKey))
 	}
 }
 
-// hasPending reports whether k is currently queued or running in the scheduler.
-func (s *scheduler) hasPending(k jobKey) bool {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	st := s.jobs[k]
-	return st != nil && (st.queued || st.running || st.rerun)
-}
-
 // close stops the workers after their current job and releases every waiter.
 func (s *scheduler) close() {
 	s.mu.Lock()
@@ -305,13 +297,6 @@ func (d *debouncer) triggerWindow(k jobKey, window time.Duration) {
 		}
 	})
 	d.timers[k] = t
-}
-
-// hasPending reports whether k currently has an armed timer.
-func (d *debouncer) hasPending(k jobKey) bool {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-	return d.timers[k] != nil
 }
 
 // cancel drops k's armed timer, if any: the caller runs the job itself.

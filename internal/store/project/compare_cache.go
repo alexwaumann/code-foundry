@@ -26,6 +26,7 @@ const (
 	maxVerifiedCommits        = 2048
 	maxOpenCompareEntries     = 128
 	openCompareTTL            = 5 * time.Second
+	refsCacheTTL              = 15 * time.Second
 )
 
 // lruNode is one entry in an intrusive doubly-linked LRU list.
@@ -328,9 +329,29 @@ func readHeadFast(gitDir, commonDir string) (string, bool) {
 	return sha, true
 }
 
+// isSpecialPseudoRef reports git pseudo-refs stored directly under gitDir/commonDir
+// rather than under refs/{heads,remotes,tags}/ (so our loose-ref stamps do not cover them).
+func isSpecialPseudoRef(ref string) bool {
+	switch ref {
+	case "stash", "FETCH_HEAD", "ORIG_HEAD", "MERGE_HEAD", "CHERRY_PICK_HEAD", "REVERT_HEAD", "BISECT_HEAD", "AUTO_MERGE":
+		return true
+	}
+	return false
+}
+
+// isLooseSymref reports whether path is an existing loose ref file containing a symbolic
+// ref ("ref: ..."), whose target file would also need to be stamped.
+func isLooseSymref(path string) bool {
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return false
+	}
+	return strings.HasPrefix(strings.TrimSpace(string(b)), "ref:")
+}
+
 // refStampsFor collects the filesystem stamps needed to validate a cached SourceRef.
-// Returns ok=false for expressions that cannot be cheaply validated (e.g. reflog queries
-// or abbreviated SHAs), causing openCompare to skip caching for that pair.
+// Returns ok=false for expressions that cannot be cheaply validated (e.g. reflog queries,
+// pseudo-refs, symrefs, or abbreviated SHAs), causing openCompare to skip caching.
 func refStampsFor(s DiffSource, gitDir, commonDir string) ([]pathStamp, bool) {
 	if s.Kind != SourceRef {
 		return nil, true
@@ -350,7 +371,7 @@ func refStampsFor(s DiffSource, gitDir, commonDir string) ([]pathStamp, bool) {
 	if idx := strings.IndexAny(baseRef, "~^"); idx >= 0 {
 		baseRef = baseRef[:idx]
 	}
-	if baseRef == "" {
+	if baseRef == "" || isSpecialPseudoRef(baseRef) {
 		return nil, false
 	}
 	if baseRef == "HEAD" || baseRef == "@" {
@@ -363,7 +384,11 @@ func refStampsFor(s DiffSource, gitDir, commonDir string) ([]pathStamp, bool) {
 	}
 	if strings.HasPrefix(baseRef, "refs/") && !strings.Contains(baseRef, "..") {
 		p := filepath.Join(commonDir, filepath.FromSlash(baseRef))
-		stamps = append(stamps, pathStamp{path: p, stamp: statStamp(p)})
+		st := statStamp(p)
+		if st.exists && isLooseSymref(p) {
+			return nil, false
+		}
+		stamps = append(stamps, pathStamp{path: p, stamp: st})
 		return stamps, true
 	}
 	if strings.Contains(baseRef, "..") {
@@ -380,6 +405,9 @@ func refStampsFor(s DiffSource, gitDir, commonDir string) ([]pathStamp, bool) {
 	for _, p := range candidates {
 		st := statStamp(p)
 		if st.exists {
+			if isLooseSymref(p) {
+				return nil, false
+			}
 			anyLoose = true
 		}
 		stamps = append(stamps, pathStamp{path: p, stamp: st})
@@ -403,36 +431,45 @@ func stampsMatch(stamps []pathStamp) bool {
 
 // --- ListRefs cache ---------------------------------------------------------------
 
+type refsCacheEntry struct {
+	refs     Refs
+	cachedAt time.Time
+}
+
 // refsCache caches ListRefs per project, invalidated via generation counters on ref/branch
-// mutations and FSEvents so an in-flight ListRefs never stores a stale result after an
-// invalidation.
+// mutations and FSEvents (with a short refsCacheTTL backstop for non-FSEvents environments
+// or dropped events) so an in-flight ListRefs never stores a stale result after invalidation.
 type refsCache struct {
 	mu      sync.Mutex
-	entries map[string]Refs
+	entries map[string]refsCacheEntry
 	gen     map[string]uint64
 }
 
-func (c *refsCache) get(projectID string) (Refs, uint64, bool) {
+func (c *refsCache) get(projectID string, now time.Time) (Refs, uint64, bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	gen := c.gen[projectID]
-	r, ok := c.entries[projectID]
+	e, ok := c.entries[projectID]
 	if !ok {
 		return Refs{}, gen, false
 	}
-	return cloneRefs(r), gen, true
+	if now.Sub(e.cachedAt) > refsCacheTTL {
+		delete(c.entries, projectID)
+		return Refs{}, gen, false
+	}
+	return cloneRefs(e.refs), gen, true
 }
 
-func (c *refsCache) put(projectID string, gen uint64, r Refs) {
+func (c *refsCache) put(projectID string, gen uint64, r Refs, now time.Time) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.gen[projectID] != gen {
 		return // invalidated while git for-each-ref was running
 	}
 	if c.entries == nil {
-		c.entries = map[string]Refs{}
+		c.entries = map[string]refsCacheEntry{}
 	}
-	c.entries[projectID] = cloneRefs(r)
+	c.entries[projectID] = refsCacheEntry{refs: cloneRefs(r), cachedAt: now}
 }
 
 func (c *refsCache) invalidate(projectID string) {

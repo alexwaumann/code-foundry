@@ -2,6 +2,8 @@ package project
 
 import (
 	"context"
+	"os"
+	"os/exec"
 	"path/filepath"
 	"slices"
 	"sync"
@@ -227,7 +229,8 @@ func TestCompareWorktreeSkipsRedundantLsFilesAndReusesLineMemo(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Clean worktree with fresh status: skips both ls-files --unmerged and ls-files --others.
+	// Clean worktree with fresh status: skips ls-files --unmerged (index stamp unchanged),
+	// still runs ls-files --others (1 ls-files) so new files in subdirectories are never missed.
 	beforeLS := cr.count("ls-files")
 	cmpRes, err := h.store.CompareWorktree(ctx, CompareRequest{
 		ProjectID: r.ID, Path: wt.Path,
@@ -239,9 +242,34 @@ func TestCompareWorktreeSkipsRedundantLsFilesAndReusesLineMemo(t *testing.T) {
 	if got := rows(cmpRes.Files); !slices.Equal(got, []string{"A a.txt +2 -0"}) {
 		t.Fatalf("files = %v", got)
 	}
-	if got := cr.count("ls-files") - beforeLS; got != 0 {
-		t.Fatalf("clean worktree ran ls-files %d times, want 0", got)
+	if got := cr.count("ls-files") - beforeLS; got != 1 {
+		t.Fatalf("clean worktree ran ls-files %d times, want 1 (--others only, --unmerged skipped)", got)
 	}
+
+	// Regression: adding an untracked file inside an existing subdirectory WITHOUT calling
+	// Refresh (worktree root mtime unchanged) must be reported immediately by CompareWorktree.
+	subDir := filepath.Join(wt.Path, "sub")
+	if err := os.MkdirAll(subDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, filepath.Join(subDir, "tracked.txt"), "t1\n")
+	git(t, wt.Path, "add", "sub/tracked.txt")
+	git(t, wt.Path, "commit", "-q", "-m", "add sub/tracked")
+	if err := h.store.Refresh(ctx, r.ID); err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, filepath.Join(subDir, "new.go"), "package sub\n")
+	cmpRes, err = h.store.CompareWorktree(ctx, CompareRequest{
+		ProjectID: r.ID, Path: wt.Path,
+		Base: DiffSource{Kind: SourceMergeBase}, Head: sourceWorking,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Contains(rows(cmpRes.Files), "? sub/new.go +1 -0") {
+		t.Fatalf("untracked file in subdir missed by CompareWorktree: %v", rows(cmpRes.Files))
+	}
+	_ = os.Remove(filepath.Join(subDir, "new.go"))
 
 	// Add an untracked file and refresh: Conflicted == 0 skips --unmerged, runs only
 	// --others (1 ls-files), and populates details.lines memo.
@@ -483,5 +511,95 @@ func TestActiveWorktreeTreeDebounceWindow(t *testing.T) {
 	if h2.store.activeTreeWindow != 120*time.Millisecond || h2.store.treeDeb.window != 120*time.Millisecond {
 		t.Fatalf("custom TreeDebounce override: active=%v default=%v, want 120ms/120ms",
 			h2.store.activeTreeWindow, h2.store.treeDeb.window)
+	}
+}
+
+func TestCatFilePoolFallbackWhenGitLacksBatchCommandZ(t *testing.T) {
+	f := newFixture(t)
+	realGit, err := exec.LookPath("git")
+	if err != nil {
+		t.Skip("git not installed")
+	}
+	// Shim simulating git < 2.41 (e.g. Apple Git 2.39) that rejects `cat-file --batch-command -Z`
+	// with exit 129, while forwarding all other git commands to real git.
+	shim := filepath.Join(t.TempDir(), "old-git")
+	script := "#!/bin/sh\nfor arg in \"$@\"; do\n  if [ \"$arg\" = \"-Z\" ]; then\n    echo 'error: unknown switch `Z`' >&2\n    exit 129\n  fi\ndone\nexec \"" + realGit + "\" \"$@\"\n"
+	if err := os.WriteFile(shim, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	h := startHarness(t, "", Options{
+		Runner:       ExecRunner{Git: shim},
+		WorktreeRoot: filepath.Join(f.base, "wt"),
+	})
+	ctx := ctx20(t)
+	r, err := h.store.Register(ctx, f.project)
+	if err != nil {
+		t.Fatal(err)
+	}
+	baseSHA := git(t, f.project, "rev-parse", "HEAD")
+	writeFile(t, filepath.Join(f.project, "README.md"), "updated content\n")
+	git(t, f.project, "add", "README.md")
+	git(t, f.project, "commit", "-q", "-m", "update readme")
+	headSHA := git(t, f.project, "rev-parse", "HEAD")
+
+	sides, err := h.store.CompareFile(ctx, CompareFileRequest{
+		ProjectID: r.ID, Path: f.project,
+		Base: sourceRef(baseSHA), Head: sourceRef(headSHA), File: "README.md",
+	})
+	if err != nil {
+		t.Fatalf("CompareFile failed on git < 2.41 shim: %v", err)
+	}
+	if !sides.New.Present || string(sides.New.Contents) != "updated content\n" {
+		t.Fatalf("CompareFile New = %+v, want updated content", sides.New)
+	}
+	if !h.store.catFiles.disabled.Load() {
+		t.Fatalf("catFilePool should be disabled after exit 129")
+	}
+}
+
+func TestCatFilePoolRetrySpawnsFreshWhenAllIdleWorkersDead(t *testing.T) {
+	f := newFixture(t)
+	p := newCatFilePool(ExecRunner{}, nil)
+	t.Cleanup(p.close)
+	ctx := ctx20(t)
+	headSHA := git(t, f.project, "rev-parse", "HEAD")
+
+	// Spawn 3 workers concurrently so all 3 end up idle in the pool, then kill them all.
+	var workers []*catFileWorker
+	for range 3 {
+		w, err := p.spawn(f.project, filepath.Join(f.project, ".git"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		workers = append(workers, w)
+	}
+	for _, w := range workers {
+		p.release(w)
+	}
+	for _, w := range workers {
+		w.kill()
+	}
+	// First readRevSide pops one dead worker, retries on a FRESH worker (not another dead
+	// idle worker), and succeeds on the very first call.
+	v, fallback, err := p.readRevSide(ctx, f.project, filepath.Join(f.project, ".git"), headSHA, "README.md")
+	if err != nil || fallback || !v.Present {
+		t.Fatalf("readRevSide with all dead idle workers = (%+v, fallback=%v, err=%v), want Present with nil err", v, fallback, err)
+	}
+}
+
+func TestRefsCacheTTLExpires(t *testing.T) {
+	var c refsCache
+	t0 := time.Date(2026, 11, 25, 10, 0, 0, 0, time.UTC)
+	_, gen, ok := c.get("p1", t0)
+	if ok {
+		t.Fatal("expected miss")
+	}
+	c.put("p1", gen, Refs{Local: []string{"main"}}, t0)
+	if _, _, ok := c.get("p1", t0.Add(refsCacheTTL)); !ok {
+		t.Fatal("expected hit within TTL")
+	}
+	if _, _, ok := c.get("p1", t0.Add(refsCacheTTL+time.Second)); ok {
+		t.Fatal("expected miss after TTL expiry")
 	}
 }

@@ -326,8 +326,14 @@ func (g *Git) openCompare(ctx context.Context, projectID, path string, base, hea
 	if c.err == "" && g.compareCache != nil && (!dependsOnHead || hasWTHead) {
 		baseStamps, okB := refStampsFor(base, gitDir, commonDir)
 		headStamps, okH := refStampsFor(head, gitDir, commonDir)
-		if okB && okH {
+		okLocalBase := true
+		var localBaseStamps []pathStamp
+		if dependsOnBase && projBase.sha == "" && c.baseRef != "" {
+			localBaseStamps, okLocalBase = refStampsFor(DiffSource{Kind: SourceRef, Ref: c.baseRef}, gitDir, commonDir)
+		}
+		if okB && okH && okLocalBase {
 			stamps := append(baseStamps, headStamps...)
+			stamps = append(stamps, localBaseStamps...)
 			g.compareCache.open.put(openKey, openCompareEntry{
 				base: c.base, head: c.head, baseRef: c.baseRef,
 				mergeBase: c.mergeBase, headSHA: c.headSHA,
@@ -572,20 +578,6 @@ func (c *comparison) canSkipUnmerged() bool {
 	return ok && wt.Status.Conflicted == 0
 }
 
-func (c *comparison) canSkipUntracked() bool {
-	wt, stamp, ok := c.statusCurrentForIndex()
-	if !ok || wt.Status.Untracked != 0 {
-		return false
-	}
-	if !stamp.root.exists || statStamp(c.dir) != stamp.root {
-		return false
-	}
-	if c.g != nil && c.g.hasPendingStatus(c.projectID, c.dir) {
-		return false
-	}
-	return true
-}
-
 // changes lists what differs between the two sources, unsorted and unfiltered.
 func (c *comparison) changes() ([]CompareChange, error) {
 	if sameSource(c.base, c.head) {
@@ -604,9 +596,6 @@ func (c *comparison) changes() ([]CompareChange, error) {
 		list = markUnmerged(list, parseUnmergedZ(out))
 	}
 	if c.base.Kind != SourceWorkingTree && c.head.Kind != SourceWorkingTree {
-		return list, nil
-	}
-	if c.canSkipUntracked() {
 		return list, nil
 	}
 	if out, err = c.run("ls-files", "--others", "--exclude-standard", "-z"); err != nil {
@@ -948,7 +937,11 @@ func (g *Git) CompareFile(ctx context.Context, req CompareFileRequest) (CompareS
 		return CompareSides{}, err
 	}
 	res.Status = diffStatus(res.Old, res.New, oldPath != file)
-	if immutable && g.compareCache != nil {
+	// Skip caching when a non-emptyTree commit side came back absent: in a partial clone
+	// with promisor config inherited from an included/global file, cat-file reports a missing
+	// object identically to an absent path, so we never pin a missing side in the LRU.
+	bothPresent := (res.Old.Present || c.base.SHA == emptyTree) && (res.New.Present || c.head.SHA == emptyTree)
+	if immutable && bothPresent && g.compareCache != nil {
 		stored := cloneCompareSides(res)
 		g.compareCache.files.put(cacheKey, stored, compareSidesWeight(stored))
 	}

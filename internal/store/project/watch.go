@@ -341,7 +341,7 @@ func refsChangedProject(dirs map[string]watchTarget, path string, flags fsevents
 					return "", false
 				}
 				rel = filepath.ToSlash(rel)
-				if rel == "packed-refs" || rel == "FETCH_HEAD" || rel == "refs" || strings.HasPrefix(rel, "refs/") {
+				if rel == "packed-refs" || rel == "FETCH_HEAD" || rel == "refs" || strings.HasPrefix(rel, "refs/") || rel == "reftable" || strings.HasPrefix(rel, "reftable/") {
 					return t.projectID, true
 				}
 				return "", false

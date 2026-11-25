@@ -36,26 +36,31 @@ overhead and UI latency:
   `maxCatFileTotalIdle = 16` globally, reaped after `defaultCatFileIdleTimeout = 45s` via a
   single lazy `time.AfterFunc` timer (no idle goroutines).
 - Process-group cleanup (`killGroup`) + `cmd.Wait()` on broken pipe/EOF (with one transparent
-  retry on a reused worker), `context.AfterFunc` cancellation, `Unregister`, and `Close`
-  prevent zombie processes and PID-reuse races.
+  retry that always spawns a fresh worker), `context.AfterFunc` cancellation +
+  `DefaultGitTimeout` (30s) parity with `ExecRunner`, `Unregister`, and `Close` prevent
+  zombie processes and PID-reuse races.
+- **Older git fallback:** if a fresh worker fails on its first request with exit 129 or a
+  usage error (e.g. git < 2.41 lacking `--batch-command -Z`), the pool permanently disables
+  itself for the process and falls back cleanly to `ls-tree` + `cat-file blob`.
 - **Partial clone gotcha:** `git cat-file --batch-command` under `GIT_NO_LAZY_FETCH=1`
   reports a missing promisor object identically to an absent path (`<spec> missing`).
   Each worker checks `<commonDir>/config` once on spawn for `promisor`; in partial clones,
   a `missing` result falls back to `ls-tree` + `cat-file blob` so `isMissingObject` still
-  produces `objectsMissing` without triggering lazy fetch.
+  produces `objectsMissing` without triggering lazy fetch. In addition, `CompareFile` skips
+  LRU caching when either non-`emptyTree` side came back absent so a missing promisor object
+  (e.g. from included/global config) is never pinned in cache.
 - `CompareFile` now reads `res.Old` and `res.New` concurrently (and reads once when both
   sides are identical with the same path).
 
 ### 2. Redundant subprocess skipping, `lineMemo` reuse, and `openCompare` caching
 
 - **`statusDiskStamp` on `wtSlot`:** Right before `git status` runs in `g.status`, the store
-  snapshots `(dev, ino, size, mtime)` of `.git/index` and the worktree root directory.
+  snapshots `(dev, ino, size, mtime)` of `.git/index`.
   - `CompareWorktree` skips `ls-files --unmerged` when `Status` is refreshed with no error,
     `Status.Conflicted == 0`, `HEAD` matches `wt.Head`, and `.git/index` stamp is unchanged
     (git atomically renames `index.lock` over `index`, always changing the inode).
-  - `CompareWorktree` skips `ls-files --others` under the same conditions plus
-    `Status.Untracked == 0`, unchanged worktree root stamp, and no pending status job in
-    debouncers or scheduler.
+  - `ls-files --others --exclude-standard -z` still runs whenever a side is `SourceWorkingTree`
+    so newly created untracked files inside subdirectories are never missed.
 - **`lineMemo` sharing:** `addUntracked` reads and updates `g.details.lines` (immutable
   copy-on-write maps under `g.details.mu`), avoiding re-reading unchanged untracked files.
 - **`openCompare` context cache & `readHeadFast`:**
@@ -64,8 +69,10 @@ overhead and UI latency:
   - `readHeadFast` reads `<gitDir>/HEAD` and its loose ref file directly (falling back to
     `git rev-parse` for unborn branches, packed refs, or reftables).
   - Resolved `openCompare` results are cached up to 5s (128 entries) and validated against
-    current `HEAD`, `st.base`, and loose ref + `packed-refs` disk stamps so `git commit`,
-    `git branch -D`, `git rebase`, and `git checkout` invalidate immediately without FSEvents.
+    current `HEAD`, `st.base` (plus local default-branch ref stamps when falling back to it),
+    and loose ref + `packed-refs` disk stamps (skipping pseudo-refs like `stash`/`FETCH_HEAD`
+    and loose symrefs) so `git commit`, `git branch -D`, `git rebase`, and `git checkout`
+    invalidate immediately without FSEvents.
 
 ### 3. Bounded LRU caches and event-invalidated `ListRefs` cache (`compare_cache.go`)
 
@@ -77,10 +84,10 @@ overhead and UI latency:
   - `CompareCommitBody` `CompareCommitMessage`: 512 entries / 4 MiB
   - Verified commit SHAs: 2,048 entries
 - `ListRefs` is cached per project with a generation counter (preventing stale in-flight
-  `for-each-ref` calls from repopulating after invalidation) and defensive slice clones.
-  Invalidated on `reconcile`, `resolveBase` (`jobBase`), `CreateWorktree`, `RemoveWorktree`,
-  `DeleteBranch`, `Unregister`, and FSEvents matching `<commonDir>/refs/`, `packed-refs`,
-  `FETCH_HEAD`, or rescan flags.
+  `for-each-ref` calls from repopulating after invalidation), a `15s` TTL backstop, and
+  defensive slice clones. Invalidated on `reconcile`, `resolveBase` (`jobBase`),
+  `CreateWorktree`, `RemoveWorktree`, `DeleteBranch`, `Unregister`, and FSEvents matching
+  `<commonDir>/refs/`, `reftable/`, `packed-refs`, `FETCH_HEAD`, or rescan flags.
 
 ### 4. Faster active-worktree tree debounce (`sched.go`, `activity.go`, `fsevents.go`, `store.go`)
 
@@ -103,7 +110,7 @@ Measured on Apple M3 Pro (`darwin/arm64`), Go 1.26, git 2.52.0, using `b1_bench_
 | `CompareFile` commit-to-commit (10 repeated files, cached) | 70 spawns (7.0/call), 40.81 ms/op | 0 spawns (0.0/call), 15.1 µs/op | **2,702x faster** |
 | `readRevSide` (warm `cat-file --batch`, rotating 20 files) | 12.77 ms/op (57.8 KB/op) | 0.192 ms/op (4.8 KB/op) | **66.4x faster** |
 | `CompareFile` merge-base-to-worktree (10 files after `CompareWorktree`) | 30 spawns (3.0/call), 19.54 ms/op | 0 spawns (0.0/call), 0.265 ms/op | **73.7x faster** |
-| `CompareWorktree` clean worktree (5 calls) | 20 spawns (4.0/call), 24.40 ms/op | 5 spawns (1.0/call), 7.40 ms/op | **3.3x faster, -75% spawns** |
+| `CompareWorktree` clean worktree (5 calls) | 20 spawns (4.0/call), 24.40 ms/op | 10 spawns (2.0/call), 11.37 ms/op | **2.15x faster, -50% spawns** |
 | `CompareWorktree` dirty + 15 untracked files (5 calls) | 20 spawns (4.0/call), 26.25 ms/op (1.11 MB/op) | 10 spawns (2.0/call), 12.62 ms/op (86 KB/op) | **2.08x faster, -92% B/op** |
 | `CompareWorktree` commit-to-commit (5 calls) | 20 spawns (4.0/call), 24.53 ms/op | 1 spawn (0.2/call), 85.3 µs/op | **287.6x faster** |
 | `CompareCommitBody` repeated (10 calls) | 20 spawns (2.0/call), 11.42 ms/op | 2 spawns (0.2/call), 13.8 µs/op | **825.6x faster** |
