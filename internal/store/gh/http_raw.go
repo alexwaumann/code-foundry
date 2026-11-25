@@ -14,7 +14,7 @@ func (r *HTTPRunner) RESTRaw(ctx context.Context, path string, params map[string
 	if accept == "" || limit <= 0 {
 		return RawResponse{}, fmt.Errorf("%w: raw REST needs an Accept and a positive limit", ErrInvalidArgument)
 	}
-	res, err := r.do(ctx, http.MethodGet, r.restURL(path, params), nil, sendOpts{accept: accept, limit: limit})
+	res, err := r.do(ctx, http.MethodGet, r.restURL(path, params), nil, sendOpts{accept: accept, limit: limit, idempotent: true})
 	if err != nil {
 		return RawResponse{}, err
 	}

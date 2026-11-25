@@ -87,6 +87,8 @@ type Options struct {
 	// streams starts the fs event stream; nil means fseventsSource. Tests set their
 	// own (fakestream_test.go).
 	streams streamSource
+	// wake overrides the sleep/wake monitor in tests (sleepwake.go).
+	wake *wakeConfig
 }
 
 // projectMeta is a project's metadata slot, written only by Register, the project's
@@ -185,9 +187,12 @@ type Git struct {
 
 	// live is the worktrees with a live thread (SetLiveWorktrees); pollNudge and
 	// fetchNudge wake the tier loops when a project may have turned live (activity.go).
+	// fetchWake wakes the fetch loop immediately on system wake (sleepwake.go).
 	live       liveSet
 	pollNudge  chan struct{}
 	fetchNudge chan struct{}
+	fetchWake  chan struct{}
+	wakeCfg    *wakeConfig
 
 	details detailState   // worktree detail cache (detail.go)
 	files   fileCollector // live worktrees' file changes (files.go)
@@ -229,6 +234,8 @@ func Start(ctx context.Context, opts Options) (*Git, error) {
 		// Buffered: a nudge while a round runs is kept for the next one.
 		pollNudge:  make(chan struct{}, 1),
 		fetchNudge: make(chan struct{}, 1),
+		fetchWake:  make(chan struct{}, 1),
+		wakeCfg:    opts.wake,
 	}
 	if g.runner == nil {
 		g.runner = NewExecRunner()
@@ -263,14 +270,17 @@ func Start(ctx context.Context, opts Options) (*Git, error) {
 	if t := tiers(opts.FetchInterval, opts.IdleFetchInterval, DefaultFetchInterval, DefaultIdleFetchInterval); t.live > 0 {
 		// Every project is due in the first round (zero seed), shortly after start.
 		s := newTierSched(t, time.Time{})
-		g.wg.Go(func() { g.tierLoop(ctx, "fetch", s, min(t.live, firstFetchDelay), g.fetchNudge, g.fetchAsync) })
+		g.wg.Go(func() {
+			g.tierLoop(ctx, "fetch", s, min(t.live, firstFetchDelay), g.fetchNudge, g.fetchWake, g.fetchAsync)
+		})
 	}
 	if t := tiers(opts.PollInterval, opts.IdlePollInterval, DefaultPollInterval, DefaultIdlePollInterval); t.live > 0 {
 		// The initial reconcile below refreshes everything, so each project's first
 		// poll is one interval after start.
 		s := newTierSched(t, g.now())
-		g.wg.Go(func() { g.tierLoop(ctx, "poll", s, t.live, g.pollNudge, g.poll) })
+		g.wg.Go(func() { g.tierLoop(ctx, "poll", s, t.live, g.pollNudge, nil, g.poll) })
 	}
+	g.wg.Go(func() { g.runWakeMonitor(ctx) })
 
 	g.commit(nil)
 	for _, m := range metas {

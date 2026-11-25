@@ -16,6 +16,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -68,6 +69,8 @@ type HTTPRunner struct {
 	// does not ask GitHub about it again until rejectedRecheck has passed.
 	rejected   string
 	rejectedAt time.Time
+	// lastWake is when CloseIdleConnections was last called on system wake (sleepwake.go).
+	lastWake time.Time
 }
 
 // rejectedRecheck is how long AuthStatus trusts GitHub's 401 for a token before asking
@@ -170,7 +173,7 @@ func (r *HTTPRunner) GraphQL(ctx context.Context, query string, vars map[string]
 	if err != nil {
 		return nil, fmt.Errorf("github graphql: encode request: %w", err)
 	}
-	res, err := r.do(ctx, http.MethodPost, r.opts.BaseURL+"/graphql", body, sendOpts{})
+	res, err := r.do(ctx, http.MethodPost, r.opts.BaseURL+"/graphql", body, sendOpts{idempotent: !isMutationDoc(query)})
 	if err != nil {
 		return nil, err
 	}
@@ -179,7 +182,7 @@ func (r *HTTPRunner) GraphQL(ctx context.Context, query string, vars map[string]
 
 // REST implements RESTRunner: GET <BaseURL>/<path>?<params>.
 func (r *HTTPRunner) REST(ctx context.Context, path string, params map[string]string) (json.RawMessage, error) {
-	res, err := r.do(ctx, http.MethodGet, r.restURL(path, params), nil, sendOpts{})
+	res, err := r.do(ctx, http.MethodGet, r.restURL(path, params), nil, sendOpts{idempotent: true})
 	if err != nil {
 		return nil, err
 	}
@@ -218,7 +221,7 @@ func (r *HTTPRunner) AuthStatus(ctx context.Context) (AuthStatus, error) {
 	if r.knownRejected(tok) {
 		return AuthStatus{Error: "GitHub rejected the token gh has (gh auth login replaces it)"}, nil
 	}
-	res, err := r.send(ctx, http.MethodGet, r.opts.BaseURL+"/user", nil, tok, sendOpts{})
+	res, err := r.send(ctx, http.MethodGet, r.opts.BaseURL+"/user", nil, tok, sendOpts{idempotent: true})
 	if err != nil {
 		return AuthStatus{}, err
 	}
@@ -313,18 +316,34 @@ type sendOpts struct {
 	accept string
 	// limit caps the body read (maxBody when zero); a longer body sets truncated.
 	limit int64
+	// idempotent marks read-only requests (GraphQL queries, REST GET) that are safe to
+	// retry once on a fresh connection when a pooled or post-wake socket resets before
+	// any response arrives. Mutations and REST writes leave this false.
+	idempotent bool
 }
 
 func (h httpResult) ok() bool { return h.status >= 200 && h.status < 300 }
 
-// send performs one request within Timeout. Transport failures are ErrNetwork, except
-// cancellation of ctx itself, which is returned as is.
+// send performs one request within Timeout, retrying once on a fresh connection for
+// read-only requests that fail before any response arrives due to a stale/reset socket.
+// Transport failures are ErrNetwork, except cancellation of ctx itself, which is
+// returned as is.
 func (r *HTTPRunner) send(ctx context.Context, method, u string, body []byte, tok string, o sendOpts) (httpResult, error) {
+	res, err, retry := r.sendOnce(ctx, method, u, body, tok, o, true)
+	if retry {
+		r.opts.Client.CloseIdleConnections()
+		res, err, _ = r.sendOnce(ctx, method, u, body, tok, o, false)
+	}
+	return res, err
+}
+
+func (r *HTTPRunner) sendOnce(ctx context.Context, method, u string, body []byte, tok string, o sendOpts, allowRetry bool) (httpResult, error, bool) {
 	cctx, cancel := context.WithTimeout(ctx, r.opts.Timeout)
 	defer cancel()
-	var reused bool
+	var reused, gotFirstByte atomic.Bool
 	cctx = httptrace.WithClientTrace(cctx, &httptrace.ClientTrace{
-		GotConn: func(i httptrace.GotConnInfo) { reused = i.Reused },
+		GotConn:              func(i httptrace.GotConnInfo) { reused.Store(i.Reused) },
+		GotFirstResponseByte: func() { gotFirstByte.Store(true) },
 	})
 	var rd io.Reader
 	if body != nil {
@@ -332,7 +351,7 @@ func (r *HTTPRunner) send(ctx context.Context, method, u string, body []byte, to
 	}
 	req, err := http.NewRequestWithContext(cctx, method, u, rd)
 	if err != nil {
-		return httpResult{}, fmt.Errorf("github: build request: %w", err)
+		return httpResult{}, fmt.Errorf("github: build request: %w", err), false
 	}
 	req.Header.Set("Authorization", "Bearer "+tok)
 	req.Header.Set("User-Agent", r.opts.UserAgent)
@@ -351,20 +370,25 @@ func (r *HTTPRunner) send(ctx context.Context, method, u string, body []byte, to
 	}
 	if err != nil {
 		if cerr := ctx.Err(); cerr != nil {
-			return httpResult{}, fmt.Errorf("github request: %w", cerr)
+			return httpResult{}, fmt.Errorf("github request: %w", cerr), false
 		}
-		return httpResult{}, fmt.Errorf("%w: %w", ErrNetwork, err)
+		if allowRetry && resp == nil && r.shouldRetryConnReset(o.idempotent, reused.Load(), gotFirstByte.Load(), r.opts.Now(), err) {
+			r.opts.Log.Debug("github http retrying read after connection reset",
+				"method", method, "path", req.URL.Path, "reused_conn", reused.Load(), "err", err)
+			return httpResult{}, nil, true
+		}
+		return httpResult{}, fmt.Errorf("%w: %w", ErrNetwork, err), false
 	}
 	h := resp.Header
 	r.opts.Log.Debug("github http", "method", method, "path", req.URL.Path, "status", resp.StatusCode,
-		"dur", r.opts.Now().Sub(start).Round(time.Millisecond).String(), "reused_conn", reused,
+		"dur", r.opts.Now().Sub(start).Round(time.Millisecond).String(), "reused_conn", reused.Load(),
 		"proto", resp.Proto, "bytes", len(b),
 		"rl_resource", h.Get("X-Ratelimit-Resource"), "rl_remaining", h.Get("X-Ratelimit-Remaining"))
 	res := httpResult{status: resp.StatusCode, header: h, body: b}
 	if int64(len(b)) > limit {
 		res.body, res.truncated = b[:limit], true
 	}
-	return res, nil
+	return res, nil, false
 }
 
 // parseGraphQLResponse turns a /graphql response into data or a classified error. A

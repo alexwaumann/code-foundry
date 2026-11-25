@@ -76,10 +76,27 @@ func (s *tierSched) lastRun(id string) time.Time {
 	return s.seed
 }
 
+// elapsedSince returns how much time has elapsed between last and now, taking the larger
+// of wall-clock delta (so system sleep advances intervals on macOS/Linux where monotonic
+// time pauses) and monotonic delta (so a backward wall-clock jump does not stall tiers).
+// If both are negative (a backward jump on a wall-only clock with no monotonic reading),
+// ok is false and callers treat the item as due immediately rather than stalling.
+func elapsedSince(last, now time.Time) (time.Duration, bool) {
+	elapsed := max(now.Round(0).Sub(last.Round(0)), now.Sub(last))
+	if elapsed < 0 {
+		return 0, false
+	}
+	return elapsed, true
+}
+
 // due reports whether project id, live or not, is due at now.
 func (s *tierSched) due(id string, live bool, now time.Time) bool {
 	last := s.lastRun(id)
-	return last.IsZero() || !now.Before(last.Add(s.tier.every(live)))
+	if last.IsZero() {
+		return true
+	}
+	elapsed, ok := elapsedSince(last, now)
+	return !ok || elapsed >= s.tier.every(live)
 }
 
 // ran records a run (or an attempt) of id at at.
@@ -108,26 +125,37 @@ func (s *tierSched) wait(ids []string, live func(string) bool, now time.Time) ti
 		if last.IsZero() {
 			return 0
 		}
-		w = min(w, last.Add(s.tier.every(live(id))).Sub(now))
+		elapsed, ok := elapsedSince(last, now)
+		if !ok {
+			return 0
+		}
+		w = min(w, s.tier.every(live(id))-elapsed)
 	}
 	return max(w, 0)
 }
 
 // tierLoop runs run(id) for every project when it is due, first after first (nudges
 // are ignored until then), then whenever the next project is due or nudge fires
-// (a project turned live). name labels the debug log.
-func (g *Git) tierLoop(ctx context.Context, name string, s *tierSched, first time.Duration, nudge <-chan struct{}, run func(context.Context, string)) {
+// (a project turned live). wake (optional, active immediately) forces a round for live
+// projects after system sleep/wake. name labels the debug log.
+func (g *Git) tierLoop(ctx context.Context, name string, s *tierSched, first time.Duration, nudge, wake <-chan struct{}, run func(context.Context, string)) {
 	t := time.NewTimer(first)
 	defer t.Stop()
 	var nudged <-chan struct{}
+	firstDone := false
 	for {
+		forceLive := false
 		select {
 		case <-ctx.Done():
 			return
 		case <-t.C:
+			firstDone = true
+			nudged = nudge
 		case <-nudged:
+		case <-wake:
+			forceLive = true
+			t.Stop()
 		}
-		nudged = nudge
 		ids := g.projectIDs()
 		s.forget(ids)
 		for _, id := range ids {
@@ -136,7 +164,8 @@ func (g *Git) tierLoop(ctx context.Context, name string, s *tierSched, first tim
 			}
 			now := g.now()
 			live := g.projectLive(id, now)
-			if !s.due(id, live, now) {
+			due := (!forceLive || firstDone) && s.due(id, live, now)
+			if !((forceLive && live) || due) {
 				continue
 			}
 			g.log.Debug(name, "project", id, "tier", tierName(live))
@@ -144,6 +173,10 @@ func (g *Git) tierLoop(ctx context.Context, name string, s *tierSched, first tim
 			run(ctx, id)
 		}
 		now := g.now()
+		if !firstDone {
+			t.Reset(first)
+			continue
+		}
 		t.Reset(s.wait(ids, func(id string) bool { return g.projectLive(id, now) }, now))
 	}
 }
