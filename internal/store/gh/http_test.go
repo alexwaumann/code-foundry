@@ -401,19 +401,33 @@ func TestHTTPRunnerTokenRefresh(t *testing.T) {
 	t.Run("token TTL", func(t *testing.T) {
 		srv := newAPIServer(t, "tok1", serveViewer)
 		tokens := &fakeTokens{tokens: []string{"tok1"}}
+		var nowMu sync.Mutex
 		now := time.Unix(1_800_000_000, 0)
+		getNow := func() time.Time {
+			nowMu.Lock()
+			defer nowMu.Unlock()
+			return now
+		}
+		advance := func(d time.Duration) {
+			nowMu.Lock()
+			now = now.Add(d)
+			nowMu.Unlock()
+		}
 		r := NewHTTPRunner(HTTPOptions{BaseURL: srv.URL, Tokens: tokens, TokenTTL: time.Minute,
-			Now: func() time.Time { return now }})
+			Now: getNow})
+		t.Cleanup(r.Close)
 		_, _ = r.GraphQL(ctx, "q", nil)
-		now = now.Add(59 * time.Second)
+		// Below soft TTL (48s for 1m TokenTTL): cached without background refresh.
+		advance(47 * time.Second)
 		_, _ = r.GraphQL(ctx, "q", nil)
 		if n := tokens.count(); n != 1 {
-			t.Errorf("within TTL: resolutions = %d", n)
+			t.Errorf("below soft TTL: resolutions = %d, want 1", n)
 		}
-		now = now.Add(2 * time.Second)
+		// Past hard TTL (61s): resolves synchronously.
+		advance(14 * time.Second)
 		_, _ = r.GraphQL(ctx, "q", nil)
 		if n := tokens.count(); n != 2 {
-			t.Errorf("after TTL: resolutions = %d", n)
+			t.Errorf("after hard TTL: resolutions = %d, want 2", n)
 		}
 	})
 }

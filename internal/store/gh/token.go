@@ -11,8 +11,9 @@ import (
 	"time"
 )
 
-// TokenSource resolves the GitHub API token. HTTPRunner caches what it returns and asks
-// again only when the cached token is rejected (HTTP 401), has aged past
+// TokenSource resolves the GitHub API token. HTTPRunner caches what it returns and
+// refreshes it off the request path once it passes HTTPOptions.TokenSoftTTL, or
+// synchronously when the cached token is rejected (HTTP 401), has aged past
 // HTTPOptions.TokenTTL, or the store re-checks authentication.
 type TokenSource interface {
 	// Token returns a github.com token. A failure that means "no usable token" (gh not

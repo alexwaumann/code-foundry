@@ -49,6 +49,10 @@ type HTTPOptions struct {
 	Timeout time.Duration
 	// TokenTTL is how long a token is reused; DefaultTokenTTL when zero.
 	TokenTTL time.Duration
+	// TokenSoftTTL is when HTTPRunner starts a background token refresh while still
+	// returning the cached token immediately. Zero defaults to 4/5 of TokenTTL (12m
+	// for DefaultTokenTTL); negative or >= TokenTTL disables background refresh.
+	TokenSoftTTL time.Duration
 	// UserAgent identifies the daemon to GitHub; "code-foundry" when empty.
 	UserAgent string
 	Log       *slog.Logger
@@ -65,12 +69,28 @@ type HTTPRunner struct {
 	mu      sync.Mutex
 	token   string
 	tokenAt time.Time
+	// refreshing is true while a single soft-TTL background token refresh is in flight.
+	refreshing bool
+	// refreshFailAt throttles retries after a failed background refresh until hard TTL.
+	refreshFailAt time.Time
+	// tokenGen increments on every synchronous token update or clear so an older
+	// in-flight background refresh never overwrites a newer synchronous resolution.
+	tokenGen uint64
 	// rejected is the last token GitHub answered 401 to, at rejectedAt: AuthStatus
 	// does not ask GitHub about it again until rejectedRecheck has passed.
 	rejected   string
 	rejectedAt time.Time
 	// lastWake is when CloseIdleConnections was last called on system wake (sleepwake.go).
 	lastWake time.Time
+	// Keep-warm state (keepwarm.go).
+	lastConnAt time.Time
+	lastWarmAt time.Time
+	warming    bool
+	// bgCtx/bgCancel/bgWG bound and drain background token refreshes and warm-ups on Close.
+	bgCtx    context.Context
+	bgCancel context.CancelFunc
+	bgWG     sync.WaitGroup
+	closed   bool
 }
 
 // rejectedRecheck is how long AuthStatus trusts GitHub's 401 for a token before asking
@@ -116,6 +136,12 @@ func NewHTTPRunner(o HTTPOptions) *HTTPRunner {
 	if o.TokenTTL <= 0 {
 		o.TokenTTL = DefaultTokenTTL
 	}
+	switch {
+	case o.TokenSoftTTL == 0:
+		o.TokenSoftTTL = o.TokenTTL * 4 / 5
+	case o.TokenSoftTTL < 0 || o.TokenSoftTTL > o.TokenTTL:
+		o.TokenSoftTTL = o.TokenTTL
+	}
 	o.UserAgent = cmp.Or(o.UserAgent, "code-foundry")
 	if o.Log == nil {
 		o.Log = slog.New(slog.DiscardHandler)
@@ -123,14 +149,32 @@ func NewHTTPRunner(o HTTPOptions) *HTTPRunner {
 	if o.Now == nil {
 		o.Now = time.Now
 	}
-	return &HTTPRunner{opts: o}
+	bgCtx, bgCancel := context.WithCancel(context.Background())
+	return &HTTPRunner{
+		opts:     o,
+		bgCtx:    bgCtx,
+		bgCancel: bgCancel,
+	}
+}
+
+// Close cancels any in-flight background token refresh or connection warm-up, waits for
+// them to finish, and drops idle HTTP connections. Safe to call multiple times.
+func (r *HTTPRunner) Close() {
+	r.mu.Lock()
+	r.closed = true
+	r.mu.Unlock()
+	r.bgCancel()
+	r.bgWG.Wait()
+	r.opts.Client.CloseIdleConnections()
 }
 
 // idleConnTimeout drops our idle connections before GitHub does. api.github.com closes
 // an HTTP/2 connection after ~30s idle (measured 2026-10: reused after 28s, new after
-// 31s), so reusing one near that edge could race the server's close, and a POST is not
-// retried on a dead connection. Requests of one poll come seconds apart and reuse; the
-// poll itself (60s) reconnects, ~0.2-0.4s once a minute.
+// 31s; re-verified 2026-11: even with HTTP/2 PINGs at 15s and 20s ACKed by GitHub,
+// api.github.com still sends GOAWAY NO_ERROR and closes the connection ~30-32s after
+// the last HTTP stream, see docs/notes/perf-gh-http2-keepwarm.md). Keeping 25s avoids
+// racing the server's close while WarmConnection (keepwarm.go) pre-warms on foreground
+// presence rise.
 const idleConnTimeout = 25 * time.Second
 
 // newHTTPClient keeps connections to api.github.com alive between the requests of a
@@ -280,24 +324,83 @@ func notAuthenticated(err error) error {
 }
 
 // resolveToken returns the cached token, or asks the TokenSource when there is none,
-// it is older than TokenTTL, or force is set.
+// it is older than TokenTTL, or force is set. When a cached token is still within
+// TokenTTL but at or past TokenSoftTTL, the cached token is returned immediately while
+// at most one background goroutine refreshes it off the request path.
 func (r *HTTPRunner) resolveToken(ctx context.Context, force bool) (string, error) {
 	r.mu.Lock()
-	defer r.mu.Unlock()
 	now := r.opts.Now()
-	if !force && r.token != "" && now.Sub(r.tokenAt) < r.opts.TokenTTL {
-		return r.token, nil
+	if !force && r.token != "" {
+		age := now.Sub(r.tokenAt)
+		if age < r.opts.TokenTTL {
+			tok := r.token
+			if age >= r.opts.TokenSoftTTL && !r.refreshing && !r.closed &&
+				(r.refreshFailAt.IsZero() || now.Sub(r.refreshFailAt) >= bgRefreshRetry) {
+				r.refreshing = true
+				gen := r.tokenGen
+				r.bgWG.Add(1)
+				go r.refreshTokenBackground(gen)
+			}
+			r.mu.Unlock()
+			return tok, nil
+		}
 	}
+	gen := r.tokenGen
+	r.mu.Unlock()
+
 	start := now
 	tok, err := r.opts.Tokens.Token(ctx)
-	r.opts.Log.Debug("github token resolved", "dur", r.opts.Now().Sub(start).Round(time.Millisecond).String(),
+	end := r.opts.Now()
+	r.opts.Log.Debug("github token resolved", "dur", end.Sub(start).Round(time.Millisecond).String(),
 		"forced", force, "err", err)
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	if err != nil {
-		r.token = ""
+		if r.tokenGen == gen {
+			r.token = ""
+			r.tokenGen++
+		}
 		return "", err
 	}
-	r.token, r.tokenAt = tok, r.opts.Now()
+	r.token, r.tokenAt = tok, end
+	r.tokenGen++
+	r.refreshFailAt = time.Time{}
 	return tok, nil
+}
+
+// refreshTokenBackground refreshes the cached token off the request path. On error the
+// still-valid cached token is preserved until TokenTTL expires; if a synchronous
+// resolution happened meanwhile (tokenGen changed) the stale result is discarded.
+func (r *HTTPRunner) refreshTokenBackground(gen uint64) {
+	defer r.bgWG.Done()
+	ctx, cancel := context.WithTimeout(r.bgCtx, DefaultTokenTimeout)
+	defer cancel()
+
+	start := r.opts.Now()
+	tok, err := r.opts.Tokens.Token(ctx)
+	end := r.opts.Now()
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.refreshing = false
+	if err != nil {
+		r.refreshFailAt = end
+		r.opts.Log.Debug("github background token refresh failed",
+			"dur", end.Sub(start).Round(time.Millisecond).String(), "err", err)
+		return
+	}
+	if r.tokenGen != gen {
+		r.opts.Log.Debug("github background token refresh discarded",
+			"dur", end.Sub(start).Round(time.Millisecond).String())
+		return
+	}
+	changed := tok != r.token
+	r.token, r.tokenAt = tok, end
+	r.tokenGen++
+	r.refreshFailAt = time.Time{}
+	r.opts.Log.Debug("github token refreshed in background",
+		"dur", end.Sub(start).Round(time.Millisecond).String(), "changed", changed)
 }
 
 // httpResult is a completed HTTP exchange.
@@ -379,9 +482,11 @@ func (r *HTTPRunner) sendOnce(ctx context.Context, method, u string, body []byte
 		}
 		return httpResult{}, fmt.Errorf("%w: %w", ErrNetwork, err), false
 	}
+	end := r.opts.Now()
+	r.recordConnUse(end)
 	h := resp.Header
 	r.opts.Log.Debug("github http", "method", method, "path", req.URL.Path, "status", resp.StatusCode,
-		"dur", r.opts.Now().Sub(start).Round(time.Millisecond).String(), "reused_conn", reused.Load(),
+		"dur", end.Sub(start).Round(time.Millisecond).String(), "reused_conn", reused.Load(),
 		"proto", resp.Proto, "bytes", len(b),
 		"rl_resource", h.Get("X-Ratelimit-Resource"), "rl_remaining", h.Get("X-Ratelimit-Remaining"))
 	res := httpResult{status: resp.StatusCode, header: h, body: b}
