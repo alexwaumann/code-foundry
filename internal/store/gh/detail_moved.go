@@ -72,8 +72,13 @@ func (d *movedDetails) writtenSince(k fullKey, fetched time.Time) bool {
 // markMovedDetails is the poll's hook: every pull request whose fingerprint moved from
 // what the store held (or that it did not hold) gets its cached PullRequest detail
 // marked so PullRequest() refetches fresh check-run rows (backing plugin pr.checks facts).
-func (s *Store) markMovedDetails(fps []prFingerprint, known map[string]PullRequest) {
-	now := s.opts.Now()
+// Marks are stamped at pollStart (when the poll request was sent) and skipped for any
+// in-memory detail fetched after fpSeq without a strictly newer UpdatedAt, so an
+// overlapping older poll fingerprint never falsely invalidates a concurrent read-lane fetch.
+func (s *Store) markMovedDetails(fps []prFingerprint, known map[string]PullRequest, fpSeq uint64, pollStart time.Time) {
+	if pollStart.IsZero() {
+		pollStart = s.opts.Now()
+	}
 	snap := s.Snapshot()
 	for _, f := range fps {
 		if f.Repo == "" || f.Number <= 0 {
@@ -81,9 +86,14 @@ func (s *Store) markMovedDetails(fps []prFingerprint, known map[string]PullReque
 		}
 		if prev, ok := known[f.ID]; !ok || fingerprintMoved(prev, f) {
 			k := fullKey{f.Repo, f.Number}
-			s.moved.mark(k, now, s.opts.DetailTTL)
+			if !s.prDetails.newerThan(k, fpSeq, f.UpdatedAt) {
+				s.moved.mark(k, pollStart, s.opts.DetailTTL)
+			}
 			if localSlug := snap.LocalRepo(f.Repo); localSlug != f.Repo {
-				s.moved.mark(fullKey{localSlug, f.Number}, now, s.opts.DetailTTL)
+				lk := fullKey{localSlug, f.Number}
+				if !s.prDetails.newerThan(lk, fpSeq, f.UpdatedAt) {
+					s.moved.mark(lk, pollStart, s.opts.DetailTTL)
+				}
 			}
 		}
 	}

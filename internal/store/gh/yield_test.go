@@ -20,6 +20,11 @@ import (
 // opLookup is the request testJob sends: nothing else in these tests uses it.
 const opLookup = "LookupRepository"
 
+// singleLane disables the read-only concurrency lane for tests that hold a poll to pin
+// single-lane queuing and yield.go fallback behavior (used when the read-lane allowance
+// is exhausted or a write is active).
+func singleLane(o *Options) { o.disableReadLane = true }
+
 // yieldWorld is a store whose every poll stage can be stopped at a request, with a log
 // of requests in the order they went out (GraphQL operations and REST paths).
 type yieldWorld struct {
@@ -284,7 +289,7 @@ func TestClickDuringEveryStageOfAPoll(t *testing.T) {
 	stages := []string{"PullRequest", "Poll", "PullRequestDetails", "DefaultBranchChecks", "PollStats", "search/commits", "PollProjects"}
 	for _, stage := range stages {
 		t.Run(stage, func(t *testing.T) {
-			w := newYieldWorld(t, nil)
+			w := newYieldWorld(t, singleLane)
 			w.moveEverything(t, 1)
 			from := w.nsent()
 			w.holdGitHub(stage, false)
@@ -383,7 +388,7 @@ func TestBurstOfClicksDuringAPoll(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			w := newYieldWorld(t, nil)
+			w := newYieldWorld(t, singleLane)
 			w.moveEverything(t, 1)
 			from := w.nsent()
 			calls := w.f.ncalls()
@@ -490,7 +495,7 @@ func TestStreamOfJobsDoesNotStarveThePoll(t *testing.T) {
 // Shutdown in the middle of a poll: the poll stops at its next request, the queued job
 // fails without being sent, and Run returns.
 func TestPollCancelledWithAJobQueued(t *testing.T) {
-	w := newYieldWorld(t, nil)
+	w := newYieldWorld(t, singleLane)
 	w.moveEverything(t, 1)
 	w.holdGitHub("Poll", false)
 	w.kickPoll(t)
@@ -509,7 +514,7 @@ func TestPollCancelledWithAJobQueued(t *testing.T) {
 // Shutdown while a yield runs: the job in flight ends, the next one is not started, the
 // poll does not resume, and a job submitted after Run ended fails at once.
 func TestShutdownWhileYielding(t *testing.T) {
-	w := newYieldWorld(t, nil)
+	w := newYieldWorld(t, singleLane)
 	w.moveEverything(t, 1)
 	w.holdGitHub("Poll", false)
 	w.kickPoll(t)
@@ -649,7 +654,7 @@ func TestCallerLeaves(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			w := newYieldWorld(t, nil)
+			w := newYieldWorld(t, singleLane)
 			from := w.nsent()
 			w.holdGitHub("Poll", false)
 			w.kickPoll(t)
@@ -716,7 +721,7 @@ func TestEveryReadLeavesWithItsCaller(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			w := newYieldWorld(t, nil)
+			w := newYieldWorld(t, singleLane)
 			w.holdGitHub("Poll", false)
 			w.kickPoll(t)
 			w.waitHeld(t)
@@ -768,7 +773,7 @@ func TestCallerLeavesWhileRunning(t *testing.T) {
 // What a click fetched is newer than the fingerprint of the poll around it: the stale
 // pass of that fingerprint comes before the click, never after.
 func TestPollDoesNotStaleWhatAClickFetched(t *testing.T) {
-	w := newYieldWorld(t, nil)
+	w := newYieldWorld(t, singleLane)
 	if _, err := w.s.FullPullRequest(context.Background(), "o/r", 1, true); err != nil {
 		t.Fatal(err)
 	}
@@ -1007,6 +1012,7 @@ func TestRefusedStatsAreNotAResult(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			w := newYieldWorld(t, func(o *Options) {
+				o.disableReadLane = true
 				o.SecondaryBackoff, o.MaxBackoff = time.Hour, time.Hour
 				if !tt.rest {
 					o.Runner = o.Runner.(rawYieldRunner).fakeRunner
@@ -1075,7 +1081,7 @@ func TestPauseInAYieldLeavesTheProjectListsAlone(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			w := newYieldWorld(t, func(o *Options) { o.SecondaryBackoff, o.MaxBackoff = time.Hour, time.Hour })
+			w := newYieldWorld(t, func(o *Options) { o.disableReadLane = true; o.SecondaryBackoff, o.MaxBackoff = time.Hour, time.Hour })
 			before := w.s.Snapshot().Projects
 			if tt.move != nil {
 				tt.move(w)
@@ -1161,7 +1167,7 @@ func TestPauseStopsThePollAndTheQueue(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			w := newYieldWorld(t, func(o *Options) { o.SecondaryBackoff, o.MaxBackoff = time.Hour, time.Hour })
+			w := newYieldWorld(t, func(o *Options) { o.disableReadLane = true; o.SecondaryBackoff, o.MaxBackoff = time.Hour, time.Hour })
 			w.moveEverything(t, 1)
 			from := w.nsent()
 			w.g.failNext(tt.limit, &RateLimitError{Secondary: true, Msg: "slow down"})
@@ -1282,7 +1288,7 @@ func TestBackgroundRefreshRefusedByAPause(t *testing.T) {
 // A refresh that joins a queued read is promised to a client, so it announces its end
 // even when nothing changed, and even when the read's caller left.
 func TestRefreshJoiningAReadStillAnnounces(t *testing.T) {
-	w := newYieldWorld(t, nil)
+	w := newYieldWorld(t, singleLane)
 	if _, err := w.s.FullPullRequest(context.Background(), "o/r", 1, true); err != nil {
 		t.Fatal(err)
 	}
@@ -1354,7 +1360,7 @@ func TestYieldTakesOnlyWaitedJobs(t *testing.T) {
 
 // The poll's own numbers stay its own, and the yield shows in its log line.
 func TestYieldInThePollLogLine(t *testing.T) {
-	w := newYieldWorld(t, nil)
+	w := newYieldWorld(t, singleLane)
 	w.holdGitHub("Poll", false)
 	w.kickPoll(t)
 	w.waitHeld(t)
@@ -1469,10 +1475,13 @@ func TestRateLimitExhaustsTheAllowance(t *testing.T) {
 	if err := w.testJob(context.Background(), "limited"); !errors.Is(err, ErrRateLimited) {
 		t.Fatalf("job: %v", err)
 	}
-	left := make(chan bool, 1) // read on the worker, whose field it is
+	left := make(chan bool, 1)
 	waitFor(t, "the pause to end", func() bool {
 		return w.s.submitBackground(&job{kind: jobFunc, id: "look", run: func(context.Context) (any, error) {
-			left <- w.s.allowance.left(time.Now())
+			w.s.mu.Lock()
+			ok := w.s.allowance.left(time.Now())
+			w.s.mu.Unlock()
+			left <- ok
 			return nil, nil
 		}}) == nil
 	})
@@ -1505,7 +1514,8 @@ func TestIsMutation(t *testing.T) {
 }
 
 // Everything at once, for the race detector: polls back to back, clicks that stay and
-// clicks that leave, and background refreshes. One request in flight, nobody left hanging.
+// clicks that leave, and background refreshes. At most two requests in flight (primary +
+// read lane), nobody left hanging.
 func TestQueueUnderLoad(t *testing.T) {
 	w := newYieldWorld(t, func(o *Options) { o.PollInterval = time.Millisecond })
 	var wg sync.WaitGroup
@@ -1531,7 +1541,7 @@ func TestQueueUnderLoad(t *testing.T) {
 	}
 	wg.Wait()
 	settleWorker(t, w.s)
-	if n := w.maxInflight(); n != 1 {
-		t.Errorf("max in flight = %d", n)
+	if n := w.maxInflight(); n < 1 || n > 2 {
+		t.Errorf("max in flight = %d, want 1..2", n)
 	}
 }

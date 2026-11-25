@@ -3,11 +3,16 @@ package gh
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
+	"os"
 	"path/filepath"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/alexwaumann/code-foundry/internal/bus"
 )
 
 func openBenchDB(b *testing.B) *sql.DB {
@@ -457,4 +462,286 @@ func TestPerfMeasurements(t *testing.T) {
 			return err
 		})
 	})
+}
+
+// BenchmarkReadLaneClickDuringSlowPoll measures before (single lane) vs after (read lane)
+// latency for a user-waited FullPullRequest arriving 50ms into a slow poll (1.5s or 2.0s)
+// with realistic production pacing (MinGap=1s, UserGap=250ms, 200ms detail fetch).
+func BenchmarkReadLaneClickDuringSlowPoll(b *testing.B) {
+	const (
+		readRTT     = 200 * time.Millisecond
+		clickOffset = 50 * time.Millisecond
+	)
+	for _, pollRTT := range []time.Duration{1500 * time.Millisecond, 2000 * time.Millisecond} {
+		for _, mode := range []struct {
+			name    string
+			disable bool
+		}{{"before_single_lane", true}, {"after_read_lane", false}} {
+			b.Run(fmt.Sprintf("poll_%dms/%s", pollRTT.Milliseconds(), mode.name), func(b *testing.B) {
+				b.ResetTimer()
+				var totalDur, totalQueue time.Duration
+				for range b.N {
+					b.StopTimer()
+					g, t0 := changeDrivenWorld()
+					g.addPR(fakePR("PR_2", "o/r", 2, t0), sectionAuthored)
+					r := &readLaneRunner{g: g}
+					busObj := bus.New()
+					polled := bus.Subscribe[Polled](busObj, 16)
+					opts := Options{
+						DB:              openBenchDB(b),
+						Runner:          r,
+						Bus:             busObj,
+						MinGap:          DefaultMinGap,
+						UserGap:         DefaultMinGap / userGapDivisor,
+						PollInterval:    time.Hour,
+						IdleInterval:    time.Hour,
+						StatsInterval:   -1,
+						disableReadLane: mode.disable,
+					}
+					s, err := New(context.Background(), opts)
+					if err != nil {
+						b.Fatal(err)
+					}
+					runCtx, cancel := context.WithCancel(context.Background())
+					runDone := make(chan struct{})
+					go func() { defer close(runDone); _ = s.Run(runCtx) }()
+					if err := s.Track("o/r"); err != nil {
+						b.Fatal(err)
+					}
+					// Initial warm-up poll without artificial delay.
+					if err := s.Refresh(context.Background(), ""); err != nil {
+						b.Fatal(err)
+					}
+					<-polled.C()
+					// Reset lastEnd well in the past so the measured poll starts immediately.
+					s.mu.Lock()
+					s.lastEnd = time.Now().Add(-10 * time.Second)
+					s.mu.Unlock()
+
+					pollStarted := make(chan struct{})
+					var pollOnce sync.Once
+					var readStarted atomic.Int64
+					r.mu.Lock()
+					r.onOp = func(_ context.Context, op string, _ bool) {
+						switch op {
+						case "Poll":
+							pollOnce.Do(func() { close(pollStarted) })
+							time.Sleep(pollRTT)
+						case "PullRequestFull":
+							readStarted.Store(time.Now().UnixNano())
+							time.Sleep(readRTT)
+						}
+					}
+					r.mu.Unlock()
+
+					if err := s.Refresh(context.Background(), ""); err != nil {
+						b.Fatal(err)
+					}
+					<-pollStarted
+					time.Sleep(clickOffset)
+
+					b.StartTimer()
+					tStart := time.Now()
+					if _, err := s.FullPullRequest(context.Background(), "o/r", 1, true); err != nil {
+						b.Fatal(err)
+					}
+					elapsed := time.Since(tStart)
+					b.StopTimer()
+
+					qWait := time.Duration(readStarted.Load() - tStart.UnixNano())
+					totalDur += elapsed
+					totalQueue += qWait
+					<-polled.C()
+					cancel()
+					<-runDone
+				}
+				b.ReportMetric(float64(totalDur.Milliseconds())/float64(b.N), "total_ms/op")
+				b.ReportMetric(float64(totalQueue.Milliseconds())/float64(b.N), "queue_wait_ms/op")
+			})
+		}
+	}
+}
+
+// BenchmarkReadLaneBurst3DuringSlowPoll measures before (single lane) vs after (read lane)
+// for a burst of 3 concurrent user-waited reads (FullPullRequest, PullRequestDiff,
+// ReviewerCandidates) arriving 50ms into a 2.0s poll with realistic production pacing.
+func BenchmarkReadLaneBurst3DuringSlowPoll(b *testing.B) {
+	const (
+		pollRTT     = 2000 * time.Millisecond
+		readRTT     = 200 * time.Millisecond
+		clickOffset = 50 * time.Millisecond
+	)
+	for _, mode := range []struct {
+		name    string
+		disable bool
+	}{{"before_single_lane", true}, {"after_read_lane", false}} {
+		b.Run(mode.name, func(b *testing.B) {
+			b.ResetTimer()
+			var totalFirst, totalAll time.Duration
+			for range b.N {
+				b.StopTimer()
+				g, _ := changeDrivenWorld()
+				g.detail.assignable = []ReviewerCandidate{{ID: "U1", Login: "alice", Name: "Alice"}}
+				r := &readLaneRunner{g: g}
+				busObj := bus.New()
+				polled := bus.Subscribe[Polled](busObj, 16)
+				opts := Options{
+					DB:              openBenchDB(b),
+					Runner:          r,
+					Bus:             busObj,
+					MinGap:          DefaultMinGap,
+					UserGap:         DefaultMinGap / userGapDivisor,
+					PollInterval:    time.Hour,
+					IdleInterval:    time.Hour,
+					StatsInterval:   -1,
+					disableReadLane: mode.disable,
+				}
+				s, err := New(context.Background(), opts)
+				if err != nil {
+					b.Fatal(err)
+				}
+				runCtx, cancel := context.WithCancel(context.Background())
+				runDone := make(chan struct{})
+				go func() { defer close(runDone); _ = s.Run(runCtx) }()
+				if err := s.Track("o/r"); err != nil {
+					b.Fatal(err)
+				}
+				if err := s.Refresh(context.Background(), ""); err != nil {
+					b.Fatal(err)
+				}
+				<-polled.C()
+				s.mu.Lock()
+				s.lastEnd = time.Now().Add(-10 * time.Second)
+				s.mu.Unlock()
+
+				pollStarted := make(chan struct{})
+				var pollOnce sync.Once
+				r.mu.Lock()
+				r.onOp = func(_ context.Context, op string, _ bool) {
+					if op == "Poll" {
+						pollOnce.Do(func() { close(pollStarted) })
+						time.Sleep(pollRTT)
+						return
+					}
+					time.Sleep(readRTT)
+				}
+				r.mu.Unlock()
+
+				if err := s.Refresh(context.Background(), ""); err != nil {
+					b.Fatal(err)
+				}
+				<-pollStarted
+				time.Sleep(clickOffset)
+
+				b.StartTimer()
+				tStart := time.Now()
+				firstDone := make(chan time.Duration, 3)
+				var wg sync.WaitGroup
+				wg.Go(func() {
+					if _, err := s.FullPullRequest(context.Background(), "o/r", 1, true); err != nil {
+						b.Error(err)
+					}
+					firstDone <- time.Since(tStart)
+				})
+				wg.Go(func() {
+					if _, err := s.PullRequestDiff(context.Background(), "o/r", 1, true); err != nil {
+						b.Error(err)
+					}
+					firstDone <- time.Since(tStart)
+				})
+				wg.Go(func() {
+					if _, err := s.ReviewerCandidates(context.Background(), "o/r", 1, "al"); err != nil {
+						b.Error(err)
+					}
+					firstDone <- time.Since(tStart)
+				})
+				d1 := <-firstDone
+				wg.Wait()
+				allDur := time.Since(tStart)
+				b.StopTimer()
+
+				totalFirst += d1
+				totalAll += allDur
+				<-polled.C()
+				cancel()
+				<-runDone
+			}
+			b.ReportMetric(float64(totalFirst.Milliseconds())/float64(b.N), "first_ms/op")
+			b.ReportMetric(float64(totalAll.Milliseconds())/float64(b.N), "all3_ms/op")
+		})
+	}
+}
+
+// TestReadLaneLiveMeasurement performs a small opt-in read-only measurement against live
+// GitHub (alexwaumann/code-foundry #904) when GH_LIVE_MEASURE=1 is set. Skipped by default.
+func TestReadLaneLiveMeasurement(t *testing.T) {
+	if os.Getenv("GH_LIVE_MEASURE") != "1" {
+		t.Skip("set GH_LIVE_MEASURE=1 to run live read-only GitHub measurement")
+	}
+	for _, mode := range []struct {
+		name    string
+		disable bool
+	}{{"before_single_lane", true}, {"after_read_lane", false}} {
+		t.Run(mode.name, func(t *testing.T) {
+			httpRunner := NewHTTPRunner(HTTPOptions{UserAgent: "code-foundry-bench"})
+			var pollStartNano atomic.Int64
+			var pollEntered sync.Once
+			pollCh := make(chan struct{})
+			wrap := &timingRunner{
+				HTTPRunner: httpRunner,
+				onGraphQL: func(op string) {
+					if op == "Poll" {
+						pollEntered.Do(func() {
+							pollStartNano.Store(time.Now().UnixNano())
+							close(pollCh)
+						})
+					}
+				},
+			}
+			b := bus.New()
+			polled := bus.Subscribe[Polled](b, 16)
+			opts := Options{
+				DB:              openTestDB(t),
+				Runner:          wrap,
+				Bus:             b,
+				MinGap:          DefaultMinGap,
+				UserGap:         DefaultMinGap / userGapDivisor,
+				PollInterval:    time.Hour,
+				IdleInterval:    time.Hour,
+				StatsInterval:   -1,
+				disableReadLane: mode.disable,
+			}
+			s := startStore(t, opts)
+			if err := s.Track("alexwaumann/code-foundry"); err != nil {
+				t.Fatal(err)
+			}
+			if err := s.Refresh(context.Background(), ""); err != nil {
+				t.Fatal(err)
+			}
+			<-pollCh
+			time.Sleep(50 * time.Millisecond)
+			tStart := time.Now()
+			d, err := s.FullPullRequest(context.Background(), "alexwaumann/code-foundry", 904, true)
+			elapsed := time.Since(tStart)
+			if err != nil {
+				t.Fatalf("FullPullRequest: %v", err)
+			}
+			<-polled.C()
+			pollDur := time.Since(time.Unix(0, pollStartNano.Load()))
+			t.Logf("LIVE %s: pr=#%d title=%q full_pr_ms=%d poll_total_ms=%d",
+				mode.name, d.PullRequest.Number, d.PullRequest.Title, elapsed.Milliseconds(), pollDur.Milliseconds())
+		})
+	}
+}
+
+type timingRunner struct {
+	*HTTPRunner
+	onGraphQL func(op string)
+}
+
+func (r *timingRunner) GraphQL(ctx context.Context, query string, vars map[string]any) (json.RawMessage, error) {
+	if m := opRE.FindStringSubmatch(query); len(m) > 1 && r.onGraphQL != nil {
+		r.onGraphQL(m[1])
+	}
+	return r.HTTPRunner.GraphQL(ctx, query, vars)
 }

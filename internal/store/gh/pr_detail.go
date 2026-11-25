@@ -88,6 +88,9 @@ type fullEntry struct {
 	// failure is why the last fetch since d failed, at failedAt; nil if none did.
 	failure  error
 	failedAt time.Time
+	// fetchSeq is the monotonic request sequence (Store.reqSeq) of the fetch that
+	// produced d, so an overlapping older poll fingerprint cannot falsely mark d stale.
+	fetchSeq uint64
 }
 
 // serves reports whether e may be served at now as current: it is not stale, and it is
@@ -193,9 +196,15 @@ func (c *fullCache) entry(k fullKey) (fullEntry, bool) {
 
 // put stores d as fresh and returns the entry it replaced.
 func (c *fullCache) put(k fullKey, d FullPullRequest) (prev fullEntry, had bool) {
+	return c.putWithSeq(k, d, 0)
+}
+
+// putWithSeq stores d as fresh with its monotonic request sequence and returns the
+// entry it replaced.
+func (c *fullCache) putWithSeq(k fullKey, d FullPullRequest, seq uint64) (prev fullEntry, had bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	return c.putLocked(k, &fullEntry{d: d})
+	return c.putLocked(k, &fullEntry{d: d, fetchSeq: seq})
 }
 
 // putLocked stores e, evicting the least recently fetched beyond fullCacheMax. c.mu is
@@ -295,7 +304,14 @@ func (c *fullCache) fail(k fullKey, err error, now time.Time) bool {
 //     open panel refreshes only checks.graphql rather than the full PullRequestFull doc).
 //   - Any other fresh entry whose fingerprint moved goes stale (returned).
 //   - Every unchanged fresh entry in fps is confirmed at now when confirmable.
+//   - When fpSeq > 0, entries fetched after the poll request started (e.fetchSeq > fpSeq)
+//     are left untouched unless the poll observed a strictly newer UpdatedAt, so an
+//     overlapping older poll fingerprint never stales a fresher read-lane fetch.
 func (c *fullCache) applyPoll(fps []prFingerprint, now time.Time) []fullKey {
+	return c.applyPollAt(fps, 0, now)
+}
+
+func (c *fullCache) applyPollAt(fps []prFingerprint, fpSeq uint64, now time.Time) []fullKey {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if len(c.m) == 0 {
@@ -310,6 +326,7 @@ func (c *fullCache) applyPoll(fps []prFingerprint, now time.Time) []fullKey {
 		f, ok := byID[e.d.PullRequest.ID]
 		switch {
 		case !ok || e.stale:
+		case fpSeq > 0 && e.fetchSeq > fpSeq && !f.UpdatedAt.After(e.d.PullRequest.UpdatedAt):
 		case pendingCheckCountsOnly(e.d.PullRequest, f):
 			e.d.PullRequest.Checks = f.Checks
 			e.checksStale = true
@@ -469,7 +486,7 @@ func (s *Store) fetchFullJob(ctx context.Context, k fullKey) (FullPullRequest, e
 // queues nothing and returns why. PullRequestDetailUpdated reports the end.
 func (s *Store) refreshFull(k fullKey) error {
 	submitted := s.opts.Now()
-	return s.submitBackground(&job{kind: jobFunc, id: fullJobID(k), run: func(ctx context.Context) (any, error) {
+	return s.submitBackground(&job{kind: jobFunc, id: fullJobID(k), read: true, run: func(ctx context.Context) (any, error) {
 		return s.runFullFetch(ctx, k, submitted, true, false)
 	}})
 }
@@ -532,7 +549,7 @@ func (s *Store) runFullFetch(ctx context.Context, k fullKey, submitted time.Time
 // full pull_request_full document (comments, commits, reviews, review threads).
 func (s *Store) fetchChecksOnly(ctx context.Context, k fullKey, base FullPullRequest, announce bool) (FullPullRequest, error) {
 	owner, name := splitSlug(k.slug)
-	data, err := s.call(ctx, queryChecks, map[string]any{"owner": owner, "name": name, "ref": base.PullRequest.HeadSHA, "after": nil})
+	data, fetchSeq, _, err := s.callMeta(ctx, queryChecks, map[string]any{"owner": owner, "name": name, "ref": base.PullRequest.HeadSHA, "after": nil})
 	if err != nil {
 		return FullPullRequest{}, err
 	}
@@ -563,7 +580,7 @@ func (s *Store) fetchChecksOnly(ctx context.Context, k fullKey, base FullPullReq
 	d.Checks = runs
 	d.ChecksTruncated = next.HasNextPage
 	d.FetchedAt = s.opts.Now()
-	prev, had := s.full.put(k, d)
+	prev, had := s.full.putWithSeq(k, d, fetchSeq)
 	s.summaries.put(k, d.PullRequest)
 	if err := s.cache.saveActivity(ctx, activityFull+k.String(), d.FetchedAt, d); err != nil {
 		s.log.Warn("gh cache write failed", "err", err)
@@ -577,13 +594,13 @@ func (s *Store) fetchChecksOnly(ctx context.Context, k fullKey, base FullPullReq
 	return d, nil
 }
 
-// fetchFull runs on the worker: the detail request, more check pages when there are
-// over 100 checks, then the cache and PullRequestDetailUpdated: when it changed, when it
-// ends a failure clients were told about, or always with announce. A failed checks page
-// keeps the checks fetched so far: ChecksTruncated and LastError say so.
+// fetchFull runs on the worker or read lane: the detail request, more check pages when
+// there are over 100 checks, then the cache and PullRequestDetailUpdated: when it
+// changed, when it ends a failure clients were told about, or always with announce. A
+// failed checks page keeps the checks fetched so far: ChecksTruncated and LastError say so.
 func (s *Store) fetchFull(ctx context.Context, k fullKey, announce bool) (FullPullRequest, error) {
 	owner, name := splitSlug(k.slug)
-	data, err := s.call(ctx, queryPullRequestFull, map[string]any{"owner": owner, "name": name, "number": k.number})
+	data, fetchSeq, _, err := s.callMeta(ctx, queryPullRequestFull, map[string]any{"owner": owner, "name": name, "number": k.number})
 	if err != nil && !isPartial(err) {
 		return FullPullRequest{}, err
 	}
@@ -621,7 +638,7 @@ func (s *Store) fetchFull(ctx context.Context, k fullKey, announce bool) (FullPu
 	d.Checks = runs
 	d.ChecksTruncated = next.HasNextPage
 	d.FetchedAt = s.opts.Now()
-	prev, had := s.full.put(k, d)
+	prev, had := s.full.putWithSeq(k, d, fetchSeq)
 	s.summaries.put(k, d.PullRequest)
 	if err := s.cache.saveActivity(ctx, activityFull+k.String(), d.FetchedAt, d); err != nil {
 		s.log.Warn("gh cache write failed", "err", err)
@@ -638,8 +655,8 @@ func (s *Store) fetchFull(ctx context.Context, k fullKey, announce bool) (FullPu
 // staleFullDetails is the poll's hook: cached details whose pull request's fingerprint
 // moved go stale (or have pending check counts patched in place), and clients hear about
 // it; the others it saw are confirmed.
-func (s *Store) staleFullDetails(fps []prFingerprint) {
-	for _, k := range s.full.applyPoll(fps, s.opts.Now()) {
+func (s *Store) staleFullDetails(fps []prFingerprint, fpSeq uint64) {
+	for _, k := range s.full.applyPollAt(fps, fpSeq, s.opts.Now()) {
 		if e, ok := s.full.entry(k); ok && e.stale {
 			s.reviewers.invalidatePR(k)
 		}

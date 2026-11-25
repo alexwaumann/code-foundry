@@ -29,6 +29,9 @@ import (
 // gets the pause's error), and waits out the gap since the previous request. read marks
 // a request that changes nothing: with a waiting caller it may use a short gap.
 func (s *Store) admit(ctx context.Context, read bool) error {
+	if isReadLane(ctx) {
+		return s.admitReadLane(ctx, read)
+	}
 	short := read && s.forUser
 wait:
 	for {
@@ -38,14 +41,17 @@ wait:
 		if err := ctx.Err(); err != nil {
 			return err
 		}
+		now := s.opts.Now()
 		s.mu.Lock()
 		err := s.pausedLocked()
+		var left time.Duration
+		if err == nil {
+			left = s.lastEnd.Add(s.gapLocked(short, now)).Sub(now)
+		}
 		s.mu.Unlock()
 		if err != nil {
 			return notSent{err}
 		}
-		now := s.opts.Now()
-		left := s.lastEnd.Add(s.gap(short, now)).Sub(now)
 		if left <= 0 {
 			break
 		}
@@ -65,9 +71,15 @@ wait:
 		}
 	}
 	now := s.opts.Now()
+	s.mu.Lock()
+	if err := s.pausedLocked(); err != nil {
+		s.mu.Unlock()
+		return notSent{err}
+	}
 	if short && now.Before(s.lastEnd.Add(s.opts.MinGap)) {
 		s.allowance.spend(now)
 	}
+	s.mu.Unlock()
 	if s.scheduled {
 		s.ahead = 0
 	}
@@ -118,12 +130,13 @@ func (s *Store) claimWaiting() *job {
 	j := s.queue[i]
 	s.queue = slices.Delete(s.queue, i, i+1)
 	s.ahead++
+	s.registerInflightLocked(j)
 	return j
 }
 
-// gap is how long after the previous request the next may start: MinGap, or UserGap for
-// a read someone waits for while the allowance lasts. Worker goroutine only.
-func (s *Store) gap(user bool, now time.Time) time.Duration {
+// gapLocked is how long after the previous request the next may start: MinGap, or
+// UserGap for a read someone waits for while the allowance lasts. Called with s.mu held.
+func (s *Store) gapLocked(user bool, now time.Time) time.Duration {
 	if user && s.allowance.left(now) {
 		return s.opts.UserGap
 	}
@@ -133,14 +146,23 @@ func (s *Store) gap(user bool, now time.Time) time.Duration {
 // isMutation reports whether a GraphQL document writes.
 func isMutation(doc string) bool { return strings.HasPrefix(doc, "mutation") }
 
-// gapAllowance is a token bucket of short gaps, userGapBurst deep, one back every
-// userGapRefill: a person opening a few pull requests does not pay MinGap on each, and a
-// runaway client still does. owed is when the bucket will be full again.
+// gapAllowance is a token bucket of short gaps (and read-lane requests), userGapBurst
+// deep, one back every userGapRefill: a person opening a few pull requests does not pay
+// MinGap or wait behind a poll on each, and a runaway client still does. owed is when
+// the bucket will be full again.
 type gapAllowance struct{ owed time.Time }
 
 // left reports whether a short gap is available at now.
 func (a gapAllowance) left(now time.Time) bool {
 	return a.owed.Sub(now) <= (userGapBurst-1)*userGapRefill
+}
+
+// nextRefill reports how long until left(now) becomes true (0 when already available).
+func (a gapAllowance) nextRefill(now time.Time) time.Duration {
+	if wait := a.owed.Sub(now) - (userGapBurst-1)*userGapRefill; wait > 0 {
+		return wait
+	}
+	return 0
 }
 
 // spend takes one short gap at now.

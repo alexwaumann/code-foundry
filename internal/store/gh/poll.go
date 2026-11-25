@@ -92,7 +92,7 @@ func (s *Store) runPoll(ctx context.Context, cfg Config, plan *pollPlan, idle bo
 	if err != nil {
 		return s.pollFailed(ctx, cfg, err, false)
 	}
-	data, err := s.callDoc(ctx, queryPoll, doc, vars)
+	data, fpSeq, pollStart, err := s.callDocMeta(ctx, queryPoll, doc, vars)
 	var partial *PartialError
 	if err != nil && !errors.As(err, &partial) {
 		// GitHub gives up on queries that need >10s of server time. Retry soon with
@@ -109,7 +109,7 @@ func (s *Store) runPoll(ctx context.Context, cfg Config, plan *pollPlan, idle bo
 			s.log.Warn("gh poll partial errors", "err", e)
 		}
 	}
-	s.applyPoll(ctx, cfg, plan, &res, idle)
+	s.applyPoll(ctx, cfg, plan, &res, idle, fpSeq, pollStart)
 	return nil
 }
 
@@ -328,7 +328,7 @@ func (s *Store) pollFailed(ctx context.Context, cfg Config, err error, retryNow 
 
 // applyPoll turns a decoded poll into the new state: details for what changed, failing
 // checks, stats, then one snapshot update and events for what differs.
-func (s *Store) applyPoll(ctx context.Context, cfg Config, plan *pollPlan, res *pollResult, idle bool) {
+func (s *Store) applyPoll(ctx context.Context, cfg Config, plan *pollPlan, res *pollResult, idle bool, fpSeq uint64, pollStart time.Time) {
 	s.applyViewer(ctx, res)
 	snap := s.Snapshot()
 	// The dashboard as the last poll left it, without local mutations shown early
@@ -366,9 +366,9 @@ func (s *Store) applyPoll(ctx context.Context, cfg Config, plan *pollPlan, res *
 			}
 		}
 	}
-	s.summaries.putFingerprints(snap, fps, s.opts.Now())
-	s.staleFullDetails(fps)        // cached detail panels: what moved goes stale, the rest is confirmed (pr_detail.go)
-	s.markMovedDetails(fps, known) // and PullRequest's cached copies (detail_moved.go)
+	s.summaries.putFingerprints(snap, fps, pollStart)
+	s.staleFullDetails(fps, fpSeq)                   // cached detail panels: what moved goes stale, the rest is confirmed (pr_detail.go)
+	s.markMovedDetails(fps, known, fpSeq, pollStart) // and PullRequest's cached copies (detail_moved.go)
 	var need []prFingerprint
 	for _, f := range fps {
 		k, ok := known[f.ID]
@@ -1050,10 +1050,12 @@ func (s *Store) searchCommits(ctx context.Context, rr RESTRunner, q string) (int
 		return 0, err
 	}
 	start := s.opts.Now()
+	s.beginPrimaryRead()
 	body, err := rr.REST(ctx, "search/commits", map[string]string{"q": q, "per_page": "1"})
-	s.lastEnd = s.opts.Now()
+	end := s.opts.Now()
+	s.endPrimaryRead(end)
 	s.cycle.requests++
-	s.log.Debug("gh request", "rest", "search/commits", "q", q, "dur", s.lastEnd.Sub(start).Round(time.Millisecond).String(), "err", err)
+	s.log.Debug("gh request", "rest", "search/commits", "q", q, "dur", end.Sub(start).Round(time.Millisecond).String(), "err", err)
 	if err != nil {
 		if isAuthOrNetwork(err) {
 			s.noteResult(ctx, err, nil)
@@ -1083,7 +1085,7 @@ func (s *Store) checkAuth(ctx context.Context) {
 		return
 	}
 	st, err := s.opts.Runner.AuthStatus(ctx)
-	s.lastEnd = s.opts.Now()
+	s.recordLastEnd(s.opts.Now())
 	if ctx.Err() != nil {
 		return
 	}
@@ -1116,16 +1118,20 @@ func (s *Store) checkAuth(ctx context.Context) {
 func (s *Store) fetchPullRequest(ctx context.Context, slug string, number int) (PullRequestDetail, error) {
 	owner, name := splitSlug(slug)
 	var (
-		pr    PullRequest
-		runs  []CheckRun
-		after string
+		pr       PullRequest
+		runs     []CheckRun
+		after    string
+		fetchSeq uint64
 	)
 	for range s.opts.MaxPages {
 		vars := map[string]any{"owner": owner, "name": name, "number": number}
 		if after != "" {
 			vars["after"] = after
 		}
-		data, err := s.call(ctx, queryPullRequest, vars)
+		data, seq, _, err := s.callMeta(ctx, queryPullRequest, vars)
+		if fetchSeq == 0 {
+			fetchSeq = seq
+		}
 		if isPartial(err) {
 			// A failure still, beside what came back: a nested "not found" with the pull
 			// request in the answer does not mean the pull request is gone.
@@ -1149,7 +1155,7 @@ func (s *Store) fetchPullRequest(ctx context.Context, slug string, number int) (
 	sortRuns(runs)
 	d := PullRequestDetail{PullRequest: pr, Checks: runs, FetchedAt: s.opts.Now()}
 	k := fullKey{slug, number}
-	s.prDetails.put(k, d)
+	s.prDetails.putWithSeq(k, d, fetchSeq)
 	s.summaries.put(k, pr)
 	if err := s.cache.saveDetail(ctx, slug, d); err != nil {
 		s.log.Warn("gh cache write failed", "err", err)
