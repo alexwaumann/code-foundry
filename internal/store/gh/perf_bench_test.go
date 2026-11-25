@@ -255,4 +255,27 @@ func TestPerfMeasurements(t *testing.T) {
 		t.Logf("METRIC reviewer_candidates_6_keystrokes: graphql_calls=%d total=%v avg=%v",
 			f.count("ReviewerCandidates")-before, dur, dur/time.Duration(len(keystrokes)))
 	})
+
+	t.Run("background_5_poll_cycles_unwatched", func(t *testing.T) {
+		g, _ := projectsWorld()
+		f := (&fakeRunner{}).serve(g)
+		opts := testOptions(openTestDB(t), f, nil)
+		s := startStore(t, opts)
+		for _, slug := range []string{"o/r", "o/s"} {
+			if err := s.Track(slug); err != nil {
+				t.Fatal(err)
+			}
+		}
+		// Warm up initial poll so steady-state details are cached.
+		pollOnce(t, s, f)
+		from := f.ncalls()
+		for range 5 {
+			pollOnce(t, s, f)
+		}
+		calls, _ := f.snapshot()
+		total := len(calls) - from
+		pollCount := f.countSince(from, "Poll")
+		projectsCount := f.countSince(from, "PollProjects")
+		t.Logf("METRIC background_5_poll_cycles_unwatched: total_graphql=%d poll=%d poll_projects=%d", total, pollCount, projectsCount)
+	})
 }

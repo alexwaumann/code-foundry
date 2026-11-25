@@ -28,7 +28,8 @@ service GhService {
   // involving them) and their monthly stats across GitHub, from the last poll. The
   // lists are viewer-wide: every repository, tracked or not. project_open and
   // project_merged are the Pull Requests page's project-wide lists over the tracked
-  // repositories only (fetched in the same poll cycle by a request of their own).
+  // repositories only (fetched in the same poll cycle by a request of their own while
+  // watch_projects is active).
   rpc GetDashboard(GetDashboardRequest) returns (GetDashboardResponse) {}
   // GetRepoActivity returns the viewer's monthly stats in one repository, its default
   // branch's CI, and the dashboard's recently merged PRs in it. Served from cache.
@@ -38,6 +39,12 @@ service GhService {
   // for 10 minutes after the last call. A first call returns an empty list with
   // fetched_at unset; a branch_pull_requests_updated event follows the next poll.
   rpc GetBranchPullRequests(GetBranchPullRequestsRequest) returns (GetBranchPullRequestsResponse) {}
+  // GetBranchesPullRequests is the batched form of GetBranchPullRequests: it returns the
+  // viewer's cached pull requests for each requested branch in input order and keeps
+  // every requested branch in the poll for 10 minutes after the call. Duplicate
+  // (repo_slug, head_ref) items are deduplicated internally, and newly watched branches
+  // share at most one poll wakeup.
+  rpc GetBranchesPullRequests(GetBranchesPullRequestsRequest) returns (GetBranchesPullRequestsResponse) {}
   // GetPullRequestDetail returns everything the pull request detail panel shows: the
   // summary, body, labels, reviewers, commits, comments and reviews, review threads, and
   // checks. On demand (one GraphQL request, more only for checks beyond 100), cached per
@@ -497,6 +504,10 @@ message ActivityStats {
 message GetDashboardRequest {
   reserved 1;
   reserved "include_untracked";
+  // Keeps the project-wide pull request lists (project_open, project_merged) in the
+  // poll for 10 minutes after the call, and triggers a background refresh when they
+  // are absent or older than the poll interval. Only the Pull Requests page sets this.
+  bool watch_projects = 2;
 }
 
 message GetDashboardResponse {
@@ -591,6 +602,27 @@ message GetBranchPullRequestsResponse {
   repeated PullRequest pull_requests = 1;
   google.protobuf.Timestamp fetched_at = 2;
   string last_error = 3;
+}
+
+message BranchPullRequestsQuery {
+  string repo_slug = 1;
+  string head_ref = 2;
+}
+
+message GetBranchesPullRequestsRequest {
+  repeated BranchPullRequestsQuery branches = 1;
+}
+
+message BranchPullRequestsEntry {
+  string repo_slug = 1;
+  string head_ref = 2;
+  repeated PullRequest pull_requests = 3;
+  google.protobuf.Timestamp fetched_at = 4;
+  string last_error = 5;
+}
+
+message GetBranchesPullRequestsResponse {
+  repeated BranchPullRequestsEntry entries = 1;
 }
 
 // ---- Pull request detail (GetPullRequestDetail) -----------------------------------

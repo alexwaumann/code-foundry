@@ -2185,7 +2185,11 @@ func (x *ActivityStats) GetLastError() string {
 }
 
 type GetDashboardRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Keeps the project-wide pull request lists (project_open, project_merged) in the
+	// poll for 10 minutes after the call, and triggers a background refresh when they
+	// are absent or older than the poll interval. Only the Pull Requests page sets this.
+	WatchProjects bool `protobuf:"varint,2,opt,name=watch_projects,json=watchProjects,proto3" json:"watch_projects,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2218,6 +2222,13 @@ func (x *GetDashboardRequest) ProtoReflect() protoreflect.Message {
 // Deprecated: Use GetDashboardRequest.ProtoReflect.Descriptor instead.
 func (*GetDashboardRequest) Descriptor() ([]byte, []int) {
 	return file_codefoundry_v1_gh_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *GetDashboardRequest) GetWatchProjects() bool {
+	if x != nil {
+		return x.WatchProjects
+	}
+	return false
 }
 
 type GetDashboardResponse struct {
@@ -2804,6 +2815,222 @@ func (x *GetBranchPullRequestsResponse) GetLastError() string {
 	return ""
 }
 
+type BranchPullRequestsQuery struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	RepoSlug      string                 `protobuf:"bytes,1,opt,name=repo_slug,json=repoSlug,proto3" json:"repo_slug,omitempty"`
+	HeadRef       string                 `protobuf:"bytes,2,opt,name=head_ref,json=headRef,proto3" json:"head_ref,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *BranchPullRequestsQuery) Reset() {
+	*x = BranchPullRequestsQuery{}
+	mi := &file_codefoundry_v1_gh_proto_msgTypes[21]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BranchPullRequestsQuery) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BranchPullRequestsQuery) ProtoMessage() {}
+
+func (x *BranchPullRequestsQuery) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_gh_proto_msgTypes[21]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BranchPullRequestsQuery.ProtoReflect.Descriptor instead.
+func (*BranchPullRequestsQuery) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_gh_proto_rawDescGZIP(), []int{21}
+}
+
+func (x *BranchPullRequestsQuery) GetRepoSlug() string {
+	if x != nil {
+		return x.RepoSlug
+	}
+	return ""
+}
+
+func (x *BranchPullRequestsQuery) GetHeadRef() string {
+	if x != nil {
+		return x.HeadRef
+	}
+	return ""
+}
+
+type GetBranchesPullRequestsRequest struct {
+	state         protoimpl.MessageState     `protogen:"open.v1"`
+	Branches      []*BranchPullRequestsQuery `protobuf:"bytes,1,rep,name=branches,proto3" json:"branches,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetBranchesPullRequestsRequest) Reset() {
+	*x = GetBranchesPullRequestsRequest{}
+	mi := &file_codefoundry_v1_gh_proto_msgTypes[22]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetBranchesPullRequestsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetBranchesPullRequestsRequest) ProtoMessage() {}
+
+func (x *GetBranchesPullRequestsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_gh_proto_msgTypes[22]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetBranchesPullRequestsRequest.ProtoReflect.Descriptor instead.
+func (*GetBranchesPullRequestsRequest) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_gh_proto_rawDescGZIP(), []int{22}
+}
+
+func (x *GetBranchesPullRequestsRequest) GetBranches() []*BranchPullRequestsQuery {
+	if x != nil {
+		return x.Branches
+	}
+	return nil
+}
+
+type BranchPullRequestsEntry struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	RepoSlug      string                 `protobuf:"bytes,1,opt,name=repo_slug,json=repoSlug,proto3" json:"repo_slug,omitempty"`
+	HeadRef       string                 `protobuf:"bytes,2,opt,name=head_ref,json=headRef,proto3" json:"head_ref,omitempty"`
+	PullRequests  []*PullRequest         `protobuf:"bytes,3,rep,name=pull_requests,json=pullRequests,proto3" json:"pull_requests,omitempty"`
+	FetchedAt     *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=fetched_at,json=fetchedAt,proto3" json:"fetched_at,omitempty"`
+	LastError     string                 `protobuf:"bytes,5,opt,name=last_error,json=lastError,proto3" json:"last_error,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *BranchPullRequestsEntry) Reset() {
+	*x = BranchPullRequestsEntry{}
+	mi := &file_codefoundry_v1_gh_proto_msgTypes[23]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BranchPullRequestsEntry) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BranchPullRequestsEntry) ProtoMessage() {}
+
+func (x *BranchPullRequestsEntry) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_gh_proto_msgTypes[23]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BranchPullRequestsEntry.ProtoReflect.Descriptor instead.
+func (*BranchPullRequestsEntry) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_gh_proto_rawDescGZIP(), []int{23}
+}
+
+func (x *BranchPullRequestsEntry) GetRepoSlug() string {
+	if x != nil {
+		return x.RepoSlug
+	}
+	return ""
+}
+
+func (x *BranchPullRequestsEntry) GetHeadRef() string {
+	if x != nil {
+		return x.HeadRef
+	}
+	return ""
+}
+
+func (x *BranchPullRequestsEntry) GetPullRequests() []*PullRequest {
+	if x != nil {
+		return x.PullRequests
+	}
+	return nil
+}
+
+func (x *BranchPullRequestsEntry) GetFetchedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.FetchedAt
+	}
+	return nil
+}
+
+func (x *BranchPullRequestsEntry) GetLastError() string {
+	if x != nil {
+		return x.LastError
+	}
+	return ""
+}
+
+type GetBranchesPullRequestsResponse struct {
+	state         protoimpl.MessageState     `protogen:"open.v1"`
+	Entries       []*BranchPullRequestsEntry `protobuf:"bytes,1,rep,name=entries,proto3" json:"entries,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetBranchesPullRequestsResponse) Reset() {
+	*x = GetBranchesPullRequestsResponse{}
+	mi := &file_codefoundry_v1_gh_proto_msgTypes[24]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetBranchesPullRequestsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetBranchesPullRequestsResponse) ProtoMessage() {}
+
+func (x *GetBranchesPullRequestsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_gh_proto_msgTypes[24]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetBranchesPullRequestsResponse.ProtoReflect.Descriptor instead.
+func (*GetBranchesPullRequestsResponse) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_gh_proto_rawDescGZIP(), []int{24}
+}
+
+func (x *GetBranchesPullRequestsResponse) GetEntries() []*BranchPullRequestsEntry {
+	if x != nil {
+		return x.Entries
+	}
+	return nil
+}
+
 type GetPullRequestDetailRequest struct {
 	state    protoimpl.MessageState `protogen:"open.v1"`
 	RepoSlug string                 `protobuf:"bytes,1,opt,name=repo_slug,json=repoSlug,proto3" json:"repo_slug,omitempty"`
@@ -2816,7 +3043,7 @@ type GetPullRequestDetailRequest struct {
 
 func (x *GetPullRequestDetailRequest) Reset() {
 	*x = GetPullRequestDetailRequest{}
-	mi := &file_codefoundry_v1_gh_proto_msgTypes[21]
+	mi := &file_codefoundry_v1_gh_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2828,7 +3055,7 @@ func (x *GetPullRequestDetailRequest) String() string {
 func (*GetPullRequestDetailRequest) ProtoMessage() {}
 
 func (x *GetPullRequestDetailRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_gh_proto_msgTypes[21]
+	mi := &file_codefoundry_v1_gh_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2841,7 +3068,7 @@ func (x *GetPullRequestDetailRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetPullRequestDetailRequest.ProtoReflect.Descriptor instead.
 func (*GetPullRequestDetailRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_gh_proto_rawDescGZIP(), []int{21}
+	return file_codefoundry_v1_gh_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *GetPullRequestDetailRequest) GetRepoSlug() string {
@@ -2874,7 +3101,7 @@ type GetPullRequestDetailResponse struct {
 
 func (x *GetPullRequestDetailResponse) Reset() {
 	*x = GetPullRequestDetailResponse{}
-	mi := &file_codefoundry_v1_gh_proto_msgTypes[22]
+	mi := &file_codefoundry_v1_gh_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2886,7 +3113,7 @@ func (x *GetPullRequestDetailResponse) String() string {
 func (*GetPullRequestDetailResponse) ProtoMessage() {}
 
 func (x *GetPullRequestDetailResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_gh_proto_msgTypes[22]
+	mi := &file_codefoundry_v1_gh_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2899,7 +3126,7 @@ func (x *GetPullRequestDetailResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetPullRequestDetailResponse.ProtoReflect.Descriptor instead.
 func (*GetPullRequestDetailResponse) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_gh_proto_rawDescGZIP(), []int{22}
+	return file_codefoundry_v1_gh_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *GetPullRequestDetailResponse) GetDetail() *PullRequestDetail {
@@ -2995,7 +3222,7 @@ type PullRequestDetail struct {
 
 func (x *PullRequestDetail) Reset() {
 	*x = PullRequestDetail{}
-	mi := &file_codefoundry_v1_gh_proto_msgTypes[23]
+	mi := &file_codefoundry_v1_gh_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3007,7 +3234,7 @@ func (x *PullRequestDetail) String() string {
 func (*PullRequestDetail) ProtoMessage() {}
 
 func (x *PullRequestDetail) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_gh_proto_msgTypes[23]
+	mi := &file_codefoundry_v1_gh_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3020,7 +3247,7 @@ func (x *PullRequestDetail) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PullRequestDetail.ProtoReflect.Descriptor instead.
 func (*PullRequestDetail) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_gh_proto_rawDescGZIP(), []int{23}
+	return file_codefoundry_v1_gh_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *PullRequestDetail) GetPullRequest() *PullRequest {
@@ -3251,7 +3478,7 @@ type PullRequestLabel struct {
 
 func (x *PullRequestLabel) Reset() {
 	*x = PullRequestLabel{}
-	mi := &file_codefoundry_v1_gh_proto_msgTypes[24]
+	mi := &file_codefoundry_v1_gh_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3263,7 +3490,7 @@ func (x *PullRequestLabel) String() string {
 func (*PullRequestLabel) ProtoMessage() {}
 
 func (x *PullRequestLabel) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_gh_proto_msgTypes[24]
+	mi := &file_codefoundry_v1_gh_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3276,7 +3503,7 @@ func (x *PullRequestLabel) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PullRequestLabel.ProtoReflect.Descriptor instead.
 func (*PullRequestLabel) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_gh_proto_rawDescGZIP(), []int{24}
+	return file_codefoundry_v1_gh_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *PullRequestLabel) GetName() string {
@@ -3314,7 +3541,7 @@ type PullRequestReviewer struct {
 
 func (x *PullRequestReviewer) Reset() {
 	*x = PullRequestReviewer{}
-	mi := &file_codefoundry_v1_gh_proto_msgTypes[25]
+	mi := &file_codefoundry_v1_gh_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3326,7 +3553,7 @@ func (x *PullRequestReviewer) String() string {
 func (*PullRequestReviewer) ProtoMessage() {}
 
 func (x *PullRequestReviewer) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_gh_proto_msgTypes[25]
+	mi := &file_codefoundry_v1_gh_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3339,7 +3566,7 @@ func (x *PullRequestReviewer) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PullRequestReviewer.ProtoReflect.Descriptor instead.
 func (*PullRequestReviewer) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_gh_proto_rawDescGZIP(), []int{25}
+	return file_codefoundry_v1_gh_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *PullRequestReviewer) GetLogin() string {
@@ -3413,7 +3640,7 @@ type PullRequestCommit struct {
 
 func (x *PullRequestCommit) Reset() {
 	*x = PullRequestCommit{}
-	mi := &file_codefoundry_v1_gh_proto_msgTypes[26]
+	mi := &file_codefoundry_v1_gh_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3425,7 +3652,7 @@ func (x *PullRequestCommit) String() string {
 func (*PullRequestCommit) ProtoMessage() {}
 
 func (x *PullRequestCommit) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_gh_proto_msgTypes[26]
+	mi := &file_codefoundry_v1_gh_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3438,7 +3665,7 @@ func (x *PullRequestCommit) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PullRequestCommit.ProtoReflect.Descriptor instead.
 func (*PullRequestCommit) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_gh_proto_rawDescGZIP(), []int{26}
+	return file_codefoundry_v1_gh_proto_rawDescGZIP(), []int{30}
 }
 
 func (x *PullRequestCommit) GetSha() string {
@@ -3502,7 +3729,7 @@ type PullRequestComment struct {
 
 func (x *PullRequestComment) Reset() {
 	*x = PullRequestComment{}
-	mi := &file_codefoundry_v1_gh_proto_msgTypes[27]
+	mi := &file_codefoundry_v1_gh_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3514,7 +3741,7 @@ func (x *PullRequestComment) String() string {
 func (*PullRequestComment) ProtoMessage() {}
 
 func (x *PullRequestComment) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_gh_proto_msgTypes[27]
+	mi := &file_codefoundry_v1_gh_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3527,7 +3754,7 @@ func (x *PullRequestComment) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PullRequestComment.ProtoReflect.Descriptor instead.
 func (*PullRequestComment) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_gh_proto_rawDescGZIP(), []int{27}
+	return file_codefoundry_v1_gh_proto_rawDescGZIP(), []int{31}
 }
 
 func (x *PullRequestComment) GetId() string {
@@ -3627,7 +3854,7 @@ type PullRequestReviewThread struct {
 
 func (x *PullRequestReviewThread) Reset() {
 	*x = PullRequestReviewThread{}
-	mi := &file_codefoundry_v1_gh_proto_msgTypes[28]
+	mi := &file_codefoundry_v1_gh_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3639,7 +3866,7 @@ func (x *PullRequestReviewThread) String() string {
 func (*PullRequestReviewThread) ProtoMessage() {}
 
 func (x *PullRequestReviewThread) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_gh_proto_msgTypes[28]
+	mi := &file_codefoundry_v1_gh_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3652,7 +3879,7 @@ func (x *PullRequestReviewThread) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PullRequestReviewThread.ProtoReflect.Descriptor instead.
 func (*PullRequestReviewThread) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_gh_proto_rawDescGZIP(), []int{28}
+	return file_codefoundry_v1_gh_proto_rawDescGZIP(), []int{32}
 }
 
 func (x *PullRequestReviewThread) GetId() string {
@@ -3724,7 +3951,7 @@ type ListReviewerCandidatesRequest struct {
 
 func (x *ListReviewerCandidatesRequest) Reset() {
 	*x = ListReviewerCandidatesRequest{}
-	mi := &file_codefoundry_v1_gh_proto_msgTypes[29]
+	mi := &file_codefoundry_v1_gh_proto_msgTypes[33]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3736,7 +3963,7 @@ func (x *ListReviewerCandidatesRequest) String() string {
 func (*ListReviewerCandidatesRequest) ProtoMessage() {}
 
 func (x *ListReviewerCandidatesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_gh_proto_msgTypes[29]
+	mi := &file_codefoundry_v1_gh_proto_msgTypes[33]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3749,7 +3976,7 @@ func (x *ListReviewerCandidatesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListReviewerCandidatesRequest.ProtoReflect.Descriptor instead.
 func (*ListReviewerCandidatesRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_gh_proto_rawDescGZIP(), []int{29}
+	return file_codefoundry_v1_gh_proto_rawDescGZIP(), []int{33}
 }
 
 func (x *ListReviewerCandidatesRequest) GetRepoSlug() string {
@@ -3782,7 +4009,7 @@ type ListReviewerCandidatesResponse struct {
 
 func (x *ListReviewerCandidatesResponse) Reset() {
 	*x = ListReviewerCandidatesResponse{}
-	mi := &file_codefoundry_v1_gh_proto_msgTypes[30]
+	mi := &file_codefoundry_v1_gh_proto_msgTypes[34]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3794,7 +4021,7 @@ func (x *ListReviewerCandidatesResponse) String() string {
 func (*ListReviewerCandidatesResponse) ProtoMessage() {}
 
 func (x *ListReviewerCandidatesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_gh_proto_msgTypes[30]
+	mi := &file_codefoundry_v1_gh_proto_msgTypes[34]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3807,7 +4034,7 @@ func (x *ListReviewerCandidatesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListReviewerCandidatesResponse.ProtoReflect.Descriptor instead.
 func (*ListReviewerCandidatesResponse) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_gh_proto_rawDescGZIP(), []int{30}
+	return file_codefoundry_v1_gh_proto_rawDescGZIP(), []int{34}
 }
 
 func (x *ListReviewerCandidatesResponse) GetCandidates() []*ReviewerCandidate {
@@ -3834,7 +4061,7 @@ type ReviewerCandidate struct {
 
 func (x *ReviewerCandidate) Reset() {
 	*x = ReviewerCandidate{}
-	mi := &file_codefoundry_v1_gh_proto_msgTypes[31]
+	mi := &file_codefoundry_v1_gh_proto_msgTypes[35]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3846,7 +4073,7 @@ func (x *ReviewerCandidate) String() string {
 func (*ReviewerCandidate) ProtoMessage() {}
 
 func (x *ReviewerCandidate) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_gh_proto_msgTypes[31]
+	mi := &file_codefoundry_v1_gh_proto_msgTypes[35]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3859,7 +4086,7 @@ func (x *ReviewerCandidate) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReviewerCandidate.ProtoReflect.Descriptor instead.
 func (*ReviewerCandidate) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_gh_proto_rawDescGZIP(), []int{31}
+	return file_codefoundry_v1_gh_proto_rawDescGZIP(), []int{35}
 }
 
 func (x *ReviewerCandidate) GetId() string {
@@ -3920,7 +4147,7 @@ type SetReviewRequestRequest struct {
 
 func (x *SetReviewRequestRequest) Reset() {
 	*x = SetReviewRequestRequest{}
-	mi := &file_codefoundry_v1_gh_proto_msgTypes[32]
+	mi := &file_codefoundry_v1_gh_proto_msgTypes[36]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3932,7 +4159,7 @@ func (x *SetReviewRequestRequest) String() string {
 func (*SetReviewRequestRequest) ProtoMessage() {}
 
 func (x *SetReviewRequestRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_gh_proto_msgTypes[32]
+	mi := &file_codefoundry_v1_gh_proto_msgTypes[36]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3945,7 +4172,7 @@ func (x *SetReviewRequestRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetReviewRequestRequest.ProtoReflect.Descriptor instead.
 func (*SetReviewRequestRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_gh_proto_rawDescGZIP(), []int{32}
+	return file_codefoundry_v1_gh_proto_rawDescGZIP(), []int{36}
 }
 
 func (x *SetReviewRequestRequest) GetRepoSlug() string {
@@ -3994,7 +4221,7 @@ type SetReviewRequestResponse struct {
 
 func (x *SetReviewRequestResponse) Reset() {
 	*x = SetReviewRequestResponse{}
-	mi := &file_codefoundry_v1_gh_proto_msgTypes[33]
+	mi := &file_codefoundry_v1_gh_proto_msgTypes[37]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4006,7 +4233,7 @@ func (x *SetReviewRequestResponse) String() string {
 func (*SetReviewRequestResponse) ProtoMessage() {}
 
 func (x *SetReviewRequestResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_gh_proto_msgTypes[33]
+	mi := &file_codefoundry_v1_gh_proto_msgTypes[37]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4019,7 +4246,7 @@ func (x *SetReviewRequestResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetReviewRequestResponse.ProtoReflect.Descriptor instead.
 func (*SetReviewRequestResponse) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_gh_proto_rawDescGZIP(), []int{33}
+	return file_codefoundry_v1_gh_proto_rawDescGZIP(), []int{37}
 }
 
 func (x *SetReviewRequestResponse) GetRequested() []string {
@@ -4039,7 +4266,7 @@ type RevertPullRequestRequest struct {
 
 func (x *RevertPullRequestRequest) Reset() {
 	*x = RevertPullRequestRequest{}
-	mi := &file_codefoundry_v1_gh_proto_msgTypes[34]
+	mi := &file_codefoundry_v1_gh_proto_msgTypes[38]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4051,7 +4278,7 @@ func (x *RevertPullRequestRequest) String() string {
 func (*RevertPullRequestRequest) ProtoMessage() {}
 
 func (x *RevertPullRequestRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_gh_proto_msgTypes[34]
+	mi := &file_codefoundry_v1_gh_proto_msgTypes[38]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4064,7 +4291,7 @@ func (x *RevertPullRequestRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RevertPullRequestRequest.ProtoReflect.Descriptor instead.
 func (*RevertPullRequestRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_gh_proto_rawDescGZIP(), []int{34}
+	return file_codefoundry_v1_gh_proto_rawDescGZIP(), []int{38}
 }
 
 func (x *RevertPullRequestRequest) GetRepoSlug() string {
@@ -4092,7 +4319,7 @@ type RevertPullRequestResponse struct {
 
 func (x *RevertPullRequestResponse) Reset() {
 	*x = RevertPullRequestResponse{}
-	mi := &file_codefoundry_v1_gh_proto_msgTypes[35]
+	mi := &file_codefoundry_v1_gh_proto_msgTypes[39]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4104,7 +4331,7 @@ func (x *RevertPullRequestResponse) String() string {
 func (*RevertPullRequestResponse) ProtoMessage() {}
 
 func (x *RevertPullRequestResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_gh_proto_msgTypes[35]
+	mi := &file_codefoundry_v1_gh_proto_msgTypes[39]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4117,7 +4344,7 @@ func (x *RevertPullRequestResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RevertPullRequestResponse.ProtoReflect.Descriptor instead.
 func (*RevertPullRequestResponse) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_gh_proto_rawDescGZIP(), []int{35}
+	return file_codefoundry_v1_gh_proto_rawDescGZIP(), []int{39}
 }
 
 func (x *RevertPullRequestResponse) GetNumber() int32 {
@@ -4153,7 +4380,7 @@ type MergePullRequestRequest struct {
 
 func (x *MergePullRequestRequest) Reset() {
 	*x = MergePullRequestRequest{}
-	mi := &file_codefoundry_v1_gh_proto_msgTypes[36]
+	mi := &file_codefoundry_v1_gh_proto_msgTypes[40]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4165,7 +4392,7 @@ func (x *MergePullRequestRequest) String() string {
 func (*MergePullRequestRequest) ProtoMessage() {}
 
 func (x *MergePullRequestRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_gh_proto_msgTypes[36]
+	mi := &file_codefoundry_v1_gh_proto_msgTypes[40]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4178,7 +4405,7 @@ func (x *MergePullRequestRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MergePullRequestRequest.ProtoReflect.Descriptor instead.
 func (*MergePullRequestRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_gh_proto_rawDescGZIP(), []int{36}
+	return file_codefoundry_v1_gh_proto_rawDescGZIP(), []int{40}
 }
 
 func (x *MergePullRequestRequest) GetRepoSlug() string {
@@ -4233,7 +4460,7 @@ type MergePullRequestResponse struct {
 
 func (x *MergePullRequestResponse) Reset() {
 	*x = MergePullRequestResponse{}
-	mi := &file_codefoundry_v1_gh_proto_msgTypes[37]
+	mi := &file_codefoundry_v1_gh_proto_msgTypes[41]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4245,7 +4472,7 @@ func (x *MergePullRequestResponse) String() string {
 func (*MergePullRequestResponse) ProtoMessage() {}
 
 func (x *MergePullRequestResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_gh_proto_msgTypes[37]
+	mi := &file_codefoundry_v1_gh_proto_msgTypes[41]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4258,7 +4485,7 @@ func (x *MergePullRequestResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MergePullRequestResponse.ProtoReflect.Descriptor instead.
 func (*MergePullRequestResponse) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_gh_proto_rawDescGZIP(), []int{37}
+	return file_codefoundry_v1_gh_proto_rawDescGZIP(), []int{41}
 }
 
 func (x *MergePullRequestResponse) GetMerged() bool {
@@ -4301,7 +4528,7 @@ type SetPullRequestDraftRequest struct {
 
 func (x *SetPullRequestDraftRequest) Reset() {
 	*x = SetPullRequestDraftRequest{}
-	mi := &file_codefoundry_v1_gh_proto_msgTypes[38]
+	mi := &file_codefoundry_v1_gh_proto_msgTypes[42]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4313,7 +4540,7 @@ func (x *SetPullRequestDraftRequest) String() string {
 func (*SetPullRequestDraftRequest) ProtoMessage() {}
 
 func (x *SetPullRequestDraftRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_gh_proto_msgTypes[38]
+	mi := &file_codefoundry_v1_gh_proto_msgTypes[42]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4326,7 +4553,7 @@ func (x *SetPullRequestDraftRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetPullRequestDraftRequest.ProtoReflect.Descriptor instead.
 func (*SetPullRequestDraftRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_gh_proto_rawDescGZIP(), []int{38}
+	return file_codefoundry_v1_gh_proto_rawDescGZIP(), []int{42}
 }
 
 func (x *SetPullRequestDraftRequest) GetRepoSlug() string {
@@ -4362,7 +4589,7 @@ type SetPullRequestDraftResponse struct {
 
 func (x *SetPullRequestDraftResponse) Reset() {
 	*x = SetPullRequestDraftResponse{}
-	mi := &file_codefoundry_v1_gh_proto_msgTypes[39]
+	mi := &file_codefoundry_v1_gh_proto_msgTypes[43]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4374,7 +4601,7 @@ func (x *SetPullRequestDraftResponse) String() string {
 func (*SetPullRequestDraftResponse) ProtoMessage() {}
 
 func (x *SetPullRequestDraftResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_gh_proto_msgTypes[39]
+	mi := &file_codefoundry_v1_gh_proto_msgTypes[43]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4387,7 +4614,7 @@ func (x *SetPullRequestDraftResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetPullRequestDraftResponse.ProtoReflect.Descriptor instead.
 func (*SetPullRequestDraftResponse) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_gh_proto_rawDescGZIP(), []int{39}
+	return file_codefoundry_v1_gh_proto_rawDescGZIP(), []int{43}
 }
 
 func (x *SetPullRequestDraftResponse) GetDraft() bool {
@@ -4416,7 +4643,7 @@ type SetPullRequestClosedRequest struct {
 
 func (x *SetPullRequestClosedRequest) Reset() {
 	*x = SetPullRequestClosedRequest{}
-	mi := &file_codefoundry_v1_gh_proto_msgTypes[40]
+	mi := &file_codefoundry_v1_gh_proto_msgTypes[44]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4428,7 +4655,7 @@ func (x *SetPullRequestClosedRequest) String() string {
 func (*SetPullRequestClosedRequest) ProtoMessage() {}
 
 func (x *SetPullRequestClosedRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_gh_proto_msgTypes[40]
+	mi := &file_codefoundry_v1_gh_proto_msgTypes[44]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4441,7 +4668,7 @@ func (x *SetPullRequestClosedRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetPullRequestClosedRequest.ProtoReflect.Descriptor instead.
 func (*SetPullRequestClosedRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_gh_proto_rawDescGZIP(), []int{40}
+	return file_codefoundry_v1_gh_proto_rawDescGZIP(), []int{44}
 }
 
 func (x *SetPullRequestClosedRequest) GetRepoSlug() string {
@@ -4477,7 +4704,7 @@ type SetPullRequestClosedResponse struct {
 
 func (x *SetPullRequestClosedResponse) Reset() {
 	*x = SetPullRequestClosedResponse{}
-	mi := &file_codefoundry_v1_gh_proto_msgTypes[41]
+	mi := &file_codefoundry_v1_gh_proto_msgTypes[45]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4489,7 +4716,7 @@ func (x *SetPullRequestClosedResponse) String() string {
 func (*SetPullRequestClosedResponse) ProtoMessage() {}
 
 func (x *SetPullRequestClosedResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_gh_proto_msgTypes[41]
+	mi := &file_codefoundry_v1_gh_proto_msgTypes[45]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4502,7 +4729,7 @@ func (x *SetPullRequestClosedResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetPullRequestClosedResponse.ProtoReflect.Descriptor instead.
 func (*SetPullRequestClosedResponse) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_gh_proto_rawDescGZIP(), []int{41}
+	return file_codefoundry_v1_gh_proto_rawDescGZIP(), []int{45}
 }
 
 func (x *SetPullRequestClosedResponse) GetState() PullRequestState {
@@ -4537,7 +4764,7 @@ type SetPullRequestCheckboxRequest struct {
 
 func (x *SetPullRequestCheckboxRequest) Reset() {
 	*x = SetPullRequestCheckboxRequest{}
-	mi := &file_codefoundry_v1_gh_proto_msgTypes[42]
+	mi := &file_codefoundry_v1_gh_proto_msgTypes[46]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4549,7 +4776,7 @@ func (x *SetPullRequestCheckboxRequest) String() string {
 func (*SetPullRequestCheckboxRequest) ProtoMessage() {}
 
 func (x *SetPullRequestCheckboxRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_gh_proto_msgTypes[42]
+	mi := &file_codefoundry_v1_gh_proto_msgTypes[46]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4562,7 +4789,7 @@ func (x *SetPullRequestCheckboxRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetPullRequestCheckboxRequest.ProtoReflect.Descriptor instead.
 func (*SetPullRequestCheckboxRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_gh_proto_rawDescGZIP(), []int{42}
+	return file_codefoundry_v1_gh_proto_rawDescGZIP(), []int{46}
 }
 
 func (x *SetPullRequestCheckboxRequest) GetRepoSlug() string {
@@ -4612,7 +4839,7 @@ type SetPullRequestCheckboxResponse struct {
 
 func (x *SetPullRequestCheckboxResponse) Reset() {
 	*x = SetPullRequestCheckboxResponse{}
-	mi := &file_codefoundry_v1_gh_proto_msgTypes[43]
+	mi := &file_codefoundry_v1_gh_proto_msgTypes[47]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4624,7 +4851,7 @@ func (x *SetPullRequestCheckboxResponse) String() string {
 func (*SetPullRequestCheckboxResponse) ProtoMessage() {}
 
 func (x *SetPullRequestCheckboxResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_gh_proto_msgTypes[43]
+	mi := &file_codefoundry_v1_gh_proto_msgTypes[47]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4637,7 +4864,7 @@ func (x *SetPullRequestCheckboxResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetPullRequestCheckboxResponse.ProtoReflect.Descriptor instead.
 func (*SetPullRequestCheckboxResponse) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_gh_proto_rawDescGZIP(), []int{43}
+	return file_codefoundry_v1_gh_proto_rawDescGZIP(), []int{47}
 }
 
 func (x *SetPullRequestCheckboxResponse) GetChanged() bool {
@@ -4672,7 +4899,7 @@ type SetPullRequestAutoMergeRequest struct {
 
 func (x *SetPullRequestAutoMergeRequest) Reset() {
 	*x = SetPullRequestAutoMergeRequest{}
-	mi := &file_codefoundry_v1_gh_proto_msgTypes[44]
+	mi := &file_codefoundry_v1_gh_proto_msgTypes[48]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4684,7 +4911,7 @@ func (x *SetPullRequestAutoMergeRequest) String() string {
 func (*SetPullRequestAutoMergeRequest) ProtoMessage() {}
 
 func (x *SetPullRequestAutoMergeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_gh_proto_msgTypes[44]
+	mi := &file_codefoundry_v1_gh_proto_msgTypes[48]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4697,7 +4924,7 @@ func (x *SetPullRequestAutoMergeRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetPullRequestAutoMergeRequest.ProtoReflect.Descriptor instead.
 func (*SetPullRequestAutoMergeRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_gh_proto_rawDescGZIP(), []int{44}
+	return file_codefoundry_v1_gh_proto_rawDescGZIP(), []int{48}
 }
 
 func (x *SetPullRequestAutoMergeRequest) GetRepoSlug() string {
@@ -4749,7 +4976,7 @@ type SetPullRequestAutoMergeResponse struct {
 
 func (x *SetPullRequestAutoMergeResponse) Reset() {
 	*x = SetPullRequestAutoMergeResponse{}
-	mi := &file_codefoundry_v1_gh_proto_msgTypes[45]
+	mi := &file_codefoundry_v1_gh_proto_msgTypes[49]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4761,7 +4988,7 @@ func (x *SetPullRequestAutoMergeResponse) String() string {
 func (*SetPullRequestAutoMergeResponse) ProtoMessage() {}
 
 func (x *SetPullRequestAutoMergeResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_gh_proto_msgTypes[45]
+	mi := &file_codefoundry_v1_gh_proto_msgTypes[49]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4774,7 +5001,7 @@ func (x *SetPullRequestAutoMergeResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetPullRequestAutoMergeResponse.ProtoReflect.Descriptor instead.
 func (*SetPullRequestAutoMergeResponse) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_gh_proto_rawDescGZIP(), []int{45}
+	return file_codefoundry_v1_gh_proto_rawDescGZIP(), []int{49}
 }
 
 func (x *SetPullRequestAutoMergeResponse) GetEnabled() bool {
@@ -4812,7 +5039,7 @@ type SubmitPullRequestReviewRequest struct {
 
 func (x *SubmitPullRequestReviewRequest) Reset() {
 	*x = SubmitPullRequestReviewRequest{}
-	mi := &file_codefoundry_v1_gh_proto_msgTypes[46]
+	mi := &file_codefoundry_v1_gh_proto_msgTypes[50]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4824,7 +5051,7 @@ func (x *SubmitPullRequestReviewRequest) String() string {
 func (*SubmitPullRequestReviewRequest) ProtoMessage() {}
 
 func (x *SubmitPullRequestReviewRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_gh_proto_msgTypes[46]
+	mi := &file_codefoundry_v1_gh_proto_msgTypes[50]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4837,7 +5064,7 @@ func (x *SubmitPullRequestReviewRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SubmitPullRequestReviewRequest.ProtoReflect.Descriptor instead.
 func (*SubmitPullRequestReviewRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_gh_proto_rawDescGZIP(), []int{46}
+	return file_codefoundry_v1_gh_proto_rawDescGZIP(), []int{50}
 }
 
 func (x *SubmitPullRequestReviewRequest) GetRepoSlug() string {
@@ -4884,7 +5111,7 @@ type SubmitPullRequestReviewResponse struct {
 
 func (x *SubmitPullRequestReviewResponse) Reset() {
 	*x = SubmitPullRequestReviewResponse{}
-	mi := &file_codefoundry_v1_gh_proto_msgTypes[47]
+	mi := &file_codefoundry_v1_gh_proto_msgTypes[51]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4896,7 +5123,7 @@ func (x *SubmitPullRequestReviewResponse) String() string {
 func (*SubmitPullRequestReviewResponse) ProtoMessage() {}
 
 func (x *SubmitPullRequestReviewResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_gh_proto_msgTypes[47]
+	mi := &file_codefoundry_v1_gh_proto_msgTypes[51]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4909,7 +5136,7 @@ func (x *SubmitPullRequestReviewResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SubmitPullRequestReviewResponse.ProtoReflect.Descriptor instead.
 func (*SubmitPullRequestReviewResponse) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_gh_proto_rawDescGZIP(), []int{47}
+	return file_codefoundry_v1_gh_proto_rawDescGZIP(), []int{51}
 }
 
 func (x *SubmitPullRequestReviewResponse) GetId() string {
@@ -4959,7 +5186,7 @@ type AddPullRequestCommentRequest struct {
 
 func (x *AddPullRequestCommentRequest) Reset() {
 	*x = AddPullRequestCommentRequest{}
-	mi := &file_codefoundry_v1_gh_proto_msgTypes[48]
+	mi := &file_codefoundry_v1_gh_proto_msgTypes[52]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4971,7 +5198,7 @@ func (x *AddPullRequestCommentRequest) String() string {
 func (*AddPullRequestCommentRequest) ProtoMessage() {}
 
 func (x *AddPullRequestCommentRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_gh_proto_msgTypes[48]
+	mi := &file_codefoundry_v1_gh_proto_msgTypes[52]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4984,7 +5211,7 @@ func (x *AddPullRequestCommentRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AddPullRequestCommentRequest.ProtoReflect.Descriptor instead.
 func (*AddPullRequestCommentRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_gh_proto_rawDescGZIP(), []int{48}
+	return file_codefoundry_v1_gh_proto_rawDescGZIP(), []int{52}
 }
 
 func (x *AddPullRequestCommentRequest) GetRepoSlug() string {
@@ -5020,7 +5247,7 @@ type AddPullRequestCommentResponse struct {
 
 func (x *AddPullRequestCommentResponse) Reset() {
 	*x = AddPullRequestCommentResponse{}
-	mi := &file_codefoundry_v1_gh_proto_msgTypes[49]
+	mi := &file_codefoundry_v1_gh_proto_msgTypes[53]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5032,7 +5259,7 @@ func (x *AddPullRequestCommentResponse) String() string {
 func (*AddPullRequestCommentResponse) ProtoMessage() {}
 
 func (x *AddPullRequestCommentResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_gh_proto_msgTypes[49]
+	mi := &file_codefoundry_v1_gh_proto_msgTypes[53]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5045,7 +5272,7 @@ func (x *AddPullRequestCommentResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AddPullRequestCommentResponse.ProtoReflect.Descriptor instead.
 func (*AddPullRequestCommentResponse) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_gh_proto_rawDescGZIP(), []int{49}
+	return file_codefoundry_v1_gh_proto_rawDescGZIP(), []int{53}
 }
 
 func (x *AddPullRequestCommentResponse) GetId() string {
@@ -5081,7 +5308,7 @@ type GetPullRequestDiffRequest struct {
 
 func (x *GetPullRequestDiffRequest) Reset() {
 	*x = GetPullRequestDiffRequest{}
-	mi := &file_codefoundry_v1_gh_proto_msgTypes[50]
+	mi := &file_codefoundry_v1_gh_proto_msgTypes[54]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5093,7 +5320,7 @@ func (x *GetPullRequestDiffRequest) String() string {
 func (*GetPullRequestDiffRequest) ProtoMessage() {}
 
 func (x *GetPullRequestDiffRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_gh_proto_msgTypes[50]
+	mi := &file_codefoundry_v1_gh_proto_msgTypes[54]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5106,7 +5333,7 @@ func (x *GetPullRequestDiffRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetPullRequestDiffRequest.ProtoReflect.Descriptor instead.
 func (*GetPullRequestDiffRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_gh_proto_rawDescGZIP(), []int{50}
+	return file_codefoundry_v1_gh_proto_rawDescGZIP(), []int{54}
 }
 
 func (x *GetPullRequestDiffRequest) GetRepoSlug() string {
@@ -5148,7 +5375,7 @@ type GetPullRequestDiffResponse struct {
 
 func (x *GetPullRequestDiffResponse) Reset() {
 	*x = GetPullRequestDiffResponse{}
-	mi := &file_codefoundry_v1_gh_proto_msgTypes[51]
+	mi := &file_codefoundry_v1_gh_proto_msgTypes[55]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5160,7 +5387,7 @@ func (x *GetPullRequestDiffResponse) String() string {
 func (*GetPullRequestDiffResponse) ProtoMessage() {}
 
 func (x *GetPullRequestDiffResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_gh_proto_msgTypes[51]
+	mi := &file_codefoundry_v1_gh_proto_msgTypes[55]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5173,7 +5400,7 @@ func (x *GetPullRequestDiffResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetPullRequestDiffResponse.ProtoReflect.Descriptor instead.
 func (*GetPullRequestDiffResponse) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_gh_proto_rawDescGZIP(), []int{51}
+	return file_codefoundry_v1_gh_proto_rawDescGZIP(), []int{55}
 }
 
 func (x *GetPullRequestDiffResponse) GetDiff() string {
@@ -5226,7 +5453,7 @@ type GetPullRequestFileRequest struct {
 
 func (x *GetPullRequestFileRequest) Reset() {
 	*x = GetPullRequestFileRequest{}
-	mi := &file_codefoundry_v1_gh_proto_msgTypes[52]
+	mi := &file_codefoundry_v1_gh_proto_msgTypes[56]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5238,7 +5465,7 @@ func (x *GetPullRequestFileRequest) String() string {
 func (*GetPullRequestFileRequest) ProtoMessage() {}
 
 func (x *GetPullRequestFileRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_gh_proto_msgTypes[52]
+	mi := &file_codefoundry_v1_gh_proto_msgTypes[56]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5251,7 +5478,7 @@ func (x *GetPullRequestFileRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetPullRequestFileRequest.ProtoReflect.Descriptor instead.
 func (*GetPullRequestFileRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_gh_proto_rawDescGZIP(), []int{52}
+	return file_codefoundry_v1_gh_proto_rawDescGZIP(), []int{56}
 }
 
 func (x *GetPullRequestFileRequest) GetRepoSlug() string {
@@ -5290,7 +5517,7 @@ type GetPullRequestFileResponse struct {
 
 func (x *GetPullRequestFileResponse) Reset() {
 	*x = GetPullRequestFileResponse{}
-	mi := &file_codefoundry_v1_gh_proto_msgTypes[53]
+	mi := &file_codefoundry_v1_gh_proto_msgTypes[57]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5302,7 +5529,7 @@ func (x *GetPullRequestFileResponse) String() string {
 func (*GetPullRequestFileResponse) ProtoMessage() {}
 
 func (x *GetPullRequestFileResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_gh_proto_msgTypes[53]
+	mi := &file_codefoundry_v1_gh_proto_msgTypes[57]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5315,7 +5542,7 @@ func (x *GetPullRequestFileResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetPullRequestFileResponse.ProtoReflect.Descriptor instead.
 func (*GetPullRequestFileResponse) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_gh_proto_rawDescGZIP(), []int{53}
+	return file_codefoundry_v1_gh_proto_rawDescGZIP(), []int{57}
 }
 
 func (x *GetPullRequestFileResponse) GetContents() []byte {
@@ -5366,7 +5593,7 @@ type GhEvent_PullRequestChanged struct {
 
 func (x *GhEvent_PullRequestChanged) Reset() {
 	*x = GhEvent_PullRequestChanged{}
-	mi := &file_codefoundry_v1_gh_proto_msgTypes[54]
+	mi := &file_codefoundry_v1_gh_proto_msgTypes[58]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5378,7 +5605,7 @@ func (x *GhEvent_PullRequestChanged) String() string {
 func (*GhEvent_PullRequestChanged) ProtoMessage() {}
 
 func (x *GhEvent_PullRequestChanged) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_gh_proto_msgTypes[54]
+	mi := &file_codefoundry_v1_gh_proto_msgTypes[58]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5449,7 +5676,7 @@ type GhEvent_PullRequestDetailUpdated struct {
 
 func (x *GhEvent_PullRequestDetailUpdated) Reset() {
 	*x = GhEvent_PullRequestDetailUpdated{}
-	mi := &file_codefoundry_v1_gh_proto_msgTypes[55]
+	mi := &file_codefoundry_v1_gh_proto_msgTypes[59]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5461,7 +5688,7 @@ func (x *GhEvent_PullRequestDetailUpdated) String() string {
 func (*GhEvent_PullRequestDetailUpdated) ProtoMessage() {}
 
 func (x *GhEvent_PullRequestDetailUpdated) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_gh_proto_msgTypes[55]
+	mi := &file_codefoundry_v1_gh_proto_msgTypes[59]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5502,7 +5729,7 @@ type GhEvent_DashboardUpdated struct {
 
 func (x *GhEvent_DashboardUpdated) Reset() {
 	*x = GhEvent_DashboardUpdated{}
-	mi := &file_codefoundry_v1_gh_proto_msgTypes[56]
+	mi := &file_codefoundry_v1_gh_proto_msgTypes[60]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5514,7 +5741,7 @@ func (x *GhEvent_DashboardUpdated) String() string {
 func (*GhEvent_DashboardUpdated) ProtoMessage() {}
 
 func (x *GhEvent_DashboardUpdated) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_gh_proto_msgTypes[56]
+	mi := &file_codefoundry_v1_gh_proto_msgTypes[60]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5549,7 +5776,7 @@ type GhEvent_RepoActivityUpdated struct {
 
 func (x *GhEvent_RepoActivityUpdated) Reset() {
 	*x = GhEvent_RepoActivityUpdated{}
-	mi := &file_codefoundry_v1_gh_proto_msgTypes[57]
+	mi := &file_codefoundry_v1_gh_proto_msgTypes[61]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5561,7 +5788,7 @@ func (x *GhEvent_RepoActivityUpdated) String() string {
 func (*GhEvent_RepoActivityUpdated) ProtoMessage() {}
 
 func (x *GhEvent_RepoActivityUpdated) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_gh_proto_msgTypes[57]
+	mi := &file_codefoundry_v1_gh_proto_msgTypes[61]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5604,7 +5831,7 @@ type GhEvent_BranchPullRequestsUpdated struct {
 
 func (x *GhEvent_BranchPullRequestsUpdated) Reset() {
 	*x = GhEvent_BranchPullRequestsUpdated{}
-	mi := &file_codefoundry_v1_gh_proto_msgTypes[58]
+	mi := &file_codefoundry_v1_gh_proto_msgTypes[62]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5616,7 +5843,7 @@ func (x *GhEvent_BranchPullRequestsUpdated) String() string {
 func (*GhEvent_BranchPullRequestsUpdated) ProtoMessage() {}
 
 func (x *GhEvent_BranchPullRequestsUpdated) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_gh_proto_msgTypes[58]
+	mi := &file_codefoundry_v1_gh_proto_msgTypes[62]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5663,7 +5890,7 @@ type GhEvent_ViewerUpdated struct {
 
 func (x *GhEvent_ViewerUpdated) Reset() {
 	*x = GhEvent_ViewerUpdated{}
-	mi := &file_codefoundry_v1_gh_proto_msgTypes[59]
+	mi := &file_codefoundry_v1_gh_proto_msgTypes[63]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5675,7 +5902,7 @@ func (x *GhEvent_ViewerUpdated) String() string {
 func (*GhEvent_ViewerUpdated) ProtoMessage() {}
 
 func (x *GhEvent_ViewerUpdated) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_gh_proto_msgTypes[59]
+	mi := &file_codefoundry_v1_gh_proto_msgTypes[63]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5717,7 +5944,7 @@ type GhEvent_Polled struct {
 
 func (x *GhEvent_Polled) Reset() {
 	*x = GhEvent_Polled{}
-	mi := &file_codefoundry_v1_gh_proto_msgTypes[60]
+	mi := &file_codefoundry_v1_gh_proto_msgTypes[64]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5729,7 +5956,7 @@ func (x *GhEvent_Polled) String() string {
 func (*GhEvent_Polled) ProtoMessage() {}
 
 func (x *GhEvent_Polled) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_gh_proto_msgTypes[60]
+	mi := &file_codefoundry_v1_gh_proto_msgTypes[64]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5936,8 +6163,9 @@ const file_codefoundry_v1_gh_proto_rawDesc = "" +
 	"\n" +
 	"last_error\x18\x05 \x01(\tR\tlastErrorJ\x04\b\x01\x10\x02J\x04\b\x02\x10\x03R\n" +
 	"this_monthR\n" +
-	"last_month\".\n" +
-	"\x13GetDashboardRequestJ\x04\b\x01\x10\x02R\x11include_untracked\"\xe3\x06\n" +
+	"last_month\"U\n" +
+	"\x13GetDashboardRequest\x12%\n" +
+	"\x0ewatch_projects\x18\x02 \x01(\bR\rwatchProjectsJ\x04\b\x01\x10\x02R\x11include_untracked\"\xe3\x06\n" +
 	"\x14GetDashboardResponse\x120\n" +
 	"\x06viewer\x18\x01 \x01(\v2\x18.codefoundry.v1.GhViewerR\x06viewer\x12$\n" +
 	"\rauthenticated\x18\x02 \x01(\bR\rauthenticated\x127\n" +
@@ -5990,7 +6218,22 @@ const file_codefoundry_v1_gh_proto_rawDesc = "" +
 	"\n" +
 	"fetched_at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\tfetchedAt\x12\x1d\n" +
 	"\n" +
-	"last_error\x18\x03 \x01(\tR\tlastError\"l\n" +
+	"last_error\x18\x03 \x01(\tR\tlastError\"Q\n" +
+	"\x17BranchPullRequestsQuery\x12\x1b\n" +
+	"\trepo_slug\x18\x01 \x01(\tR\brepoSlug\x12\x19\n" +
+	"\bhead_ref\x18\x02 \x01(\tR\aheadRef\"e\n" +
+	"\x1eGetBranchesPullRequestsRequest\x12C\n" +
+	"\bbranches\x18\x01 \x03(\v2'.codefoundry.v1.BranchPullRequestsQueryR\bbranches\"\xed\x01\n" +
+	"\x17BranchPullRequestsEntry\x12\x1b\n" +
+	"\trepo_slug\x18\x01 \x01(\tR\brepoSlug\x12\x19\n" +
+	"\bhead_ref\x18\x02 \x01(\tR\aheadRef\x12@\n" +
+	"\rpull_requests\x18\x03 \x03(\v2\x1b.codefoundry.v1.PullRequestR\fpullRequests\x129\n" +
+	"\n" +
+	"fetched_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\tfetchedAt\x12\x1d\n" +
+	"\n" +
+	"last_error\x18\x05 \x01(\tR\tlastError\"d\n" +
+	"\x1fGetBranchesPullRequestsResponse\x12A\n" +
+	"\aentries\x18\x01 \x03(\v2'.codefoundry.v1.BranchPullRequestsEntryR\aentries\"l\n" +
 	"\x1bGetPullRequestDetailRequest\x12\x1b\n" +
 	"\trepo_slug\x18\x01 \x01(\tR\brepoSlug\x12\x16\n" +
 	"\x06number\x18\x02 \x01(\x05R\x06number\x12\x18\n" +
@@ -6288,13 +6531,14 @@ const file_codefoundry_v1_gh_proto_rawDesc = "" +
 	"%PULL_REQUEST_REVIEW_EVENT_UNSPECIFIED\x10\x00\x12%\n" +
 	"!PULL_REQUEST_REVIEW_EVENT_APPROVE\x10\x01\x12-\n" +
 	")PULL_REQUEST_REVIEW_EVENT_REQUEST_CHANGES\x10\x02\x12%\n" +
-	"!PULL_REQUEST_REVIEW_EVENT_COMMENT\x10\x032\xdf\x0f\n" +
+	"!PULL_REQUEST_REVIEW_EVENT_COMMENT\x10\x032\xdd\x10\n" +
 	"\tGhService\x12R\n" +
 	"\tGetViewer\x12 .codefoundry.v1.GetViewerRequest\x1a!.codefoundry.v1.GetViewerResponse\"\x00\x12a\n" +
 	"\x0eGetPullRequest\x12%.codefoundry.v1.GetPullRequestRequest\x1a&.codefoundry.v1.GetPullRequestResponse\"\x00\x12[\n" +
 	"\fGetDashboard\x12#.codefoundry.v1.GetDashboardRequest\x1a$.codefoundry.v1.GetDashboardResponse\"\x00\x12d\n" +
 	"\x0fGetRepoActivity\x12&.codefoundry.v1.GetRepoActivityRequest\x1a'.codefoundry.v1.GetRepoActivityResponse\"\x00\x12v\n" +
-	"\x15GetBranchPullRequests\x12,.codefoundry.v1.GetBranchPullRequestsRequest\x1a-.codefoundry.v1.GetBranchPullRequestsResponse\"\x00\x12s\n" +
+	"\x15GetBranchPullRequests\x12,.codefoundry.v1.GetBranchPullRequestsRequest\x1a-.codefoundry.v1.GetBranchPullRequestsResponse\"\x00\x12|\n" +
+	"\x17GetBranchesPullRequests\x12..codefoundry.v1.GetBranchesPullRequestsRequest\x1a/.codefoundry.v1.GetBranchesPullRequestsResponse\"\x00\x12s\n" +
 	"\x14GetPullRequestDetail\x12+.codefoundry.v1.GetPullRequestDetailRequest\x1a,.codefoundry.v1.GetPullRequestDetailResponse\"\x00\x12y\n" +
 	"\x16ListReviewerCandidates\x12-.codefoundry.v1.ListReviewerCandidatesRequest\x1a..codefoundry.v1.ListReviewerCandidatesResponse\"\x00\x12g\n" +
 	"\x10SetReviewRequest\x12'.codefoundry.v1.SetReviewRequestRequest\x1a(.codefoundry.v1.SetReviewRequestResponse\"\x00\x12j\n" +
@@ -6323,7 +6567,7 @@ func file_codefoundry_v1_gh_proto_rawDescGZIP() []byte {
 }
 
 var file_codefoundry_v1_gh_proto_enumTypes = make([]protoimpl.EnumInfo, 14)
-var file_codefoundry_v1_gh_proto_msgTypes = make([]protoimpl.MessageInfo, 61)
+var file_codefoundry_v1_gh_proto_msgTypes = make([]protoimpl.MessageInfo, 65)
 var file_codefoundry_v1_gh_proto_goTypes = []any{
 	(PullRequestState)(0),                     // 0: codefoundry.v1.PullRequestState
 	(ReviewDecision)(0),                       // 1: codefoundry.v1.ReviewDecision
@@ -6360,77 +6604,81 @@ var file_codefoundry_v1_gh_proto_goTypes = []any{
 	(*GetRepoActivityResponse)(nil),           // 32: codefoundry.v1.GetRepoActivityResponse
 	(*GetBranchPullRequestsRequest)(nil),      // 33: codefoundry.v1.GetBranchPullRequestsRequest
 	(*GetBranchPullRequestsResponse)(nil),     // 34: codefoundry.v1.GetBranchPullRequestsResponse
-	(*GetPullRequestDetailRequest)(nil),       // 35: codefoundry.v1.GetPullRequestDetailRequest
-	(*GetPullRequestDetailResponse)(nil),      // 36: codefoundry.v1.GetPullRequestDetailResponse
-	(*PullRequestDetail)(nil),                 // 37: codefoundry.v1.PullRequestDetail
-	(*PullRequestLabel)(nil),                  // 38: codefoundry.v1.PullRequestLabel
-	(*PullRequestReviewer)(nil),               // 39: codefoundry.v1.PullRequestReviewer
-	(*PullRequestCommit)(nil),                 // 40: codefoundry.v1.PullRequestCommit
-	(*PullRequestComment)(nil),                // 41: codefoundry.v1.PullRequestComment
-	(*PullRequestReviewThread)(nil),           // 42: codefoundry.v1.PullRequestReviewThread
-	(*ListReviewerCandidatesRequest)(nil),     // 43: codefoundry.v1.ListReviewerCandidatesRequest
-	(*ListReviewerCandidatesResponse)(nil),    // 44: codefoundry.v1.ListReviewerCandidatesResponse
-	(*ReviewerCandidate)(nil),                 // 45: codefoundry.v1.ReviewerCandidate
-	(*SetReviewRequestRequest)(nil),           // 46: codefoundry.v1.SetReviewRequestRequest
-	(*SetReviewRequestResponse)(nil),          // 47: codefoundry.v1.SetReviewRequestResponse
-	(*RevertPullRequestRequest)(nil),          // 48: codefoundry.v1.RevertPullRequestRequest
-	(*RevertPullRequestResponse)(nil),         // 49: codefoundry.v1.RevertPullRequestResponse
-	(*MergePullRequestRequest)(nil),           // 50: codefoundry.v1.MergePullRequestRequest
-	(*MergePullRequestResponse)(nil),          // 51: codefoundry.v1.MergePullRequestResponse
-	(*SetPullRequestDraftRequest)(nil),        // 52: codefoundry.v1.SetPullRequestDraftRequest
-	(*SetPullRequestDraftResponse)(nil),       // 53: codefoundry.v1.SetPullRequestDraftResponse
-	(*SetPullRequestClosedRequest)(nil),       // 54: codefoundry.v1.SetPullRequestClosedRequest
-	(*SetPullRequestClosedResponse)(nil),      // 55: codefoundry.v1.SetPullRequestClosedResponse
-	(*SetPullRequestCheckboxRequest)(nil),     // 56: codefoundry.v1.SetPullRequestCheckboxRequest
-	(*SetPullRequestCheckboxResponse)(nil),    // 57: codefoundry.v1.SetPullRequestCheckboxResponse
-	(*SetPullRequestAutoMergeRequest)(nil),    // 58: codefoundry.v1.SetPullRequestAutoMergeRequest
-	(*SetPullRequestAutoMergeResponse)(nil),   // 59: codefoundry.v1.SetPullRequestAutoMergeResponse
-	(*SubmitPullRequestReviewRequest)(nil),    // 60: codefoundry.v1.SubmitPullRequestReviewRequest
-	(*SubmitPullRequestReviewResponse)(nil),   // 61: codefoundry.v1.SubmitPullRequestReviewResponse
-	(*AddPullRequestCommentRequest)(nil),      // 62: codefoundry.v1.AddPullRequestCommentRequest
-	(*AddPullRequestCommentResponse)(nil),     // 63: codefoundry.v1.AddPullRequestCommentResponse
-	(*GetPullRequestDiffRequest)(nil),         // 64: codefoundry.v1.GetPullRequestDiffRequest
-	(*GetPullRequestDiffResponse)(nil),        // 65: codefoundry.v1.GetPullRequestDiffResponse
-	(*GetPullRequestFileRequest)(nil),         // 66: codefoundry.v1.GetPullRequestFileRequest
-	(*GetPullRequestFileResponse)(nil),        // 67: codefoundry.v1.GetPullRequestFileResponse
-	(*GhEvent_PullRequestChanged)(nil),        // 68: codefoundry.v1.GhEvent.PullRequestChanged
-	(*GhEvent_PullRequestDetailUpdated)(nil),  // 69: codefoundry.v1.GhEvent.PullRequestDetailUpdated
-	(*GhEvent_DashboardUpdated)(nil),          // 70: codefoundry.v1.GhEvent.DashboardUpdated
-	(*GhEvent_RepoActivityUpdated)(nil),       // 71: codefoundry.v1.GhEvent.RepoActivityUpdated
-	(*GhEvent_BranchPullRequestsUpdated)(nil), // 72: codefoundry.v1.GhEvent.BranchPullRequestsUpdated
-	(*GhEvent_ViewerUpdated)(nil),             // 73: codefoundry.v1.GhEvent.ViewerUpdated
-	(*GhEvent_Polled)(nil),                    // 74: codefoundry.v1.GhEvent.Polled
-	(*timestamppb.Timestamp)(nil),             // 75: google.protobuf.Timestamp
+	(*BranchPullRequestsQuery)(nil),           // 35: codefoundry.v1.BranchPullRequestsQuery
+	(*GetBranchesPullRequestsRequest)(nil),    // 36: codefoundry.v1.GetBranchesPullRequestsRequest
+	(*BranchPullRequestsEntry)(nil),           // 37: codefoundry.v1.BranchPullRequestsEntry
+	(*GetBranchesPullRequestsResponse)(nil),   // 38: codefoundry.v1.GetBranchesPullRequestsResponse
+	(*GetPullRequestDetailRequest)(nil),       // 39: codefoundry.v1.GetPullRequestDetailRequest
+	(*GetPullRequestDetailResponse)(nil),      // 40: codefoundry.v1.GetPullRequestDetailResponse
+	(*PullRequestDetail)(nil),                 // 41: codefoundry.v1.PullRequestDetail
+	(*PullRequestLabel)(nil),                  // 42: codefoundry.v1.PullRequestLabel
+	(*PullRequestReviewer)(nil),               // 43: codefoundry.v1.PullRequestReviewer
+	(*PullRequestCommit)(nil),                 // 44: codefoundry.v1.PullRequestCommit
+	(*PullRequestComment)(nil),                // 45: codefoundry.v1.PullRequestComment
+	(*PullRequestReviewThread)(nil),           // 46: codefoundry.v1.PullRequestReviewThread
+	(*ListReviewerCandidatesRequest)(nil),     // 47: codefoundry.v1.ListReviewerCandidatesRequest
+	(*ListReviewerCandidatesResponse)(nil),    // 48: codefoundry.v1.ListReviewerCandidatesResponse
+	(*ReviewerCandidate)(nil),                 // 49: codefoundry.v1.ReviewerCandidate
+	(*SetReviewRequestRequest)(nil),           // 50: codefoundry.v1.SetReviewRequestRequest
+	(*SetReviewRequestResponse)(nil),          // 51: codefoundry.v1.SetReviewRequestResponse
+	(*RevertPullRequestRequest)(nil),          // 52: codefoundry.v1.RevertPullRequestRequest
+	(*RevertPullRequestResponse)(nil),         // 53: codefoundry.v1.RevertPullRequestResponse
+	(*MergePullRequestRequest)(nil),           // 54: codefoundry.v1.MergePullRequestRequest
+	(*MergePullRequestResponse)(nil),          // 55: codefoundry.v1.MergePullRequestResponse
+	(*SetPullRequestDraftRequest)(nil),        // 56: codefoundry.v1.SetPullRequestDraftRequest
+	(*SetPullRequestDraftResponse)(nil),       // 57: codefoundry.v1.SetPullRequestDraftResponse
+	(*SetPullRequestClosedRequest)(nil),       // 58: codefoundry.v1.SetPullRequestClosedRequest
+	(*SetPullRequestClosedResponse)(nil),      // 59: codefoundry.v1.SetPullRequestClosedResponse
+	(*SetPullRequestCheckboxRequest)(nil),     // 60: codefoundry.v1.SetPullRequestCheckboxRequest
+	(*SetPullRequestCheckboxResponse)(nil),    // 61: codefoundry.v1.SetPullRequestCheckboxResponse
+	(*SetPullRequestAutoMergeRequest)(nil),    // 62: codefoundry.v1.SetPullRequestAutoMergeRequest
+	(*SetPullRequestAutoMergeResponse)(nil),   // 63: codefoundry.v1.SetPullRequestAutoMergeResponse
+	(*SubmitPullRequestReviewRequest)(nil),    // 64: codefoundry.v1.SubmitPullRequestReviewRequest
+	(*SubmitPullRequestReviewResponse)(nil),   // 65: codefoundry.v1.SubmitPullRequestReviewResponse
+	(*AddPullRequestCommentRequest)(nil),      // 66: codefoundry.v1.AddPullRequestCommentRequest
+	(*AddPullRequestCommentResponse)(nil),     // 67: codefoundry.v1.AddPullRequestCommentResponse
+	(*GetPullRequestDiffRequest)(nil),         // 68: codefoundry.v1.GetPullRequestDiffRequest
+	(*GetPullRequestDiffResponse)(nil),        // 69: codefoundry.v1.GetPullRequestDiffResponse
+	(*GetPullRequestFileRequest)(nil),         // 70: codefoundry.v1.GetPullRequestFileRequest
+	(*GetPullRequestFileResponse)(nil),        // 71: codefoundry.v1.GetPullRequestFileResponse
+	(*GhEvent_PullRequestChanged)(nil),        // 72: codefoundry.v1.GhEvent.PullRequestChanged
+	(*GhEvent_PullRequestDetailUpdated)(nil),  // 73: codefoundry.v1.GhEvent.PullRequestDetailUpdated
+	(*GhEvent_DashboardUpdated)(nil),          // 74: codefoundry.v1.GhEvent.DashboardUpdated
+	(*GhEvent_RepoActivityUpdated)(nil),       // 75: codefoundry.v1.GhEvent.RepoActivityUpdated
+	(*GhEvent_BranchPullRequestsUpdated)(nil), // 76: codefoundry.v1.GhEvent.BranchPullRequestsUpdated
+	(*GhEvent_ViewerUpdated)(nil),             // 77: codefoundry.v1.GhEvent.ViewerUpdated
+	(*GhEvent_Polled)(nil),                    // 78: codefoundry.v1.GhEvent.Polled
+	(*timestamppb.Timestamp)(nil),             // 79: google.protobuf.Timestamp
 }
 var file_codefoundry_v1_gh_proto_depIdxs = []int32{
 	5,   // 0: codefoundry.v1.CheckRollup.state:type_name -> codefoundry.v1.CheckRollupState
 	1,   // 1: codefoundry.v1.PullRequest.review_decision:type_name -> codefoundry.v1.ReviewDecision
 	2,   // 2: codefoundry.v1.PullRequest.mergeable:type_name -> codefoundry.v1.Mergeable
 	3,   // 3: codefoundry.v1.PullRequest.merge_state_status:type_name -> codefoundry.v1.MergeStateStatus
-	75,  // 4: codefoundry.v1.PullRequest.updated_at:type_name -> google.protobuf.Timestamp
+	79,  // 4: codefoundry.v1.PullRequest.updated_at:type_name -> google.protobuf.Timestamp
 	15,  // 5: codefoundry.v1.PullRequest.checks:type_name -> codefoundry.v1.CheckRollup
 	0,   // 6: codefoundry.v1.PullRequest.state:type_name -> codefoundry.v1.PullRequestState
-	75,  // 7: codefoundry.v1.PullRequest.created_at:type_name -> google.protobuf.Timestamp
-	75,  // 8: codefoundry.v1.PullRequest.merged_at:type_name -> google.protobuf.Timestamp
+	79,  // 7: codefoundry.v1.PullRequest.created_at:type_name -> google.protobuf.Timestamp
+	79,  // 8: codefoundry.v1.PullRequest.merged_at:type_name -> google.protobuf.Timestamp
 	17,  // 9: codefoundry.v1.PullRequest.latest_reviews:type_name -> codefoundry.v1.PullRequestReview
 	4,   // 10: codefoundry.v1.PullRequestReview.state:type_name -> codefoundry.v1.PullRequestReviewState
-	75,  // 11: codefoundry.v1.PullRequestReview.submitted_at:type_name -> google.protobuf.Timestamp
+	79,  // 11: codefoundry.v1.PullRequestReview.submitted_at:type_name -> google.protobuf.Timestamp
 	6,   // 12: codefoundry.v1.CheckRun.status:type_name -> codefoundry.v1.CheckStatus
 	7,   // 13: codefoundry.v1.CheckRun.conclusion:type_name -> codefoundry.v1.CheckConclusion
-	75,  // 14: codefoundry.v1.CheckRun.started_at:type_name -> google.protobuf.Timestamp
-	75,  // 15: codefoundry.v1.CheckRun.completed_at:type_name -> google.protobuf.Timestamp
+	79,  // 14: codefoundry.v1.CheckRun.started_at:type_name -> google.protobuf.Timestamp
+	79,  // 15: codefoundry.v1.CheckRun.completed_at:type_name -> google.protobuf.Timestamp
 	14,  // 16: codefoundry.v1.GetViewerResponse.viewer:type_name -> codefoundry.v1.GhViewer
-	75,  // 17: codefoundry.v1.GetViewerResponse.fetched_at:type_name -> google.protobuf.Timestamp
+	79,  // 17: codefoundry.v1.GetViewerResponse.fetched_at:type_name -> google.protobuf.Timestamp
 	16,  // 18: codefoundry.v1.GetPullRequestResponse.pull_request:type_name -> codefoundry.v1.PullRequest
 	18,  // 19: codefoundry.v1.GetPullRequestResponse.checks:type_name -> codefoundry.v1.CheckRun
-	75,  // 20: codefoundry.v1.GetPullRequestResponse.fetched_at:type_name -> google.protobuf.Timestamp
-	73,  // 21: codefoundry.v1.GhEvent.viewer_updated:type_name -> codefoundry.v1.GhEvent.ViewerUpdated
-	70,  // 22: codefoundry.v1.GhEvent.dashboard_updated:type_name -> codefoundry.v1.GhEvent.DashboardUpdated
-	71,  // 23: codefoundry.v1.GhEvent.repo_activity_updated:type_name -> codefoundry.v1.GhEvent.RepoActivityUpdated
-	72,  // 24: codefoundry.v1.GhEvent.branch_pull_requests_updated:type_name -> codefoundry.v1.GhEvent.BranchPullRequestsUpdated
-	74,  // 25: codefoundry.v1.GhEvent.polled:type_name -> codefoundry.v1.GhEvent.Polled
-	69,  // 26: codefoundry.v1.GhEvent.pull_request_detail_updated:type_name -> codefoundry.v1.GhEvent.PullRequestDetailUpdated
-	68,  // 27: codefoundry.v1.GhEvent.pull_request_changed:type_name -> codefoundry.v1.GhEvent.PullRequestChanged
+	79,  // 20: codefoundry.v1.GetPullRequestResponse.fetched_at:type_name -> google.protobuf.Timestamp
+	77,  // 21: codefoundry.v1.GhEvent.viewer_updated:type_name -> codefoundry.v1.GhEvent.ViewerUpdated
+	74,  // 22: codefoundry.v1.GhEvent.dashboard_updated:type_name -> codefoundry.v1.GhEvent.DashboardUpdated
+	75,  // 23: codefoundry.v1.GhEvent.repo_activity_updated:type_name -> codefoundry.v1.GhEvent.RepoActivityUpdated
+	76,  // 24: codefoundry.v1.GhEvent.branch_pull_requests_updated:type_name -> codefoundry.v1.GhEvent.BranchPullRequestsUpdated
+	78,  // 25: codefoundry.v1.GhEvent.polled:type_name -> codefoundry.v1.GhEvent.Polled
+	73,  // 26: codefoundry.v1.GhEvent.pull_request_detail_updated:type_name -> codefoundry.v1.GhEvent.PullRequestDetailUpdated
+	72,  // 27: codefoundry.v1.GhEvent.pull_request_changed:type_name -> codefoundry.v1.GhEvent.PullRequestChanged
 	8,   // 28: codefoundry.v1.PullRequestChange.kind:type_name -> codefoundry.v1.PullRequestChangeKind
 	0,   // 29: codefoundry.v1.PullRequestChange.old_state:type_name -> codefoundry.v1.PullRequestState
 	0,   // 30: codefoundry.v1.PullRequestChange.new_state:type_name -> codefoundry.v1.PullRequestState
@@ -6439,108 +6687,114 @@ var file_codefoundry_v1_gh_proto_depIdxs = []int32{
 	1,   // 33: codefoundry.v1.PullRequestChange.old_review_decision:type_name -> codefoundry.v1.ReviewDecision
 	1,   // 34: codefoundry.v1.PullRequestChange.new_review_decision:type_name -> codefoundry.v1.ReviewDecision
 	25,  // 35: codefoundry.v1.ActivityStats.months:type_name -> codefoundry.v1.MonthActivity
-	75,  // 36: codefoundry.v1.ActivityStats.fetched_at:type_name -> google.protobuf.Timestamp
+	79,  // 36: codefoundry.v1.ActivityStats.fetched_at:type_name -> google.protobuf.Timestamp
 	14,  // 37: codefoundry.v1.GetDashboardResponse.viewer:type_name -> codefoundry.v1.GhViewer
 	16,  // 38: codefoundry.v1.GetDashboardResponse.authored:type_name -> codefoundry.v1.PullRequest
 	16,  // 39: codefoundry.v1.GetDashboardResponse.review_requested:type_name -> codefoundry.v1.PullRequest
 	16,  // 40: codefoundry.v1.GetDashboardResponse.recently_merged:type_name -> codefoundry.v1.PullRequest
 	26,  // 41: codefoundry.v1.GetDashboardResponse.stats:type_name -> codefoundry.v1.ActivityStats
-	75,  // 42: codefoundry.v1.GetDashboardResponse.fetched_at:type_name -> google.protobuf.Timestamp
+	79,  // 42: codefoundry.v1.GetDashboardResponse.fetched_at:type_name -> google.protobuf.Timestamp
 	16,  // 43: codefoundry.v1.GetDashboardResponse.reviewed:type_name -> codefoundry.v1.PullRequest
 	29,  // 44: codefoundry.v1.GetDashboardResponse.project_open:type_name -> codefoundry.v1.ProjectPullRequests
 	29,  // 45: codefoundry.v1.GetDashboardResponse.project_merged:type_name -> codefoundry.v1.ProjectPullRequests
-	75,  // 46: codefoundry.v1.GetDashboardResponse.projects_fetched_at:type_name -> google.protobuf.Timestamp
+	79,  // 46: codefoundry.v1.GetDashboardResponse.projects_fetched_at:type_name -> google.protobuf.Timestamp
 	16,  // 47: codefoundry.v1.ProjectPullRequests.pull_requests:type_name -> codefoundry.v1.PullRequest
-	75,  // 48: codefoundry.v1.DefaultBranchStatus.committed_at:type_name -> google.protobuf.Timestamp
+	79,  // 48: codefoundry.v1.DefaultBranchStatus.committed_at:type_name -> google.protobuf.Timestamp
 	15,  // 49: codefoundry.v1.DefaultBranchStatus.rollup:type_name -> codefoundry.v1.CheckRollup
 	18,  // 50: codefoundry.v1.DefaultBranchStatus.failing:type_name -> codefoundry.v1.CheckRun
-	75,  // 51: codefoundry.v1.DefaultBranchStatus.fetched_at:type_name -> google.protobuf.Timestamp
+	79,  // 51: codefoundry.v1.DefaultBranchStatus.fetched_at:type_name -> google.protobuf.Timestamp
 	26,  // 52: codefoundry.v1.GetRepoActivityResponse.stats:type_name -> codefoundry.v1.ActivityStats
 	31,  // 53: codefoundry.v1.GetRepoActivityResponse.default_branch:type_name -> codefoundry.v1.DefaultBranchStatus
 	16,  // 54: codefoundry.v1.GetRepoActivityResponse.recently_merged:type_name -> codefoundry.v1.PullRequest
 	16,  // 55: codefoundry.v1.GetBranchPullRequestsResponse.pull_requests:type_name -> codefoundry.v1.PullRequest
-	75,  // 56: codefoundry.v1.GetBranchPullRequestsResponse.fetched_at:type_name -> google.protobuf.Timestamp
-	37,  // 57: codefoundry.v1.GetPullRequestDetailResponse.detail:type_name -> codefoundry.v1.PullRequestDetail
-	16,  // 58: codefoundry.v1.PullRequestDetail.pull_request:type_name -> codefoundry.v1.PullRequest
-	38,  // 59: codefoundry.v1.PullRequestDetail.labels:type_name -> codefoundry.v1.PullRequestLabel
-	39,  // 60: codefoundry.v1.PullRequestDetail.reviewers:type_name -> codefoundry.v1.PullRequestReviewer
-	40,  // 61: codefoundry.v1.PullRequestDetail.commits:type_name -> codefoundry.v1.PullRequestCommit
-	41,  // 62: codefoundry.v1.PullRequestDetail.comments:type_name -> codefoundry.v1.PullRequestComment
-	42,  // 63: codefoundry.v1.PullRequestDetail.review_threads:type_name -> codefoundry.v1.PullRequestReviewThread
-	18,  // 64: codefoundry.v1.PullRequestDetail.checks:type_name -> codefoundry.v1.CheckRun
-	75,  // 65: codefoundry.v1.PullRequestDetail.closed_at:type_name -> google.protobuf.Timestamp
-	75,  // 66: codefoundry.v1.PullRequestDetail.fetched_at:type_name -> google.protobuf.Timestamp
-	12,  // 67: codefoundry.v1.PullRequestDetail.merge_methods_allowed:type_name -> codefoundry.v1.PullRequestMergeMethod
-	12,  // 68: codefoundry.v1.PullRequestDetail.auto_merge_method:type_name -> codefoundry.v1.PullRequestMergeMethod
-	4,   // 69: codefoundry.v1.PullRequestReviewer.state:type_name -> codefoundry.v1.PullRequestReviewState
-	75,  // 70: codefoundry.v1.PullRequestReviewer.submitted_at:type_name -> google.protobuf.Timestamp
-	75,  // 71: codefoundry.v1.PullRequestCommit.committed_at:type_name -> google.protobuf.Timestamp
-	10,  // 72: codefoundry.v1.PullRequestComment.kind:type_name -> codefoundry.v1.PullRequestCommentKind
-	75,  // 73: codefoundry.v1.PullRequestComment.created_at:type_name -> google.protobuf.Timestamp
-	4,   // 74: codefoundry.v1.PullRequestComment.review_state:type_name -> codefoundry.v1.PullRequestReviewState
-	9,   // 75: codefoundry.v1.PullRequestReviewThread.side:type_name -> codefoundry.v1.DiffSide
-	41,  // 76: codefoundry.v1.PullRequestReviewThread.comments:type_name -> codefoundry.v1.PullRequestComment
-	45,  // 77: codefoundry.v1.ListReviewerCandidatesResponse.candidates:type_name -> codefoundry.v1.ReviewerCandidate
-	11,  // 78: codefoundry.v1.ReviewerCandidate.kind:type_name -> codefoundry.v1.ReviewerKind
-	11,  // 79: codefoundry.v1.SetReviewRequestRequest.kind:type_name -> codefoundry.v1.ReviewerKind
-	12,  // 80: codefoundry.v1.MergePullRequestRequest.method:type_name -> codefoundry.v1.PullRequestMergeMethod
-	0,   // 81: codefoundry.v1.SetPullRequestClosedResponse.state:type_name -> codefoundry.v1.PullRequestState
-	12,  // 82: codefoundry.v1.SetPullRequestAutoMergeRequest.method:type_name -> codefoundry.v1.PullRequestMergeMethod
-	12,  // 83: codefoundry.v1.SetPullRequestAutoMergeResponse.method:type_name -> codefoundry.v1.PullRequestMergeMethod
-	13,  // 84: codefoundry.v1.SubmitPullRequestReviewRequest.event:type_name -> codefoundry.v1.PullRequestReviewEvent
-	4,   // 85: codefoundry.v1.SubmitPullRequestReviewResponse.state:type_name -> codefoundry.v1.PullRequestReviewState
-	75,  // 86: codefoundry.v1.SubmitPullRequestReviewResponse.submitted_at:type_name -> google.protobuf.Timestamp
-	75,  // 87: codefoundry.v1.AddPullRequestCommentResponse.created_at:type_name -> google.protobuf.Timestamp
-	75,  // 88: codefoundry.v1.GetPullRequestDiffResponse.fetched_at:type_name -> google.protobuf.Timestamp
-	16,  // 89: codefoundry.v1.GhEvent.PullRequestChanged.pull_request:type_name -> codefoundry.v1.PullRequest
-	24,  // 90: codefoundry.v1.GhEvent.PullRequestChanged.changes:type_name -> codefoundry.v1.PullRequestChange
-	75,  // 91: codefoundry.v1.GhEvent.DashboardUpdated.fetched_at:type_name -> google.protobuf.Timestamp
-	75,  // 92: codefoundry.v1.GhEvent.RepoActivityUpdated.fetched_at:type_name -> google.protobuf.Timestamp
-	75,  // 93: codefoundry.v1.GhEvent.BranchPullRequestsUpdated.fetched_at:type_name -> google.protobuf.Timestamp
-	75,  // 94: codefoundry.v1.GhEvent.ViewerUpdated.fetched_at:type_name -> google.protobuf.Timestamp
-	75,  // 95: codefoundry.v1.GhEvent.Polled.fetched_at:type_name -> google.protobuf.Timestamp
-	75,  // 96: codefoundry.v1.GhEvent.Polled.projects_fetched_at:type_name -> google.protobuf.Timestamp
-	19,  // 97: codefoundry.v1.GhService.GetViewer:input_type -> codefoundry.v1.GetViewerRequest
-	21,  // 98: codefoundry.v1.GhService.GetPullRequest:input_type -> codefoundry.v1.GetPullRequestRequest
-	27,  // 99: codefoundry.v1.GhService.GetDashboard:input_type -> codefoundry.v1.GetDashboardRequest
-	30,  // 100: codefoundry.v1.GhService.GetRepoActivity:input_type -> codefoundry.v1.GetRepoActivityRequest
-	33,  // 101: codefoundry.v1.GhService.GetBranchPullRequests:input_type -> codefoundry.v1.GetBranchPullRequestsRequest
-	35,  // 102: codefoundry.v1.GhService.GetPullRequestDetail:input_type -> codefoundry.v1.GetPullRequestDetailRequest
-	43,  // 103: codefoundry.v1.GhService.ListReviewerCandidates:input_type -> codefoundry.v1.ListReviewerCandidatesRequest
-	46,  // 104: codefoundry.v1.GhService.SetReviewRequest:input_type -> codefoundry.v1.SetReviewRequestRequest
-	48,  // 105: codefoundry.v1.GhService.RevertPullRequest:input_type -> codefoundry.v1.RevertPullRequestRequest
-	50,  // 106: codefoundry.v1.GhService.MergePullRequest:input_type -> codefoundry.v1.MergePullRequestRequest
-	60,  // 107: codefoundry.v1.GhService.SubmitPullRequestReview:input_type -> codefoundry.v1.SubmitPullRequestReviewRequest
-	62,  // 108: codefoundry.v1.GhService.AddPullRequestComment:input_type -> codefoundry.v1.AddPullRequestCommentRequest
-	52,  // 109: codefoundry.v1.GhService.SetPullRequestDraft:input_type -> codefoundry.v1.SetPullRequestDraftRequest
-	58,  // 110: codefoundry.v1.GhService.SetPullRequestAutoMerge:input_type -> codefoundry.v1.SetPullRequestAutoMergeRequest
-	54,  // 111: codefoundry.v1.GhService.SetPullRequestClosed:input_type -> codefoundry.v1.SetPullRequestClosedRequest
-	56,  // 112: codefoundry.v1.GhService.SetPullRequestCheckbox:input_type -> codefoundry.v1.SetPullRequestCheckboxRequest
-	64,  // 113: codefoundry.v1.GhService.GetPullRequestDiff:input_type -> codefoundry.v1.GetPullRequestDiffRequest
-	66,  // 114: codefoundry.v1.GhService.GetPullRequestFile:input_type -> codefoundry.v1.GetPullRequestFileRequest
-	20,  // 115: codefoundry.v1.GhService.GetViewer:output_type -> codefoundry.v1.GetViewerResponse
-	22,  // 116: codefoundry.v1.GhService.GetPullRequest:output_type -> codefoundry.v1.GetPullRequestResponse
-	28,  // 117: codefoundry.v1.GhService.GetDashboard:output_type -> codefoundry.v1.GetDashboardResponse
-	32,  // 118: codefoundry.v1.GhService.GetRepoActivity:output_type -> codefoundry.v1.GetRepoActivityResponse
-	34,  // 119: codefoundry.v1.GhService.GetBranchPullRequests:output_type -> codefoundry.v1.GetBranchPullRequestsResponse
-	36,  // 120: codefoundry.v1.GhService.GetPullRequestDetail:output_type -> codefoundry.v1.GetPullRequestDetailResponse
-	44,  // 121: codefoundry.v1.GhService.ListReviewerCandidates:output_type -> codefoundry.v1.ListReviewerCandidatesResponse
-	47,  // 122: codefoundry.v1.GhService.SetReviewRequest:output_type -> codefoundry.v1.SetReviewRequestResponse
-	49,  // 123: codefoundry.v1.GhService.RevertPullRequest:output_type -> codefoundry.v1.RevertPullRequestResponse
-	51,  // 124: codefoundry.v1.GhService.MergePullRequest:output_type -> codefoundry.v1.MergePullRequestResponse
-	61,  // 125: codefoundry.v1.GhService.SubmitPullRequestReview:output_type -> codefoundry.v1.SubmitPullRequestReviewResponse
-	63,  // 126: codefoundry.v1.GhService.AddPullRequestComment:output_type -> codefoundry.v1.AddPullRequestCommentResponse
-	53,  // 127: codefoundry.v1.GhService.SetPullRequestDraft:output_type -> codefoundry.v1.SetPullRequestDraftResponse
-	59,  // 128: codefoundry.v1.GhService.SetPullRequestAutoMerge:output_type -> codefoundry.v1.SetPullRequestAutoMergeResponse
-	55,  // 129: codefoundry.v1.GhService.SetPullRequestClosed:output_type -> codefoundry.v1.SetPullRequestClosedResponse
-	57,  // 130: codefoundry.v1.GhService.SetPullRequestCheckbox:output_type -> codefoundry.v1.SetPullRequestCheckboxResponse
-	65,  // 131: codefoundry.v1.GhService.GetPullRequestDiff:output_type -> codefoundry.v1.GetPullRequestDiffResponse
-	67,  // 132: codefoundry.v1.GhService.GetPullRequestFile:output_type -> codefoundry.v1.GetPullRequestFileResponse
-	115, // [115:133] is the sub-list for method output_type
-	97,  // [97:115] is the sub-list for method input_type
-	97,  // [97:97] is the sub-list for extension type_name
-	97,  // [97:97] is the sub-list for extension extendee
-	0,   // [0:97] is the sub-list for field type_name
+	79,  // 56: codefoundry.v1.GetBranchPullRequestsResponse.fetched_at:type_name -> google.protobuf.Timestamp
+	35,  // 57: codefoundry.v1.GetBranchesPullRequestsRequest.branches:type_name -> codefoundry.v1.BranchPullRequestsQuery
+	16,  // 58: codefoundry.v1.BranchPullRequestsEntry.pull_requests:type_name -> codefoundry.v1.PullRequest
+	79,  // 59: codefoundry.v1.BranchPullRequestsEntry.fetched_at:type_name -> google.protobuf.Timestamp
+	37,  // 60: codefoundry.v1.GetBranchesPullRequestsResponse.entries:type_name -> codefoundry.v1.BranchPullRequestsEntry
+	41,  // 61: codefoundry.v1.GetPullRequestDetailResponse.detail:type_name -> codefoundry.v1.PullRequestDetail
+	16,  // 62: codefoundry.v1.PullRequestDetail.pull_request:type_name -> codefoundry.v1.PullRequest
+	42,  // 63: codefoundry.v1.PullRequestDetail.labels:type_name -> codefoundry.v1.PullRequestLabel
+	43,  // 64: codefoundry.v1.PullRequestDetail.reviewers:type_name -> codefoundry.v1.PullRequestReviewer
+	44,  // 65: codefoundry.v1.PullRequestDetail.commits:type_name -> codefoundry.v1.PullRequestCommit
+	45,  // 66: codefoundry.v1.PullRequestDetail.comments:type_name -> codefoundry.v1.PullRequestComment
+	46,  // 67: codefoundry.v1.PullRequestDetail.review_threads:type_name -> codefoundry.v1.PullRequestReviewThread
+	18,  // 68: codefoundry.v1.PullRequestDetail.checks:type_name -> codefoundry.v1.CheckRun
+	79,  // 69: codefoundry.v1.PullRequestDetail.closed_at:type_name -> google.protobuf.Timestamp
+	79,  // 70: codefoundry.v1.PullRequestDetail.fetched_at:type_name -> google.protobuf.Timestamp
+	12,  // 71: codefoundry.v1.PullRequestDetail.merge_methods_allowed:type_name -> codefoundry.v1.PullRequestMergeMethod
+	12,  // 72: codefoundry.v1.PullRequestDetail.auto_merge_method:type_name -> codefoundry.v1.PullRequestMergeMethod
+	4,   // 73: codefoundry.v1.PullRequestReviewer.state:type_name -> codefoundry.v1.PullRequestReviewState
+	79,  // 74: codefoundry.v1.PullRequestReviewer.submitted_at:type_name -> google.protobuf.Timestamp
+	79,  // 75: codefoundry.v1.PullRequestCommit.committed_at:type_name -> google.protobuf.Timestamp
+	10,  // 76: codefoundry.v1.PullRequestComment.kind:type_name -> codefoundry.v1.PullRequestCommentKind
+	79,  // 77: codefoundry.v1.PullRequestComment.created_at:type_name -> google.protobuf.Timestamp
+	4,   // 78: codefoundry.v1.PullRequestComment.review_state:type_name -> codefoundry.v1.PullRequestReviewState
+	9,   // 79: codefoundry.v1.PullRequestReviewThread.side:type_name -> codefoundry.v1.DiffSide
+	45,  // 80: codefoundry.v1.PullRequestReviewThread.comments:type_name -> codefoundry.v1.PullRequestComment
+	49,  // 81: codefoundry.v1.ListReviewerCandidatesResponse.candidates:type_name -> codefoundry.v1.ReviewerCandidate
+	11,  // 82: codefoundry.v1.ReviewerCandidate.kind:type_name -> codefoundry.v1.ReviewerKind
+	11,  // 83: codefoundry.v1.SetReviewRequestRequest.kind:type_name -> codefoundry.v1.ReviewerKind
+	12,  // 84: codefoundry.v1.MergePullRequestRequest.method:type_name -> codefoundry.v1.PullRequestMergeMethod
+	0,   // 85: codefoundry.v1.SetPullRequestClosedResponse.state:type_name -> codefoundry.v1.PullRequestState
+	12,  // 86: codefoundry.v1.SetPullRequestAutoMergeRequest.method:type_name -> codefoundry.v1.PullRequestMergeMethod
+	12,  // 87: codefoundry.v1.SetPullRequestAutoMergeResponse.method:type_name -> codefoundry.v1.PullRequestMergeMethod
+	13,  // 88: codefoundry.v1.SubmitPullRequestReviewRequest.event:type_name -> codefoundry.v1.PullRequestReviewEvent
+	4,   // 89: codefoundry.v1.SubmitPullRequestReviewResponse.state:type_name -> codefoundry.v1.PullRequestReviewState
+	79,  // 90: codefoundry.v1.SubmitPullRequestReviewResponse.submitted_at:type_name -> google.protobuf.Timestamp
+	79,  // 91: codefoundry.v1.AddPullRequestCommentResponse.created_at:type_name -> google.protobuf.Timestamp
+	79,  // 92: codefoundry.v1.GetPullRequestDiffResponse.fetched_at:type_name -> google.protobuf.Timestamp
+	16,  // 93: codefoundry.v1.GhEvent.PullRequestChanged.pull_request:type_name -> codefoundry.v1.PullRequest
+	24,  // 94: codefoundry.v1.GhEvent.PullRequestChanged.changes:type_name -> codefoundry.v1.PullRequestChange
+	79,  // 95: codefoundry.v1.GhEvent.DashboardUpdated.fetched_at:type_name -> google.protobuf.Timestamp
+	79,  // 96: codefoundry.v1.GhEvent.RepoActivityUpdated.fetched_at:type_name -> google.protobuf.Timestamp
+	79,  // 97: codefoundry.v1.GhEvent.BranchPullRequestsUpdated.fetched_at:type_name -> google.protobuf.Timestamp
+	79,  // 98: codefoundry.v1.GhEvent.ViewerUpdated.fetched_at:type_name -> google.protobuf.Timestamp
+	79,  // 99: codefoundry.v1.GhEvent.Polled.fetched_at:type_name -> google.protobuf.Timestamp
+	79,  // 100: codefoundry.v1.GhEvent.Polled.projects_fetched_at:type_name -> google.protobuf.Timestamp
+	19,  // 101: codefoundry.v1.GhService.GetViewer:input_type -> codefoundry.v1.GetViewerRequest
+	21,  // 102: codefoundry.v1.GhService.GetPullRequest:input_type -> codefoundry.v1.GetPullRequestRequest
+	27,  // 103: codefoundry.v1.GhService.GetDashboard:input_type -> codefoundry.v1.GetDashboardRequest
+	30,  // 104: codefoundry.v1.GhService.GetRepoActivity:input_type -> codefoundry.v1.GetRepoActivityRequest
+	33,  // 105: codefoundry.v1.GhService.GetBranchPullRequests:input_type -> codefoundry.v1.GetBranchPullRequestsRequest
+	36,  // 106: codefoundry.v1.GhService.GetBranchesPullRequests:input_type -> codefoundry.v1.GetBranchesPullRequestsRequest
+	39,  // 107: codefoundry.v1.GhService.GetPullRequestDetail:input_type -> codefoundry.v1.GetPullRequestDetailRequest
+	47,  // 108: codefoundry.v1.GhService.ListReviewerCandidates:input_type -> codefoundry.v1.ListReviewerCandidatesRequest
+	50,  // 109: codefoundry.v1.GhService.SetReviewRequest:input_type -> codefoundry.v1.SetReviewRequestRequest
+	52,  // 110: codefoundry.v1.GhService.RevertPullRequest:input_type -> codefoundry.v1.RevertPullRequestRequest
+	54,  // 111: codefoundry.v1.GhService.MergePullRequest:input_type -> codefoundry.v1.MergePullRequestRequest
+	64,  // 112: codefoundry.v1.GhService.SubmitPullRequestReview:input_type -> codefoundry.v1.SubmitPullRequestReviewRequest
+	66,  // 113: codefoundry.v1.GhService.AddPullRequestComment:input_type -> codefoundry.v1.AddPullRequestCommentRequest
+	56,  // 114: codefoundry.v1.GhService.SetPullRequestDraft:input_type -> codefoundry.v1.SetPullRequestDraftRequest
+	62,  // 115: codefoundry.v1.GhService.SetPullRequestAutoMerge:input_type -> codefoundry.v1.SetPullRequestAutoMergeRequest
+	58,  // 116: codefoundry.v1.GhService.SetPullRequestClosed:input_type -> codefoundry.v1.SetPullRequestClosedRequest
+	60,  // 117: codefoundry.v1.GhService.SetPullRequestCheckbox:input_type -> codefoundry.v1.SetPullRequestCheckboxRequest
+	68,  // 118: codefoundry.v1.GhService.GetPullRequestDiff:input_type -> codefoundry.v1.GetPullRequestDiffRequest
+	70,  // 119: codefoundry.v1.GhService.GetPullRequestFile:input_type -> codefoundry.v1.GetPullRequestFileRequest
+	20,  // 120: codefoundry.v1.GhService.GetViewer:output_type -> codefoundry.v1.GetViewerResponse
+	22,  // 121: codefoundry.v1.GhService.GetPullRequest:output_type -> codefoundry.v1.GetPullRequestResponse
+	28,  // 122: codefoundry.v1.GhService.GetDashboard:output_type -> codefoundry.v1.GetDashboardResponse
+	32,  // 123: codefoundry.v1.GhService.GetRepoActivity:output_type -> codefoundry.v1.GetRepoActivityResponse
+	34,  // 124: codefoundry.v1.GhService.GetBranchPullRequests:output_type -> codefoundry.v1.GetBranchPullRequestsResponse
+	38,  // 125: codefoundry.v1.GhService.GetBranchesPullRequests:output_type -> codefoundry.v1.GetBranchesPullRequestsResponse
+	40,  // 126: codefoundry.v1.GhService.GetPullRequestDetail:output_type -> codefoundry.v1.GetPullRequestDetailResponse
+	48,  // 127: codefoundry.v1.GhService.ListReviewerCandidates:output_type -> codefoundry.v1.ListReviewerCandidatesResponse
+	51,  // 128: codefoundry.v1.GhService.SetReviewRequest:output_type -> codefoundry.v1.SetReviewRequestResponse
+	53,  // 129: codefoundry.v1.GhService.RevertPullRequest:output_type -> codefoundry.v1.RevertPullRequestResponse
+	55,  // 130: codefoundry.v1.GhService.MergePullRequest:output_type -> codefoundry.v1.MergePullRequestResponse
+	65,  // 131: codefoundry.v1.GhService.SubmitPullRequestReview:output_type -> codefoundry.v1.SubmitPullRequestReviewResponse
+	67,  // 132: codefoundry.v1.GhService.AddPullRequestComment:output_type -> codefoundry.v1.AddPullRequestCommentResponse
+	57,  // 133: codefoundry.v1.GhService.SetPullRequestDraft:output_type -> codefoundry.v1.SetPullRequestDraftResponse
+	63,  // 134: codefoundry.v1.GhService.SetPullRequestAutoMerge:output_type -> codefoundry.v1.SetPullRequestAutoMergeResponse
+	59,  // 135: codefoundry.v1.GhService.SetPullRequestClosed:output_type -> codefoundry.v1.SetPullRequestClosedResponse
+	61,  // 136: codefoundry.v1.GhService.SetPullRequestCheckbox:output_type -> codefoundry.v1.SetPullRequestCheckboxResponse
+	69,  // 137: codefoundry.v1.GhService.GetPullRequestDiff:output_type -> codefoundry.v1.GetPullRequestDiffResponse
+	71,  // 138: codefoundry.v1.GhService.GetPullRequestFile:output_type -> codefoundry.v1.GetPullRequestFileResponse
+	120, // [120:139] is the sub-list for method output_type
+	101, // [101:120] is the sub-list for method input_type
+	101, // [101:101] is the sub-list for extension type_name
+	101, // [101:101] is the sub-list for extension extendee
+	0,   // [0:101] is the sub-list for field type_name
 }
 
 func init() { file_codefoundry_v1_gh_proto_init() }
@@ -6563,7 +6817,7 @@ func file_codefoundry_v1_gh_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_codefoundry_v1_gh_proto_rawDesc), len(file_codefoundry_v1_gh_proto_rawDesc)),
 			NumEnums:      14,
-			NumMessages:   61,
+			NumMessages:   65,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

@@ -1,7 +1,18 @@
 import { notify } from "@/lib/notify";
 import { create } from "zustand";
 import { invokeCommand } from "@/api/command";
-import { getBranchPullRequests, getDashboard, getPullRequestDetail, getRepoActivity, getViewer, type GhEventView, type ProjectPullRequestsView, type PullRequestView } from "@/api/gh";
+import {
+  getBranchesPullRequests,
+  getBranchPullRequests,
+  getDashboard,
+  getPullRequestDetail,
+  getRepoActivity,
+  getViewer,
+  type BranchPullRequestsView,
+  type GhEventView,
+  type ProjectPullRequestsView,
+  type PullRequestView,
+} from "@/api/gh";
 import { errorMessage } from "@/api/stream";
 import { getUiContext } from "./context";
 import { createResource, useResource } from "./resource";
@@ -80,8 +91,47 @@ export function useViewerLogin(): string {
  */
 export const DASHBOARD_KEY = "all";
 
+/**
+ * How often the Pull Requests page renews its daemon-side project-list watch lease
+ * (the daemon keeps PollProjects active for 10 minutes after the last GetDashboard
+ * with watch_projects: true).
+ */
+export const PROJECTS_WATCH_KEEPALIVE_MS = 5 * 60_000;
+
+let projectsWatchers = 0;
+let projectsTimer: ReturnType<typeof setInterval> | null = null;
+
 /** Key: DASHBOARD_KEY. The viewer's pull request lists in every repository (GhService.GetDashboard). */
-export const dashboardResource = createResource((_key, signal) => getDashboard(undefined, signal));
+export const dashboardResource = createResource((_key, signal) => getDashboard(undefined, signal, { watchProjects: projectsWatchers > 0 }));
+
+/**
+ * Declares active Pull Requests page interest in Snapshot.Projects. While held,
+ * dashboardResource sends watch_projects: true and renews the daemon's 10-minute
+ * lease every 5 minutes.
+ */
+export function watchProjects(): () => void {
+  projectsWatchers++;
+  if (projectsWatchers === 1) {
+    if (dashboardResource.watched().includes(DASHBOARD_KEY)) {
+      dashboardResource.invalidate(DASHBOARD_KEY);
+    }
+    projectsTimer = setInterval(() => {
+      if (dashboardResource.watched().includes(DASHBOARD_KEY)) {
+        dashboardResource.invalidate(DASHBOARD_KEY);
+      }
+    }, PROJECTS_WATCH_KEEPALIVE_MS);
+  }
+  let released = false;
+  return () => {
+    if (released) return;
+    released = true;
+    projectsWatchers = Math.max(0, projectsWatchers - 1);
+    if (projectsWatchers === 0 && projectsTimer !== null) {
+      clearInterval(projectsTimer);
+      projectsTimer = null;
+    }
+  };
+}
 
 /**
  * Key: the repository's slug, lower case (the daemon's). Its default branch checks, read
@@ -94,17 +144,121 @@ export const repoActivityResource = createResource((slug, signal) => getRepoActi
 const SEP = "\u0000";
 export const branchKey = (slug: string, head: string): string => `${slug}${SEP}${head}`;
 
+interface PendingBranchRead {
+  key: string;
+  slug: string;
+  head: string;
+  signal: AbortSignal;
+  resolve: (v: BranchPullRequestsView) => void;
+  reject: (err: unknown) => void;
+  onAbort: () => void;
+  aborted: boolean;
+}
+
+const pendingBranchReads: PendingBranchRead[] = [];
+let branchFlushScheduled = false;
+
+function abortError(): DOMException {
+  return new DOMException("The operation was aborted.", "AbortError");
+}
+
+function flushBranchReads(): void {
+  branchFlushScheduled = false;
+  const raw = pendingBranchReads.splice(0).filter((item) => !item.aborted && !item.signal.aborted);
+  if (raw.length === 0) return;
+
+  const groups = new Map<string, { slug: string; head: string; waiters: PendingBranchRead[] }>();
+  for (const item of raw) {
+    const g = groups.get(item.key);
+    if (g) g.waiters.push(item);
+    else groups.set(item.key, { slug: item.slug, head: item.head, waiters: [item] });
+  }
+  const unique = [...groups.values()];
+  const batchCtl = new AbortController();
+
+  const detachListeners = () => {
+    for (const item of raw) item.signal.removeEventListener("abort", item.onAbort);
+  };
+  for (const item of raw) {
+    item.signal.removeEventListener("abort", item.onAbort);
+    item.onAbort = () => {
+      if (item.aborted) return;
+      item.aborted = true;
+      item.reject(abortError());
+      if (raw.every((w) => w.aborted || w.signal.aborted)) batchCtl.abort();
+    };
+    item.signal.addEventListener("abort", item.onAbort, { once: true });
+  }
+
+  const single = unique.length === 1 ? unique[0] : undefined;
+  const req = single
+    ? getBranchPullRequests(single.slug, single.head, undefined, batchCtl.signal).then((v) => [v])
+    : getBranchesPullRequests(
+        unique.map((u) => ({ repoSlug: u.slug, headRef: u.head })),
+        undefined,
+        batchCtl.signal,
+      );
+
+  void req
+    .then((entries) => {
+      for (let i = 0; i < unique.length; i++) {
+        const group = unique[i];
+        const entry = entries[i];
+        if (!group) continue;
+        for (const w of group.waiters) {
+          if (w.aborted || w.signal.aborted) continue;
+          if (entry) w.resolve(entry);
+          else w.reject(new Error(`missing branch pull requests entry for ${group.slug}@${group.head}`));
+        }
+      }
+    })
+    .catch((err: unknown) => {
+      for (const w of raw) {
+        if (!w.aborted && !w.signal.aborted) w.reject(err);
+      }
+    })
+    .finally(detachListeners);
+}
+
+/**
+ * Loads one branch's pull requests, coalescing concurrent reads queued in the same
+ * microtask into one GetBranchesPullRequests RPC (single-branch loads keep using
+ * GetBranchPullRequests).
+ */
+export function loadBranchPullRequests(key: string, signal: AbortSignal): Promise<BranchPullRequestsView> {
+  if (signal.aborted) return Promise.reject(abortError());
+  const [slug = "", head = ""] = key.split(SEP);
+  return new Promise<BranchPullRequestsView>((resolve, reject) => {
+    const item: PendingBranchRead = {
+      key,
+      slug,
+      head,
+      signal,
+      resolve,
+      reject,
+      aborted: false,
+      onAbort: () => {
+        if (item.aborted) return;
+        item.aborted = true;
+        const idx = pendingBranchReads.indexOf(item);
+        if (idx >= 0) pendingBranchReads.splice(idx, 1);
+        reject(abortError());
+      },
+    };
+    signal.addEventListener("abort", item.onAbort, { once: true });
+    pendingBranchReads.push(item);
+    if (!branchFlushScheduled) {
+      branchFlushScheduled = true;
+      queueMicrotask(flushBranchReads);
+    }
+  });
+}
+
 /**
  * Key: branchKey(slug, head). Re-read every 5 minutes while shown: the daemon keeps a
- * branch polled for 10 minutes after the last GetBranchPullRequests.
+ * branch polled for 10 minutes after the last GetBranchPullRequests / GetBranchesPullRequests.
  */
-export const branchPullRequestsResource = createResource(
-  (key, signal) => {
-    const [slug = "", head = ""] = key.split(SEP);
-    return getBranchPullRequests(slug, head, undefined, signal);
-  },
-  { keepAliveMs: 5 * 60_000 },
-);
+export const branchPullRequestsResource = createResource(loadBranchPullRequests, { keepAliveMs: 5 * 60_000 });
 
 /** Key of pullRequestDetailResource: "owner/name#number" (slug lower case, like the daemon's). */
 export const pullRequestKey = (slug: string, number: number): string => `${slug.toLowerCase()}#${String(number)}`;

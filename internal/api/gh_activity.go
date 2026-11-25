@@ -12,7 +12,10 @@ import (
 
 // GetDashboard returns the viewer's dashboards and global stats from the snapshot. The
 // lists are viewer-wide (every repository).
-func (h *Gh) GetDashboard(_ context.Context, _ *connect.Request[v1.GetDashboardRequest]) (*connect.Response[v1.GetDashboardResponse], error) {
+func (h *Gh) GetDashboard(_ context.Context, req *connect.Request[v1.GetDashboardRequest]) (*connect.Response[v1.GetDashboardResponse], error) {
+	if req.Msg.GetWatchProjects() {
+		h.store.WatchProjects()
+	}
 	snap := h.store.Snapshot()
 	d := snap.Dashboard
 	res := &v1.GetDashboardResponse{
@@ -87,6 +90,31 @@ func (h *Gh) GetBranchPullRequests(ctx context.Context, req *connect.Request[v1.
 		FetchedAt:    timestamp(b.FetchedAt),
 		LastError:    b.LastError,
 	}), nil
+}
+
+// GetBranchesPullRequests returns the viewer's cached pull requests for several branches
+// in one call and keeps each branch polled.
+func (h *Gh) GetBranchesPullRequests(ctx context.Context, req *connect.Request[v1.GetBranchesPullRequestsRequest]) (*connect.Response[v1.GetBranchesPullRequestsResponse], error) {
+	in := req.Msg.GetBranches()
+	queries := make([]gh.BranchQuery, len(in))
+	for i, b := range in {
+		queries[i] = gh.BranchQuery{Slug: b.GetRepoSlug(), HeadRef: b.GetHeadRef()}
+	}
+	res, err := h.store.BranchesPullRequests(ctx, queries)
+	if err != nil {
+		return nil, ghError(err)
+	}
+	entries := make([]*v1.BranchPullRequestsEntry, len(res))
+	for i, b := range res {
+		entries[i] = &v1.BranchPullRequestsEntry{
+			RepoSlug:     b.Slug,
+			HeadRef:      b.HeadRef,
+			PullRequests: searchPullRequestsToProto(b.PullRequests, nil),
+			FetchedAt:    timestamp(b.FetchedAt),
+			LastError:    b.LastError,
+		}
+	}
+	return connect.NewResponse(&v1.GetBranchesPullRequestsResponse{Entries: entries}), nil
 }
 
 // trackedSlugs lists the tracked repositories, sorted.

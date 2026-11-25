@@ -196,6 +196,32 @@ func TestGhRepoActivityAndBranch(t *testing.T) {
 	if _, err := client.GetBranchPullRequests(ctx, connect.NewRequest(&v1.GetBranchPullRequestsRequest{RepoSlug: "o/repo"})); connect.CodeOf(err) != connect.CodeInvalidArgument {
 		t.Errorf("empty head err = %v", err)
 	}
+
+	// Batched branch PRs: preserves input order, deduplicates duplicate entries, and validates.
+	store.SetBranchPullRequests(gh.BranchPullRequests{Slug: "o/other", HeadRef: "fix", FetchedAt: at,
+		PullRequests: []gh.PullRequest{{Repo: "o/other", Number: 9, State: gh.PullRequestOpen, HeadRef: "fix"}}})
+	batch, err := client.GetBranchesPullRequests(ctx, connect.NewRequest(&v1.GetBranchesPullRequestsRequest{
+		Branches: []*v1.BranchPullRequestsQuery{
+			{RepoSlug: "O/Repo", HeadRef: "feat"},
+			{RepoSlug: "o/other", HeadRef: "fix"},
+			{RepoSlug: "o/repo", HeadRef: "feat"},
+		},
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	entries := batch.Msg.GetEntries()
+	if len(entries) != 3 ||
+		entries[0].GetRepoSlug() != "o/repo" || entries[0].GetHeadRef() != "feat" || len(entries[0].GetPullRequests()) != 1 || entries[0].GetPullRequests()[0].GetNumber() != 5 ||
+		entries[1].GetRepoSlug() != "o/other" || entries[1].GetHeadRef() != "fix" || len(entries[1].GetPullRequests()) != 1 || entries[1].GetPullRequests()[0].GetNumber() != 9 ||
+		entries[2].GetRepoSlug() != "o/repo" || entries[2].GetHeadRef() != "feat" || len(entries[2].GetPullRequests()) != 1 || entries[2].GetPullRequests()[0].GetNumber() != 5 {
+		t.Errorf("batch = %v", entries)
+	}
+	if _, err := client.GetBranchesPullRequests(ctx, connect.NewRequest(&v1.GetBranchesPullRequestsRequest{
+		Branches: []*v1.BranchPullRequestsQuery{{RepoSlug: "bad", HeadRef: "feat"}},
+	})); connect.CodeOf(err) != connect.CodeInvalidArgument {
+		t.Errorf("batch bad slug err = %v", err)
+	}
 }
 
 func TestProjectGetWorktreeDetail(t *testing.T) {
@@ -321,5 +347,16 @@ func TestGhDashboardProjectLists(t *testing.T) {
 	// They are not in the viewer's lists.
 	if len(m.GetAuthored())+len(m.GetReviewRequested())+len(m.GetReviewed())+len(m.GetRecentlyMerged()) != 0 {
 		t.Errorf("dashboard lists = %v", m)
+	}
+
+	// Only watch_projects: true declares project list interest on the store.
+	if calls := store.Calls(); fmt.Sprint(calls) != "[track o/tracked]" {
+		t.Errorf("calls without watch_projects = %v", calls)
+	}
+	if _, err := client.GetDashboard(ctx, connect.NewRequest(&v1.GetDashboardRequest{WatchProjects: true})); err != nil {
+		t.Fatal(err)
+	}
+	if calls := store.Calls(); fmt.Sprint(calls) != "[track o/tracked watch_projects]" {
+		t.Errorf("calls with watch_projects = %v", calls)
 	}
 }

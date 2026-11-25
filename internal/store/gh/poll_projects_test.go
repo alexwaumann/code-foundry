@@ -204,6 +204,7 @@ func TestPollProjectsWaitsOutThePause(t *testing.T) {
 			"viewer":{"id":"V","login":"octocat"}}`, reset.Format(time.RFC3339))), nil
 	})
 	s = startStore(t, testOptions(openTestDB(t), f, nil))
+	s.WatchProjects()
 	close(ready)
 	waitFor(t, "the poll's end", func() bool {
 		s.mu.Lock()
@@ -229,6 +230,7 @@ func TestPollProjects(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+	s.WatchProjects()
 	pollOnce(t, s, f)
 	pollOnce(t, s, f) // a baseline for PullRequestChanged
 
@@ -402,6 +404,7 @@ func TestPollProjectsCache(t *testing.T) {
 	if err := s.Track("o/r"); err != nil {
 		t.Fatal(err)
 	}
+	s.WatchProjects()
 	waitFor(t, "projects", func() bool { return !s.Snapshot().Projects.FetchedAt.IsZero() })
 	first := s.Snapshot().Projects
 	clock.Add(int64(time.Minute))
@@ -460,6 +463,7 @@ func TestPollProjectsLeaveDashboardRechecks(t *testing.T) {
 	if err := s.Track("o/r"); err != nil {
 		t.Fatal(err)
 	}
+	s.WatchProjects()
 	waitFor(t, "projects", func() bool { return len(s.Snapshot().Projects.Open.PullRequests) == 1 })
 	for range 3 {
 		pollOnce(t, s, f)
@@ -501,4 +505,185 @@ func prNumbers(prs []PullRequest) string {
 		out = append(out, fmt.Sprintf("%s#%d", p.Repo, p.Number))
 	}
 	return "[" + strings.Join(out, " ") + "]"
+}
+
+func TestPollProjectsGatingAndLease(t *testing.T) {
+	b := bus.New()
+	dash := bus.Subscribe[DashboardUpdated](b, 64)
+	polled := bus.Subscribe[Polled](b, 64)
+	g, _ := projectsWorld()
+	f := (&fakeRunner{}).serve(g)
+	clk := &testClock{}
+	opts := testOptions(openTestDB(t), f, b)
+	opts.Now = clk.now
+	opts.PollInterval = time.Minute
+	opts.ProjectsWatch = 10 * time.Minute
+	s := startStore(t, opts)
+	for _, slug := range []string{"o/r", "o/s"} {
+		if err := s.Track(slug); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// 1. Unwatched poll runs dashboard only (1 GraphQL Poll, 0 PollProjects).
+	pollOnce(t, s, f)
+	from := f.ncalls()
+	clk.advance(time.Minute)
+	pollOnce(t, s, f)
+	if got := f.countSince(from, "Poll"); got != 1 {
+		t.Errorf("unwatched Poll calls = %d, want 1", got)
+	}
+	if got := f.countSince(from, "PollProjects"); got != 0 {
+		t.Errorf("unwatched PollProjects calls = %d, want 0", got)
+	}
+	if !s.Snapshot().Projects.FetchedAt.IsZero() {
+		t.Errorf("unwatched Projects.FetchedAt = %v, want zero", s.Snapshot().Projects.FetchedAt)
+	}
+	// Core dashboards and review counts still work unaffected.
+	if got := len(s.Snapshot().Dashboard.ReviewRequested); got != 1 {
+		t.Errorf("unwatched ReviewRequested = %d, want 1", got)
+	}
+
+	// 2. Calling WatchProjects() when unfetched triggers an immediate non-blocking
+	// background PollProjects fetch, coalescing concurrent calls, and emits
+	// DashboardUpdated + Polled.
+	drain(dash)
+	drain(polled)
+	from = f.ncalls()
+	for range 5 {
+		s.WatchProjects()
+	}
+	waitFor(t, "background pollProjects", func() bool {
+		return !s.Snapshot().Projects.FetchedAt.IsZero() && len(s.Snapshot().Projects.Open.PullRequests) == 2
+	})
+	settleWorker(t, s)
+	if got := f.countSince(from, "PollProjects"); got != 1 {
+		t.Errorf("coalesced WatchProjects PollProjects calls = %d, want 1", got)
+	}
+	if n := drain(dash); n != 1 {
+		t.Errorf("DashboardUpdated after background PollProjects = %d, want 1", n)
+	}
+	if n := drain(polled); n != 1 {
+		t.Errorf("Polled after background PollProjects = %d, want 1", n)
+	}
+	// CachedPullRequests (thread linking) and ReviewRequested remain isolated from Projects.
+	for _, pr := range s.CachedPullRequests() {
+		if pr.ID == "PR_x" || pr.ID == "PR_y" || pr.ID == "PR_m" {
+			t.Errorf("CachedPullRequests leaked project PR %s", pr.ID)
+		}
+	}
+	if got := len(s.Snapshot().Dashboard.ReviewRequested); got != 1 {
+		t.Errorf("ReviewRequested after WatchProjects = %d, want 1", got)
+	}
+
+	// Calling WatchProjects() again while fresh does not trigger another background fetch.
+	from = f.ncalls()
+	s.WatchProjects()
+	settleWorker(t, s)
+	if got := f.countSince(from, "PollProjects"); got != 0 {
+		t.Errorf("fresh WatchProjects PollProjects calls = %d, want 0", got)
+	}
+
+	// 3. Regular poll while watched runs both Poll and PollProjects (including via Refresh).
+	from = f.ncalls()
+	clk.advance(time.Minute)
+	pollOnce(t, s, f)
+	if got := f.countSince(from, "Poll"); got != 1 {
+		t.Errorf("watched Poll calls = %d, want 1", got)
+	}
+	if got := f.countSince(from, "PollProjects"); got != 1 {
+		t.Errorf("watched PollProjects calls = %d, want 1", got)
+	}
+
+	// 4. After lease expires, polls stop running PollProjects again while preserving cached Projects.
+	clk.advance(10*time.Minute + time.Second)
+	from = f.ncalls()
+	pollOnce(t, s, f)
+	if got := f.countSince(from, "Poll"); got != 1 {
+		t.Errorf("expired Poll calls = %d, want 1", got)
+	}
+	if got := f.countSince(from, "PollProjects"); got != 0 {
+		t.Errorf("expired PollProjects calls = %d, want 0", got)
+	}
+	// Cached Projects remain available until cleared or refreshed.
+	if len(s.Snapshot().Projects.Open.PullRequests) != 2 {
+		t.Errorf("cached Projects lost after lease expiry: %+v", s.Snapshot().Projects)
+	}
+
+	// Re-watching when stale (> PollInterval old) triggers a prompt background refresh
+	// and emits Polled even when lists did not change.
+	drain(polled)
+	staleAt := s.Snapshot().Projects.FetchedAt
+	from = f.ncalls()
+	s.WatchProjects()
+	waitFor(t, "stale re-watch refresh", func() bool {
+		return s.Snapshot().Projects.FetchedAt.After(staleAt)
+	})
+	settleWorker(t, s)
+	if got := f.countSince(from, "PollProjects"); got != 1 {
+		t.Errorf("stale re-watch PollProjects calls = %d, want 1", got)
+	}
+	if n := drain(polled); n != 1 {
+		t.Errorf("Polled after stale re-watch = %d, want 1", n)
+	}
+}
+
+func TestBranchesPullRequestsBatch(t *testing.T) {
+	ctx := context.Background()
+	g, _ := changeDrivenWorld()
+	g.setBranch("o/r", "feat-1", "PR_a")
+	g.setBranch("o/r", "feat-2", "PR_b")
+	f := (&fakeRunner{}).serve(g)
+	clk := &testClock{}
+	opts := testOptions(openTestDB(t), f, nil)
+	opts.Now = clk.now
+	s := startStore(t, opts)
+	if err := s.Track("o/r"); err != nil {
+		t.Fatal(err)
+	}
+	pollOnce(t, s, f)
+
+	// Empty batch returns nil without error.
+	empty, err := s.BranchesPullRequests(ctx, nil)
+	if err != nil || len(empty) != 0 {
+		t.Fatalf("empty batch = %v, %v", empty, err)
+	}
+
+	// Validation rejects bad slug or empty head before mutating watches.
+	if _, err := s.BranchesPullRequests(ctx, []BranchQuery{{Slug: "o/r", HeadRef: "feat-1"}, {Slug: "bad", HeadRef: "x"}}); err == nil {
+		t.Fatal("expected error for invalid slug")
+	}
+	if _, err := s.BranchesPullRequests(ctx, []BranchQuery{{Slug: "o/r", HeadRef: " "}}); err == nil {
+		t.Fatal("expected error for empty head")
+	}
+
+	// Batch with duplicate (case-insensitive slug) deduplicates internally and preserves order.
+	res, err := s.BranchesPullRequests(ctx, []BranchQuery{
+		{Slug: "O/R", HeadRef: "feat-1"},
+		{Slug: "o/r", HeadRef: "feat-2"},
+		{Slug: "o/r", HeadRef: "feat-1"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res) != 3 || res[0].Slug != "o/r" || res[0].HeadRef != "feat-1" || res[1].HeadRef != "feat-2" || res[2].HeadRef != "feat-1" {
+		t.Fatalf("initial batch = %+v", res)
+	}
+
+	// One poll fetches both newly watched branches together.
+	pollOnce(t, s, f)
+	res, err = s.BranchesPullRequests(ctx, []BranchQuery{
+		{Slug: "o/r", HeadRef: "feat-1"},
+		{Slug: "o/r", HeadRef: "feat-2"},
+		{Slug: "o/r", HeadRef: "feat-1"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res[0].PullRequests) != 1 || res[0].PullRequests[0].Number != 1 || len(res[2].PullRequests) != 1 || res[2].PullRequests[0].Number != 1 {
+		t.Errorf("feat-1 results = %+v, %+v", res[0], res[2])
+	}
+	if len(res[1].PullRequests) != 0 || res[1].FetchedAt.IsZero() {
+		t.Errorf("feat-2 (other author PR_b filtered out) = %+v", res[1])
+	}
 }

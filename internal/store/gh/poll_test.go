@@ -484,6 +484,7 @@ func TestPollDashboardsDisabled(t *testing.T) {
 	if err := s.Track("o/r"); err != nil {
 		t.Fatal(err)
 	}
+	s.WatchProjects()
 	pollOnce(t, s, f)
 	if len(s.Snapshot().Dashboard.Authored) != 1 {
 		t.Fatalf("dashboard = %+v", s.Snapshot().Dashboard)

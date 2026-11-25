@@ -6,7 +6,7 @@ import { PaneHeader } from "@/components/window/PaneHeader";
 import { useNav, type NavItem } from "@/lib/nav";
 import { NavProvider } from "@/lib/NavRow";
 import { cn } from "@/lib/utils";
-import { DASHBOARD_KEY, dashboardResource, openUrl, pullRequestKey, useFreshness, useProjectsFreshness } from "@/stores/gh";
+import { DASHBOARD_KEY, dashboardResource, openUrl, pullRequestKey, useFreshness, useProjectsFreshness, watchProjects } from "@/stores/gh";
 import { openPullRequestInPanel } from "@/stores/prPanel";
 import { armPrefetch, disarmPrefetch } from "@/stores/prPrefetch";
 import { useResource } from "@/stores/resource";
@@ -218,6 +218,7 @@ function PageLoading() {
  * in every repository, the rest open in the tracked ones, and this week's merges.
  */
 export function PullRequestsPage() {
+  useEffect(() => watchProjects(), []);
   const entry = useResource(dashboardResource, DASHBOARD_KEY);
   const d = entry?.data ?? null;
   const dashFresh = useFreshness(d?.fetchedAtMs ?? null, d?.lastError || entry?.error || "", true);

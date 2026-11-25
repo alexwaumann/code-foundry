@@ -501,9 +501,9 @@ export async function getViewer(conn: DaemonConnection = daemon, signal?: AbortS
 }
 
 /** GetDashboard: the viewer's pull request lists in every repository (the daemon's last poll). */
-export async function getDashboard(conn: DaemonConnection = daemon, signal?: AbortSignal): Promise<DashboardView> {
+export async function getDashboard(conn: DaemonConnection = daemon, signal?: AbortSignal, opts?: { watchProjects?: boolean }): Promise<DashboardView> {
   const c = await conn.client(GhService);
-  const r = await c.getDashboard({}, { signal });
+  const r = await c.getDashboard(opts?.watchProjects ? { watchProjects: true } : {}, { signal });
   return {
     viewer: r.viewer ? { login: r.viewer.login, name: r.viewer.name, url: r.viewer.url } : null,
     authenticated: r.authenticated,
@@ -537,6 +537,11 @@ export async function getRepoActivity(repoSlug: string, conn: DaemonConnection =
   };
 }
 
+export interface BranchPullRequestsQuery {
+  repoSlug: string;
+  headRef: string;
+}
+
 export async function getBranchPullRequests(
   repoSlug: string,
   headRef: string,
@@ -546,6 +551,17 @@ export async function getBranchPullRequests(
   const c = await conn.client(GhService);
   const r = await c.getBranchPullRequests({ repoSlug, headRef }, { signal });
   return { pullRequests: r.pullRequests.map(toPullRequestView), fetchedAtMs: ms(r.fetchedAt), lastError: r.lastError };
+}
+
+export async function getBranchesPullRequests(
+  branches: readonly BranchPullRequestsQuery[],
+  conn: DaemonConnection = daemon,
+  signal?: AbortSignal,
+): Promise<BranchPullRequestsView[]> {
+  if (branches.length === 0) return [];
+  const c = await conn.client(GhService);
+  const r = await c.getBranchesPullRequests({ branches: branches.map((b) => ({ repoSlug: b.repoSlug, headRef: b.headRef })) }, { signal });
+  return r.entries.map((e) => ({ pullRequests: e.pullRequests.map(toPullRequestView), fetchedAtMs: ms(e.fetchedAt), lastError: e.lastError }));
 }
 
 // ---- Pull request detail panel ------------------------------------------------------

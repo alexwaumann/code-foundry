@@ -9,6 +9,7 @@ import {
   CheckRollupState,
   CheckStatus,
   DiffSide,
+  GetBranchesPullRequestsResponseSchema,
   GetDashboardResponseSchema,
   GhEventSchema,
   Mergeable,
@@ -29,7 +30,7 @@ import { WorkspaceEventSchema } from "@/gen/codefoundry/v1/workspace_pb";
 import { toCommandView, toUiContext } from "./command";
 import { overrideEndpoint, type DaemonConnection } from "./endpoint";
 import { toEventView } from "./events";
-import { getDashboard, toGhEventView, toPullRequestDetailView, toPullRequestView, toReviewerCandidateView, toStatsView } from "./gh";
+import { getBranchesPullRequests, getDashboard, toGhEventView, toPullRequestDetailView, toPullRequestView, toReviewerCandidateView, toStatsView } from "./gh";
 import { isRemoteless, toProjectEventView, toProjectView } from "./project";
 import { toThreadListEventView, toThreadView } from "./threads";
 import { toAttachEventView, toTerminalEventView, toTerminalView } from "./terminal";
@@ -288,8 +289,50 @@ describe("gh mapping", () => {
     expect(d.projectMerged).toMatchObject({ totalCount: 64, searchUrl: "", pullRequests: [{ number: 137, state: "merged" }] });
     expect([d.projectsFetchedAtMs, d.projectsLastError]).toEqual([4000, "busy"]);
     // A daemon that never fetched them: empty lists, no URL, no time.
-    const none = await getDashboard({ client: () => Promise.resolve({ getDashboard: () => Promise.resolve(create(GetDashboardResponseSchema)) }) } as unknown as DaemonConnection);
+    const seenReqs: { watchProjects?: boolean }[] = [];
+    const none = await getDashboard(
+      {
+        client: () =>
+          Promise.resolve({
+            getDashboard: (req: { watchProjects?: boolean }) => {
+              seenReqs.push(req);
+              return Promise.resolve(create(GetDashboardResponseSchema));
+            },
+          }),
+      } as unknown as DaemonConnection,
+      undefined,
+      { watchProjects: true },
+    );
     expect([none.projectOpen, none.projectMerged, none.projectsFetchedAtMs]).toEqual([{ pullRequests: [], totalCount: 0, searchUrl: "" }, { pullRequests: [], totalCount: 0, searchUrl: "" }, null]);
+    expect(seenReqs).toEqual([{ watchProjects: true }]);
+  });
+
+  it("maps GetBranchesPullRequests batch responses", async () => {
+    const conn = {
+      client: () =>
+        Promise.resolve({
+          getBranchesPullRequests: () =>
+            Promise.resolve(
+              create(GetBranchesPullRequestsResponseSchema, {
+                entries: [
+                  { repoSlug: "o/r", headRef: "feat", pullRequests: [{ repoSlug: "o/r", number: 7, state: PullRequestState.OPEN }], fetchedAt: timestampFromMs(2000), lastError: "" },
+                  { repoSlug: "o/s", headRef: "fix", pullRequests: [], lastError: "not found" },
+                ],
+              }),
+            ),
+        }),
+    } as unknown as DaemonConnection;
+    const got = await getBranchesPullRequests(
+      [
+        { repoSlug: "o/r", headRef: "feat" },
+        { repoSlug: "o/s", headRef: "fix" },
+      ],
+      conn,
+    );
+    expect(got).toHaveLength(2);
+    expect(got[0]).toMatchObject({ fetchedAtMs: 2000, lastError: "", pullRequests: [{ repoSlug: "o/r", number: 7, state: "open" }] });
+    expect(got[1]).toEqual({ pullRequests: [], fetchedAtMs: null, lastError: "not found" });
+    expect(await getBranchesPullRequests([], conn)).toEqual([]);
   });
 
   it("maps a pull request detail", () => {

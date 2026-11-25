@@ -46,6 +46,9 @@ const (
 	// GhServiceGetBranchPullRequestsProcedure is the fully-qualified name of the GhService's
 	// GetBranchPullRequests RPC.
 	GhServiceGetBranchPullRequestsProcedure = "/codefoundry.v1.GhService/GetBranchPullRequests"
+	// GhServiceGetBranchesPullRequestsProcedure is the fully-qualified name of the GhService's
+	// GetBranchesPullRequests RPC.
+	GhServiceGetBranchesPullRequestsProcedure = "/codefoundry.v1.GhService/GetBranchesPullRequests"
 	// GhServiceGetPullRequestDetailProcedure is the fully-qualified name of the GhService's
 	// GetPullRequestDetail RPC.
 	GhServiceGetPullRequestDetailProcedure = "/codefoundry.v1.GhService/GetPullRequestDetail"
@@ -101,7 +104,8 @@ type GhServiceClient interface {
 	// involving them) and their monthly stats across GitHub, from the last poll. The
 	// lists are viewer-wide: every repository, tracked or not. project_open and
 	// project_merged are the Pull Requests page's project-wide lists over the tracked
-	// repositories only (fetched in the same poll cycle by a request of their own).
+	// repositories only (fetched in the same poll cycle by a request of their own while
+	// watch_projects is active).
 	GetDashboard(context.Context, *connect.Request[v1.GetDashboardRequest]) (*connect.Response[v1.GetDashboardResponse], error)
 	// GetRepoActivity returns the viewer's monthly stats in one repository, its default
 	// branch's CI, and the dashboard's recently merged PRs in it. Served from cache.
@@ -111,6 +115,12 @@ type GhServiceClient interface {
 	// for 10 minutes after the last call. A first call returns an empty list with
 	// fetched_at unset; a branch_pull_requests_updated event follows the next poll.
 	GetBranchPullRequests(context.Context, *connect.Request[v1.GetBranchPullRequestsRequest]) (*connect.Response[v1.GetBranchPullRequestsResponse], error)
+	// GetBranchesPullRequests is the batched form of GetBranchPullRequests: it returns the
+	// viewer's cached pull requests for each requested branch in input order and keeps
+	// every requested branch in the poll for 10 minutes after the call. Duplicate
+	// (repo_slug, head_ref) items are deduplicated internally, and newly watched branches
+	// share at most one poll wakeup.
+	GetBranchesPullRequests(context.Context, *connect.Request[v1.GetBranchesPullRequestsRequest]) (*connect.Response[v1.GetBranchesPullRequestsResponse], error)
 	// GetPullRequestDetail returns everything the pull request detail panel shows: the
 	// summary, body, labels, reviewers, commits, comments and reviews, review threads, and
 	// checks. On demand (one GraphQL request, more only for checks beyond 100), cached per
@@ -245,6 +255,12 @@ func NewGhServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...c
 			connect.WithSchema(ghServiceMethods.ByName("GetBranchPullRequests")),
 			connect.WithClientOptions(opts...),
 		),
+		getBranchesPullRequests: connect.NewClient[v1.GetBranchesPullRequestsRequest, v1.GetBranchesPullRequestsResponse](
+			httpClient,
+			baseURL+GhServiceGetBranchesPullRequestsProcedure,
+			connect.WithSchema(ghServiceMethods.ByName("GetBranchesPullRequests")),
+			connect.WithClientOptions(opts...),
+		),
 		getPullRequestDetail: connect.NewClient[v1.GetPullRequestDetailRequest, v1.GetPullRequestDetailResponse](
 			httpClient,
 			baseURL+GhServiceGetPullRequestDetailProcedure,
@@ -333,6 +349,7 @@ type ghServiceClient struct {
 	getDashboard            *connect.Client[v1.GetDashboardRequest, v1.GetDashboardResponse]
 	getRepoActivity         *connect.Client[v1.GetRepoActivityRequest, v1.GetRepoActivityResponse]
 	getBranchPullRequests   *connect.Client[v1.GetBranchPullRequestsRequest, v1.GetBranchPullRequestsResponse]
+	getBranchesPullRequests *connect.Client[v1.GetBranchesPullRequestsRequest, v1.GetBranchesPullRequestsResponse]
 	getPullRequestDetail    *connect.Client[v1.GetPullRequestDetailRequest, v1.GetPullRequestDetailResponse]
 	listReviewerCandidates  *connect.Client[v1.ListReviewerCandidatesRequest, v1.ListReviewerCandidatesResponse]
 	setReviewRequest        *connect.Client[v1.SetReviewRequestRequest, v1.SetReviewRequestResponse]
@@ -371,6 +388,11 @@ func (c *ghServiceClient) GetRepoActivity(ctx context.Context, req *connect.Requ
 // GetBranchPullRequests calls codefoundry.v1.GhService.GetBranchPullRequests.
 func (c *ghServiceClient) GetBranchPullRequests(ctx context.Context, req *connect.Request[v1.GetBranchPullRequestsRequest]) (*connect.Response[v1.GetBranchPullRequestsResponse], error) {
 	return c.getBranchPullRequests.CallUnary(ctx, req)
+}
+
+// GetBranchesPullRequests calls codefoundry.v1.GhService.GetBranchesPullRequests.
+func (c *ghServiceClient) GetBranchesPullRequests(ctx context.Context, req *connect.Request[v1.GetBranchesPullRequestsRequest]) (*connect.Response[v1.GetBranchesPullRequestsResponse], error) {
+	return c.getBranchesPullRequests.CallUnary(ctx, req)
 }
 
 // GetPullRequestDetail calls codefoundry.v1.GhService.GetPullRequestDetail.
@@ -452,7 +474,8 @@ type GhServiceHandler interface {
 	// involving them) and their monthly stats across GitHub, from the last poll. The
 	// lists are viewer-wide: every repository, tracked or not. project_open and
 	// project_merged are the Pull Requests page's project-wide lists over the tracked
-	// repositories only (fetched in the same poll cycle by a request of their own).
+	// repositories only (fetched in the same poll cycle by a request of their own while
+	// watch_projects is active).
 	GetDashboard(context.Context, *connect.Request[v1.GetDashboardRequest]) (*connect.Response[v1.GetDashboardResponse], error)
 	// GetRepoActivity returns the viewer's monthly stats in one repository, its default
 	// branch's CI, and the dashboard's recently merged PRs in it. Served from cache.
@@ -462,6 +485,12 @@ type GhServiceHandler interface {
 	// for 10 minutes after the last call. A first call returns an empty list with
 	// fetched_at unset; a branch_pull_requests_updated event follows the next poll.
 	GetBranchPullRequests(context.Context, *connect.Request[v1.GetBranchPullRequestsRequest]) (*connect.Response[v1.GetBranchPullRequestsResponse], error)
+	// GetBranchesPullRequests is the batched form of GetBranchPullRequests: it returns the
+	// viewer's cached pull requests for each requested branch in input order and keeps
+	// every requested branch in the poll for 10 minutes after the call. Duplicate
+	// (repo_slug, head_ref) items are deduplicated internally, and newly watched branches
+	// share at most one poll wakeup.
+	GetBranchesPullRequests(context.Context, *connect.Request[v1.GetBranchesPullRequestsRequest]) (*connect.Response[v1.GetBranchesPullRequestsResponse], error)
 	// GetPullRequestDetail returns everything the pull request detail panel shows: the
 	// summary, body, labels, reviewers, commits, comments and reviews, review threads, and
 	// checks. On demand (one GraphQL request, more only for checks beyond 100), cached per
@@ -592,6 +621,12 @@ func NewGhServiceHandler(svc GhServiceHandler, opts ...connect.HandlerOption) (s
 		connect.WithSchema(ghServiceMethods.ByName("GetBranchPullRequests")),
 		connect.WithHandlerOptions(opts...),
 	)
+	ghServiceGetBranchesPullRequestsHandler := connect.NewUnaryHandler(
+		GhServiceGetBranchesPullRequestsProcedure,
+		svc.GetBranchesPullRequests,
+		connect.WithSchema(ghServiceMethods.ByName("GetBranchesPullRequests")),
+		connect.WithHandlerOptions(opts...),
+	)
 	ghServiceGetPullRequestDetailHandler := connect.NewUnaryHandler(
 		GhServiceGetPullRequestDetailProcedure,
 		svc.GetPullRequestDetail,
@@ -682,6 +717,8 @@ func NewGhServiceHandler(svc GhServiceHandler, opts ...connect.HandlerOption) (s
 			ghServiceGetRepoActivityHandler.ServeHTTP(w, r)
 		case GhServiceGetBranchPullRequestsProcedure:
 			ghServiceGetBranchPullRequestsHandler.ServeHTTP(w, r)
+		case GhServiceGetBranchesPullRequestsProcedure:
+			ghServiceGetBranchesPullRequestsHandler.ServeHTTP(w, r)
 		case GhServiceGetPullRequestDetailProcedure:
 			ghServiceGetPullRequestDetailHandler.ServeHTTP(w, r)
 		case GhServiceListReviewerCandidatesProcedure:
@@ -735,6 +772,10 @@ func (UnimplementedGhServiceHandler) GetRepoActivity(context.Context, *connect.R
 
 func (UnimplementedGhServiceHandler) GetBranchPullRequests(context.Context, *connect.Request[v1.GetBranchPullRequestsRequest]) (*connect.Response[v1.GetBranchPullRequestsResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.GhService.GetBranchPullRequests is not implemented"))
+}
+
+func (UnimplementedGhServiceHandler) GetBranchesPullRequests(context.Context, *connect.Request[v1.GetBranchesPullRequestsRequest]) (*connect.Response[v1.GetBranchesPullRequestsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.GhService.GetBranchesPullRequests is not implemented"))
 }
 
 func (UnimplementedGhServiceHandler) GetPullRequestDetail(context.Context, *connect.Request[v1.GetPullRequestDetailRequest]) (*connect.Response[v1.GetPullRequestDetailResponse], error) {

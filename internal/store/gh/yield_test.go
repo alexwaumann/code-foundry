@@ -98,6 +98,7 @@ func newYieldWorld(t *testing.T, mod func(*Options)) *yieldWorld {
 	if err := s.Track("o/r"); err != nil {
 		t.Fatal(err)
 	}
+	s.WatchProjects()
 	pollOnce(t, s, w.f)
 	if opts.StatsInterval > 0 {
 		// The first poll learned the viewer's id; the stats follow, then nothing is left.

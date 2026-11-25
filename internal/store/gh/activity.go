@@ -23,6 +23,7 @@ const (
 	// daily refetch catches late corrections). Missing months are fetched sooner.
 	DefaultHistoryInterval = 24 * time.Hour
 	DefaultBranchWatch     = 10 * time.Minute
+	DefaultProjectsWatch   = 10 * time.Minute
 
 	// statsMonths is how many months the stats hold: the current one and five closed.
 	statsMonths = 6
@@ -221,41 +222,92 @@ func (s *Store) viewerLogin() string {
 	return ""
 }
 
+// BranchQuery identifies one repository branch for BranchesPullRequests.
+type BranchQuery struct {
+	Slug    string
+	HeadRef string
+}
+
 // BranchPullRequests implements Service.
 func (s *Store) BranchPullRequests(ctx context.Context, slug, head string) (BranchPullRequests, error) {
-	key, err := NormalizeSlug(slug)
+	res, err := s.BranchesPullRequests(ctx, []BranchQuery{{Slug: slug, HeadRef: head}})
 	if err != nil {
 		return BranchPullRequests{}, err
 	}
-	head = strings.TrimSpace(head)
-	if head == "" || len(head) > 255 {
-		return BranchPullRequests{}, fmt.Errorf("%w: head branch %q", ErrInvalidArgument, head)
+	return res[0], nil
+}
+
+// BranchesPullRequests implements Service.
+func (s *Store) BranchesPullRequests(ctx context.Context, queries []BranchQuery) ([]BranchPullRequests, error) {
+	if len(queries) == 0 {
+		return nil, nil
 	}
-	k := branchKey{key, head}
-	st, ok := s.branches.get(k)
-	if !ok {
-		var err error
-		st, ok, err = loadActivityRow[BranchPullRequests](ctx, s.cache, activityBranchKey(k))
+	keys := make([]branchKey, len(queries))
+	unique := make([]branchKey, 0, len(queries))
+	seen := make(map[branchKey]bool, len(queries))
+	for i, q := range queries {
+		key, err := NormalizeSlug(q.Slug)
 		if err != nil {
-			s.log.Warn("gh cache read failed", "err", err)
+			return nil, err
 		}
-		if ok {
-			s.branches.setIfAbsent(k, st)
-			s.summaries.putBranch(s.Snapshot(), key, st.PullRequests)
+		head := strings.TrimSpace(q.HeadRef)
+		if head == "" || len(head) > 255 {
+			return nil, fmt.Errorf("%w: head branch %q", ErrInvalidArgument, head)
+		}
+		k := branchKey{key, head}
+		keys[i] = k
+		if !seen[k] {
+			seen[k] = true
+			unique = append(unique, k)
 		}
 	}
+
+	results := make(map[branchKey]BranchPullRequests, len(unique))
+	found := make(map[branchKey]bool, len(unique))
+	for _, k := range unique {
+		st, ok := s.branches.get(k)
+		if !ok {
+			var err error
+			st, ok, err = loadActivityRow[BranchPullRequests](ctx, s.cache, activityBranchKey(k))
+			if err != nil {
+				s.log.Warn("gh cache read failed", "err", err)
+			}
+			if ok {
+				s.branches.setIfAbsent(k, st)
+				s.summaries.putBranch(s.Snapshot(), k.slug, st.PullRequests)
+			}
+		}
+		results[k] = st
+		found[k] = ok
+	}
+
+	interval := s.config().PollInterval
 	now := s.opts.Now()
+	needPoll := false
 	s.mu.Lock()
-	_, watched := s.watches[k]
-	s.watches[k] = now
-	// A branch nobody polled recently goes into the next poll, soon.
-	if !watched && (!ok || now.Sub(st.FetchedAt) >= s.config().PollInterval) {
+	for _, k := range unique {
+		_, watched := s.watches[k]
+		s.watches[k] = now
+		// A branch nobody polled recently goes into the next poll, soon.
+		if !watched && (!found[k] || now.Sub(results[k].FetchedAt) >= interval) {
+			needPoll = true
+		}
+	}
+	if needPoll {
 		s.pollSoonLocked(now)
 	}
 	s.mu.Unlock()
-	s.nudge()
-	st.Slug, st.HeadRef = key, head
-	return st, nil
+	if needPoll {
+		s.nudge()
+	}
+
+	out := make([]BranchPullRequests, len(queries))
+	for i, k := range keys {
+		st := results[k]
+		st.Slug, st.HeadRef = k.slug, k.head
+		out[i] = st
+	}
+	return out, nil
 }
 
 // keepViewerFingerprints keeps pull requests from the repository itself (a fork's
