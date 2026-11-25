@@ -134,7 +134,8 @@ func (c *comparison) markShallow(commits []CompareCommit) error {
 // CompareCommits implements Store.
 func (g *Git) CompareCommits(ctx context.Context, req CompareCommitsRequest) (CompareLog, error) {
 	ctx = guarded(ctx)
-	c, err := g.openCompare(ctx, req.ProjectID, req.Path, req.Base, req.Head)
+	needBase := req.Base.Kind != SourceRef || req.Head.Kind != SourceRef
+	c, err := g.openCompare(ctx, req.ProjectID, req.Path, req.Base, req.Head, needBase)
 	if err != nil {
 		return CompareLog{}, err
 	}
@@ -144,6 +145,13 @@ func (g *Git) CompareCommits(ctx context.Context, req CompareCommitsRequest) (Co
 	from, to := c.commitOf(c.base), c.commitOf(c.head)
 	if to == "" {
 		return CompareLog{}, nil
+	}
+	cacheKey := compareCommitsKey{projectID: req.ProjectID, fromSHA: from, toSHA: to}
+	if g.compareCache != nil {
+		if cached, ok := g.compareCache.commits.get(cacheKey); ok {
+			cached.Commits = slices.Clone(cached.Commits)
+			return cached, nil
+		}
 	}
 	rng := to
 	if from != "" {
@@ -163,13 +171,16 @@ func (g *Git) CompareCommits(ctx context.Context, req CompareCommitsRequest) (Co
 		return CompareLog{}, err
 	}
 	res.Total = len(res.Commits)
-	if res.Total < CompareCommitsMax {
-		return res, nil
+	if res.Total >= CompareCommitsMax {
+		if out, err = c.run("rev-list", "--count", rng, "--"); err != nil {
+			return CompareLog{}, err
+		}
+		res.Total, _ = strconv.Atoi(string(trimNL(out)))
 	}
-	if out, err = c.run("rev-list", "--count", rng, "--"); err != nil {
-		return CompareLog{}, err
+	if g.compareCache != nil && !slices.ContainsFunc(res.Commits, func(x CompareCommit) bool { return x.Shallow }) {
+		stored := CompareLog{Commits: slices.Clone(res.Commits), Total: res.Total}
+		g.compareCache.commits.put(cacheKey, stored, compareLogWeight(stored))
 	}
-	res.Total, _ = strconv.Atoi(string(trimNL(out)))
 	return res, nil
 }
 
@@ -182,6 +193,12 @@ func (g *Git) CompareCommitBody(ctx context.Context, req CompareCommitRequest) (
 	_, _, dir, err := g.gitWorktree(req.ProjectID, req.Path)
 	if err != nil {
 		return CompareCommitMessage{}, err
+	}
+	cacheKey := commitBodyKey{projectID: req.ProjectID, sha: req.SHA}
+	if g.compareCache != nil {
+		if cached, ok := g.compareCache.bodies.get(cacheKey); ok {
+			return cached, nil
+		}
 	}
 	// Only a commit: anything else this sha names has no message to show.
 	if _, err := g.runner.Run(ctx, dir, "rev-parse", "--verify", "--quiet", "--end-of-options", req.SHA+"^{commit}"); err != nil {
@@ -198,5 +215,9 @@ func (g *Git) CompareCommitBody(ctx context.Context, req CompareCommitRequest) (
 	if err != nil {
 		return CompareCommitMessage{}, err
 	}
-	return CompareCommitMessage{Body: commitText(string(bytes.TrimRight(out, "\x00")), commitBodyMax)}, nil
+	msg := CompareCommitMessage{Body: commitText(string(bytes.TrimRight(out, "\x00")), commitBodyMax)}
+	if g.compareCache != nil {
+		g.compareCache.bodies.put(cacheKey, msg, int64(len(msg.Body))+128)
+	}
+	return msg, nil
 }

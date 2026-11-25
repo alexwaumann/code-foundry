@@ -25,9 +25,14 @@ const (
 	DefaultWorkers       = 4
 	DefaultDebounce      = 300 * time.Millisecond
 	DefaultFetchInterval = 2 * time.Minute
-	// DefaultTreeDebounce is longer than DefaultDebounce: a dev server or build
-	// writing continuously costs at most one `git status` per second per worktree.
+	// DefaultTreeDebounce is the file-tree coalescing window for idle worktrees: a dev
+	// server or build writing continuously costs at most one `git status` per second per
+	// idle worktree. Active worktrees default to DefaultActiveTreeDebounce.
 	DefaultTreeDebounce = time.Second
+	// DefaultActiveTreeDebounce is the tree coalescing window for an active worktree
+	// (one with a live thread or watched detail) when Options.TreeDebounce is not set
+	// (at most ~3.3 `git status` runs/s under continuous writes).
+	DefaultActiveTreeDebounce = 300 * time.Millisecond
 	// DefaultPollInterval is a backstop: the FSEvents stream and thread Touch/TouchNow
 	// see live edits, so the live backstop poll runs every 5 min (and IdlePollInterval
 	// aligns with IdleFetchInterval at 15 min).
@@ -64,6 +69,10 @@ type Options struct {
 	// TreeDebounce is the per-worktree coalescing window for fs events in a
 	// worktree's tree (its files, at any depth). Zero means DefaultTreeDebounce.
 	TreeDebounce time.Duration
+	// ActiveTreeDebounce is the tree coalescing window for active worktrees (those with a
+	// live thread or watched detail). Zero means DefaultActiveTreeDebounce when
+	// TreeDebounce is zero, or TreeDebounce when TreeDebounce is explicitly set.
+	ActiveTreeDebounce time.Duration
 	// FetchInterval is how often each live project runs `git fetch --prune`
 	// (activity.go). Zero means DefaultFetchInterval; negative disables fetching.
 	FetchInterval time.Duration
@@ -129,6 +138,12 @@ type projectState struct {
 	wts map[string]*wtSlot
 }
 
+// statusDiskStamp snapshots .git/index right before `git status` runs so CompareWorktree
+// can tell whether Status.Conflicted is still current without spawning `git ls-files --unmerged`.
+type statusDiskStamp struct {
+	index fileStamp
+}
+
 // wtSlot is one worktree's snapshot slot, written only by its status job (and seeded
 // by the reconcile job that creates it).
 type wtSlot struct {
@@ -141,7 +156,10 @@ type wtSlot struct {
 	// written only by the status job, which keeps the last list when a refresh fails.
 	// It is kept off Status, which is compared with ==.
 	entries atomic.Pointer[[]statusEntry]
-	admin   string // linked worktree admin dir; guarded by Git.mu
+	// statusStamp records the index and root stamps captured right before the last
+	// successful `git status`; written only by the status job.
+	statusStamp atomic.Pointer[statusDiskStamp]
+	admin       string // linked worktree admin dir; guarded by Git.mu
 	// gitDir is the worktree's git admin dir (worktreeAdminDir), where the status job
 	// reads operation markers (operation.go). Resolved by reconcile; guarded by Git.mu.
 	gitDir string
@@ -177,10 +195,11 @@ type Git struct {
 	// renameMu serializes Rename's check of the other projects' names and its write.
 	renameMu sync.Mutex
 
-	fs      *fsWatcher
-	sched   *scheduler
-	deb     *debouncer // git's directories, rescans, a known directory going away
-	treeDeb *debouncer // edits in a worktree's tree
+	fs               *fsWatcher
+	sched            *scheduler
+	deb              *debouncer    // git's directories, rescans, a known directory going away
+	treeDeb          *debouncer    // edits in a worktree's tree
+	activeTreeWindow time.Duration // snappier tree debounce window for active worktrees
 	// touch debounces Touch, apart from deb and treeDeb so fs events keep their
 	// shorter windows.
 	touch *debouncer
@@ -200,6 +219,13 @@ type Git struct {
 	autoPull autoPullState
 	// fetches runs the fetch loop's fetches (fetchpool.go).
 	fetches fetchPool
+	// catFiles pools persistent `git cat-file --batch-command` workers when running with
+	// ExecRunner (nil when a custom test Runner is injected).
+	catFiles *catFilePool
+	// compareCache holds bounded LRUs for immutable compare queries and openCompare reuse.
+	compareCache *compareCaches
+	// refsCache caches ListRefs per project until invalidated by mutations or FSEvents.
+	refsCache refsCache
 
 	cancel context.CancelFunc
 	wg     sync.WaitGroup
@@ -243,6 +269,10 @@ func Start(ctx context.Context, opts Options) (*Git, error) {
 	if g.now == nil {
 		g.now = time.Now
 	}
+	g.compareCache = newCompareCaches()
+	if er, ok := execRunnerOf(g.runner); ok {
+		g.catFiles = newCatFilePool(er, g.now)
+	}
 	metas, err := g.load(ctx)
 	if err != nil {
 		return nil, err
@@ -259,7 +289,16 @@ func Start(ctx context.Context, opts Options) (*Git, error) {
 	ctx, g.cancel = context.WithCancel(context.WithoutCancel(ctx))
 	g.sched = newScheduler(ctx, cmp.Or(opts.Workers, DefaultWorkers), g.runJob)
 	g.deb = newDebouncer(cmp.Or(opts.Debounce, DefaultDebounce), func(k jobKey) { g.sched.requestPrio(k, g.eventPrio(k)) })
-	g.treeDeb = newDebouncer(cmp.Or(opts.TreeDebounce, DefaultTreeDebounce), func(k jobKey) { g.sched.requestPrio(k, g.eventPrio(k)) })
+	treeWindow := cmp.Or(opts.TreeDebounce, DefaultTreeDebounce)
+	g.treeDeb = newDebouncer(treeWindow, func(k jobKey) { g.sched.requestPrio(k, g.eventPrio(k)) })
+	switch {
+	case opts.ActiveTreeDebounce > 0:
+		g.activeTreeWindow = opts.ActiveTreeDebounce
+	case opts.TreeDebounce == 0:
+		g.activeTreeWindow = DefaultActiveTreeDebounce
+	default:
+		g.activeTreeWindow = treeWindow
+	}
 	g.touch = newDebouncer(cmp.Or(opts.TouchDebounce, DefaultTouchDebounce), func(k jobKey) {
 		g.log.Debug("worktree touched", "path", k.path, "debounced", true)
 		g.sched.requestPrio(k, g.eventPrio(k))
@@ -321,6 +360,10 @@ func (g *Git) Close() error {
 	g.touch.close()
 	g.sched.close()
 	g.wg.Wait()
+	if g.catFiles != nil {
+		g.catFiles.close()
+	}
+	g.compareCache.clear()
 	return nil
 }
 
@@ -637,7 +680,11 @@ func (g *Git) Unregister(ctx context.Context, id string) error {
 		return fmt.Errorf("project: unregister %s: %w", id, err)
 	}
 	g.mu.Lock()
-	_, inMem := g.projects[id]
+	st, inMem := g.projects[id]
+	var repoDir string
+	if st != nil {
+		repoDir = st.meta.Load().Path
+	}
 	delete(g.projects, id)
 	routed := false
 	for dir, t := range g.routes {
@@ -653,6 +700,11 @@ func (g *Git) Unregister(ctx context.Context, id string) error {
 	if routed {
 		g.fs.sync(ctx) // the stream may drop the project's directories
 	}
+	if g.catFiles != nil && repoDir != "" {
+		g.catFiles.closeRepo(repoDir)
+	}
+	g.compareCache.forgetProject(id)
+	g.refsCache.forget(id)
 	g.forgetDetails(id)
 	g.fetches.forget(id)
 	g.log.Info("project unregistered", "id", id)
@@ -791,6 +843,7 @@ func (g *Git) CreateWorktree(ctx context.Context, opts CreateWorktreeOptions) (W
 		undo()
 		return Worktree{}, fmt.Errorf("%w: %w", ErrFailedPrecondition, err)
 	}
+	g.refsCache.invalidate(m.ID)
 	if real, err := filepath.EvalSymlinks(path); err == nil {
 		path = real
 	}
@@ -1065,23 +1118,30 @@ func (g *Git) ListRefs(ctx context.Context, projectID string) (Refs, error) {
 	if err := requireGit(m); err != nil {
 		return Refs{}, err
 	}
-	out, err := g.runner.Run(ctx, m.Path, "for-each-ref", refsFormat, "refs/heads", "refs/remotes")
-	if err != nil {
-		return Refs{}, fmt.Errorf("project: list refs of %s: %w", m.ID, err)
+	if cached, gen, ok := g.refsCache.get(projectID, g.now()); ok {
+		return cached, nil
+	} else {
+		out, err := g.runner.Run(ctx, m.Path, "for-each-ref", refsFormat, "refs/heads", "refs/remotes")
+		if err != nil {
+			return Refs{}, fmt.Errorf("project: list refs of %s: %w", m.ID, err)
+		}
+		refs := parseRefs(out)
+		// DefaultBranch is empty until the project's first reconcile after a daemon start.
+		def := m.DefaultBranch
+		if def == "" {
+			_, err := g.runner.Run(ctx, m.Path, "remote", "get-url", "origin")
+			def = g.defaultBranch(ctx, m.Path, "", err == nil)
+		}
+		refs.DefaultRef, refs.DefaultBranch = def, def
+		_, local := slices.BinarySearch(refs.Local, def)
+		if _, remote := slices.BinarySearch(refs.Remote, "origin/"+def); remote && !local {
+			refs.DefaultRef = "origin/" + def
+		}
+		if g.project(projectID) == st {
+			g.refsCache.put(projectID, gen, refs, g.now())
+		}
+		return refs, nil
 	}
-	refs := parseRefs(out)
-	// DefaultBranch is empty until the project's first reconcile after a daemon start.
-	def := m.DefaultBranch
-	if def == "" {
-		_, err := g.runner.Run(ctx, m.Path, "remote", "get-url", "origin")
-		def = g.defaultBranch(ctx, m.Path, "", err == nil)
-	}
-	refs.DefaultRef, refs.DefaultBranch = def, def
-	_, local := slices.BinarySearch(refs.Local, def)
-	if _, remote := slices.BinarySearch(refs.Remote, "origin/"+def); remote && !local {
-		refs.DefaultRef = "origin/" + def
-	}
-	return refs, nil
 }
 
 func (g *Git) refExists(ctx context.Context, dir, ref string) bool {
@@ -1159,6 +1219,7 @@ func (g *Git) RemoveWorktree(ctx context.Context, opts RemoveWorktreeOptions) er
 	if opts.DeleteMadeBranch != "" {
 		g.deleteUntouchedBranch(ctx, m, opts.DeleteMadeBranch, wt.CreatedHead)
 	}
+	g.refsCache.invalidate(m.ID)
 	if err := g.sched.wait(ctx, jobKey{kind: jobReconcile, projectID: m.ID}); err != nil {
 		return errors.Join(branchErr, err)
 	}
@@ -1219,6 +1280,7 @@ func (g *Git) runJob(ctx context.Context, k jobKey) {
 // publishes, then requests jobBase, which re-resolves the base and refreshes the
 // status of every worktree.
 func (g *Git) reconcile(ctx context.Context, id string) {
+	g.refsCache.invalidate(id)
 	st := g.project(id)
 	if st == nil {
 		return
@@ -1454,6 +1516,13 @@ func (g *Git) status(ctx context.Context, projectID, path string) {
 	gitDir := slot.gitDir
 	g.mu.RUnlock()
 
+	// Snapshot .git/index right before `git status` runs so any concurrent modification
+	// invalidates the stamp instead of hiding a race.
+	var preStamp statusDiskStamp
+	if gitDir != "" {
+		preStamp.index = statStamp(filepath.Join(gitDir, "index"))
+	}
+
 	out, err := g.runner.Run(ctx, path, statusArgs...)
 	var info statusInfo
 	if err == nil {
@@ -1496,6 +1565,12 @@ func (g *Git) status(ctx context.Context, projectID, path string) {
 	}
 	if err == nil {
 		slot.entries.Store(&info.Entries) // a failed refresh keeps the last list, like Status
+		if gitDir != "" {
+			s := preStamp
+			slot.statusStamp.Store(&s)
+		} else {
+			slot.statusStamp.Store(nil)
+		}
 	}
 	slot.cur.Store(&next)
 	changed := next.Branch != prev.Branch || next.Head != prev.Head || next.Detached != prev.Detached ||

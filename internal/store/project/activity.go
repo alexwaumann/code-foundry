@@ -209,6 +209,15 @@ func (g *Git) worktreeActive(projectID, path string) bool {
 	return g.isLive(path) || g.detailWatched(projectID, path, g.now())
 }
 
+// treeWindow returns the tree debounce window for k: activeTreeWindow for an active
+// worktree (live thread or watched detail), else the default treeDeb window.
+func (g *Git) treeWindow(k jobKey) time.Duration {
+	if k.path != "" && g.worktreeActive(k.projectID, k.path) {
+		return g.activeTreeWindow
+	}
+	return g.treeDeb.window
+}
+
 // eventPrio returns prioHigh for jobs targeting an active worktree (or a live project
 // for project-wide jobs) and prioLow for idle worktrees and projects.
 func (g *Git) eventPrio(k jobKey) priority {

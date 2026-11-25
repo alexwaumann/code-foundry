@@ -273,13 +273,18 @@ func (d *debouncer) setClock(after func(time.Duration, func()) stopper) {
 }
 
 func (d *debouncer) trigger(k jobKey) {
+	d.triggerWindow(k, d.window)
+}
+
+// triggerWindow arms k's timer for window if not already armed.
+func (d *debouncer) triggerWindow(k jobKey, window time.Duration) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	if d.closed || d.timers[k] != nil {
 		return
 	}
 	var t stopper
-	t = d.after(d.window, func() {
+	t = d.after(window, func() {
 		d.mu.Lock()
 		mine := d.timers[k] == t // false once cancelled (or cancelled and re-armed)
 		if mine {

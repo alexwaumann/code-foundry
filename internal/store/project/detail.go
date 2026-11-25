@@ -77,13 +77,34 @@ func (WorktreeDetailUpdated) isProjectEvent() {}
 type wtKey struct{ projectID, path string }
 
 // detailState is the Git store's detail cache. Zero value is ready to use. Each
-// worktree's entries in cache, heads, and lines are written only by its jobDetail.
+// worktree's entries in cache and heads are written only by its jobDetail; lines is
+// shared with CompareWorktree's untracked counter (each stored lineMemo map is immutable).
 type detailState struct {
 	mu        sync.Mutex
 	requested map[wtKey]time.Time
 	cache     map[wtKey]WorktreeDetail
 	heads     map[wtKey]*headPart
 	lines     map[wtKey]lineMemo
+}
+
+// getLineMemo returns the worktree's last immutable untracked line-count memo, if any.
+func (g *Git) getLineMemo(k wtKey) lineMemo {
+	ds := &g.details
+	ds.mu.Lock()
+	defer ds.mu.Unlock()
+	return ds.lines[k]
+}
+
+// setLineMemo stores an immutable untracked line-count memo for a worktree still in the store.
+func (g *Git) setLineMemo(k wtKey, lm lineMemo) {
+	if lm == nil || g.slot(k.projectID, k.path) == nil {
+		return
+	}
+	ds := &g.details
+	ds.mu.Lock()
+	ds.initLocked()
+	ds.lines[k] = lm
+	ds.mu.Unlock()
 }
 
 // lineMemo is a worktree's untracked files' line counts by path, kept only for the

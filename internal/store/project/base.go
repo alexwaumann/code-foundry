@@ -41,6 +41,7 @@ type baseCount struct {
 // changes, it fans out a status refresh to every worktree in the project; when the base
 // is unchanged, it only refreshes worktrees that have never had a status yet.
 func (g *Git) resolveBase(ctx context.Context, projectID string) {
+	g.refsCache.invalidate(projectID)
 	st := g.project(projectID)
 	if st == nil {
 		return
