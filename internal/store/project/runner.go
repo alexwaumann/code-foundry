@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"slices"
 	"strings"
 	"syscall"
 	"time"
@@ -118,6 +119,22 @@ type ExecRunner struct {
 	// Timeout bounds each invocation whose context has no deadline. Zero means
 	// DefaultGitTimeout. Long operations (fetch, worktree add) pass their own deadline.
 	Timeout time.Duration
+
+	// Precomputed immutable environment slices (set by NewExecRunner). When nil (a
+	// zero-value ExecRunner{} literal), exec builds from os.Environ() per call so tests
+	// that mutate env with t.Setenv continue to see updates.
+	env        []string
+	guardedEnv []string
+}
+
+// NewExecRunner returns an ExecRunner whose git environment is precomputed once from
+// os.Environ(), avoiding per-invocation environment scans and allocations.
+func NewExecRunner() ExecRunner {
+	env := gitEnv(os.Environ())
+	guardedEnv := make([]string, len(env)+1)
+	copy(guardedEnv, env)
+	guardedEnv[len(env)] = "GIT_NO_LAZY_FETCH=1"
+	return ExecRunner{env: env, guardedEnv: guardedEnv}
 }
 
 // DefaultGitTimeout bounds a single git command that is not a fetch.
@@ -128,14 +145,10 @@ const DefaultGitTimeout = 30 * time.Second
 // `git status` would otherwise rewrite the index, fire our own watcher and loop), plus
 // stable, untranslated output and no pager.
 func gitEnv(base []string) []string {
-	out := make([]string, 0, len(base)+4)
-	for _, kv := range fsx.GitEnv(base) {
-		switch name, _, _ := strings.Cut(kv, "="); name {
-		case "LC_ALL", "GIT_PAGER":
-			continue
-		}
-		out = append(out, kv)
-	}
+	out := slices.DeleteFunc(fsx.GitEnv(base), func(kv string) bool {
+		name, _, _ := strings.Cut(kv, "=")
+		return name == "LC_ALL" || name == "GIT_PAGER"
+	})
 	return append(out, "LC_ALL=C", "GIT_PAGER=cat")
 }
 
@@ -200,10 +213,18 @@ func (r ExecRunner) exec(ctx context.Context, dir string, stdin []byte, stdout i
 	if bin == "" {
 		bin = "git"
 	}
-	env := gitEnv(os.Environ())
+	var env []string
 	if ctx.Value(guardedKey{}) != nil {
 		args = append([]string{"-c", "core.fsmonitor=false", "-c", "diff.autoRefreshIndex=false"}, args...)
-		env = append(env, "GIT_NO_LAZY_FETCH=1")
+		if r.guardedEnv != nil {
+			env = r.guardedEnv
+		} else {
+			env = append(gitEnv(os.Environ()), "GIT_NO_LAZY_FETCH=1")
+		}
+	} else if r.env != nil {
+		env = r.env
+	} else {
+		env = gitEnv(os.Environ())
 	}
 	cmd := exec.CommandContext(ctx, bin, args...)
 	cmd.Dir = dir

@@ -97,6 +97,97 @@ func TestSchedulerCloseReleasesWaiters(t *testing.T) {
 	}
 }
 
+func TestSchedulerPriorityAndPromotion(t *testing.T) {
+	gate := make(chan struct{})
+	started := make(chan struct{})
+	var (
+		mu    sync.Mutex
+		order []string
+	)
+	s := newScheduler(context.Background(), 1, func(_ context.Context, k jobKey) {
+		if k.path == "blocker" {
+			close(started)
+			<-gate
+			return
+		}
+		mu.Lock()
+		order = append(order, k.path)
+		mu.Unlock()
+	})
+	defer s.close()
+
+	s.request(jobKey{kind: jobStatus, path: "blocker"})
+	<-started
+
+	// Queue three low-priority jobs, then promote "low-2" to prioHigh and add "hi-new".
+	s.request(jobKey{kind: jobStatus, path: "low-1"})
+	s.request(jobKey{kind: jobStatus, path: "low-2"})
+	s.request(jobKey{kind: jobStatus, path: "low-3"})
+	chPromoted := s.requestHigh(jobKey{kind: jobStatus, path: "low-2"})
+	chHi := s.requestHigh(jobKey{kind: jobStatus, path: "hi-new"})
+	chLowLast := s.request(jobKey{kind: jobStatus, path: "low-3"})
+
+	close(gate)
+	<-chPromoted
+	<-chHi
+	<-chLowLast
+
+	mu.Lock()
+	defer mu.Unlock()
+	want := []string{"low-2", "hi-new", "low-1", "low-3"}
+	if len(order) != len(want) {
+		t.Fatalf("order = %v, want %v", order, want)
+	}
+	for i := range want {
+		if order[i] != want[i] {
+			t.Fatalf("order = %v, want %v", order, want)
+		}
+	}
+}
+
+func TestSchedulerRunningRerunPromotesPriority(t *testing.T) {
+	gate := make(chan struct{})
+	started := make(chan struct{})
+	var (
+		mu    sync.Mutex
+		runs  int
+		order []string
+	)
+	s := newScheduler(context.Background(), 1, func(_ context.Context, k jobKey) {
+		mu.Lock()
+		runs++
+		n := runs
+		if n == 1 {
+			mu.Unlock()
+			close(started)
+			<-gate
+			return
+		}
+		order = append(order, k.path)
+		mu.Unlock()
+	})
+	defer s.close()
+
+	running := jobKey{kind: jobStatus, path: "target"}
+	s.request(running)
+	<-started
+
+	// Queue a low-priority job, then request a low rerun and promote it with prioHigh.
+	chOther := s.request(jobKey{kind: jobStatus, path: "other-low"})
+	s.request(running)
+	chHi := s.requestHigh(running)
+
+	close(gate)
+	<-chHi
+	<-chOther
+
+	mu.Lock()
+	defer mu.Unlock()
+	if len(order) != 2 || order[0] != "target" || order[1] != "other-low" {
+		t.Fatalf("rerun order = %v, want [target other-low]", order)
+	}
+}
+
 func TestDebouncerCancel(t *testing.T) {
 	var fired atomic.Int32
 	d := newDebouncer(30*time.Millisecond, func(jobKey) { fired.Add(1) })

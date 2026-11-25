@@ -28,9 +28,10 @@ const (
 	// DefaultTreeDebounce is longer than DefaultDebounce: a dev server or build
 	// writing continuously costs at most one `git status` per second per worktree.
 	DefaultTreeDebounce = time.Second
-	// DefaultPollInterval is a backstop: the FSEvents stream sees edits anywhere in a
-	// worktree, so the poll only covers what it cannot (fsevents-watcher.md).
-	DefaultPollInterval = 2 * time.Minute
+	// DefaultPollInterval is a backstop: the FSEvents stream and thread Touch/TouchNow
+	// see live edits, so the live backstop poll runs every 5 min (and IdlePollInterval
+	// aligns with IdleFetchInterval at 15 min).
+	DefaultPollInterval = 5 * time.Minute
 	// fetchTimeout bounds one `git fetch`; worktreeTimeout bounds worktree add/remove,
 	// which may check out or delete a large tree.
 	fetchTimeout    = 2 * time.Minute
@@ -230,7 +231,7 @@ func Start(ctx context.Context, opts Options) (*Git, error) {
 		fetchNudge: make(chan struct{}, 1),
 	}
 	if g.runner == nil {
-		g.runner = ExecRunner{}
+		g.runner = NewExecRunner()
 	}
 	if g.now == nil {
 		g.now = time.Now
@@ -250,11 +251,11 @@ func Start(ctx context.Context, opts Options) (*Git, error) {
 
 	ctx, g.cancel = context.WithCancel(context.WithoutCancel(ctx))
 	g.sched = newScheduler(ctx, cmp.Or(opts.Workers, DefaultWorkers), g.runJob)
-	g.deb = newDebouncer(cmp.Or(opts.Debounce, DefaultDebounce), func(k jobKey) { g.sched.request(k) })
-	g.treeDeb = newDebouncer(cmp.Or(opts.TreeDebounce, DefaultTreeDebounce), func(k jobKey) { g.sched.request(k) })
+	g.deb = newDebouncer(cmp.Or(opts.Debounce, DefaultDebounce), func(k jobKey) { g.sched.requestPrio(k, g.eventPrio(k)) })
+	g.treeDeb = newDebouncer(cmp.Or(opts.TreeDebounce, DefaultTreeDebounce), func(k jobKey) { g.sched.requestPrio(k, g.eventPrio(k)) })
 	g.touch = newDebouncer(cmp.Or(opts.TouchDebounce, DefaultTouchDebounce), func(k jobKey) {
 		g.log.Debug("worktree touched", "path", k.path, "debounced", true)
-		g.sched.request(k)
+		g.sched.requestPrio(k, g.eventPrio(k))
 	})
 	g.fs = newFSWatcher(g.log, opts.streams, g.streamPaths, g.onEvents)
 	g.wg.Go(func() { g.fs.run(ctx) })
@@ -441,6 +442,47 @@ func (g *Git) statusKeys(projectID string) []jobKey {
 	return keys
 }
 
+// uninitializedStatusKeys returns status job keys for worktrees in projectID that have
+// never completed a status refresh yet (RefreshedAt is zero).
+func (g *Git) uninitializedStatusKeys(projectID string) []jobKey {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+	st := g.projects[projectID]
+	if st == nil {
+		return nil
+	}
+	var keys []jobKey
+	for p, slot := range st.wts {
+		if slot.cur.Load().Status.RefreshedAt.IsZero() {
+			keys = append(keys, jobKey{kind: jobStatus, projectID: projectID, path: p})
+		}
+	}
+	return keys
+}
+
+// defaultBranchStatusKeys returns status job keys for non-detached worktrees in
+// projectID checked out on its default branch (the only candidates for auto pull).
+func (g *Git) defaultBranchStatusKeys(projectID string) []jobKey {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+	st := g.projects[projectID]
+	if st == nil {
+		return nil
+	}
+	def := st.meta.Load().DefaultBranch
+	if def == "" {
+		return nil
+	}
+	var keys []jobKey
+	for p, slot := range st.wts {
+		w := slot.cur.Load()
+		if !w.Detached && w.Branch == def {
+			keys = append(keys, jobKey{kind: jobStatus, projectID: projectID, path: p})
+		}
+	}
+	return keys
+}
+
 func (g *Git) projectIDs() []string {
 	g.mu.RLock()
 	defer g.mu.RUnlock()
@@ -619,8 +661,37 @@ func (g *Git) Refresh(ctx context.Context, id string) error {
 		if err := g.refresh(ctx, id); err != nil {
 			return err
 		}
+		g.republishMainFreshness(id)
 	}
 	return nil
+}
+
+// republishMainFreshness publishes the main worktree's updated RefreshedAt after an
+// explicit Refresh when status was otherwise unchanged within republishAfter, so the
+// project title's "refreshed just now" always moves on user refresh.
+func (g *Git) republishMainFreshness(projectID string) {
+	st := g.project(projectID)
+	if st == nil {
+		return
+	}
+	m := st.meta.Load()
+	if !m.Git {
+		return
+	}
+	slot := g.slot(projectID, m.Path)
+	if slot == nil {
+		return
+	}
+	cur := slot.cur.Load()
+	if cur.Status.RefreshedAt.IsZero() || !g.publishedBefore(projectID, m.Path, cur.Status.RefreshedAt) {
+		return
+	}
+	g.commit(func(s *Snapshot) []Event {
+		if w, ok := s.Worktree(projectID, m.Path); ok {
+			return []Event{WorktreeUpdated{Worktree: w}}
+		}
+		return nil
+	})
 }
 
 // CreateWorktree implements Store.
@@ -713,10 +784,20 @@ func (g *Git) CreateWorktree(ctx context.Context, opts CreateWorktreeOptions) (W
 		path = real
 	}
 	g.log.Info("worktree created", "project", m.ID, "path", path, "branch", opts.Branch, "base", base)
-	g.recordMade(ctx, m.ID, path) // before the refresh, so its snapshot has it Managed
-	if err := g.refresh(ctx, m.ID); err != nil {
-		undo()
-		return Worktree{}, err
+	head := g.recordMade(ctx, m.ID, path) // before registering/status, so its snapshot has it Managed
+	// Re-read metadata in case ensureBorn ran a refresh above.
+	m = st.meta.Load()
+	if m.DefaultBranch == "" {
+		// Before the first reconcile, DefaultBranch and base are not known yet.
+		if err := g.refresh(ctx, m.ID); err != nil {
+			undo()
+			return Worktree{}, err
+		}
+	} else {
+		if err := g.registerCreatedWorktree(ctx, st, m, path, opts.Branch, head, opts.Fetch); err != nil {
+			undo()
+			return Worktree{}, err
+		}
 	}
 	wt, ok := g.Snapshot().Worktree(m.ID, path)
 	if !ok {
@@ -724,6 +805,66 @@ func (g *Git) CreateWorktree(ctx context.Context, opts CreateWorktreeOptions) (W
 	}
 	wt.StartPoint = base
 	return wt, nil
+}
+
+// registerCreatedWorktree adds a newly created worktree slot and its fs routes directly,
+// waits for jobBase only if unset or if CreateWorktree fetched a start point, and waits
+// only for the new worktree's status (rather than reconciling and refreshing every
+// existing worktree in the project).
+func (g *Git) registerCreatedWorktree(ctx context.Context, st *projectState, m *projectMeta, path, branch, head string, fetched bool) error {
+	admin, _ := readGitFile(path)
+	g.mu.Lock()
+	if g.projects[m.ID] != st {
+		g.mu.Unlock()
+		return fmt.Errorf("%w: project %s was unregistered concurrently", ErrNotFound, m.ID)
+	}
+	added := false
+	slot := st.wts[path]
+	if slot == nil {
+		slot = &wtSlot{}
+		slot.cur.Store(&Worktree{ProjectID: m.ID, Path: path, Branch: branch, Head: head})
+		st.wts[path] = slot
+		added = true
+	}
+	slot.admin = admin
+	slot.gitDir = admin
+	g.routes[path] = watchTarget{kind: wkRoot, projectID: m.ID, wtPath: path}
+	if admin != "" {
+		g.routes[admin] = watchTarget{kind: wkLinkedAdmin, projectID: m.ID, wtPath: path}
+		g.routes[filepath.Join(admin, "logs")] = watchTarget{kind: wkLinkedLogs, projectID: m.ID, wtPath: path}
+	}
+	g.mu.Unlock()
+
+	rollback := func() {
+		if !added {
+			return
+		}
+		g.mu.Lock()
+		if g.projects[m.ID] == st && st.wts[path] == slot {
+			delete(st.wts, path)
+			delete(g.routes, path)
+			if admin != "" {
+				delete(g.routes, admin)
+				delete(g.routes, filepath.Join(admin, "logs"))
+			}
+		}
+		g.mu.Unlock()
+		g.commit(nil)
+	}
+
+	g.fs.sync(ctx)
+	g.commit(projectUpdated(m.ID))
+	if st.base.Load() == nil || fetched {
+		if err := g.sched.wait(ctx, jobKey{kind: jobBase, projectID: m.ID}); err != nil {
+			rollback()
+			return err
+		}
+	}
+	if err := g.sched.wait(ctx, jobKey{kind: jobStatus, projectID: m.ID, path: path}); err != nil {
+		rollback()
+		return err
+	}
+	return nil
 }
 
 // ensureBorn makes the empty initial commit in the main checkout when it has no
@@ -1188,7 +1329,7 @@ func (g *Git) reconcile(ctx context.Context, id string) {
 		})
 	}
 	if next.Git {
-		g.sched.request(jobKey{kind: jobBase, projectID: id})
+		g.sched.requestPrio(jobKey{kind: jobBase, projectID: id}, prioLow)
 	}
 }
 
@@ -1310,7 +1451,8 @@ func (g *Git) status(ctx context.Context, projectID, path string) {
 			Operation:  op.Op, OperationStep: op.Step, OperationTotal: op.Total,
 			RefreshedAt: now,
 		}
-		if c, ok, reused := g.baseCounts(ctx, st, slot, path, info.Head); ok {
+		checkMerged := !next.IsMain && !next.Status.Dirty && next.Status.Operation == "" && g.isManaged(path)
+		if c, ok, reused := g.baseCounts(ctx, st, slot, path, info.Head, checkMerged); ok {
 			next.Status.BaseRef, next.Status.BaseAhead, next.Status.BaseBehind = c.ref, c.ahead, c.behind
 			next.Status.BaseMerged = c.merged
 			if reused {
@@ -1331,12 +1473,13 @@ func (g *Git) status(ctx context.Context, projectID, path string) {
 		!next.Status.equalIgnoringTime(prev.Status)
 	if !changed {
 		// Nothing but RefreshedAt moved. The snapshot is rebuilt for the first refresh
-		// (unset RefreshedAt means "status not known yet") and, with an event, once
-		// the published RefreshedAt is older than republishAfter (the Projects page's
-		// freshness reads it); other refreshes leave the snapshot alone.
+		// (unset RefreshedAt means "status not known yet") and, for the main worktree
+		// only (the Projects page's freshness reads only the main worktree's
+		// RefreshedAt), once the published RefreshedAt is older than republishAfter.
+		// Linked worktrees never emit periodic unchanged WorktreeUpdated wakeups.
 		if prev.Status.RefreshedAt.IsZero() {
 			g.commit(nil)
-		} else if g.publishedBefore(projectID, path, now.Add(-republishAfter)) {
+		} else if next.IsMain && g.publishedBefore(projectID, path, now.Add(-republishAfter)) {
 			g.commit(func(s *Snapshot) []Event {
 				if w, ok := s.Worktree(projectID, path); ok {
 					return []Event{WorktreeUpdated{Worktree: w}}
@@ -1356,10 +1499,11 @@ func (g *Git) status(ctx context.Context, projectID, path string) {
 	})
 }
 
-// republishAfter is how stale a worktree's published RefreshedAt may get while its
-// status does not change: an unchanged refresh past it republishes the worktree, so
-// "updated N ago" stays within about a poll interval of the last check.
-const republishAfter = time.Minute
+// republishAfter is how stale the main worktree's published RefreshedAt may get while
+// its status does not change: an unchanged refresh past it republishes the main
+// worktree so the project page's freshness stays current without waking subscribers
+// every minute or for linked worktrees.
+const republishAfter = 5 * time.Minute
 
 // publishedBefore reports whether the snapshot's RefreshedAt for the worktree is
 // before t (false when the worktree is not in the snapshot).
@@ -1395,7 +1539,8 @@ func (g *Git) fetch(ctx context.Context, id string) {
 		}
 		return
 	}
-	// The watcher sees FETCH_HEAD too; the reconcile afterFetch requests (or its auto
-	// pull pass runs) makes the refresh independent of fs events.
+	// Record fetch completion before afterFetch so FSEvents from our own FETCH_HEAD /
+	// remote-ref writes coalesce with afterFetch instead of triggering a second round.
+	g.fetches.markFetched(id, time.Now())
 	g.afterFetch(ctx, id)
 }

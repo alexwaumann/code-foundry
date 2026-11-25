@@ -191,25 +191,52 @@ func (g *Git) onEvents(evs []fsevents.Event) {
 		order    []routed
 		treeHits []treeHit
 	)
+	addHit := func(k jobKey, tree bool, path string, flags fsevents.EventFlags) {
+		r := routed{key: k, tree: tree}
+		if h := hits[r]; h != nil {
+			h.n++
+			return
+		}
+		hits[r] = &hit{path: path, flags: flags, n: 1}
+		order = append(order, r)
+	}
 	g.mu.RLock()
 	for _, ev := range evs {
-		keys, tree := eventKeys(g.routes, ev.Path, ev.Flags)
+		clean := filepath.Clean(ev.Path)
+		keys, tree := eventKeys(g.routes, clean, ev.Flags)
 		if tree {
-			treeHits = append(treeHits, treeHit{key: keys[0], path: filepath.Clean(ev.Path), flags: ev.Flags})
+			treeHits = append(treeHits, treeHit{key: keys[0], path: clean, flags: ev.Flags})
 		}
 		for _, k := range keys {
-			r := routed{key: k, tree: tree}
-			if h := hits[r]; h != nil {
-				h.n++
-				continue
+			addHit(k, tree, ev.Path, ev.Flags)
+		}
+		// When a non-default remote-tracking ref moves (e.g. `git push` or fetch on a
+		// feature branch), resolveBase will see an unchanged default base and skip
+		// fanning out. Refresh only the worktrees tracking/on that specific branch.
+		if pid, ref, ok := remoteRefFor(g.routes, clean, ev.Flags); ok {
+			if st := g.projects[pid]; st != nil {
+				m := st.meta.Load()
+				if ref != "origin/"+m.DefaultBranch {
+					branch := ref[len("origin/"):]
+					for p, slot := range st.wts {
+						w := slot.cur.Load()
+						if w.Status.Upstream == ref || w.Branch == branch {
+							addHit(jobKey{kind: jobStatus, projectID: pid, path: p}, false, ev.Path, ev.Flags)
+						}
+					}
+				}
 			}
-			hits[r] = &hit{path: ev.Path, flags: ev.Flags, n: 1}
-			order = append(order, r)
 		}
 	}
 	g.mu.RUnlock()
+	now := time.Now()
+	fetchSuppress := max(2*g.deb.window, 500*time.Millisecond)
 	for _, r := range order {
 		k, h := r.key, hits[r]
+		if k.kind == jobBase && g.fetches.suppressing(k.projectID, now, fetchSuppress) {
+			g.log.Debug("fs event coalesced with store fetch", "path", h.path, "project", k.projectID)
+			continue
+		}
 		if h.flags&rescanFlags != 0 {
 			g.log.Info("fs events need a rescan", "path", h.path, "flags", uint32(h.flags), "project", k.projectID)
 		} else {
@@ -226,7 +253,6 @@ func (g *Git) onEvents(evs []fsevents.Event) {
 	// same tree window. A delivery's hits go in together and trigger once: a window that
 	// closed partway through them would split one delivery into two files events.
 	live := map[string]bool{}
-	now := time.Now() // compared with file birth times: the wall clock, not g.now
 	files := map[jobKey][]fileHit{}
 	var filesOrder []jobKey
 	for _, h := range treeHits {

@@ -58,6 +58,53 @@ func TestUnchangedStatusRepublishesStaleRefreshedAt(t *testing.T) {
 	}
 }
 
+// Linked worktrees never emit periodic unchanged WorktreeUpdated events past
+// republishAfter, while an explicit Refresh updates the main worktree's published
+// RefreshedAt immediately even within republishAfter.
+func TestLinkedWorktreeSkipsRepublishAndRefreshUpdatesMain(t *testing.T) {
+	f := newFixture(t)
+	var clock atomic.Int64
+	clock.Store(time.Date(2026, 10, 12, 9, 0, 0, 0, time.UTC).UnixNano())
+	now := func() time.Time { return time.Unix(0, clock.Load()).UTC() }
+	h := startHarness(t, "", Options{Now: now})
+	ctx := context.Background()
+	r, err := h.store.Register(ctx, f.project)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wt, err := h.store.CreateWorktree(ctx, CreateWorktreeOptions{ProjectID: r.ID, Branch: "feat/quiet"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Explicit Refresh within republishAfter still bumps the main worktree's RefreshedAt.
+	clock.Add(int64(30 * time.Second))
+	drain(h)
+	if err := h.store.Refresh(ctx, r.ID); err != nil {
+		t.Fatal(err)
+	}
+	mainWT, _ := h.store.Snapshot().Worktree(r.ID, f.project)
+	if !mainWT.Status.RefreshedAt.Equal(now()) {
+		t.Fatalf("main RefreshedAt after Refresh = %v, want %v", mainWT.Status.RefreshedAt, now())
+	}
+	if !sawWorktreeUpdated(h, f.project) {
+		t.Fatal("Refresh did not publish WorktreeUpdated for main worktree")
+	}
+
+	// Linked worktree past republishAfter does NOT rebuild snapshot or emit WorktreeUpdated.
+	h.store.sched.close()
+	clock.Add(int64(republishAfter + time.Minute))
+	before := h.store.Snapshot()
+	drain(h)
+	h.store.status(ctx, r.ID, wt.Path)
+	if h.store.Snapshot() != before {
+		t.Fatal("unchanged linked worktree rebuilt the snapshot past republishAfter")
+	}
+	if sawWorktreeUpdated(h, wt.Path) {
+		t.Fatal("unchanged linked worktree published WorktreeUpdated past republishAfter")
+	}
+}
+
 func drain(h *harness) {
 	for {
 		select {

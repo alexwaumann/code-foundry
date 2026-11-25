@@ -143,8 +143,12 @@ func classify(kind watchKind, name string, o op) action {
 		switch name {
 		case "HEAD", "index":
 			return actStatus // main worktree: checkout, staging, commit
-		case "FETCH_HEAD", "packed-refs", "config", "worktrees":
-			// fetch, gc/pack-refs, remote url change, first/last linked worktree
+		case "FETCH_HEAD":
+			// A fetch updates remote-tracking refs, never worktrees or remote config;
+			// mapping it to actStatusAll lets it coalesce with refs/remotes/origin/*.
+			return actStatusAll
+		case "packed-refs", "config", "worktrees":
+			// gc/pack-refs, remote url change, first/last linked worktree
 			return actReconcile
 		}
 	case wkCommonLogs, wkLinkedLogs:
@@ -278,6 +282,39 @@ func eventKeys(dirs map[string]watchTarget, path string, flags fsevents.EventFla
 	}
 	t, act := route(dirs, path, opsOf(flags))
 	return keysFor(t, act), t.kind == wkRoot && act == actStatus
+}
+
+// remoteRefFor reports whether an event at path (already cleaned) modified a loose
+// remote-tracking ref under a project's refs/remotes/origin directory, returning the
+// project ID and short remote ref name (e.g. "origin/feat"). Lock files and HEAD are
+// ignored.
+func remoteRefFor(dirs map[string]watchTarget, path string, flags fsevents.EventFlags) (projectID, ref string, ok bool) {
+	if flags&rescanFlags != 0 {
+		return "", "", false
+	}
+	o := opsOf(flags)
+	if o == opChmod {
+		return "", "", false
+	}
+	name := filepath.Base(path)
+	if strings.HasSuffix(name, ".lock") || name == "HEAD" {
+		return "", "", false
+	}
+	for d := filepath.Dir(path); ; d = filepath.Dir(d) {
+		if t, found := dirs[d]; found {
+			if t.kind != wkRemoteRefs {
+				return "", "", false
+			}
+			rel, err := filepath.Rel(d, path)
+			if err != nil || rel == "." || strings.HasPrefix(rel, "..") {
+				return "", "", false
+			}
+			return t.projectID, "origin/" + filepath.ToSlash(rel), true
+		}
+		if filepath.Dir(d) == d {
+			return "", "", false
+		}
+	}
 }
 
 // watchWorktree is the input to desiredWatches for one worktree.

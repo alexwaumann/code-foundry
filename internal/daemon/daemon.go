@@ -241,7 +241,7 @@ func Run(ctx context.Context, opts Options) (retErr error) {
 		return err
 	}
 	st.thread.SetPageRecorder(pages)
-	filesystemAPI := api.NewFilesystem(st.home, st.project, grants).WithTemp(tempRoots).WithPagesPort(pagesPort).WithPagesRoot(p.Pages()).
+	filesystemAPI := api.NewFilesystem(st.home, st.project, grants).WithFileIndex(st.files).WithTemp(tempRoots).WithPagesPort(pagesPort).WithPagesRoot(p.Pages()).
 		WithIncludeIgnored(includeIgnored(st.settings)).WithRipgrep(st.ripgrep).WithPages(pages)
 	commands := command.NewRegistry()
 	facts := pluginFacts{thread: st.thread, project: st.project, gh: st.gh}

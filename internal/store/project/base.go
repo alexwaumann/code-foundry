@@ -31,10 +31,17 @@ type baseCount struct {
 	head, ref, sha string
 	ahead, behind  int
 	merged         bool
+	// mergedChecked reports whether mergedByContent has been evaluated (or was
+	// unnecessary because the worktree is not both ahead and behind). A dirty,
+	// unmanaged, or main worktree skips mergedByContent; if a managed worktree later
+	// becomes clean at the same (head, base), mergedChecked=false ensures it runs
+	// mergedByContent without re-running rev-list.
+	mergedChecked bool
 }
 
-// resolveBase is the jobBase body: the only writer of st.base. It then requests a
-// status refresh of every worktree in the project.
+// resolveBase is the jobBase body: the only writer of st.base. When the resolved base
+// changes, it fans out a status refresh to every worktree in the project; when the base
+// is unchanged, it only refreshes worktrees that have never had a status yet.
 func (g *Git) resolveBase(ctx context.Context, projectID string) {
 	st := g.project(projectID)
 	if st == nil {
@@ -65,27 +72,42 @@ func (g *Git) resolveBase(ctx context.Context, projectID string) {
 			}
 		}
 	}
-	if prev := st.base.Load(); prev == nil || *prev != *next {
+	prev := st.base.Load()
+	changed := prev == nil || *prev != *next
+	if changed {
 		g.log.Debug("base resolved", "project", projectID, "ref", next.ref, "sha", next.sha)
 	}
 	st.base.Store(next)
-	for _, k := range g.statusKeys(projectID) {
-		g.sched.request(k)
+	keys := g.uninitializedStatusKeys(projectID)
+	if changed {
+		keys = g.statusKeys(projectID)
+	}
+	for _, k := range keys {
+		g.sched.requestPrio(k, g.eventPrio(k))
 	}
 }
 
 // baseCounts returns HEAD's ahead/behind against the project's base, reusing the
 // worktree's memo when neither HEAD nor the base moved. ok is false when there is no
 // base comparison (no base ref, unborn HEAD, or rev-list failed). reused reports a memo
-// hit. Called only by the worktree's status job, which owns slot.base.
-func (g *Git) baseCounts(ctx context.Context, st *projectState, slot *wtSlot, dir, head string) (c baseCount, ok, reused bool) {
+// hit. checkMerged gates mergedByContent (only managed, non-main, clean worktrees run
+// merge-tree automatically during status refreshes). Called only by the worktree's
+// status job, which owns slot.base.
+func (g *Git) baseCounts(ctx context.Context, st *projectState, slot *wtSlot, dir, head string, checkMerged bool) (c baseCount, ok, reused bool) {
 	b := st.base.Load()
 	if b == nil || b.sha == "" || head == "" {
 		slot.base.Store(nil)
 		return baseCount{}, false, false
 	}
 	if m := slot.base.Load(); m != nil && m.head == head && m.ref == b.ref && m.sha == b.sha {
-		return *m, true, true
+		if !checkMerged || m.mergedChecked || m.ahead == 0 || m.behind == 0 {
+			return *m, true, true
+		}
+		c = *m
+		c.merged = g.mergedByContent(ctx, dir, head, b.sha)
+		c.mergedChecked = true
+		slot.base.Store(&c)
+		return c, true, false
 	}
 	out, err := g.runner.Run(ctx, dir, "rev-list", "--left-right", "--count", head+"..."+b.sha)
 	if err != nil {
@@ -99,8 +121,13 @@ func (g *Git) baseCounts(ctx context.Context, st *projectState, slot *wtSlot, di
 	}
 	c = baseCount{head: head, ref: b.ref, sha: b.sha, ahead: a, behind: behind}
 	if a > 0 && behind > 0 {
-		// Only then can a rebased or squash-merged copy of head have landed in the base.
-		c.merged = g.mergedByContent(ctx, dir, head, b.sha)
+		if checkMerged {
+			// Only then can a rebased or squash-merged copy of head have landed in the base.
+			c.merged = g.mergedByContent(ctx, dir, head, b.sha)
+			c.mergedChecked = true
+		}
+	} else {
+		c.mergedChecked = true
 	}
 	slot.base.Store(&c)
 	return c, true, false
