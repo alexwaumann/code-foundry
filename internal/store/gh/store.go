@@ -71,6 +71,9 @@ type Options struct {
 	// Now and Rand are injectable for tests.
 	Now  func() time.Time
 	Rand func() float64
+
+	// wake overrides the sleep/wake monitor in tests (sleepwake.go).
+	wake *wakeConfig
 }
 
 // Config is the user-tunable part of the poll (github.* settings).
@@ -175,7 +178,8 @@ type Store struct {
 	searchAsID  string // node id of Options.SearchAs
 	cycle       cycleStats
 
-	wake chan struct{}
+	wake     chan struct{}
+	sleepDet *sleepDetector
 }
 
 var _ Service = (*Store)(nil)
@@ -241,6 +245,7 @@ func New(ctx context.Context, opts Options) (*Store, error) {
 		failingKey:  map[string]string{},
 		wake:        make(chan struct{}, 1),
 	}
+	s.initWakeDetector()
 	now := opts.Now()
 	if err := s.cache.prune(ctx, now); err != nil {
 		s.log.Warn("gh cache prune failed", "err", err)
@@ -443,6 +448,7 @@ func (s *Store) cachedPullRequestDetail(k fullKey) (d PullRequestDetail, ok, fro
 // fails fast instead of queueing behind the pause. A caller that goes away gives up its
 // place (abandon); a job already running finishes.
 func (s *Store) submit(ctx context.Context, j *job) jobResult {
+	s.checkWakeSkew()
 	ch := make(chan jobResult, 1)
 	s.mu.Lock()
 	if err := cmpErr(ctx.Err(), s.stopped, s.pausedLocked()); err != nil {
@@ -494,6 +500,7 @@ func (s *Store) abandon(j *job, ch chan jobResult) {
 // for, coalescing with an identical queued job. While the store is paused it queues
 // nothing and returns the pause's error.
 func (s *Store) submitBackground(j *job) error {
+	s.checkWakeSkew()
 	j.background, j.promised = true, true
 	s.mu.Lock()
 	err := cmpErr(s.stopped, s.pausedLocked())
@@ -571,6 +578,8 @@ func (s *Store) Run(ctx context.Context) error {
 		"min_gap", s.opts.MinGap.String(), "poll_interval", s.config().PollInterval.String())
 	timer := time.NewTimer(time.Hour)
 	defer timer.Stop()
+	wakeTicks, stopWake := s.startWakeMonitor()
+	defer stopWake()
 	for {
 		if ctx.Err() != nil { // a refused request sets no lastEnd, so nothing below would wait
 			s.failQueued(ctx.Err())
@@ -592,6 +601,8 @@ func (s *Store) Run(ctx context.Context) error {
 			return nil
 		case <-s.wake:
 		case <-timerC:
+		case <-wakeTicks:
+			s.checkWakeTick()
 		}
 		timer.Stop()
 	}
