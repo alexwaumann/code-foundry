@@ -25,6 +25,9 @@ type Options struct {
 	// Bus receives the store's events (gh.go, activity.go). Optional.
 	Bus *bus.Bus
 	Log *slog.Logger
+	// LocalGit serves pull request diffs and commit files from local git clones when the
+	// required objects are present locally, avoiding GitHub REST calls. Optional.
+	LocalGit LocalGitProvider
 
 	MinGap time.Duration
 	// UserGap replaces MinGap for a read someone is waiting for, while the allowance

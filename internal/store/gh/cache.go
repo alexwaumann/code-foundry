@@ -155,10 +155,63 @@ func (c cache) saveDetail(ctx context.Context, slug string, d PullRequestDetail)
 	return nil
 }
 
+const (
+	// diffDBCacheMax caps the number of pull request diffs persisted in gh_pr_diffs.
+	diffDBCacheMax = 32
+	// diffDBMaxBytes skips persisting diffs over 1 MiB so worst-case SQLite growth stays
+	// bounded (~32 MiB max instead of 128 MiB).
+	diffDBMaxBytes = 1 << 20
+)
+
+func (c cache) loadPRDiff(ctx context.Context, slug string, number int) (PullRequestDiff, bool, error) {
+	var d PullRequestDiff
+	var truncated int
+	var fetched int64
+	err := c.db.QueryRowContext(ctx,
+		`SELECT head_sha, base_sha, diff, truncated, fetched_at FROM gh_pr_diffs WHERE repo_slug = ? AND number = ?`,
+		slug, number).Scan(&d.HeadSHA, &d.BaseSHA, &d.Diff, &truncated, &fetched)
+	if errors.Is(err, sql.ErrNoRows) {
+		return PullRequestDiff{}, false, nil
+	}
+	if err != nil {
+		return PullRequestDiff{}, false, fmt.Errorf("gh: load pr diff: %w", err)
+	}
+	d.Truncated = truncated != 0
+	d.FetchedAt = fromMillis(fetched)
+	return d, true, nil
+}
+
+func (c cache) savePRDiff(ctx context.Context, slug string, number int, d PullRequestDiff) error {
+	truncated := 0
+	if d.Truncated {
+		truncated = 1
+	}
+	_, err := c.db.ExecContext(ctx,
+		`INSERT INTO gh_pr_diffs (repo_slug, number, head_sha, base_sha, diff, truncated, fetched_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?)
+		 ON CONFLICT (repo_slug, number) DO UPDATE SET
+		   head_sha = excluded.head_sha,
+		   base_sha = excluded.base_sha,
+		   diff = excluded.diff,
+		   truncated = excluded.truncated,
+		   fetched_at = excluded.fetched_at`,
+		slug, number, d.HeadSHA, d.BaseSHA, d.Diff, truncated, toMillis(d.FetchedAt))
+	if err != nil {
+		return fmt.Errorf("gh: save pr diff: %w", err)
+	}
+	if _, err := c.db.ExecContext(ctx,
+		`DELETE FROM gh_pr_diffs WHERE rowid NOT IN (
+			SELECT rowid FROM gh_pr_diffs ORDER BY fetched_at DESC, rowid DESC LIMIT ?
+		)`, diffDBCacheMax); err != nil {
+		return fmt.Errorf("gh: prune pr diffs: %w", err)
+	}
+	return nil
+}
+
 // prune drops on-demand rows older than cacheRetention.
 func (c cache) prune(ctx context.Context, now time.Time) error {
 	cutoff := toMillis(now.Add(-cacheRetention))
-	for _, table := range []string{"gh_pull_request_details", "gh_ref_checks"} {
+	for _, table := range []string{"gh_pull_request_details", "gh_ref_checks", "gh_pr_diffs"} {
 		if _, err := c.db.ExecContext(ctx, `DELETE FROM `+table+` WHERE fetched_at < ?`, cutoff); err != nil {
 			return fmt.Errorf("gh: prune %s: %w", table, err)
 		}
