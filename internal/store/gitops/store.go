@@ -27,6 +27,8 @@ const (
 	MaxOutput = 64 << 10
 	// RefreshTimeout bounds the project refresh after an operation.
 	RefreshTimeout = 30 * time.Second
+	// GitHubNotifyTimeout bounds the post-op GitHub notification.
+	GitHubNotifyTimeout = 5 * time.Second
 )
 
 // DefaultTimeouts bound each kind of operation, from start to finish.
@@ -48,7 +50,10 @@ type Options struct {
 	// Projects maps paths to projects and is refreshed after ref-moving operations. May be nil
 	// (no project ids, slugs or refreshes).
 	Projects Projects
-	Log      *slog.Logger
+	// GitHub bridges gitops to the GitHub store for instant OpenPR cache lookups and
+	// post-Push/post-CreatePR refresh notifications. Optional.
+	GitHub GitHub
+	Log    *slog.Logger
 	// Runner runs processes. Default ExecRunner{}.
 	Runner Runner
 	// Workers bounds operations running at once across worktrees. Default DefaultWorkers.
@@ -153,40 +158,75 @@ func (m *Manager) timeout(k Kind) time.Duration {
 
 // target is where an operation runs, resolved against the project snapshot.
 type target struct {
-	path    string // symlinks resolved
-	project project.Project
-	branch  string // from the snapshot; ops that need it exactly re-read it from git
+	path         string // symlinks resolved (may be a subdirectory inside worktreePath)
+	worktreePath string // matched registered worktree root from snapshot (empty if unregistered)
+	project      project.Project
+	branch       string // from the snapshot, or read from HEAD when resolved with needBranch
 }
 
 // resolve validates worktreePath (absolute, an existing directory) and finds the
 // registered project containing it: an exact worktree match, else the longest containing
-// worktree path.
-func (m *Manager) resolve(worktreePath string) (target, error) {
+// worktree path. When needBranch is true, the checked-out branch is resolved from disk
+// (reading .git/HEAD directly, falling back to git symbolic-ref only when needed);
+// operations that do not use the branch (OpenEditor, Reveal) pass false and spawn no git
+// subprocesses.
+func (m *Manager) resolve(worktreePath string, needBranch bool) (target, error) {
+	t, wt, found, err := m.resolvePath(worktreePath)
+	if err != nil {
+		return target{}, err
+	}
+	if needBranch {
+		m.resolveBranch(&t, wt, found)
+	}
+	return t, nil
+}
+
+// resolvePath validates worktreePath and looks up its registered project/worktree from
+// the in-memory project snapshot without executing any subprocesses.
+func (m *Manager) resolvePath(worktreePath string) (target, project.Worktree, bool, error) {
 	if worktreePath == "" {
-		return target{}, fmt.Errorf("%w: worktree path is required", ErrInvalidArgument)
+		return target{}, project.Worktree{}, false, fmt.Errorf("%w: worktree path is required", ErrInvalidArgument)
 	}
 	if !filepath.IsAbs(worktreePath) {
-		return target{}, fmt.Errorf("%w: worktree path %q is not absolute", ErrInvalidArgument, worktreePath)
+		return target{}, project.Worktree{}, false, fmt.Errorf("%w: worktree path %q is not absolute", ErrInvalidArgument, worktreePath)
 	}
 	p, err := filepath.EvalSymlinks(filepath.Clean(worktreePath))
 	if err != nil {
-		return target{}, fmt.Errorf("%w: worktree path: %v", ErrInvalidArgument, err)
+		return target{}, project.Worktree{}, false, fmt.Errorf("%w: worktree path: %v", ErrInvalidArgument, err)
 	}
 	if fi, err := os.Stat(p); err != nil || !fi.IsDir() {
-		return target{}, fmt.Errorf("%w: %s is not a directory", ErrInvalidArgument, worktreePath)
+		return target{}, project.Worktree{}, false, fmt.Errorf("%w: %s is not a directory", ErrInvalidArgument, worktreePath)
 	}
 	t := target{path: p}
+	var wt project.Worktree
+	var found bool
 	if r, w, ok := m.lookup(p); ok {
-		t.project, t.branch = r, w.Branch
+		t.project, t.worktreePath, t.branch, wt, found = r, w.Path, w.Branch, w, true
 	}
-	// The project snapshot can trail a `git switch` by a debounce; titles should name the
-	// branch that is actually checked out.
+	return t, wt, found, nil
+}
+
+// resolveBranch updates t.branch with the checked-out branch. It reads .git/HEAD
+// directly (0 subprocesses) so titles reflect a recent `git switch` immediately; only
+// when .git/HEAD cannot be parsed directly does it keep a fresh snapshot branch or fall
+// back to `git symbolic-ref`.
+func (m *Manager) resolveBranch(t *target, wt project.Worktree, hasWT bool) {
+	if b, attached, ok := readHeadBranch(t.path); ok {
+		if attached {
+			t.branch = b
+		} else {
+			t.branch = ""
+		}
+		return
+	}
+	if hasWT && t.branch != "" && !wt.Status.RefreshedAt.IsZero() {
+		return
+	}
 	ctx, cancel := context.WithTimeout(m.ctx, 5*time.Second)
 	defer cancel()
-	if b, ok := (&run{m: m, dir: p}).probe(ctx, "symbolic-ref", "--quiet", "--short", "HEAD"); ok && b != "" {
+	if b, ok := (&run{m: m, dir: t.path}).probe(ctx, "symbolic-ref", "--quiet", "--short", "HEAD"); ok && b != "" {
 		t.branch = b
 	}
-	return t, nil
 }
 
 func (m *Manager) lookup(path string) (project.Project, project.Worktree, bool) {
@@ -250,10 +290,37 @@ type opError struct{ summary string }
 
 func (e *opError) Error() string { return e.summary }
 
+// refreshMode says how much of the project store to refresh after an operation finishes.
+type refreshMode int
+
+const (
+	_ refreshMode = iota // zero value: no project refresh
+	// refreshProject reconciles the whole project (Fetch, Pull, or pushing the default branch).
+	refreshProject
+	// refreshPush refreshes only the single worktree via TouchNow when pushing a known
+	// non-default branch, and reconciles the whole project otherwise.
+	refreshPush
+)
+
+// postOp configures background refreshes triggered after an operation finishes.
+type postOp struct {
+	refresh       refreshMode
+	notifyGH      bool
+	githubSlug    string
+	defaultBranch string
+	worktreePath  string
+}
+
+// worktreeToucher is implemented by project.Store (TouchNow) so a feature-branch push
+// refreshes only that worktree instead of reconciling every worktree in the project.
+type worktreeToucher interface {
+	TouchNow(path string)
+}
+
 // submit runs b on t's lane and waits for it. The operation runs on the store's
 // context, not ctx: once queued it completes even if the caller goes away (a push
 // should not be half-cancelled because a CLI was interrupted). ctx only bounds the wait.
-func (m *Manager) submit(ctx context.Context, kind Kind, title string, t target, refresh bool, b body) (Op, error) {
+func (m *Manager) submit(ctx context.Context, kind Kind, title string, t target, post postOp, b body) (Op, error) {
 	op := &Op{
 		ID:           "op-" + strconv.FormatUint(m.seq.Add(1), 10),
 		Kind:         kind,
@@ -271,7 +338,7 @@ func (m *Manager) submit(ctx context.Context, kind Kind, title string, t target,
 		return Op{}, ErrClosed
 	}
 	m.active = append(m.active, op)
-	waits := m.lanes.submit(t.path, func() { done <- m.execute(op, refresh, b) })
+	waits := m.lanes.submit(t.path, func() { done <- m.execute(op, post, b) })
 	if waits {
 		m.publishLocked(Queued, *op)
 	}
@@ -285,7 +352,7 @@ func (m *Manager) submit(ctx context.Context, kind Kind, title string, t target,
 	}
 }
 
-func (m *Manager) execute(op *Op, refresh bool, b body) Op {
+func (m *Manager) execute(op *Op, post postOp, b body) Op {
 	m.mu.Lock()
 	op.State = StateRunning
 	op.StartedAt = m.opts.Now()
@@ -310,6 +377,9 @@ func (m *Manager) execute(op *Op, refresh bool, b body) Op {
 	m.mu.Lock()
 	op.FinishedAt = m.opts.Now()
 	op.Duration = op.FinishedAt.Sub(op.StartedAt)
+	if x.resolvedBranch != "" {
+		op.Branch = x.resolvedBranch
+	}
 	op.Summary, op.URL, op.Output = summary, url, x.output()
 	op.State = StateSucceeded
 	if err != nil {
@@ -322,13 +392,44 @@ func (m *Manager) execute(op *Op, refresh bool, b body) Op {
 		m.finished = m.finished[:KeepFinished]
 	}
 	m.publishLocked(Finished, final)
-	if refresh && final.ProjectID != "" && m.opts.Projects != nil {
-		m.bg.Go(func() { m.refresh(final.ProjectID) })
-	}
+	m.afterOpLocked(final, post, x.setUpstream)
 	m.mu.Unlock()
 	m.log.Info("gitops", "op", final.ID, "kind", final.Kind.String(), "path", final.WorktreePath,
 		"ok", final.OK(), "summary", final.Summary, "duration", final.Duration)
 	return final
+}
+
+// afterOpLocked schedules background project and GitHub refreshes after final finishes.
+// Called with m.mu held.
+func (m *Manager) afterOpLocked(final Op, post postOp, setUpstream bool) {
+	noopPush := final.Kind == KindPush && final.OK() && final.Summary == "already up to date" && !setUpstream
+	if final.ProjectID != "" && m.opts.Projects != nil {
+		switch post.refresh {
+		case refreshProject:
+			m.bg.Go(func() { m.refresh(final.ProjectID) })
+		case refreshPush:
+			// A no-op push ("already up to date") that did not set a new upstream
+			// changes no local config or remote refs.
+			if noopPush {
+				break
+			}
+			// Pushing a non-default feature branch only updates that worktree's upstream
+			// and ahead/behind counts; use TouchNow on the registered worktree root when
+			// available instead of scanning every worktree in the project.
+			if post.defaultBranch != "" && final.Branch != "" && final.Branch != post.defaultBranch && post.worktreePath != "" {
+				if wt, ok := m.opts.Projects.(worktreeToucher); ok {
+					path := post.worktreePath
+					m.bg.Go(func() { wt.TouchNow(path) })
+					break
+				}
+			}
+			m.bg.Go(func() { m.refresh(final.ProjectID) })
+		}
+	}
+	if post.notifyGH && final.OK() && !noopPush && post.githubSlug != "" && final.Branch != "" && m.opts.GitHub != nil {
+		slug, branch := post.githubSlug, final.Branch
+		m.bg.Go(func() { m.notifyGitHub(slug, branch) })
+	}
 }
 
 // refresh asks the project store to re-read the project after its refs moved.
@@ -338,6 +439,13 @@ func (m *Manager) refresh(projectID string) {
 	if err := m.opts.Projects.Refresh(ctx, projectID); err != nil && m.ctx.Err() == nil {
 		m.log.Warn("gitops: project refresh", "project", projectID, "err", err)
 	}
+}
+
+// notifyGitHub tells the GitHub bridge that branch in slug changed (Push or CreatePR).
+func (m *Manager) notifyGitHub(slug, branch string) {
+	ctx, cancel := context.WithTimeout(m.ctx, GitHubNotifyTimeout)
+	defer cancel()
+	m.opts.GitHub.NotifyBranchChanged(ctx, slug, branch)
 }
 
 // publishLocked rebuilds the snapshot and publishes ev. Holding mu keeps events in
@@ -355,9 +463,11 @@ func (m *Manager) publishLocked(t EventType, op Op) {
 // run is one operation's execution: it runs commands in the worktree and keeps the
 // transcript.
 type run struct {
-	m   *Manager
-	dir string
-	out strings.Builder
+	m              *Manager
+	dir            string
+	resolvedBranch string
+	setUpstream    bool
+	out            strings.Builder
 }
 
 // exec runs c, appends "$ <cmd>" and its output to the transcript, and returns the

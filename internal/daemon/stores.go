@@ -255,7 +255,7 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, threadEnv 
 		return nil, err
 	}
 	s.gitops = gitops.New(gitops.Options{
-		Bus: s.bus, Projects: s.project, Log: log.With("store", "gitops"),
+		Bus: s.bus, Projects: s.project, GitHub: newGitOpsGitHubBridge(s.gh, log.With("store", "gitops")), Log: log.With("store", "gitops"),
 		// Read on every open, so gitops.editor_command applies live. CODE_FOUNDRY_EDITOR
 		// is the fallback when the setting is empty; both empty means auto-detect.
 		Editor: func() string {
@@ -433,6 +433,7 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, threadEnv 
 	uo := update.DefaultOptions(version.Version)
 	uo.Bus, uo.Log = s.bus, log.With("store", "update")
 	uo.Channel = update.ParseChannel(cfg.Update.Channel)
+	configureUpdateSource(&uo, cfg)
 	s.update = update.Start(ctx, uo)
 	applyUpdateChannel(s.settings, s.update)
 	s.dictation = openDictation(log.With("store", "dictation"), p, s.bus, s.settings)

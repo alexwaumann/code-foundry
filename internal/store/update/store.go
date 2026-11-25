@@ -231,7 +231,7 @@ func DefaultOptions(current string) Options {
 			o.Repo = "local:" + dir
 		}
 	case o.Repo != "":
-		o.Source = GhSource{Repo: o.Repo}
+		o.Source = &GhSource{Repo: o.Repo}
 	default:
 		o.DisabledReason = "no release repository configured"
 	}

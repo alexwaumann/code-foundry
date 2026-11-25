@@ -74,7 +74,7 @@ func runUpdate(ctx context.Context, cl *cli, args []string) error {
 	case dir != "":
 		src = update.DirSource{Dir: dir}
 	case repo != "":
-		src = update.GhSource{Repo: repo}
+		src = &update.GhSource{Repo: repo, UserAgent: "code-foundry/" + version.Version}
 	default:
 		return errors.New("this build has no release repository; set " + version.EnvReleaseRepo + "=owner/name")
 	}
