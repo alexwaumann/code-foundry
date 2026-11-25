@@ -100,7 +100,7 @@ export function parsePrDiff(text: string, cacheKey: string): PrDiffModel {
 }
 
 /** Bounded LRU cache size for parsed pull request diff models. */
-export const PR_DIFF_MODEL_CACHE_MAX = 16;
+export const PR_DIFF_MODEL_CACHE_MAX = 8;
 
 interface CachedPrDiffModel {
   diff: string;

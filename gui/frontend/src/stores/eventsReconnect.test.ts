@@ -212,11 +212,38 @@ describe("EventService.Watch connect and reconnect", () => {
     expect(env.requests[1]?.sinceSeq).toBe(5n);
     expect(env.requests[1]?.sinceEpoch).toBe("ep-1");
     expect(useProjectsStore.getState().order).toEqual(["a", "b", "c"]);
-    // Incremental replay did not trigger gh reconnect invalidations or settings reload.
+    // Incremental replay did not trigger gh reconnect invalidations or an extra schema reload.
     expect(env.getBranchPrs).toBe(0);
     expect(env.getPrDetail).toBe(0);
     expect(env.loadSchema).toBe(1);
     expect(env.listProjects + env.listTerminals + env.listThreads).toBe(0);
+  });
+
+  it("resume-at-head heartbeat clears attemptFirstEvent so a later mid-stream seq-0 resync does not wipe terminals", async () => {
+    const heartbeat = (epoch: string) =>
+      create(EventSchema, { epoch, seq: 0n, event: { case: "heartbeat", value: {} } });
+
+    let attempt = 0;
+    env.stream = (_req, signal) =>
+      (async function* () {
+        attempt++;
+        if (attempt === 1) {
+          yield projectSnap("ep-1", ["a"]);
+          yield workspaceSnap("ep-1");
+          yield terminalUpdated("ep-1", "term-keep");
+          yield threadSnap("ep-1", []);
+          yield terminalUpdated("ep-1", "term-keep", 3n);
+          throw new TypeError("blip");
+        }
+        // Resume at head: heartbeat arrives first, then a mid-stream threadList resync (seq 0).
+        yield heartbeat("ep-1");
+        yield threadSnap("ep-1", []);
+        await park(signal);
+      })();
+
+    stop = startEventSync();
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(useTerminalsStore.getState().order).toEqual(["term-keep"]);
   });
 
   it("on daemon restart snapshot fallback, resets seq, prunes removed terminals, reloads schema, and invalidates watched gh caches once", async () => {

@@ -32,12 +32,10 @@ export interface TabRead<T> {
   replace: (data: T) => void;
 }
 
-/** One entry in a bounded LRU TabReadCache. */
 export interface TabReadCacheEntry<T> {
   data: T;
   stale: boolean;
-  /** Monotonic revision bumped on set and invalidate so hooks know whether their state settled after invalidation. */
-  rev: number;
+  bytes: number;
 }
 
 /**
@@ -50,8 +48,8 @@ export interface TabReadCache<T> {
   peek: (key: string) => TabReadCacheEntry<T> | undefined;
   /** Lookup that refreshes LRU recency. */
   get: (key: string) => TabReadCacheEntry<T> | undefined;
-  /** Stores fresh data and refreshes LRU recency, evicting the oldest entry past max. */
-  set: (key: string, data: T) => number;
+  /** Stores fresh data and refreshes LRU recency, evicting the oldest entries past max/maxBytes. */
+  set: (key: string, data: T) => void;
   /** Marks matching entries (or all entries) stale so the next read revalidates. */
   invalidate: (keyOrPred?: string | ((key: string) => boolean)) => void;
   /** Removes matching entries (or all entries) completely. */
@@ -59,12 +57,18 @@ export interface TabReadCache<T> {
   size: () => number;
 }
 
-export function createTabReadCache<T>({ max = 32 }: { max?: number } = {}): TabReadCache<T> {
+export function createTabReadCache<T>({ max = 32, maxBytes, sizeOf }: { max?: number; maxBytes?: number; sizeOf?: (data: T) => number } = {}): TabReadCache<T> {
   const map = new Map<string, TabReadCacheEntry<T>>();
-  let nextRev = 0;
+  let totalBytes = 0;
   const match = (key: string, keyOrPred?: string | ((k: string) => boolean)): boolean => {
     if (keyOrPred === undefined) return true;
     return typeof keyOrPred === "string" ? key === keyOrPred : keyOrPred(key);
+  };
+  const del = (key: string) => {
+    const prev = map.get(key);
+    if (!prev) return;
+    totalBytes -= prev.bytes;
+    map.delete(key);
   };
   return {
     peek: (key) => map.get(key),
@@ -76,43 +80,38 @@ export function createTabReadCache<T>({ max = 32 }: { max?: number } = {}): TabR
       return hit;
     },
     set: (key, data) => {
-      const rev = ++nextRev;
-      if (map.has(key)) map.delete(key);
-      map.set(key, { data, stale: false, rev });
-      while (map.size > max) {
+      del(key);
+      const bytes = sizeOf ? Math.max(0, sizeOf(data)) : 0;
+      map.set(key, { data, stale: false, bytes });
+      totalBytes += bytes;
+      while (map.size > max || (maxBytes !== undefined && map.size > 1 && totalBytes > maxBytes)) {
         const oldest = map.keys().next().value;
         if (oldest === undefined) break;
-        map.delete(oldest);
+        del(oldest);
       }
-      return rev;
     },
     invalidate: (keyOrPred) => {
       if (typeof keyOrPred === "string") {
         const hit = map.get(keyOrPred);
-        if (hit) {
-          hit.stale = true;
-          hit.rev = ++nextRev;
-        }
+        if (hit) hit.stale = true;
         return;
       }
       for (const [k, entry] of map) {
-        if (match(k, keyOrPred)) {
-          entry.stale = true;
-          entry.rev = ++nextRev;
-        }
+        if (match(k, keyOrPred)) entry.stale = true;
       }
     },
     clear: (keyOrPred) => {
       if (keyOrPred === undefined) {
         map.clear();
+        totalBytes = 0;
         return;
       }
       if (typeof keyOrPred === "string") {
-        map.delete(keyOrPred);
+        del(keyOrPred);
         return;
       }
       for (const k of [...map.keys()]) {
-        if (keyOrPred(k)) map.delete(k);
+        if (keyOrPred(k)) del(k);
       }
     },
     size: () => map.size,
@@ -143,12 +142,19 @@ export function useTabRead<T>(key: string, read: (signal: AbortSignal) => Promis
   const mode = opts?.mode ?? "revalidate";
   const [reloadReq, setReloadReq] = useState<{ key: string; n: number }>({ key: "", n: 0 });
   const force = reloadReq.key === key ? reloadReq.n : 0;
-  const [state, setState] = useState<{ key: string; force: number; rev: number; data: T | null; error: string | null }>(() => {
+  const [lastKey, setLastKey] = useState(key);
+  const [state, setState] = useState<{ key: string; force: number; data: T | null; error: string | null }>(() => {
     const hit = cache?.peek(key);
     return hit
-      ? { key, force: mode === "fresh" && !hit.stale ? 0 : -1, rev: hit.rev, data: hit.data, error: null }
-      : { key: "", force: -1, rev: 0, data: null, error: null };
+      ? { key, force: mode === "fresh" && !hit.stale ? 0 : -1, data: hit.data, error: null }
+      : { key: "", force: -1, data: null, error: null };
   });
+  const cached = cache?.peek(key);
+  const freshHit = force === 0 && mode === "fresh" && cached !== undefined && !cached.stale;
+  if (lastKey !== key) {
+    setLastKey(key);
+    if (freshHit) setState({ key, force, data: cached.data, error: null });
+  }
   const keyRef = useRef(key);
   const cacheRef = useRef(cache);
   useEffect(() => {
@@ -165,13 +171,13 @@ export function useTabRead<T>(key: string, read: (signal: AbortSignal) => Promis
     run(c.signal)
       .then((data) => {
         if (c.signal.aborted) return;
-        const rev = cache ? cache.set(key, data) : 0;
-        setState({ key, force, rev, data, error: null });
+        cache?.set(key, data);
+        setState({ key, force, data, error: null });
       })
       .catch((err: unknown) => {
         if (c.signal.aborted || isAbort(err)) return;
         const entry = cache?.peek(key);
-        setState((s) => ({ key, force, rev: entry?.rev ?? 0, data: s.key === key ? s.data : (entry?.data ?? null), error: errorMessage(err) }));
+        setState((s) => ({ key, force, data: s.key === key ? s.data : (entry?.data ?? null), error: errorMessage(err) }));
       });
     return () => {
       c.abort();
@@ -184,14 +190,14 @@ export function useTabRead<T>(key: string, read: (signal: AbortSignal) => Promis
   }, []);
   const replace = useCallback((data: T) => {
     const k = keyRef.current;
-    const rev = cacheRef.current ? cacheRef.current.set(k, data) : 0;
-    setState((s) => ({ ...s, key: k, rev, data, error: null }));
+    cacheRef.current?.set(k, data);
+    setState((s) => ({ ...s, key: k, data, error: null }));
   }, []);
-  // Another key's answer is not this one's: fall back to a cached entry for the new key if present.
-  const cached = cache?.peek(key);
+  // An external cache.invalidate() marks the cache stale for future mounts/switches without
+  // flipping a mounted hook into loading:true while no fetch is in flight (which would starve
+  // useThrottled's busy guard).
   const same = state.key === key;
-  const freshHit = force === 0 && mode === "fresh" && cached !== undefined && !cached.stale;
-  const settled = same && state.force === force && state.rev === (cached?.rev ?? 0);
+  const settled = same && state.force === force;
   return {
     data: freshHit ? cached.data : same ? state.data : (cached?.data ?? null),
     error: freshHit ? null : same ? state.error : null,

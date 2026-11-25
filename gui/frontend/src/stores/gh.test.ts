@@ -187,6 +187,23 @@ describe("pull_request_changed in-place cache patching", () => {
     expect(toGhEventView(create(GhEventSchema, { event: { case: "pullRequestChanged", value: create(GhEvent_PullRequestChangedSchema, { repoSlug: "acme/app", number: 1 }) } }))).toBeNull();
   });
 
+  it("never downgrades a merged PR back to open from a lagging pull_request_changed event", () => {
+    const mergedPr = makePr({ state: "merged", title: "Merged title" });
+    dashboardResource.set(DASHBOARD_KEY, { data: makeDashboard({ recentlyMerged: [mergedPr] }) });
+    const bKey = branchKey("acme/app", "feat/x");
+    branchPullRequestsResource.set(bKey, { data: { pullRequests: [mergedPr], fetchedAtMs: 1000, lastError: "" } });
+    const dKey = pullRequestKey("acme/app", 42);
+    pullRequestDetailResource.set(dKey, {
+      data: { pullRequest: mergedPr, body: "keep", comments: [], commits: [] } as unknown as PullRequestDetailView,
+    });
+
+    applyGhEvent({ kind: "pullRequestChanged", repoSlug: "acme/app", number: 42, headRef: "feat/x", pullRequest: makePr({ state: "open", title: "Lagging open" }) });
+
+    expect(dashboardResource.store.getState().entries[DASHBOARD_KEY]?.data?.recentlyMerged[0]?.state).toBe("merged");
+    expect(branchPullRequestsResource.store.getState().entries[bKey]?.data?.pullRequests[0]?.state).toBe("merged");
+    expect(pullRequestDetailResource.store.getState().entries[dKey]?.data?.pullRequest.state).toBe("merged");
+  });
+
   it("invalidateWatchedGhOnReconnect invalidates watched branch and detail resources", () => {
     const bInv = vi.spyOn(branchPullRequestsResource, "invalidate");
     const dInv = vi.spyOn(pullRequestDetailResource, "invalidate");

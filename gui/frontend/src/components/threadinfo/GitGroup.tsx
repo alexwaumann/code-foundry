@@ -251,9 +251,13 @@ function usePrRows(threadId: string): PrRow[] {
       }),
     [links],
   );
-  const summary = useSummaryPrViews(keys);
-  const missingKeys = useMemo(() => keys.filter((_k, i) => summary[i] === null), [keys, summary]);
+  // Only suppress detail watching for PRs backed by actively polled summary caches
+  // (core dashboard lists or currently watched branch lists) so stale unwatched branch
+  // entries cannot leave a merged/closed PR stuck as open.
+  const freshSummary = useSummaryPrViews(keys, { watchedOnly: true });
+  const missingKeys = useMemo(() => keys.filter((_k, i) => freshSummary[i] === null), [keys, freshSummary]);
   useWatchKeys(pullRequestDetailResource.watch, missingKeys);
+  const summary = useSummaryPrViews(keys);
   const detail = pullRequestDetailResource.store(useShallow((s) => keys.map((k) => s.entries[k]?.data?.pullRequest ?? null)));
   const views = useMemo(() => keys.map((_, i) => fresher(detail[i] ?? null, summary[i] ?? null)), [keys, detail, summary]);
   const projectKey = useProjectsStore(useShallow((s) => members.map((id) => [id, s.byId[id]?.name ?? id, s.byId[id]?.githubSlug ?? ""].join(SEP))));

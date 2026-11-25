@@ -140,10 +140,15 @@ export const pullRequestDetailResource = createResource(
   { keepAliveMs: PULL_REQUEST_DETAIL_KEEPALIVE_MS, abortOnRelease: true },
 );
 
-/** Replaces the PR matching `targetKey` in `list`; returns `list` unchanged when absent. */
+/**
+ * Replaces the PR matching `targetKey` in `list`; returns `list` unchanged when absent.
+ * Never downgrades a locally overlaid "merged" PR back to "open" from a lagging poll event.
+ */
 function patchPrList(list: PullRequestView[], targetKey: string, next: PullRequestView): PullRequestView[] {
   const idx = list.findIndex((p) => pullRequestKey(p.repoSlug, p.number) === targetKey);
   if (idx === -1) return list;
+  const cur = list[idx];
+  if (cur?.state === "merged" && next.state === "open") return list;
   const out = list.slice();
   out[idx] = next;
   return out;
@@ -167,8 +172,6 @@ function patchPullRequestInCaches(repoSlug: string, number: number, headRef: str
   if (!slug || !num) return;
   const patched: PullRequestView = pr.repoSlug && pr.number && (pr.headRef || !headRef) ? pr : { ...pr, repoSlug: slug, number: num, headRef: pr.headRef || headRef };
   const targetKey = pullRequestKey(slug, num);
-  const slugLower = slug.toLowerCase();
-  const branchHead = patched.headRef;
 
   // 1. Dashboard lists (authored, reviewRequested, reviewed, recentlyMerged, projectOpen, projectMerged).
   const dashEntries = dashboardResource.store.getState().entries;
@@ -208,33 +211,26 @@ function patchPullRequestInCaches(repoSlug: string, number: number, headRef: str
   }
   if (dashChanged) dashboardResource.store.setState({ entries: nextDashEntries });
 
-  // 2. Branch pull request lists matching repoSlug + headRef or already holding this PR.
+  // 2. Branch pull request lists holding this PR.
   const branchEntries = branchPullRequestsResource.store.getState().entries;
   let branchChanged = false;
   const nextBranchEntries = { ...branchEntries };
   for (const [key, entry] of Object.entries(branchEntries)) {
     const b = entry.data;
     if (!b) continue;
-    const [entrySlug = "", entryHead = ""] = key.split(SEP);
-    const matchesBranch = entrySlug.toLowerCase() === slugLower && branchHead !== "" && entryHead === branchHead;
     const pullRequests = patchPrList(b.pullRequests, targetKey, patched);
     if (pullRequests !== b.pullRequests) {
       nextBranchEntries[key] = { ...entry, data: { ...b, pullRequests } };
-      branchChanged = true;
-    } else if (matchesBranch && b.pullRequests.some((p) => p.number === num)) {
-      nextBranchEntries[key] = {
-        ...entry,
-        data: { ...b, pullRequests: b.pullRequests.map((p) => (p.number === num ? patched : p)) },
-      };
       branchChanged = true;
     }
   }
   if (branchChanged) branchPullRequestsResource.store.setState({ entries: nextBranchEntries });
 
-  // 3. Cached pull request detail: update pullRequest in-place while keeping comments/commits/reviews.
+  // 3. Cached pull request detail: update pullRequest in-place while keeping comments/commits/reviews,
+  // never downgrading an overlaid "merged" PR back to "open".
   const detailEntries = pullRequestDetailResource.store.getState().entries;
   const detailEntry = detailEntries[targetKey];
-  if (detailEntry?.data) {
+  if (detailEntry?.data && !(detailEntry.data.pullRequest.state === "merged" && patched.state === "open")) {
     pullRequestDetailResource.store.setState({
       entries: {
         ...detailEntries,

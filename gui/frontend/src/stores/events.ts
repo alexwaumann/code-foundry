@@ -196,24 +196,34 @@ export function startEventSync({ observer = false }: { observer?: boolean } = {}
   let snapshotTerminals: Set<string> | null = null;
   let ghSnapshotInvalidated = false;
 
-  // Load settings schema once on startup; re-loaded below if a restarted daemon changes epoch.
-  void loadSettingsSchema();
+  let schemaLoadedEpoch: string | null = null;
 
   const onEnvelope = (meta: EventEnvelope): void => {
     if (meta.epoch) {
-      if (lastEpoch && meta.epoch !== lastEpoch) {
-        // Daemon restarted: reset seq and reload schema (model registry may have changed).
-        lastSeq = 0n;
-        lastEpoch = meta.epoch;
-        void loadSettingsSchema();
-      } else if (!lastEpoch) {
+      if (meta.epoch !== lastEpoch) {
+        if (lastEpoch) {
+          // Daemon restarted: reset seq and reload schema (model registry may have changed).
+          lastSeq = 0n;
+        }
         lastEpoch = meta.epoch;
       }
+      if (schemaLoadedEpoch !== meta.epoch) {
+        schemaLoadedEpoch = meta.epoch;
+        void loadSettingsSchema();
+      }
+    } else if (schemaLoadedEpoch === null) {
+      schemaLoadedEpoch = "";
+      void loadSettingsSchema();
     }
-    if (meta.isHeartbeat) return;
+    if (meta.isHeartbeat) {
+      // A resume-at-head heartbeat confirms the attempt resumed without snapshot fallback;
+      // clear attemptFirstEvent so a later mid-stream seq-0 resync is never treated as a
+      // full reconnect fallback that would wipe terminals.
+      attemptFirstEvent = false;
+      return;
+    }
     lastEnvelopeSeq = meta.seq;
     if (meta.seq > 0n) {
-      if (meta.seq > lastSeq) lastSeq = meta.seq;
       attemptSawLive = true;
       ghSnapshotInvalidated = false;
     } else if (reconnecting && attemptFirstEvent) {
@@ -248,6 +258,9 @@ export function startEventSync({ observer = false }: { observer?: boolean } = {}
       }
     }
     deliver(ev);
+    // Advance the resume cursor only after delivery succeeded so a throwing handler does
+    // not skip the event on reconnect.
+    if (lastEnvelopeSeq > lastSeq) lastSeq = lastEnvelopeSeq;
     // A full gh snapshot on reconnect (or after a mid-stream gh drop resync) invalidates
     // viewer, dashboard and repo activity via its events, but not watched PR details or
     // branch lists; invalidate those once per gh snapshot burst so they do not wait 60s-5m.

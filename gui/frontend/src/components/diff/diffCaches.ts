@@ -8,9 +8,12 @@ import type { CompareFileSidesView, CompareLogView, CompareView } from "@/api/co
 import type { RefsView } from "@/api/project";
 import { createTabReadCache } from "@/components/files/useTabRead";
 
+const COMPARE_FILE_CACHE_MAX_BYTES = 16 * 1024 * 1024;
+const sidesBytes = (s: CompareFileSidesView): number => (s.old.text.length + s.new.text.length) * 2;
+
 export const compareWorktreeCache = createTabReadCache<CompareView>({ max: 24 });
 export const compareLogCache = createTabReadCache<CompareLogView | null>({ max: 24 });
-export const compareFileCache = createTabReadCache<CompareFileSidesView>({ max: 32 });
+export const compareFileCache = createTabReadCache<CompareFileSidesView>({ max: 32, maxBytes: COMPARE_FILE_CACHE_MAX_BYTES, sizeOf: sidesBytes });
 export const refsReadCache = createTabReadCache<RefsView>({ max: 32 });
 
 /** Marks cached diff entries for `(projectId, worktree)` stale so revisits revalidate. */

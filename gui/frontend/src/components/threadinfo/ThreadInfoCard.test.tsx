@@ -454,28 +454,34 @@ describe("ThreadInfoCard: other scenarios", () => {
       expect(screen.getAllByTestId("ti-pr-title")[0]?.textContent).toBe("From the dashboard");
     });
 
-    it("resolves linked PRs from dashboard and branch caches without watching pullRequestDetailResource, falling back only for missing PRs", async () => {
+    it("resolves linked PRs from core dashboard and watched branch caches without watching pullRequestDetailResource, falling back for unwatched or missing PRs", async () => {
       const id = seedSingle();
-      updateThread(id, { linkedPullRequests: [linkTo(101), linkTo(102), linkTo(103), linkTo(104)] });
+      updateThread(id, { linkedPullRequests: [linkTo(101), linkTo(102), linkTo(103), linkTo(104), linkTo(105)] });
       const pr101 = pullRequest({ repoSlug: SLUG, number: 101, title: "Base PR", headRef: "b1" });
       const pr102 = pullRequest({ repoSlug: SLUG, number: 102, title: "Stacked PR", headRef: "b2", baseRef: "b1" });
-      const pr103 = pullRequest({ repoSlug: SLUG, number: 103, title: "Branch cached PR", headRef: "b3" });
+      const pr103 = pullRequest({ repoSlug: SLUG, number: 103, title: "Watched branch PR", headRef: "b3" });
       const pr104 = pullRequest({ repoSlug: SLUG, number: 104, title: "Uncached old merged", headRef: "b4", state: "merged" });
+      const pr105 = pullRequest({ repoSlug: SLUG, number: 105, title: "Stale unwatched branch PR", headRef: "b5", state: "open" });
       dashboardResource.set(DASHBOARD_KEY, {
-        data: { authored: [pr101], reviewRequested: [], reviewed: [], recentlyMerged: [], projectOpen: { pullRequests: [pr102], totalCount: 1, searchUrl: "" }, projectMerged: { pullRequests: [], totalCount: 0, searchUrl: "" } } as unknown as DashboardView,
+        data: { authored: [pr101], reviewRequested: [pr102], reviewed: [], recentlyMerged: [], projectOpen: { pullRequests: [], totalCount: 0, searchUrl: "" }, projectMerged: { pullRequests: [], totalCount: 0, searchUrl: "" } } as unknown as DashboardView,
       });
+      const releaseWatchedBranch = branchPullRequestsResource.watch(branchKey(SLUG, "b3"));
       branchPullRequestsResource.set(branchKey(SLUG, "b3"), { data: { pullRequests: [pr103], fetchedAtMs: Date.now(), lastError: "" } });
+      // b5 is NOT watched: must still watch pullRequestDetailResource so stale open state heals.
+      branchPullRequestsResource.set(branchKey(SLUG, "b5"), { data: { pullRequests: [pr105], fetchedAtMs: Date.now(), lastError: "" } });
       card.prDetails.set(`${SLUG}#104`, pr104);
+      card.prDetails.set(`${SLUG}#105`, { ...pr105, state: "merged", updatedAtMs: (pr105.updatedAtMs ?? 0) + 1000 });
 
       const watchSpy = vi.spyOn(pullRequestDetailResource, "watch");
       try {
         await renderCard(id);
         await waitFor(() => {
-          expect(screen.getAllByTestId("ti-pr")).toHaveLength(4);
+          expect(screen.getAllByTestId("ti-pr")).toHaveLength(5);
         });
-        expect(watchSpy.mock.calls.map((c) => c[0])).toEqual([`${SLUG}#104`]);
+        expect(watchSpy.mock.calls.map((c) => c[0])).toEqual([`${SLUG}#104`, `${SLUG}#105`]);
         expect(oneLine(screen.getByTestId("ti-pr-stacked"))).toBe("#101");
       } finally {
+        releaseWatchedBranch();
         watchSpy.mockRestore();
         branchPullRequestsResource.store.setState({ entries: {} });
       }

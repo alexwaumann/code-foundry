@@ -31,23 +31,30 @@ const numberOf = (key: string): number => Number(key.slice(key.lastIndexOf("#") 
 const projectPrs = (p: ProjectPullRequestsView | undefined): readonly PullRequestView[] => (p ? p.pullRequests : []);
 
 /**
- * What the summary caches (dashboard lists and any watched branch's list) already hold
- * on each linked pull request, without watching or fetching full PullRequestDetail.
+ * What the summary caches (dashboard lists and branch lists) hold on each linked PR,
+ * without watching or fetching full PullRequestDetail.
+ * With `watchedOnly: true`, only actively polled sources count (core dashboard lists
+ * plus currently watched branch keys) so stale unwatched branch entries or gated project
+ * lists never suppress watching `pullRequestDetailResource`.
  * `keys` must be stable between renders.
  */
-export function useSummaryPrViews(keys: readonly string[]): (PullRequestView | null)[] {
+export function useSummaryPrViews(keys: readonly string[], opts?: { watchedOnly?: boolean }): (PullRequestView | null)[] {
+  const watchedOnly = opts?.watchedOnly ?? false;
   const dashboard = dashboardResource.store(
     useShallow((s) => {
       const d = s.entries[DASHBOARD_KEY]?.data;
       const lists = d
-        ? [d.authored, d.reviewRequested, d.reviewed, d.recentlyMerged, projectPrs(d.projectOpen), projectPrs(d.projectMerged)]
+        ? watchedOnly
+          ? [d.authored, d.reviewRequested, d.reviewed, d.recentlyMerged]
+          : [d.authored, d.reviewRequested, d.reviewed, d.recentlyMerged, projectPrs(d.projectOpen), projectPrs(d.projectMerged)]
         : [];
       return keys.map((k) => findLinkedPr(lists, k));
     }),
   );
   const branches = branchPullRequestsResource.store(
     useShallow((s) => {
-      const lists = Object.values(s.entries).flatMap((e) => (e.data ? [e.data.pullRequests] : []));
+      const watchedSet = watchedOnly ? new Set(branchPullRequestsResource.watched()) : null;
+      const lists = Object.entries(s.entries).flatMap(([k, e]) => (e.data && (!watchedSet || watchedSet.has(k)) ? [e.data.pullRequests] : []));
       return keys.map((k) => findLinkedPr(lists, k));
     }),
   );

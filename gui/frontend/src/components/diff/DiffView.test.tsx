@@ -248,7 +248,9 @@ describe("file by file", () => {
     expect(api.reads).toEqual(["a.ts", "b.ts"]);
   });
 
-  it("revisiting a previously viewed file serves from the LRU cache without re-reading until invalidated", async () => {
+  it("revisiting a file renders cached sides immediately and revalidates live diffs while skipping RPCs on immutable commit diffs", async () => {
+    // 1. Live comparison: revisiting a.ts revalidates in the background so edits whose
+    // line counts did not change are never missed.
     list([file("a.ts"), file("b.ts")]);
     api.sides.set("a.ts", changed("old-a\n", "new-a\n"));
     api.sides.set("b.ts", changed("old-b\n", "new-b\n"));
@@ -258,19 +260,30 @@ describe("file by file", () => {
     await waitFor(() => {
       expect(screen.getByTestId("diff-file").getAttribute("data-path")).toBe("b.ts");
     });
-    expect(api.reads).toEqual(["a.ts", "b.ts"]);
-    // Switching back to a.ts reuses the cached sides with 0 extra RPCs.
+    api.sides.set("a.ts", changed("old-a\n", "new-a-edited\n"));
+    fireEvent.click(rowOf("a.ts"));
+    await waitFor(() => {
+      expect(api.reads).toEqual(["a.ts", "b.ts", "a.ts"]);
+    });
+    expect(screen.getByTestId("diff-file").getAttribute("data-path")).toBe("a.ts");
+
+    // 2. Immutable commit comparison (commit prop -> live=false): revisiting skips the RPC.
+    cleanup();
+    api.reads.length = 0;
+    list([file("a.ts"), file("b.ts")]);
+    const shaB = "b".repeat(40);
+    const shaC = "c".repeat(40);
+    await show(target({ base: { kind: "ref", ref: shaB }, head: { kind: "ref", ref: shaC }, file: "a.ts", commit: { sha: shaC, base: DEFAULT_BASE, head: DEFAULT_HEAD, file: "", oldPath: "" } }));
+    expect(api.reads).toEqual(["a.ts"]);
+    fireEvent.click(rowOf("b.ts"));
+    await waitFor(() => {
+      expect(screen.getByTestId("diff-file").getAttribute("data-path")).toBe("b.ts");
+    });
     fireEvent.click(rowOf("a.ts"));
     await waitFor(() => {
       expect(screen.getByTestId("diff-file").getAttribute("data-path")).toBe("a.ts");
     });
     expect(api.reads).toEqual(["a.ts", "b.ts"]);
-    // A worktree status change invalidates the worktree's cache, so switching back to b.ts revalidates it.
-    await again([file("a.ts"), file("b.ts")]);
-    fireEvent.click(rowOf("b.ts"));
-    await waitFor(() => {
-      expect(api.reads.at(-1)).toBe("b.ts");
-    });
   });
 
   it("a rename reads both its paths and keeps its source in the tab", async () => {

@@ -100,6 +100,40 @@ describe("useTabRead", () => {
     expect(cache.peek("b")).toBeUndefined();
     expect(cache.size()).toBe(2);
   });
+
+  it("external cache.invalidate does not flip a mounted hook into loading:true", async () => {
+    const cache = createTabReadCache<string>({ max: 4 });
+    let n = 0;
+    const read = vi.fn(() => Promise.resolve(`v${String(++n)}`));
+    const { result } = renderHook(() => useTabRead("a", read, { cache, mode: "revalidate" }));
+    await waitFor(() => {
+      expect(result.current).toMatchObject({ data: "v1", loading: false });
+    });
+    // External invalidation (e.g. DiffView list reload) must not leave loading:true with no fetch in flight.
+    act(() => {
+      cache.invalidate("a");
+    });
+    expect(result.current.loading).toBe(false);
+    expect(cache.peek("a")?.stale).toBe(true);
+    // Explicit reload still runs cleanly.
+    act(() => {
+      result.current.reload();
+    });
+    await waitFor(() => {
+      expect(result.current).toMatchObject({ data: "v2", loading: false });
+    });
+  });
+
+  it("evicts oldest entries when maxBytes is exceeded", () => {
+    const cache = createTabReadCache<string>({ max: 10, maxBytes: 10, sizeOf: (s) => s.length });
+    cache.set("a", "123456"); // 6 bytes
+    cache.set("b", "1234"); // 10 bytes total
+    expect(cache.size()).toBe(2);
+    cache.set("c", "12345"); // 15 > 10 -> evicts "a" (9 bytes left)
+    expect(cache.peek("a")).toBeUndefined();
+    expect(cache.peek("b")?.data).toBe("1234");
+    expect(cache.peek("c")?.data).toBe("12345");
+  });
 });
 
 describe("useThrottled", () => {
