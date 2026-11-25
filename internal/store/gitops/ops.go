@@ -159,6 +159,7 @@ func (m *Manager) Push(ctx context.Context, o PushOptions) (Op, error) {
 		notifyGH:      true,
 		githubSlug:    t.project.GitHubSlug,
 		defaultBranch: t.project.DefaultBranch,
+		worktreePath:  t.worktreePath,
 	}
 	return m.submit(ctx, KindPush, title, t, post, func(ctx context.Context, x *run) (string, string, error) {
 		branch, err := x.branch(ctx)
@@ -215,6 +216,7 @@ func (x *run) push(ctx context.Context, branch string, force bool) (string, stri
 		}
 		x.note("# %s has no upstream: pushing to origin/%s and setting it as upstream", branch, branch)
 		args = append(args, "-u", "origin", branch)
+		x.setUpstream = true
 	} else if r, _, ok := strings.Cut(up, "/"); ok {
 		remote = r
 	}
@@ -239,6 +241,7 @@ func (m *Manager) CreatePR(ctx context.Context, o CreatePROptions) (Op, error) {
 		notifyGH:      true,
 		githubSlug:    slug,
 		defaultBranch: t.project.DefaultBranch,
+		worktreePath:  t.worktreePath,
 	}
 	return m.submit(ctx, KindPRCreate, "Create PR for "+t.label(), t, post, func(ctx context.Context, x *run) (string, string, error) {
 		ghBin, err := m.gh()

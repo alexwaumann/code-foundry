@@ -46,8 +46,9 @@ func ParseChannel(s string) Channel {
 type Source interface {
 	// Latest returns the tag of the channel's latest release, e.g. "v0.2.0" or
 	// "v0.3.0-tip.4", as published (it is validated by the caller). Stable is the
-	// newest full release; tip is the highest version of any published release,
-	// prerelease or not, so it is never below stable.
+	// newest full release; tip returns the highest semver tag on the newest page of
+	// published releases (prerelease or not, falling back to older pages if page 1 has
+	// none), so it is never below stable.
 	Latest(ctx context.Context, ch Channel) (string, error)
 	// NotesURL returns the release page for tag.
 	NotesURL(tag string) string
@@ -376,7 +377,11 @@ func (s *GhSource) latestTip(ctx context.Context) (string, error) {
 			}
 		}
 		if tag, ok := HighestTag(tags); ok {
-			s.storeETag(ChannelTip, page1ETag, tag)
+			// Only cache page 1's ETag when page 1 produced the winning tag; a tag from
+			// a later page could become stale even if page 1 returns 304 Not Modified.
+			if page == 0 {
+				s.storeETag(ChannelTip, page1ETag, tag)
+			}
 			return tag, nil
 		}
 		nextURL = nextPageURL(res.header.Get("Link"), base)

@@ -1,7 +1,6 @@
 package gitops
 
 import (
-	"cmp"
 	"context"
 	"fmt"
 	"log/slog"
@@ -159,9 +158,10 @@ func (m *Manager) timeout(k Kind) time.Duration {
 
 // target is where an operation runs, resolved against the project snapshot.
 type target struct {
-	path    string // symlinks resolved
-	project project.Project
-	branch  string // from the snapshot, or read from HEAD when resolved with needBranch
+	path         string // symlinks resolved (may be a subdirectory inside worktreePath)
+	worktreePath string // matched registered worktree root from snapshot (empty if unregistered)
+	project      project.Project
+	branch       string // from the snapshot, or read from HEAD when resolved with needBranch
 }
 
 // resolve validates worktreePath (absolute, an existing directory) and finds the
@@ -201,7 +201,7 @@ func (m *Manager) resolvePath(worktreePath string) (target, project.Worktree, bo
 	var wt project.Worktree
 	var found bool
 	if r, w, ok := m.lookup(p); ok {
-		t.project, t.branch, wt, found = r, w.Branch, w, true
+		t.project, t.worktreePath, t.branch, wt, found = r, w.Path, w.Branch, w, true
 	}
 	return t, wt, found, nil
 }
@@ -308,6 +308,7 @@ type postOp struct {
 	notifyGH      bool
 	githubSlug    string
 	defaultBranch string
+	worktreePath  string
 }
 
 // worktreeToucher is implemented by project.Store (TouchNow) so a feature-branch push
@@ -391,7 +392,7 @@ func (m *Manager) execute(op *Op, post postOp, b body) Op {
 		m.finished = m.finished[:KeepFinished]
 	}
 	m.publishLocked(Finished, final)
-	m.afterOpLocked(final, post)
+	m.afterOpLocked(final, post, x.setUpstream)
 	m.mu.Unlock()
 	m.log.Info("gitops", "op", final.ID, "kind", final.Kind.String(), "path", final.WorktreePath,
 		"ok", final.OK(), "summary", final.Summary, "duration", final.Duration)
@@ -400,22 +401,24 @@ func (m *Manager) execute(op *Op, post postOp, b body) Op {
 
 // afterOpLocked schedules background project and GitHub refreshes after final finishes.
 // Called with m.mu held.
-func (m *Manager) afterOpLocked(final Op, post postOp) {
+func (m *Manager) afterOpLocked(final Op, post postOp, setUpstream bool) {
+	noopPush := final.Kind == KindPush && final.OK() && final.Summary == "already up to date" && !setUpstream
 	if final.ProjectID != "" && m.opts.Projects != nil {
 		switch post.refresh {
 		case refreshProject:
 			m.bg.Go(func() { m.refresh(final.ProjectID) })
 		case refreshPush:
-			// A no-op push ("already up to date") changes no local or remote refs.
-			if final.Kind == KindPush && final.OK() && final.Summary == "already up to date" {
+			// A no-op push ("already up to date") that did not set a new upstream
+			// changes no local config or remote refs.
+			if noopPush {
 				break
 			}
 			// Pushing a non-default feature branch only updates that worktree's upstream
-			// and ahead/behind counts; use TouchNow when available instead of scanning
-			// every worktree in the project.
-			if post.defaultBranch != "" && final.Branch != "" && final.Branch != post.defaultBranch {
+			// and ahead/behind counts; use TouchNow on the registered worktree root when
+			// available instead of scanning every worktree in the project.
+			if post.defaultBranch != "" && final.Branch != "" && final.Branch != post.defaultBranch && post.worktreePath != "" {
 				if wt, ok := m.opts.Projects.(worktreeToucher); ok {
-					path := final.WorktreePath
+					path := post.worktreePath
 					m.bg.Go(func() { wt.TouchNow(path) })
 					break
 				}
@@ -423,11 +426,9 @@ func (m *Manager) afterOpLocked(final Op, post postOp) {
 			m.bg.Go(func() { m.refresh(final.ProjectID) })
 		}
 	}
-	if post.notifyGH && final.OK() && post.githubSlug != "" && m.opts.GitHub != nil {
-		if branch := cmp.Or(final.Branch, ""); branch != "" {
-			slug := post.githubSlug
-			m.bg.Go(func() { m.notifyGitHub(slug, branch) })
-		}
+	if post.notifyGH && final.OK() && !noopPush && post.githubSlug != "" && final.Branch != "" && m.opts.GitHub != nil {
+		slug, branch := post.githubSlug, final.Branch
+		m.bg.Go(func() { m.notifyGitHub(slug, branch) })
 	}
 }
 
@@ -465,6 +466,7 @@ type run struct {
 	m              *Manager
 	dir            string
 	resolvedBranch string
+	setUpstream    bool
 	out            strings.Builder
 }
 

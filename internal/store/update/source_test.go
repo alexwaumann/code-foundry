@@ -342,18 +342,18 @@ func TestGhSourceTipPagination(t *testing.T) {
 		var requests atomic.Int32
 		var srv *httptest.Server
 		srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			n := requests.Add(1)
+			requests.Add(1)
 			if r.URL.Query().Get("page") == "2" {
 				_, _ = w.Write([]byte(`[{"tag_name":"v0.14.9","draft":false}]`))
 				return
 			}
 			w.Header().Set("ETag", `"p1"`)
 			w.Header().Set("Link", fmt.Sprintf(`<%s/repos/o/n/releases?per_page=2&page=2>; rel="next"`, srv.URL))
-			if n == 1 {
-				_, _ = w.Write([]byte(`[{"tag_name":"v0.15.0-draft","draft":true},{"tag_name":"not-semver","draft":false}]`))
+			if r.Header.Get("If-None-Match") == `"p1"` {
+				w.WriteHeader(http.StatusNotModified)
 				return
 			}
-			w.WriteHeader(http.StatusNotModified)
+			_, _ = w.Write([]byte(`[{"tag_name":"v0.15.0-draft","draft":true},{"tag_name":"not-semver","draft":false}]`))
 		}))
 		defer srv.Close()
 
@@ -369,6 +369,15 @@ func TestGhSourceTipPagination(t *testing.T) {
 		}
 		if n := requests.Load(); n != 2 {
 			t.Errorf("HTTP requests = %d, want 2", n)
+		}
+		// A second call must not send page 1's ETag for a tag that came from page 2:
+		// page 2's contents could change even while page 1 returns 304.
+		got2, err := src.Latest(context.Background(), update.ChannelTip)
+		if err != nil || got2 != "v0.14.9" {
+			t.Fatalf("second Latest = %q, %v", got2, err)
+		}
+		if n := requests.Load(); n != 4 {
+			t.Errorf("HTTP requests after second call = %d, want 4 (page 1 ETag not reused for page 2 tag)", n)
 		}
 	})
 }

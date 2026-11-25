@@ -232,13 +232,54 @@ func TestPushMinimalProjectRefresh(t *testing.T) {
 	commit(t, w.a, "m.txt", "1\n", "feat: minimal")
 	wantOK(t, mustOp(t)(w.m.Push(ctx, PushOptions{WorktreePath: w.a})), "pushed feat/minimal to origin (new branch)")
 
-	// No-op push ("already up to date"): skips both Refresh and TouchNow.
-	wantOK(t, mustOp(t)(w.m.Push(ctx, PushOptions{WorktreePath: w.a})), "already up to date")
+	// No-op push ("already up to date") with existing upstream: skips both Refresh/TouchNow and GH notify.
+	ghBridge := &fakeGitHub{}
+	wNoop := newWorld(t, Options{GitHub: ghBridge})
+	wNoop.projects.Put(project.Project{
+		ID: "ra", Path: wNoop.a, Name: "a", DefaultBranch: "main", GitHubSlug: "me/a",
+		Remotes:   []string{"origin"},
+		Worktrees: []project.Worktree{{ProjectID: "ra", Path: wNoop.a, Branch: "main", IsMain: true}},
+	})
+	git(t, wNoop.a, "switch", "-q", "-c", "feat/noop")
+	commit(t, wNoop.a, "n.txt", "1\n", "feat: noop")
+	wantOK(t, mustOp(t)(wNoop.m.Push(ctx, PushOptions{WorktreePath: wNoop.a})), "pushed feat/noop to origin (new branch)")
+	// Push again with upstream already set: true no-op.
+	wantOK(t, mustOp(t)(wNoop.m.Push(ctx, PushOptions{WorktreePath: wNoop.a})), "already up to date")
+	_ = wNoop.m.Close()
+	if !slices.Equal(wNoop.projects.Calls, []string{"TouchNow " + wNoop.a}) {
+		t.Errorf("project calls for feature push + no-op push = %v, want [TouchNow %s]", wNoop.projects.Calls, wNoop.a)
+	}
+	if got := ghBridge.notifications(); !slices.Equal(got, []string{"me/a|feat/noop"}) {
+		t.Errorf("GH notifications for push + no-op push = %v, want 1 notification", got)
+	}
 
-	// Wait for background refreshes by closing manager.
+	// Subdirectory push on a feature branch: TouchNow receives the registered worktree root, not the subdir.
+	sub := filepath.Join(w.a, "nested", "dir")
+	if err := os.MkdirAll(sub, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	commit(t, w.a, "m2.txt", "2\n", "feat: subdir push")
+	wantOK(t, mustOp(t)(w.m.Push(ctx, PushOptions{WorktreePath: sub})), "pushed feat/minimal to origin")
 	_ = w.m.Close()
-	if !slices.Equal(w.projects.Calls, []string{"TouchNow " + w.a}) {
-		t.Errorf("project calls for feature push + no-op push = %v, want [TouchNow %s]", w.projects.Calls, w.a)
+	if !slices.Equal(w.projects.Calls, []string{"TouchNow " + w.a, "TouchNow " + w.a}) {
+		t.Errorf("project calls for root + subdir feature pushes = %v, want two [TouchNow %s]", w.projects.Calls, w.a)
+	}
+
+	// Push that prints "Everything up-to-date" while setting a new upstream (-u) must still refresh.
+	wUp := newWorld(t, Options{})
+	wUp.projects.Put(project.Project{
+		ID: "ra", Path: wUp.a, Name: "a", DefaultBranch: "main", GitHubSlug: "me/a",
+		Remotes:   []string{"origin"},
+		Worktrees: []project.Worktree{{ProjectID: "ra", Path: wUp.a, Branch: "main", IsMain: true}},
+	})
+	git(t, wUp.a, "switch", "-q", "-c", "feat/set-up")
+	commit(t, wUp.a, "u.txt", "1\n", "feat: set-up")
+	// Push once without setting upstream, then push via gitops (which runs `git push -u`).
+	git(t, wUp.a, "push", "-q", "origin", "feat/set-up")
+	wantOK(t, mustOp(t)(wUp.m.Push(ctx, PushOptions{WorktreePath: wUp.a})), "already up to date")
+	_ = wUp.m.Close()
+	if !slices.Equal(wUp.projects.Calls, []string{"TouchNow " + wUp.a}) {
+		t.Errorf("project calls for already-up-to-date -u push = %v, want [TouchNow %s]", wUp.projects.Calls, wUp.a)
 	}
 
 	// Default branch push: triggers full project Refresh because origin/main moved.
