@@ -246,8 +246,8 @@ func TestReviewerCandidatesSeveralWords(t *testing.T) {
 			t.Errorf("%q: got %v, want %v", q, got, want)
 		}
 	}
-	if n := f.count("ReviewerCandidates") - before; n != 3 {
-		t.Errorf("requests = %d, want one per search", n)
+	if n := f.count("ReviewerCandidates") - before; n != 1 {
+		t.Errorf("requests = %d, want 1 (subsequent searches served from assignable cache)", n)
 	}
 }
 

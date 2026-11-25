@@ -1,14 +1,21 @@
 # Who can be asked to review a pull request: whoever is requested now (users and teams)
 # plus, when $search is set, up to 20 assignable users GitHub matches against $query
-# (login and name). A search of several words also asks for each word on its own
-# (t0..t3, set by $s0..$s3): GitHub matches the whole string against the stored name,
-# so "jane doe" misses "Doe, Jane"; the store merges the lists and keeps only users
-# matching every word (reviewer_search.go). Still one request. Fetched on demand by
-# ListReviewerCandidates; never cached.
+# (login and name). When $all is set, also fetches the first 100 assignable users with
+# pageInfo.hasNextPage so repositories with <=100 assignable users are cached in memory
+# and subsequent search keystrokes filter locally without hitting GitHub. A search of
+# several words also asks for each word on its own (t0..t3, set by $s0..$s3): GitHub
+# matches the whole string against the stored name, so "jane doe" misses "Doe, Jane";
+# the store merges the lists and keeps only users matching every word
+# (reviewer_search.go). Still one request. Fetched on demand by ListReviewerCandidates.
 query ReviewerCandidates($owner: String!, $name: String!, $number: Int!, $query: String, $search: Boolean!,
+    $all: Boolean!,
     $q0: String, $s0: Boolean!, $q1: String, $s1: Boolean!, $q2: String, $s2: Boolean!, $q3: String, $s3: Boolean!) {
   rateLimit { ...RateLimitFields }
   repository(owner: $owner, name: $name) {
+    allAssignable: assignableUsers(first: 100) @include(if: $all) {
+      pageInfo { hasNextPage }
+      nodes { id login name avatarUrl }
+    }
     assignableUsers(first: 20, query: $query) @include(if: $search) {
       nodes { id login name avatarUrl }
     }

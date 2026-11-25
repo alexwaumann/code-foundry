@@ -73,7 +73,12 @@ func fullKeyOf(slug string, number int) (fullKey, error) {
 
 type fullEntry struct {
 	d     FullPullRequest
-	stale bool // the poll saw the pull request change since d was fetched
+	stale bool // the poll saw a non-check or settled change since d was fetched
+	// checksStale: only pending check counts moved on the same head SHA. The summary
+	// Checks counts are patched immediately, and a background refresh fetches only
+	// checks.graphql instead of the full pull_request_full document so check-run rows
+	// stay accurate without re-reading comments, commits, reviews, and threads.
+	checksStale bool
 	// confirmed is when a poll last saw the pull request's fingerprint unchanged since d
 	// was fetched; zero until one does.
 	confirmed time.Time
@@ -90,7 +95,7 @@ type fullEntry struct {
 // or closed) or a poll confirmed it within confirmWindow of the poll's real cadence
 // (pollCadence), up to confirmedMaxAge.
 func (e fullEntry) serves(now time.Time, pollInterval, cadence time.Duration) bool {
-	if e.stale {
+	if e.stale || e.checksStale {
 		return false
 	}
 	age := now.Sub(e.d.FetchedAt)
@@ -219,12 +224,22 @@ func (c *fullCache) putLocked(k fullKey, e *fullEntry) (prev fullEntry, had bool
 // adopt stores d (loaded from SQLite) as stale and unconfirmed unless an entry exists,
 // in one step, and returns the entry cached afterwards.
 func (c *fullCache) adopt(k fullKey, d FullPullRequest) fullEntry {
+	return c.adoptWith(k, d, true, time.Time{})
+}
+
+// adoptConfirmed stores d (loaded from SQLite and validated against a live poll) as
+// fresh and confirmed at confirmed unless an entry already exists.
+func (c *fullCache) adoptConfirmed(k fullKey, d FullPullRequest, confirmed time.Time) fullEntry {
+	return c.adoptWith(k, d, false, confirmed)
+}
+
+func (c *fullCache) adoptWith(k fullKey, d FullPullRequest, stale bool, confirmed time.Time) fullEntry {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if e, ok := c.m[k]; ok {
 		return *e
 	}
-	e := &fullEntry{d: d, stale: true}
+	e := &fullEntry{d: d, stale: stale, confirmed: confirmed}
 	c.putLocked(k, e)
 	return *e
 }
@@ -252,9 +267,12 @@ func (c *fullCache) fail(k fullKey, err error, now time.Time) bool {
 	return news
 }
 
-// applyPoll records what a poll saw: every fresh entry whose pull request's fingerprint
-// in fps moved goes stale (their keys are returned), and every other fresh one in fps
-// is confirmed at now when its detail allows (confirmable).
+// applyPoll records what a poll saw:
+//   - A fresh entry whose only change is check counts while checks remain PENDING (no new
+//     failure) has its summary Checks patched in place and is marked checksStale (so an
+//     open panel refreshes only checks.graphql rather than the full PullRequestFull doc).
+//   - Any other fresh entry whose fingerprint moved goes stale (returned).
+//   - Every unchanged fresh entry in fps is confirmed at now when confirmable.
 func (c *fullCache) applyPoll(fps []prFingerprint, now time.Time) []fullKey {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -270,14 +288,36 @@ func (c *fullCache) applyPoll(fps []prFingerprint, now time.Time) []fullKey {
 		f, ok := byID[e.d.PullRequest.ID]
 		switch {
 		case !ok || e.stale:
-		case fingerprintMoved(e.d.PullRequest, f):
-			e.stale = true
+		case pendingCheckCountsOnly(e.d.PullRequest, f):
+			e.d.PullRequest.Checks = f.Checks
+			e.checksStale = true
 			out = append(out, k)
-		case confirmable(e.d):
+		case fingerprintMoved(e.d.PullRequest, f):
+			e.stale, e.checksStale = true, false
+			out = append(out, k)
+		case confirmable(e.d) && !e.checksStale:
 			e.confirmed = now
 		}
 	}
 	return out
+}
+
+// pendingCheckCountsOnly reports whether f differs from p solely in its check counts
+// while checks remain PENDING with no new failure. Patching the summary counts in place
+// avoids refetching the whole FullPullRequest while CI ticks; once CI settles or a check
+// fails (or any non-check field moves), the detail goes stale and refetches so check-run
+// rows stay accurate.
+func pendingCheckCountsOnly(p PullRequest, f prFingerprint) bool {
+	if !p.UpdatedAt.Equal(f.UpdatedAt) || p.State != f.State || p.HeadSHA != f.HeadSHA {
+		return false
+	}
+	if !f.HasChecks || p.Checks == f.Checks {
+		return false
+	}
+	return p.Checks.State == RollupPending &&
+		f.Checks.State == RollupPending &&
+		f.Checks.Pending > 0 &&
+		f.Checks.Failed == p.Checks.Failed
 }
 
 // fingerprintMoved reports whether the poll's fingerprint of a pull request differs
@@ -290,12 +330,6 @@ func fingerprintMoved(p PullRequest, f prFingerprint) bool {
 		return true
 	}
 	return false
-}
-
-// sameFull compares everything clients see except FetchedAt.
-func sameFull(a, b FullPullRequest) bool {
-	a.FetchedAt, b.FetchedAt = time.Time{}, time.Time{}
-	return sameJSON(a, b)
 }
 
 // FullPullRequest implements Service. It waits for GitHub only with nothing cached, for
@@ -372,6 +406,9 @@ func (s *Store) staleFirst(k fullKey, e fullEntry) FullPullRequest {
 }
 
 // cachedFull returns the cached entry of k from memory or, failing that, SQLite.
+// When loading from SQLite, if a live poll has already confirmed that the pull request
+// has not changed since row.FetchedAt (and no local write or move invalidated it), the
+// row is adopted as fresh and confirmed so no redundant GraphQL fetch is triggered.
 func (s *Store) cachedFull(ctx context.Context, k fullKey) (fullEntry, bool) {
 	if e, ok := s.full.entry(k); ok {
 		return e, true
@@ -383,6 +420,15 @@ func (s *Store) cachedFull(ctx context.Context, k fullKey) (fullEntry, bool) {
 	if !found {
 		return fullEntry{}, false
 	}
+	s.summaries.put(k, row.PullRequest)
+	if fp, polledAt, ok := s.summaries.polledFingerprint(k); ok &&
+		!polledAt.Before(row.FetchedAt) &&
+		confirmable(row) &&
+		!s.moved.movedSince(k, row.FetchedAt) &&
+		!s.moved.writtenSince(k, row.FetchedAt) &&
+		prMatchesFingerprint(row.PullRequest, fp) {
+		return s.full.adoptConfirmed(k, row, polledAt), true
+	}
 	return s.full.adopt(k, row), true
 }
 
@@ -393,7 +439,7 @@ func fullJobID(k fullKey) string { return "full|" + k.String() }
 func (s *Store) fetchFullJob(ctx context.Context, k fullKey) (FullPullRequest, error) {
 	submitted := s.opts.Now()
 	return submitRead(ctx, s, fullJobID(k), func(ctx context.Context) (FullPullRequest, error) {
-		return s.runFullFetch(ctx, k, submitted, false)
+		return s.runFullFetch(ctx, k, submitted, false, true)
 	})
 }
 
@@ -402,7 +448,7 @@ func (s *Store) fetchFullJob(ctx context.Context, k fullKey) (FullPullRequest, e
 func (s *Store) refreshFull(k fullKey) error {
 	submitted := s.opts.Now()
 	return s.submitBackground(&job{kind: jobFunc, id: fullJobID(k), run: func(ctx context.Context) (any, error) {
-		return s.runFullFetch(ctx, k, submitted, true)
+		return s.runFullFetch(ctx, k, submitted, true, false)
 	}})
 }
 
@@ -410,10 +456,12 @@ func (s *Store) refreshFull(k fullKey) error {
 // same id coalesce only while queued, so a job that finds a fetch ended since it was
 // submitted (one that was already running) takes that fetch's outcome instead of
 // sending another request. background: a read was answered Refreshing and waits for the
-// event, which goes out however this ends.
-func (s *Store) runFullFetch(ctx context.Context, k fullKey, submitted time.Time, background bool) (FullPullRequest, error) {
-	if e, ok := s.full.entry(k); ok {
-		fetched := !e.stale && e.d.FetchedAt.After(submitted)
+// event, which goes out however this ends. forceFull forces PullRequestFull even when
+// only checksStale is set (explicit refresh or post-write read).
+func (s *Store) runFullFetch(ctx context.Context, k fullKey, submitted time.Time, background, forceFull bool) (FullPullRequest, error) {
+	e, hasEntry := s.full.entry(k)
+	if hasEntry {
+		fetched := !e.stale && !e.checksStale && e.d.FetchedAt.After(submitted)
 		failed := e.failure != nil && e.failedAt.After(submitted)
 		if fetched || failed {
 			if background {
@@ -426,9 +474,24 @@ func (s *Store) runFullFetch(ctx context.Context, k fullKey, submitted time.Time
 		}
 	}
 	start := s.opts.Now()
-	d, err := s.fetchFull(ctx, k, background)
+	var (
+		d     FullPullRequest
+		err   error
+		query = queryPullRequestFull
+	)
+	if !forceFull && hasEntry && e.checksStale && !e.stale && !e.written && e.d.PullRequest.HeadSHA != "" {
+		query = queryChecks
+		d, err = s.fetchChecksOnly(ctx, k, e.d, background)
+		if errors.Is(err, ErrNotFound) {
+			// The commit may have been force-pushed away; fall back to full detail fetch.
+			query = queryPullRequestFull
+			d, err = s.fetchFull(ctx, k, background)
+		}
+	} else {
+		d, err = s.fetchFull(ctx, k, background)
+	}
 	end := s.opts.Now()
-	attrs := []any{"pr", k.String(), "query", queryPullRequestFull, "queue_wait", start.Sub(submitted).Round(time.Millisecond).String(),
+	attrs := []any{"pr", k.String(), "query", query, "queue_wait", start.Sub(submitted).Round(time.Millisecond).String(),
 		"fetch", end.Sub(start).Round(time.Millisecond).String(), "background", background}
 	if err != nil {
 		attrs = append(attrs, "err", err)
@@ -440,6 +503,56 @@ func (s *Store) runFullFetch(ctx context.Context, k fullKey, submitted time.Time
 		}
 	}
 	return d, err
+}
+
+// fetchChecksOnly refreshes only the commit's check-run rows (checks.graphql) for a
+// checksStale entry, keeping the panel's Checks list up to date without refetching the
+// full pull_request_full document (comments, commits, reviews, review threads).
+func (s *Store) fetchChecksOnly(ctx context.Context, k fullKey, base FullPullRequest, announce bool) (FullPullRequest, error) {
+	owner, name := splitSlug(k.slug)
+	data, err := s.call(ctx, queryChecks, map[string]any{"owner": owner, "name": name, "ref": base.PullRequest.HeadSHA, "after": nil})
+	if err != nil {
+		return FullPullRequest{}, err
+	}
+	page, err := decodeChecks(data)
+	if err != nil {
+		return FullPullRequest{}, err
+	}
+	d := base
+	d.LastError, d.FetchFailed = "", false
+	if page.Rollup.Total > 0 || page.Rollup.State != "" {
+		d.PullRequest.Checks = page.Rollup
+	}
+	runs, next := page.Runs, page.Next
+	for p := 1; next.HasNextPage && next.EndCursor != "" && p < s.opts.MaxPages; p++ {
+		data, err := s.call(ctx, queryChecks, map[string]any{"owner": owner, "name": name, "ref": d.PullRequest.HeadSHA, "after": next.EndCursor})
+		var cp checksPage
+		if err == nil {
+			cp, err = decodeChecks(data)
+		}
+		if err != nil {
+			s.log.Warn("gh pull request detail checks page failed", "pr", k.String(), "err", err)
+			d.LastError = fmt.Sprintf("checks after the first %d: %v", len(runs), err)
+			break
+		}
+		runs, next = append(runs, cp.Runs...), cp.Next
+	}
+	sortRuns(runs)
+	d.Checks = runs
+	d.ChecksTruncated = next.HasNextPage
+	d.FetchedAt = s.opts.Now()
+	prev, had := s.full.put(k, d)
+	s.summaries.put(k, d.PullRequest)
+	if err := s.cache.saveActivity(ctx, activityFull+k.String(), d.FetchedAt, d); err != nil {
+		s.log.Warn("gh cache write failed", "err", err)
+	}
+	switch {
+	case had && !sameFull(prev.d, d):
+		publish(s, PullRequestDetailUpdated{Slug: k.slug, Number: k.number})
+	case announce || prev.failure != nil:
+		publish(s, PullRequestDetailUpdated{Slug: k.slug, Number: k.number, Unchanged: true})
+	}
+	return d, nil
 }
 
 // fetchFull runs on the worker: the detail request, more check pages when there are
@@ -487,6 +600,7 @@ func (s *Store) fetchFull(ctx context.Context, k fullKey, announce bool) (FullPu
 	d.ChecksTruncated = next.HasNextPage
 	d.FetchedAt = s.opts.Now()
 	prev, had := s.full.put(k, d)
+	s.summaries.put(k, d.PullRequest)
 	if err := s.cache.saveActivity(ctx, activityFull+k.String(), d.FetchedAt, d); err != nil {
 		s.log.Warn("gh cache write failed", "err", err)
 	}
@@ -500,9 +614,13 @@ func (s *Store) fetchFull(ctx context.Context, k fullKey, announce bool) (FullPu
 }
 
 // staleFullDetails is the poll's hook: cached details whose pull request's fingerprint
-// moved go stale, and clients hear about it; the others it saw are confirmed.
+// moved go stale (or have pending check counts patched in place), and clients hear about
+// it; the others it saw are confirmed.
 func (s *Store) staleFullDetails(fps []prFingerprint) {
 	for _, k := range s.full.applyPoll(fps, s.opts.Now()) {
+		if e, ok := s.full.entry(k); ok && e.stale {
+			s.reviewers.invalidatePR(k)
+		}
 		publish(s, PullRequestDetailUpdated{Slug: k.slug, Number: k.number})
 	}
 }
@@ -511,7 +629,8 @@ func (s *Store) staleFullDetails(fps []prFingerprint) {
 // clients to re-read; that read waits for the fetch, so it shows the change.
 func (s *Store) invalidateFull(k fullKey) {
 	s.full.markWritten(k)
-	s.moved.mark(k, s.opts.Now(), s.opts.DetailTTL)
+	s.moved.markWrite(k, s.opts.Now(), s.opts.DetailTTL)
+	s.reviewers.invalidatePR(k)
 	publish(s, PullRequestDetailUpdated{Slug: k.slug, Number: k.number})
 }
 

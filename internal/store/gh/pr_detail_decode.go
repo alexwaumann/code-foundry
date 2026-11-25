@@ -336,8 +336,17 @@ type candidateUsersJSON struct {
 	Nodes []candidateUserJSON `json:"nodes"`
 }
 
+type allAssignableUsersJSON struct {
+	PageInfo struct {
+		HasNextPage bool `json:"hasNextPage"`
+	} `json:"pageInfo"`
+	Nodes []candidateUserJSON `json:"nodes"`
+}
+
 type reviewerCandidatesData struct {
 	Repository *struct {
+		// AllAssignable is present when the full repository list was requested (@include(if: $all)).
+		AllAssignable *allAssignableUsersJSON `json:"allAssignable"`
 		// Absent when the search was skipped (@include(if: $search)); T0..T3 search each
 		// word of a query of several (@include(if: $sN)).
 		AssignableUsers *candidateUsersJSON `json:"assignableUsers"`
@@ -352,6 +361,15 @@ type reviewerCandidatesData struct {
 	} `json:"repository"`
 }
 
+type decodedReviewerCandidates struct {
+	result       ReviewerCandidates
+	author       string
+	requested    []ReviewerCandidate
+	hasAll       bool
+	allUsers     []ReviewerCandidate
+	allTruncated bool
+}
+
 // decodeReviewerCandidates maps a ReviewerCandidates response for a search split into
 // tokens (reviewerSearchTokens): the requested users and teams first, by login, then
 // the search results; the author is left out and a requested user the search also
@@ -359,12 +377,20 @@ type reviewerCandidatesData struct {
 // several, the lists (the whole query's and each word's) are merged by login and only
 // the users matching every token are kept, best matches first (filterReviewerSearch).
 func decodeReviewerCandidates(data []byte, tokens []string) (ReviewerCandidates, error) {
+	dec, err := decodeReviewerCandidatesFull(data, tokens)
+	if err != nil {
+		return ReviewerCandidates{}, err
+	}
+	return dec.result, nil
+}
+
+func decodeReviewerCandidatesFull(data []byte, tokens []string) (decodedReviewerCandidates, error) {
 	var d reviewerCandidatesData
 	if err := json.Unmarshal(data, &d); err != nil {
-		return ReviewerCandidates{}, fmt.Errorf("decode reviewer candidates: %w", err)
+		return decodedReviewerCandidates{}, fmt.Errorf("decode reviewer candidates: %w", err)
 	}
 	if d.Repository == nil || d.Repository.PullRequest == nil {
-		return ReviewerCandidates{}, fmt.Errorf("decode reviewer candidates: %w", ErrNotFound)
+		return decodedReviewerCandidates{}, fmt.Errorf("decode reviewer candidates: %w", ErrNotFound)
 	}
 	pr := d.Repository.PullRequest
 	author := ""
@@ -412,7 +438,25 @@ func decodeReviewerCandidates(data []byte, tokens []string) (ReviewerCandidates,
 	} else {
 		slices.SortStableFunc(others, byLogin)
 	}
-	return ReviewerCandidates{Candidates: append(requested, others...)}, nil
+	out := decodedReviewerCandidates{
+		result:    ReviewerCandidates{Candidates: append(slices.Clone(requested), others...)},
+		author:    author,
+		requested: requested,
+	}
+	if all := d.Repository.AllAssignable; all != nil {
+		out.hasAll = true
+		out.allTruncated = all.PageInfo.HasNextPage
+		if !out.allTruncated {
+			out.allUsers = make([]ReviewerCandidate, 0, len(all.Nodes))
+			for _, u := range all.Nodes {
+				if u.Login == "" {
+					continue
+				}
+				out.allUsers = append(out.allUsers, ReviewerCandidate{ID: u.ID, Kind: ReviewerUser, Login: u.Login, Name: u.Name, AvatarURL: u.AvatarURL})
+			}
+		}
+	}
+	return out, nil
 }
 
 // decodeRevert maps a RevertPullRequest mutation response.

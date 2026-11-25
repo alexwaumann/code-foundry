@@ -223,6 +223,7 @@ func (s *Store) pollProjects(ctx context.Context, cfg Config) {
 			}
 		}
 	}
+	s.summaries.putFingerprints(s.Snapshot(), fps, s.opts.Now())
 	s.staleFullDetails(fps)
 	s.markMovedDetails(fps, known)
 	for _, f := range fps {
@@ -303,6 +304,7 @@ func (s *Store) setProjects(ctx context.Context, next ProjectPullRequests) {
 		moved = !n.Projects.FetchedAt.Equal(next.FetchedAt)
 		n.Projects = next
 	})
+	s.summaries.putProjects(s.Snapshot(), next)
 	if changed {
 		if err := s.cache.saveActivity(ctx, activityProjects, next.FetchedAt, next); err != nil {
 			s.log.Warn("gh cache write failed", "err", err)
@@ -317,15 +319,6 @@ func (s *Store) setProjects(ctx context.Context, next ProjectPullRequests) {
 	if changed {
 		publish(s, DashboardUpdated{FetchedAt: s.Snapshot().Dashboard.FetchedAt})
 	}
-}
-
-// sameProjects compares everything clients see except the fetch time and the searches'
-// queries, whose updated:>= and merged:>= move with every fetch.
-func sameProjects(a, b ProjectPullRequests) bool {
-	a.FetchedAt, b.FetchedAt = time.Time{}, time.Time{}
-	a.Open.Query, b.Open.Query, a.Open.WebQuery, b.Open.WebQuery = "", "", "", ""
-	a.Merged.Query, b.Merged.Query, a.Merged.WebQuery, b.Merged.WebQuery = "", "", "", ""
-	return a.LastError == b.LastError && sameJSON(a, b)
 }
 
 // polled is the Polled event for a poll with fetchedAt and lastErr, with the project

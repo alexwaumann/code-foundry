@@ -366,6 +366,7 @@ func (s *Store) applyPoll(ctx context.Context, cfg Config, plan *pollPlan, res *
 			}
 		}
 	}
+	s.summaries.putFingerprints(snap, fps, s.opts.Now())
 	s.staleFullDetails(fps)        // cached detail panels: what moved goes stale, the rest is confirmed (pr_detail.go)
 	s.markMovedDetails(fps, known) // and PullRequest's cached copies (detail_moved.go)
 	var need []prFingerprint
@@ -511,8 +512,11 @@ func (s *Store) applyPoll(ctx context.Context, cfg Config, plan *pollPlan, res *
 				branchLists = append(branchLists, prList{prev: prev.PullRequests, next: st.PullRequests, slug: rp.slug, head: head,
 					checks: true, baseline: had && !prev.FetchedAt.IsZero()})
 			}
-			changed := !had || prev.FetchedAt.IsZero() || prev.LastError != st.LastError || !sameJSON(prev.PullRequests, st.PullRequests)
+			changed := !had || prev.FetchedAt.IsZero() || prev.LastError != st.LastError || !samePullRequestsStrictNil(prev.PullRequests, st.PullRequests)
 			s.branches.set(k, st)
+			if st.LastError == "" {
+				s.summaries.putBranch(s.Snapshot(), rp.slug, st.PullRequests)
+			}
 			if changed {
 				branchUpdates = append(branchUpdates, branchUpdate{k, st})
 			}
@@ -552,6 +556,23 @@ func (s *Store) applyPoll(ctx context.Context, cfg Config, plan *pollPlan, res *
 		}
 	})
 	slices.Sort(repoChanged)
+	if cfg.Dashboards && len(plan.sections) > 0 {
+		snapNow := s.Snapshot()
+		var okDash Dashboard
+		if res.Sections[sectionAuthored].Err == nil {
+			okDash.Authored = newDash.Authored
+		}
+		if res.Sections[sectionReview].Err == nil {
+			okDash.ReviewRequested = newDash.ReviewRequested
+		}
+		if res.Sections[sectionReviewed].Err == nil {
+			okDash.Reviewed = newDash.Reviewed
+		}
+		if res.Sections[sectionMerged].Err == nil {
+			okDash.RecentlyMerged = newDash.RecentlyMerged
+		}
+		s.summaries.putDashboard(snapNow, okDash)
+	}
 
 	// Stats rows are written whenever stats were fetched: their times schedule them
 	// after a restart.
@@ -1038,34 +1059,12 @@ func (s *Store) searchCommits(ctx context.Context, rr RESTRunner, q string) (int
 
 // ---- comparisons ---------------------------------------------------------------
 
-// sameJSON compares two values by their JSON encoding (what the cache and clients
-// see), which sidesteps time.Time's location and monotonic-clock fields.
+// sameJSON compares two values by their JSON encoding. Hot-path comparisons use the
+// typed helpers in equal.go.
 func sameJSON(a, b any) bool {
 	x, err1 := json.Marshal(a)
 	y, err2 := json.Marshal(b)
 	return err1 == nil && err2 == nil && string(x) == string(y)
-}
-
-// sameDashboard compares everything clients see except the fetch times.
-func sameDashboard(a, b Dashboard) bool {
-	a.FetchedAt, b.FetchedAt = time.Time{}, time.Time{}
-	a.Stats.FetchedAt, b.Stats.FetchedAt = time.Time{}, time.Time{}
-	a.Stats.ClosedAt, b.Stats.ClosedAt = time.Time{}, time.Time{}
-	return a.LastError == b.LastError && a.Disabled == b.Disabled && a.Stats.LastError == b.Stats.LastError &&
-		sameJSON(a, b) && sameJSON(a.Stats, b.Stats)
-}
-
-// sameBranchCI compares everything but FetchedAt.
-func sameBranchCI(a, b BranchCI) bool {
-	a.FetchedAt, b.FetchedAt = time.Time{}, time.Time{}
-	return a.LastError == b.LastError && sameJSON(a, b)
-}
-
-// sameStats compares everything but the fetch times.
-func sameStats(a, b MonthlyStats) bool {
-	a.FetchedAt, b.FetchedAt = time.Time{}, time.Time{}
-	a.ClosedAt, b.ClosedAt = time.Time{}, time.Time{}
-	return a.LastError == b.LastError && sameJSON(a, b)
 }
 
 // ---- auth ----------------------------------------------------------------------
@@ -1143,6 +1142,9 @@ func (s *Store) fetchPullRequest(ctx context.Context, slug string, number int) (
 	}
 	sortRuns(runs)
 	d := PullRequestDetail{PullRequest: pr, Checks: runs, FetchedAt: s.opts.Now()}
+	k := fullKey{slug, number}
+	s.prDetails.put(k, d)
+	s.summaries.put(k, pr)
 	if err := s.cache.saveDetail(ctx, slug, d); err != nil {
 		s.log.Warn("gh cache write failed", "err", err)
 	}
