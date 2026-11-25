@@ -21,7 +21,7 @@ import (
 // and a snapshot update and its events cannot be split. What a poll holds across a yield is what it asked
 // GitHub before the job ran, and a job that changes GitHub asks for another poll
 // (pollSoon, kept by pollAgain), while a merge shown meanwhile survives the publish
-// (mergedOverlay.apply). See docs/notes/pr-queue-priority.md.
+// (localOverlay.apply). See docs/notes/pr-queue-priority.md.
 
 // admit is every request's door, on the worker. It lets waiting jobs go first when the
 // running job is scheduled work, refuses the request while a pause is in force (a pause

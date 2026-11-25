@@ -480,8 +480,8 @@ func TestMergePullRequestCallerLeaves(t *testing.T) {
 	if drain(events) == 0 {
 		t.Error("no detail event after the merge")
 	}
-	if _, stale, ok := s.full.get(fullKey{"o/r", 1}); !ok || !stale {
-		t.Errorf("cached detail stale = %t (cached %t), want stale", stale, ok)
+	if d, stale, ok := s.full.get(fullKey{"o/r", 1}); !ok || stale || d.PullRequest.State != PullRequestMerged {
+		t.Errorf("cached detail state = %s stale = %t (cached %t), want patched MERGED fresh", d.PullRequest.State, stale, ok)
 	}
 	res, err := s.MergePullRequest(context.Background(), "o/r", 1, MergeRequest{Method: MergeSquash, DeleteBranch: true})
 	if err != nil || !res.Merged || !res.BranchDeleted || len(g.merges()) != 1 || len(w.calls()) != 1 {

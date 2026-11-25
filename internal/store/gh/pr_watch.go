@@ -167,7 +167,9 @@ func (s *Store) setWatch(r PullRequestRef, fn func(*prWatch)) {
 func (s *Store) cachedByRef() map[PullRequestRef]PullRequest {
 	out := map[PullRequestRef]PullRequest{}
 	snap := s.Snapshot()
+	now := s.opts.Now()
 	eachKnownPullRequest(snap.Dashboard, &s.branches, func(p PullRequest) {
+		p = s.localShown.applyPullRequest(p, now)
 		p.Repo = snap.LocalRepo(p.Repo)
 		r := PullRequestRef{strings.ToLower(p.Repo), p.Number}
 		if r.Slug == "" || r.Number <= 0 {

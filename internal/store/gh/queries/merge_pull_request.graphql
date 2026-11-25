@@ -3,6 +3,6 @@
 # modified"), so commits nobody reviewed in the panel are never merged.
 mutation MergePullRequest($id: ID!, $method: PullRequestMergeMethod!, $head: GitObjectID!) {
   mergePullRequest(input: { pullRequestId: $id, mergeMethod: $method, expectedHeadOid: $head }) {
-    pullRequest { merged state mergeCommit { oid } }
+    pullRequest { merged state mergedAt mergedBy { login } mergeCommit { oid } updatedAt }
   }
 }

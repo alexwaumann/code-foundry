@@ -245,7 +245,7 @@ func (s *Store) pollProjects(ctx context.Context, cfg Config) {
 	if paused {
 		return
 	}
-	prev := s.Snapshot().Projects
+	prev := s.localShown.projectsBasis(s.Snapshot().Projects)
 	failed := func(err error) {
 		if ctx.Err() != nil {
 			return
@@ -382,12 +382,14 @@ func queriesOnly(l ProjectList) ProjectList { return ProjectList{Query: l.Query,
 // lists and publishes DashboardUpdated.
 func (s *Store) setProjects(ctx context.Context, next ProjectPullRequests) {
 	var changed, moved bool
+	now := s.opts.Now()
 	s.updateSnapshot(func(n *Snapshot) {
-		changed = !sameProjects(n.Projects, next)
-		moved = !n.Projects.FetchedAt.Equal(next.FetchedAt)
-		n.Projects = next
+		shown := s.localShown.applyProjects(next, now)
+		changed = !sameProjects(n.Projects, shown)
+		moved = !n.Projects.FetchedAt.Equal(shown.FetchedAt)
+		n.Projects = shown
 	})
-	s.summaries.putProjects(s.Snapshot(), next)
+	s.summaries.putProjects(s.Snapshot(), s.Snapshot().Projects)
 	if changed {
 		if err := s.cache.saveActivity(ctx, activityProjects, next.FetchedAt, next); err != nil {
 			s.log.Warn("gh cache write failed", "err", err)

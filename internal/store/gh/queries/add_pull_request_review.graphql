@@ -3,6 +3,18 @@
 # text.
 mutation AddPullRequestReview($id: ID!, $event: PullRequestReviewEvent!, $body: String) {
   addPullRequestReview(input: { pullRequestId: $id, event: $event, body: $body }) {
-    pullRequestReview { id url state submittedAt author { login } }
+    pullRequestReview {
+      id
+      url
+      state
+      body
+      submittedAt
+      author { ...ActorFields }
+      commit { oid }
+      pullRequest {
+        reviewDecision
+        updatedAt
+      }
+    }
   }
 }

@@ -64,15 +64,39 @@ func (g *fakeGitHub) reviewOp(op string, vars map[string]any, data map[string]an
 		}
 		g.detail.comments[id] = append(g.detail.comments[id], body)
 		data[field] = map[string]any{"commentEdge": map[string]any{"node": map[string]any{
-			"id": fmt.Sprintf("IC_%d", n), "url": fmt.Sprintf("https://github.com/%s/pull/%d#issuecomment-%d", p.Repo, p.Number, n),
-			"createdAt": "2026-10-15T12:00:00Z"}}}
+			"id":              fmt.Sprintf("IC_%d", n),
+			"author":          map[string]any{"__typename": "User", "login": strings.ToLower(g.viewer.Login), "avatarUrl": g.viewer.AvatarURL},
+			"body":            body,
+			"url":             fmt.Sprintf("https://github.com/%s/pull/%d#issuecomment-%d", p.Repo, p.Number, n),
+			"createdAt":       "2026-10-15T12:00:00Z",
+			"updatedAt":       "2026-10-15T12:00:00Z",
+			"viewerDidAuthor": true,
+		}}}
 	case event != "COMMENT" && p.Author == g.viewer.Login:
 		verb := map[string]string{"APPROVE": "approve", "REQUEST_CHANGES": "request changes on"}[event]
 		refuse("UNPROCESSABLE", "Review Can not "+verb+" your own pull request")
 	default:
 		state := map[string]string{"APPROVE": "APPROVED", "REQUEST_CHANGES": "CHANGES_REQUESTED", "COMMENT": "COMMENTED"}[event]
+		switch event {
+		case "APPROVE":
+			p.ReviewDecision = ReviewApproved
+		case "REQUEST_CHANGES":
+			p.ReviewDecision = ReviewChangesRequested
+		}
+		bodyStr, _ := vars["body"].(string)
+		var dec any
+		if p.ReviewDecision != "" {
+			dec = string(p.ReviewDecision)
+		}
 		data[field] = map[string]any{"pullRequestReview": map[string]any{
-			"id": fmt.Sprintf("PRR_%d", n), "url": fmt.Sprintf("https://github.com/%s/pull/%d#pullrequestreview-%d", p.Repo, p.Number, n),
-			"state": state, "submittedAt": "2026-10-15T12:00:00Z", "author": map[string]any{"login": strings.ToLower(g.viewer.Login)}}}
+			"id":          fmt.Sprintf("PRR_%d", n),
+			"url":         fmt.Sprintf("https://github.com/%s/pull/%d#pullrequestreview-%d", p.Repo, p.Number, n),
+			"state":       state,
+			"body":        bodyStr,
+			"submittedAt": "2026-10-15T12:00:00Z",
+			"author":      map[string]any{"__typename": "User", "login": strings.ToLower(g.viewer.Login), "avatarUrl": g.viewer.AvatarURL},
+			"commit":      map[string]any{"oid": p.HeadSHA},
+			"pullRequest": map[string]any{"reviewDecision": dec, "updatedAt": "2026-10-15T12:00:00Z"},
+		}}
 	}
 }

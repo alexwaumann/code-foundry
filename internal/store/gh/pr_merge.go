@@ -56,9 +56,25 @@ func (s *Store) MergePullRequest(ctx context.Context, slug string, number int, r
 	if m, ok := s.full.merges.recent(k, s.opts.Now()); ok {
 		return repeatMerge(m, r)
 	}
-	d, err := s.currentFull(ctx, k)
-	if err != nil {
-		return MergeResult{}, err
+	var d FullPullRequest
+	if _, hasFull := s.full.entry(k); !hasFull {
+		if p, ok := s.summaries.get(k); ok && !p.Partial && p.ID != "" && p.HeadSHA != "" {
+			cand := FullPullRequest{
+				PullRequest:   p,
+				DefaultBranch: s.Snapshot().Repos[k.slug].Activity.DefaultBranch.Branch,
+			}
+			_, polledAt, hasPoll := s.summaries.polledFingerprint(k)
+			freshPoll := hasPoll && s.opts.Now().Sub(polledAt) < s.config().PollInterval
+			if (r.ExpectedHeadSHA != "" || freshPoll) && mergeRefusal(&cand, r.Method) == "" && !headDiffers(&cand, r) && (!r.DeleteBranch || cand.DefaultBranch != "") {
+				d = cand
+			}
+		}
+	}
+	if d.PullRequest.ID == "" {
+		d, err = s.currentFull(ctx, k)
+		if err != nil {
+			return MergeResult{}, err
+		}
 	}
 	if mergeRefusal(&d, r.Method) != "" || headDiffers(&d, r) || (r.DeleteBranch && d.DefaultBranch == "") {
 		// The cached copy may be behind (marked ready, reopened, settings changed,
@@ -128,13 +144,31 @@ func (s *Store) MergePullRequest(ctx context.Context, slug string, number int, r
 		res := s.finishMerge(ctx, k, &d, r, MergeResult{Merged: o.Merged || o.State == PullRequestMerged, SHA: o.SHA})
 		s.log.Info("gh pull request merged", "pr", k.String(), "method", r.Method, "merged", res.Merged,
 			"sha", res.SHA, "branch_deleted", res.BranchDeleted)
-		s.invalidateFull(k)
 		// The dashboards move it to recently merged, and this month's merged count grows:
 		// poll soon, with the current month's stats.
 		if res.Merged {
+			mergedAt := o.MergedAt
+			if mergedAt.IsZero() {
+				mergedAt = s.opts.Now()
+			}
+			s.patchFull(ctx, k, func(d *FullPullRequest) {
+				d.PullRequest.State = PullRequestMerged
+				d.PullRequest.MergedAt = mergedAt
+				d.ClosedAt = mergedAt
+				if o.SHA != "" {
+					d.MergeCommitSHA = o.SHA
+				}
+				if o.MergedBy != "" {
+					d.MergedBy = o.MergedBy
+				}
+				d.AutoMerge, d.AutoMergeMethod = false, ""
+				d.ViewerCanReopen = false
+			})
 			s.statsDueNow("merged", "pr", k.String())
 			// The searches trail the merge: show it now (pr_merged_overlay.go).
-			s.markMerged(k)
+			s.markMergedAt(k, mergedAt, o.UpdatedAt)
+		} else {
+			s.invalidateFull(k)
 		}
 		s.pollSoon()
 		return res, nil

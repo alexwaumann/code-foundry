@@ -126,8 +126,8 @@ func TestSetPullRequestDraftCallerLeaves(t *testing.T) {
 	if drain(events) == 0 {
 		t.Error("no detail event after the change")
 	}
-	if _, stale, ok := s.full.get(fullKey{"o/r", 1}); !ok || !stale {
-		t.Errorf("cached detail stale = %t (cached %t), want stale", stale, ok)
+	if d, stale, ok := s.full.get(fullKey{"o/r", 1}); !ok || stale || !d.PullRequest.Draft {
+		t.Errorf("cached detail draft = %t stale = %t (cached %t), want patched draft=true fresh", d.PullRequest.Draft, stale, ok)
 	}
 }
 

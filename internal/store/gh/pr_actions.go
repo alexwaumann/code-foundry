@@ -134,20 +134,60 @@ func (s *Store) SetReviewRequest(ctx context.Context, slug string, number int, r
 		if err != nil {
 			return nil, err
 		}
-		requested, err := decodeRequestedReviewers(res, owner)
+		det, err := decodeRequestedReviewersDetail(res, owner)
 		if err != nil {
 			return nil, err
 		}
-		return requested, checkReviewRequest(requested, kind, login, r.Requested)
+		if err := checkReviewRequest(det.Pending, kind, login, r.Requested); err != nil {
+			return nil, err
+		}
+		s.reviewers.invalidatePR(k)
+		s.patchFull(ctx, k, func(d *FullPullRequest) {
+			patchReviewRequests(d, det)
+		})
+		return det.Pending, nil
 	})
 	if err != nil {
 		return nil, err
 	}
 	s.log.Info("gh review request set", "pr", k.String(), "kind", kind, "login", login, "requested", r.Requested)
-	s.invalidateFull(k)
 	// The review requests (and the requested reviewer's dashboard) moved: poll soon.
 	s.pollSoon()
 	return requested, nil
+}
+
+// patchReviewRequests updates d's pending review requests and reviewers list from a
+// REST requested_reviewers response without mutating existing slices in place.
+func patchReviewRequests(d *FullPullRequest, det requestedReviewersOutcome) {
+	d.PullRequest.ReviewRequests = slices.Clone(det.Pending)
+	pending := make(map[string]Reviewer, len(det.Reviewers))
+	for _, r := range det.Reviewers {
+		pending[strings.ToLower(r.Login)] = r
+	}
+	revs := make([]Reviewer, 0, len(d.Reviewers)+len(det.Reviewers))
+	for _, existing := range d.Reviewers {
+		key := strings.ToLower(existing.Login)
+		if p, ok := pending[key]; ok {
+			existing.Requested = true
+			if existing.AvatarURL == "" && p.AvatarURL != "" {
+				existing.AvatarURL = p.AvatarURL
+			}
+			revs = append(revs, existing)
+			delete(pending, key)
+		} else if existing.State != "" {
+			existing.Requested = false
+			revs = append(revs, existing)
+		}
+	}
+	for _, r := range det.Reviewers {
+		key := strings.ToLower(r.Login)
+		if _, left := pending[key]; left {
+			revs = append(revs, r)
+			delete(pending, key)
+		}
+	}
+	sortReviewers(revs)
+	d.Reviewers = revs
 }
 
 // checkReviewRequest reports whether GitHub's pending requests after a write (logins
@@ -190,25 +230,35 @@ func (s *Store) RevertPullRequest(ctx context.Context, slug string, number int) 
 	if m, ok := s.full.reverts.recent(k, s.opts.Now()); ok {
 		return m.res, m.err
 	}
-	d, err := s.currentFull(ctx, k)
-	if err != nil {
-		return RevertResult{}, err
-	}
-	if d.PullRequest.State != PullRequestMerged {
-		// Merged is final, so only a pull request not yet merged is worth a fresh look,
-		// and that look must succeed: the cached copy cannot confirm anything.
-		if d, err = s.fetchFullJob(ctx, k); err != nil {
-			return RevertResult{}, fmt.Errorf("pull request #%d: cannot confirm it is merged: %w", k.number, err)
+	var nodeID string
+	if e, ok := s.full.entry(k); ok && e.d.PullRequest.State == PullRequestMerged && e.d.PullRequest.ID != "" {
+		nodeID = e.d.PullRequest.ID
+	} else if !ok {
+		if p, has := s.summaries.get(k); has && p.State == PullRequestMerged && p.ID != "" {
+			nodeID = p.ID
 		}
 	}
-	switch {
-	case d.PullRequest.State != PullRequestMerged:
-		return RevertResult{}, fmt.Errorf("%w: pull request #%d is %s, not merged", ErrFailedPrecondition, k.number,
-			strings.ToLower(string(d.PullRequest.State)))
-	case d.PullRequest.ID == "":
-		return RevertResult{}, fmt.Errorf("pull request #%d: no node id", k.number)
+	if nodeID == "" {
+		d, err := s.currentFull(ctx, k)
+		if err != nil {
+			return RevertResult{}, err
+		}
+		if d.PullRequest.State != PullRequestMerged {
+			// Merged is final, so only a pull request not yet merged is worth a fresh look,
+			// and that look must succeed: the cached copy cannot confirm anything.
+			if d, err = s.fetchFullJob(ctx, k); err != nil {
+				return RevertResult{}, fmt.Errorf("pull request #%d: cannot confirm it is merged: %w", k.number, err)
+			}
+		}
+		switch {
+		case d.PullRequest.State != PullRequestMerged:
+			return RevertResult{}, fmt.Errorf("%w: pull request #%d is %s, not merged", ErrFailedPrecondition, k.number,
+				strings.ToLower(string(d.PullRequest.State)))
+		case d.PullRequest.ID == "":
+			return RevertResult{}, fmt.Errorf("pull request #%d: no node id", k.number)
+		}
+		nodeID = d.PullRequest.ID
 	}
-	nodeID := d.PullRequest.ID
 	res, err := submitFunc(ctx, s, "revert|"+k.String(), func(ctx context.Context) (RevertResult, error) {
 		// The worker is serial, so a concurrent second revert sees the first's memo.
 		if m, ok := s.full.reverts.recent(k, s.opts.Now()); ok {

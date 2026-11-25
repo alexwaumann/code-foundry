@@ -253,6 +253,28 @@ func (c *fullCache) markWritten(k fullKey) {
 	}
 }
 
+// patch updates a copy of k's cached detail in place when present while preserving its
+// existing staleness, confirmation, failure, and FetchedAt (only clearing written so
+// clients get the patched copy immediately without blocking). An aged or poll-stale
+// entry still surfaces Refreshing=true and reconciles in the background, and leaving
+// PullRequest.UpdatedAt at its fetch-time value lets the next poll catch any external
+// edits that landed before the mutation. Returns the patched copy and true when cached.
+func (c *fullCache) patch(k fullKey, mutate func(*FullPullRequest)) (FullPullRequest, bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	e, ok := c.m[k]
+	if !ok {
+		return FullPullRequest{}, false
+	}
+	d := e.d
+	mutate(&d)
+	next := *e
+	next.d = d
+	next.written = false
+	c.m[k] = &next
+	return d, true
+}
+
 // fail records that a fetch of k failed at now; it reports whether that is news: the
 // entry exists and its last fetch had not failed.
 func (c *fullCache) fail(k fullKey, err error, now time.Time) bool {
@@ -632,6 +654,34 @@ func (s *Store) invalidateFull(k fullKey) {
 	s.moved.markWrite(k, s.opts.Now(), s.opts.DetailTTL)
 	s.reviewers.invalidatePR(k)
 	publish(s, PullRequestDetailUpdated{Slug: k.slug, Number: k.number})
+}
+
+// patchFull updates k's cached detail in place from a mutation response while preserving
+// its existing staleness/age (so current entries serve the patched copy in 0 ms with 0
+// blocking round-trips, while aged or poll-stale entries still surface Refreshing=true
+// and reconcile in the background). It marks the separate PullRequest() cache moved via
+// s.moved.markWrite, persists to SQLite, updates the summary cache, and publishes
+// PullRequestDetailUpdated. When k is not cached in memory it falls back to invalidateFull.
+func (s *Store) patchFull(ctx context.Context, k fullKey, mutate func(*FullPullRequest)) {
+	now := s.opts.Now()
+	d, ok := s.full.patch(k, mutate)
+	if !ok {
+		s.invalidateFull(k)
+		return
+	}
+	s.moved.markWrite(k, now, s.opts.DetailTTL)
+	s.summaries.put(k, d.PullRequest)
+	if err := s.cache.saveActivity(ctx, activityFull+k.String(), d.FetchedAt, d); err != nil {
+		s.log.Warn("gh cache write failed", "err", err)
+	}
+	publish(s, PullRequestDetailUpdated{Slug: k.slug, Number: k.number})
+}
+
+// advanceUpdatedAt updates *dst to t when t is non-zero and newer (or *dst is zero).
+func advanceUpdatedAt(dst *time.Time, t time.Time) {
+	if !t.IsZero() && (dst.IsZero() || t.After(*dst)) {
+		*dst = t
+	}
 }
 
 // submitFunc queues run as an on-demand job (coalescing with a queued job of the same

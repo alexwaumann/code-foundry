@@ -251,6 +251,11 @@ func mapReviewers(p *pullRequestFullJSON) []Reviewer {
 				AvatarURL: rr.AvatarURL, Requested: true})
 		}
 	}
+	sortReviewers(out)
+	return out
+}
+
+func sortReviewers(out []Reviewer) {
 	slices.SortStableFunc(out, func(a, b Reviewer) int {
 		if a.Requested != b.Requested {
 			if a.Requested {
@@ -263,7 +268,6 @@ func mapReviewers(p *pullRequestFullJSON) []Reviewer {
 		}
 		return strings.Compare(strings.ToLower(a.Login), strings.ToLower(b.Login))
 	})
-	return out
 }
 
 func mapComment(n commentJSON, kind CommentKind) Comment {
@@ -481,9 +485,12 @@ func decodeRevert(data []byte) (RevertResult, error) {
 
 // mergeOutcome is a MergePullRequest mutation's pull request afterwards.
 type mergeOutcome struct {
-	Merged bool
-	State  PullRequestState
-	SHA    string
+	Merged    bool
+	State     PullRequestState
+	SHA       string
+	MergedAt  time.Time
+	MergedBy  string
+	UpdatedAt time.Time
 }
 
 // decodeMerge maps a MergePullRequest mutation response.
@@ -493,7 +500,10 @@ func decodeMerge(data []byte) (mergeOutcome, error) {
 			PullRequest *struct {
 				Merged      bool             `json:"merged"`
 				State       PullRequestState `json:"state"`
+				MergedAt    time.Time        `json:"mergedAt"`
+				MergedBy    *loginJSON       `json:"mergedBy"`
 				MergeCommit *oidJSON         `json:"mergeCommit"`
+				UpdatedAt   time.Time        `json:"updatedAt"`
 			} `json:"pullRequest"`
 		} `json:"mergePullRequest"`
 	}
@@ -504,20 +514,42 @@ func decodeMerge(data []byte) (mergeOutcome, error) {
 		return mergeOutcome{}, fmt.Errorf("decode merge: no pull request in the response")
 	}
 	p := d.MergePullRequest.PullRequest
-	out := mergeOutcome{Merged: p.Merged, State: p.State}
+	out := mergeOutcome{Merged: p.Merged, State: p.State, MergedAt: p.MergedAt, UpdatedAt: p.UpdatedAt}
 	if p.MergeCommit != nil {
 		out.SHA = p.MergeCommit.Oid
 	}
+	if p.MergedBy != nil {
+		out.MergedBy = p.MergedBy.Login
+	}
 	return out, nil
+}
+
+// requestedReviewersOutcome is the pending review requests decoded from a REST
+// requested_reviewers response, with optional reviewer metadata for in-place detail patching.
+type requestedReviewersOutcome struct {
+	Pending   []string
+	Reviewers []Reviewer
+	UpdatedAt time.Time
 }
 
 // decodeRequestedReviewers maps the REST pull request a requested_reviewers POST or
 // DELETE returns to the pending requests: user logins and "org/team" (org is the base
 // repository's owner, or owner; REST teams carry no organization).
 func decodeRequestedReviewers(body []byte, owner string) ([]string, error) {
+	out, err := decodeRequestedReviewersDetail(body, owner)
+	if err != nil {
+		return nil, err
+	}
+	return out.Pending, nil
+}
+
+func decodeRequestedReviewersDetail(body []byte, owner string) (requestedReviewersOutcome, error) {
 	var d struct {
+		UpdatedAt          time.Time `json:"updated_at"`
 		RequestedReviewers []struct {
-			Login string `json:"login"`
+			Login     string `json:"login"`
+			AvatarURL string `json:"avatar_url"`
+			Type      string `json:"type"`
 		} `json:"requested_reviewers"`
 		RequestedTeams []struct {
 			Slug string `json:"slug"`
@@ -529,15 +561,30 @@ func decodeRequestedReviewers(body []byte, owner string) ([]string, error) {
 		} `json:"base"`
 	}
 	if err := json.Unmarshal(body, &d); err != nil {
-		return nil, fmt.Errorf("decode requested reviewers: %w", err)
+		return requestedReviewersOutcome{}, fmt.Errorf("decode requested reviewers: %w", err)
 	}
 	owner = cmp.Or(d.Base.Repo.Owner.Login, owner)
-	out := []string{}
+	out := requestedReviewersOutcome{
+		Pending:   []string{},
+		UpdatedAt: d.UpdatedAt,
+	}
 	for _, u := range d.RequestedReviewers {
-		out = append(out, u.Login)
+		out.Pending = append(out.Pending, u.Login)
+		out.Reviewers = append(out.Reviewers, Reviewer{
+			Login:     u.Login,
+			Bot:       strings.EqualFold(u.Type, "Bot"),
+			AvatarURL: u.AvatarURL,
+			Requested: true,
+		})
 	}
 	for _, t := range d.RequestedTeams {
-		out = append(out, owner+"/"+t.Slug)
+		login := owner + "/" + t.Slug
+		out.Pending = append(out.Pending, login)
+		out.Reviewers = append(out.Reviewers, Reviewer{
+			Login:     login,
+			Team:      true,
+			Requested: true,
+		})
 	}
 	return out, nil
 }

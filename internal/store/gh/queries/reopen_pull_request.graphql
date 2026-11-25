@@ -1,6 +1,6 @@
 # Reopens a closed, unmerged pull request (SetPullRequestClosed with closed false).
 mutation ReopenPullRequest($id: ID!) {
   reopenPullRequest(input: { pullRequestId: $id }) {
-    pullRequest { state }
+    pullRequest { state closedAt updatedAt viewerCanClose viewerCanReopen }
   }
 }

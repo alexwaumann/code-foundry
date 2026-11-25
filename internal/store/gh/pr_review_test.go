@@ -327,7 +327,7 @@ func TestAddPullRequestComment(t *testing.T) {
 	}
 }
 
-// A posted comment is in the next read: the cached detail was invalidated.
+// A posted comment is in the next read immediately via in-place patching: 0 extra detail refetches.
 func TestAddPullRequestCommentRefetches(t *testing.T) {
 	ctx := context.Background()
 	_, r, s, _ := reviewWorld(t)
@@ -338,16 +338,16 @@ func TestAddPullRequestCommentRefetches(t *testing.T) {
 	if _, err := s.AddPullRequestComment(ctx, "o/r", 1, "hello"); err != nil {
 		t.Fatal(err)
 	}
-	// The mutation reused the cached node id: one detail fetch so far.
+	// The mutation reused the cached node id and patched s.full in place: one detail fetch in all.
 	if n := r.count("PullRequestFull"); n != 1 {
 		t.Errorf("detail fetches = %d, want 1", n)
 	}
 	d, err = s.FullPullRequest(ctx, "o/r", 1, false)
-	if err != nil || len(d.Comments) != 1 || d.Comments[0].Body != "hello" {
-		t.Errorf("after: %+v, %v", d.Comments, err)
+	if err != nil || len(d.Comments) != 1 || d.Comments[0].Body != "hello" || d.Comments[0].Author != "octocat" || d.Refreshing {
+		t.Errorf("after: %+v, refreshing=%v, %v", d.Comments, d.Refreshing, err)
 	}
-	if n := r.count("PullRequestFull"); n != 2 {
-		t.Errorf("detail fetches = %d, want 2", n)
+	if n := r.count("PullRequestFull"); n != 1 {
+		t.Errorf("detail fetches = %d, want 1 (patched in place, no refetch)", n)
 	}
 }
 

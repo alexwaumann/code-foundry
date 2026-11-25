@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"time"
 )
 
 // The pull request panel's direct state changes (docs/notes/pr-daemon-actions.md):
@@ -68,15 +69,42 @@ func (s *Store) SetPullRequestDraft(ctx context.Context, slug string, number int
 	}
 	defer unlock()
 	refusal := func(d *FullPullRequest) string { return draftRefusal(d, draft) }
-	d, err := s.freshFor(ctx, k, func(d *FullPullRequest) bool { return refusal(d) != "" }, refusal)
-	if err != nil {
-		return DraftResult{}, err
+	var id string
+	if e, ok := s.full.entry(k); ok && e.d.PullRequest.ID != "" && refusal(&e.d) == "" {
+		id = e.d.PullRequest.ID
+	} else if !ok {
+		if p, has := s.summaries.get(k); has && !p.Partial && p.ID != "" && p.State != "" && refusal(&FullPullRequest{PullRequest: p}) == "" {
+			id = p.ID
+		}
+	}
+	if id == "" {
+		d, err := s.freshFor(ctx, k, func(d *FullPullRequest) bool { return refusal(d) != "" }, refusal)
+		if err != nil {
+			return DraftResult{}, err
+		}
+		id = d.PullRequest.ID
 	}
 	doc, what := queryMarkReadyForReview, "marking it ready for review"
 	if draft {
 		doc, what = queryConvertToDraft, "converting it to a draft"
 	}
-	data, err := s.stateWrite(ctx, k, what, doc, map[string]any{"id": d.PullRequest.ID}, writeRefused)
+	data, err := s.stateWrite(ctx, k, what, doc, map[string]any{"id": id}, writeRefused, func(ctx context.Context, data []byte) {
+		det, err := decodeDraftDetail(data, draft)
+		if err != nil {
+			s.invalidateFull(k)
+			return
+		}
+		s.patchFull(ctx, k, func(d *FullPullRequest) {
+			d.PullRequest.Draft = det.Draft
+			if det.MergeStateStatus != "" {
+				d.PullRequest.MergeStateStatus = det.MergeStateStatus
+			}
+			if det.Draft {
+				d.AutoMerge, d.AutoMergeMethod = false, ""
+			}
+		})
+		s.markDraft(k, det.Draft, det.MergeStateStatus, det.UpdatedAt)
+	})
 	if err != nil {
 		return DraftResult{}, err
 	}
@@ -123,9 +151,19 @@ func (s *Store) SetPullRequestAutoMerge(ctx context.Context, slug string, number
 	defer unlock()
 	mr := MergeRequest{Method: r.Method, ExpectedHeadSHA: r.ExpectedHeadSHA}
 	refusal := func(d *FullPullRequest) string { return autoMergeRefusal(d, r) }
-	d, err := s.freshFor(ctx, k, func(d *FullPullRequest) bool { return refusal(d) != "" || headDiffers(d, mr) }, refusal)
-	if err != nil {
-		return AutoMergeResult{}, err
+	var d FullPullRequest
+	if e, ok := s.full.entry(k); ok && e.d.PullRequest.ID != "" && refusal(&e.d) == "" && !headDiffers(&e.d, mr) && (!r.Enabled || e.d.PullRequest.HeadSHA != "") {
+		d = e.d
+	} else if !ok && r.Enabled {
+		if p, has := s.summaries.get(k); has && !p.Partial && p.ID != "" && p.HeadSHA != "" && p.State == PullRequestOpen && !p.Draft && !headDiffers(&FullPullRequest{PullRequest: p}, mr) {
+			d = FullPullRequest{PullRequest: p}
+		}
+	}
+	if d.PullRequest.ID == "" {
+		d, err = s.freshFor(ctx, k, func(d *FullPullRequest) bool { return refusal(d) != "" || headDiffers(d, mr) }, refusal)
+		if err != nil {
+			return AutoMergeResult{}, err
+		}
 	}
 	pr := d.PullRequest
 	doc, vars, what := queryDisableAutoMerge, map[string]any{"id": pr.ID}, "disabling auto-merge"
@@ -144,7 +182,17 @@ func (s *Store) SetPullRequestAutoMerge(ctx context.Context, slug string, number
 		}
 		doc, vars, what = queryEnableAutoMerge, map[string]any{"id": pr.ID, "method": string(r.Method), "head": head}, "enabling auto-merge"
 	}
-	data, err := s.stateWrite(ctx, k, what, doc, vars, func(pe *PartialError) error { return autoMergeRefused(k, &pr, pe) })
+	data, err := s.stateWrite(ctx, k, what, doc, vars, func(pe *PartialError) error { return autoMergeRefused(k, &pr, pe) }, func(ctx context.Context, data []byte) {
+		det, err := decodeAutoMergeDetail(data, r.Enabled)
+		if err != nil {
+			s.invalidateFull(k)
+			return
+		}
+		s.patchFull(ctx, k, func(d *FullPullRequest) {
+			d.AutoMerge = det.Enabled
+			d.AutoMergeMethod = det.Method
+		})
+	})
 	if err != nil {
 		return AutoMergeResult{}, err
 	}
@@ -191,9 +239,11 @@ func (s *Store) freshFor(ctx context.Context, k fullKey, look func(*FullPullRequ
 
 // stateWrite sends one state-changing mutation for k on the worker. refused maps
 // GitHub's refusal (a part next to a null payload); a refusal in the pull request's
-// state, or no answer, invalidates the detail so clients re-read, and so does success.
+// state, or no answer, invalidates the detail so clients re-read. On success onSuccess
+// patches the cached detail in place (when nil, the detail is invalidated).
 // what names the change in errors ("disabling auto-merge").
-func (s *Store) stateWrite(ctx context.Context, k fullKey, what, doc string, vars map[string]any, refused func(*PartialError) error) ([]byte, error) {
+func (s *Store) stateWrite(ctx context.Context, k fullKey, what, doc string, vars map[string]any,
+	refused func(*PartialError) error, onSuccess func(context.Context, []byte)) ([]byte, error) {
 	return submitFunc(ctx, s, doc+"|"+k.String(), func(ctx context.Context) ([]byte, error) {
 		data, err := s.call(ctx, doc, vars)
 		var pe *PartialError
@@ -205,7 +255,10 @@ func (s *Store) stateWrite(ctx context.Context, k fullKey, what, doc string, var
 				k.number, what, err)
 		}
 		// On the worker, as a caller that left is not there to do it.
-		if err == nil || outcomeUnknown(err) || errors.Is(err, ErrFailedPrecondition) || errors.Is(err, ErrNotFound) {
+		switch {
+		case err == nil && onSuccess != nil:
+			onSuccess(ctx, data)
+		case err == nil || outcomeUnknown(err) || errors.Is(err, ErrFailedPrecondition) || errors.Is(err, ErrNotFound):
 			s.invalidateFull(k)
 		}
 		if err != nil {
@@ -271,11 +324,27 @@ func autoMergeRefused(k fullKey, pr *PullRequest, pe *PartialError) error {
 	return err
 }
 
+type draftDetail struct {
+	Draft            bool
+	UpdatedAt        time.Time
+	MergeStateStatus MergeStateStatus
+}
+
 // decodeDraft maps a MarkReadyForReview or ConvertToDraft response.
 func decodeDraft(data []byte, draft bool) (DraftResult, error) {
+	det, err := decodeDraftDetail(data, draft)
+	if err != nil {
+		return DraftResult{}, err
+	}
+	return DraftResult{Draft: det.Draft}, nil
+}
+
+func decodeDraftDetail(data []byte, draft bool) (draftDetail, error) {
 	type payload struct {
 		PullRequest *struct {
-			IsDraft bool `json:"isDraft"`
+			IsDraft          bool             `json:"isDraft"`
+			UpdatedAt        time.Time        `json:"updatedAt"`
+			MergeStateStatus MergeStateStatus `json:"mergeStateStatus"`
 		} `json:"pullRequest"`
 	}
 	var d struct {
@@ -283,23 +352,42 @@ func decodeDraft(data []byte, draft bool) (DraftResult, error) {
 		Draft *payload `json:"convertPullRequestToDraft"`
 	}
 	if err := json.Unmarshal(data, &d); err != nil {
-		return DraftResult{}, fmt.Errorf("decode draft: %w", err)
+		return draftDetail{}, fmt.Errorf("decode draft: %w", err)
 	}
 	p := d.Ready
 	if draft {
 		p = d.Draft
 	}
 	if p == nil || p.PullRequest == nil {
-		return DraftResult{}, errors.New("decode draft: no pull request in the response")
+		return draftDetail{}, errors.New("decode draft: no pull request in the response")
 	}
-	return DraftResult{Draft: p.PullRequest.IsDraft}, nil
+	return draftDetail{
+		Draft:            p.PullRequest.IsDraft,
+		UpdatedAt:        p.PullRequest.UpdatedAt,
+		MergeStateStatus: p.PullRequest.MergeStateStatus,
+	}, nil
+}
+
+type autoMergeDetail struct {
+	Enabled   bool
+	Method    MergeMethod
+	UpdatedAt time.Time
 }
 
 // decodeAutoMerge maps an EnableAutoMerge or DisableAutoMerge response.
 func decodeAutoMerge(data []byte, enabled bool) (AutoMergeResult, error) {
+	det, err := decodeAutoMergeDetail(data, enabled)
+	if err != nil {
+		return AutoMergeResult{}, err
+	}
+	return AutoMergeResult{Enabled: det.Enabled, Method: det.Method}, nil
+}
+
+func decodeAutoMergeDetail(data []byte, enabled bool) (autoMergeDetail, error) {
 	type payload struct {
 		PullRequest *struct {
 			AutoMergeRequest *autoMergeRequestJSON `json:"autoMergeRequest"`
+			UpdatedAt        time.Time             `json:"updatedAt"`
 		} `json:"pullRequest"`
 	}
 	var d struct {
@@ -307,20 +395,24 @@ func decodeAutoMerge(data []byte, enabled bool) (AutoMergeResult, error) {
 		Disable *payload `json:"disablePullRequestAutoMerge"`
 	}
 	if err := json.Unmarshal(data, &d); err != nil {
-		return AutoMergeResult{}, fmt.Errorf("decode auto-merge: %w", err)
+		return autoMergeDetail{}, fmt.Errorf("decode auto-merge: %w", err)
 	}
 	p := d.Disable
 	if enabled {
 		p = d.Enable
 	}
 	if p == nil || p.PullRequest == nil {
-		return AutoMergeResult{}, errors.New("decode auto-merge: no pull request in the response")
+		return autoMergeDetail{}, errors.New("decode auto-merge: no pull request in the response")
 	}
 	a := p.PullRequest.AutoMergeRequest
 	if a == nil {
-		return AutoMergeResult{}, nil
+		return autoMergeDetail{UpdatedAt: p.PullRequest.UpdatedAt}, nil
 	}
-	return AutoMergeResult{Enabled: true, Method: MergeMethod(a.MergeMethod)}, nil
+	return autoMergeDetail{
+		Enabled:   true,
+		Method:    MergeMethod(a.MergeMethod),
+		UpdatedAt: p.PullRequest.UpdatedAt,
+	}, nil
 }
 
 func draftWord(draft bool) string {
