@@ -54,19 +54,20 @@ We probed candidate warm-up endpoints live against `https://api.github.com` to v
 `HTTPRunner` (`internal/store/gh/http.go`) now separates hard expiry (`TokenTTL`, default 15m) from a soft refresh threshold (`TokenSoftTTL`, default `TokenTTL * 4 / 5` = 12m):
 
 - When a cached token is valid (`age < TokenTTL`) and `age >= TokenSoftTTL`, `resolveToken` returns the cached token immediately (0 ms) and spawns at most one coalesced background goroutine (`refreshing` guard, bounded by `DefaultTokenTimeout` and `bgCtx`) without holding `r.mu` during `Tokens.Token`.
-- `tokenGen` increments on every synchronous resolution (`force == true` on 401 retry and `AuthStatus`, or hard TTL expiry) so an older in-flight background refresh can never overwrite a newer synchronous token.
+- `resolveMu` serializes synchronous `Tokens.Token` calls (cold start, hard TTL expiry, and `force == true` 401 retry / `AuthStatus`) without holding `r.mu`, so concurrent cold callers (`WarmConnection` + worker) never spawn duplicate `gh auth token` subprocesses and a slow non-forced resolution can never overwrite a newer forced token.
+- `tokenGen` increments on every synchronous resolution so an older in-flight background refresh can never overwrite a newer synchronous token.
 - On background refresh error, the still-valid cached token is preserved until `TokenTTL` expires, and background retries are throttled by `bgRefreshRetry` (30s).
-- `HTTPRunner.Close()` cancels `bgCtx`, drains `bgWG`, and closes idle connections with zero goroutine leaks.
+- `Store.Run` defers `shutdownRunner()`, cancelling `warmCtx`, calling `HTTPRunner.Close()` (cancelling `bgCtx` and draining `bgWG`), and waiting on `warmWG` before returning so no background goroutine or warm-up request outlives daemon shutdown.
 
 ## Before vs After Measurements
 
 ### Live `api.github.com` 65s idle gap (`POST /graphql` `viewer { login }`)
 
-Measured live on this machine (`gh.HTTPRunner` + `gh.GhToken` against `https://api.github.com`):
+Measured live on this machine (`gh.HTTPRunner` + `gh.GhToken` against `https://api.github.com`; n=1 paired sample demonstrating HTTP/2 reuse that saves the ~95 ms TCP+TLS handshake observed in the probe table above):
 
-| Path | `reused_conn` | `POST /graphql` latency | Notes |
+| Path | `reused_conn` | `POST /graphql` latency (n=1) | Notes |
 |---|---|---|---|
-| Before (65s idle, cold reconnect) | `false` | **385 ms** | Paid cold DNS+TCP+TLS handshake |
+| Before (65s idle, cold reconnect) | `false` | **385 ms** | Paid cold DNS+TCP+TLS handshake (~95 ms) |
 | After (65s idle, `WarmConnection` during 500ms `pollDebounce`) | **`true`** | **286 ms** (−99 ms) | `HEAD /rate_limit` overlapped with `pollDebounce`; 0 RL points (`4965 → 4965`) |
 
 ### Cached token refresh across 12m–15m

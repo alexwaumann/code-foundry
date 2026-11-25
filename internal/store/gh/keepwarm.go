@@ -17,7 +17,16 @@ type ConnectionWarmer interface {
 	WarmConnection(ctx context.Context) error
 }
 
-var _ ConnectionWarmer = (*HTTPRunner)(nil)
+// runnerCloser is an optional lifecycle hook implemented by runners that own background
+// goroutines or persistent transports (HTTPRunner). Store.Run calls Close when it exits.
+type runnerCloser interface {
+	Close()
+}
+
+var (
+	_ ConnectionWarmer = (*HTTPRunner)(nil)
+	_ runnerCloser     = (*HTTPRunner)(nil)
+)
 
 const (
 	// warmTimeout bounds one best-effort connection pre-warm request.
@@ -123,16 +132,44 @@ func (r *HTTPRunner) WarmConnection(ctx context.Context) error {
 	return nil
 }
 
-// warmConnection triggers a best-effort asynchronous connection pre-warm when the runner
-// implements ConnectionWarmer.
+// warmConnection triggers a best-effort asynchronous connection pre-warm tied to the
+// store's lifetime when the runner implements ConnectionWarmer.
 func (s *Store) warmConnection() {
 	w, ok := s.opts.Runner.(ConnectionWarmer)
 	if !ok {
 		return
 	}
+	s.mu.Lock()
+	if s.stopped != nil || s.warmClosing {
+		s.mu.Unlock()
+		return
+	}
+	baseCtx := s.warmCtx
+	if baseCtx == nil {
+		baseCtx = context.Background()
+	}
+	s.warmWG.Add(1)
+	s.mu.Unlock()
 	go func() {
-		ctx, cancel := context.WithTimeout(context.Background(), warmTimeout)
+		defer s.warmWG.Done()
+		ctx, cancel := context.WithTimeout(baseCtx, warmTimeout)
 		defer cancel()
 		_ = w.WarmConnection(ctx)
 	}()
+}
+
+// shutdownRunner cancels any in-flight warm-ups, closes runners implementing runnerCloser
+// (HTTPRunner), and waits for warm goroutines to exit before Store.Run returns.
+func (s *Store) shutdownRunner() {
+	s.mu.Lock()
+	s.warmClosing = true
+	cancel := s.warmCancel
+	s.mu.Unlock()
+	if cancel != nil {
+		cancel()
+	}
+	if c, ok := s.opts.Runner.(runnerCloser); ok {
+		c.Close()
+	}
+	s.warmWG.Wait()
 }

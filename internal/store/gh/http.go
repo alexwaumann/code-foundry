@@ -66,6 +66,11 @@ type HTTPOptions struct {
 type HTTPRunner struct {
 	opts HTTPOptions
 
+	// resolveMu serializes synchronous TokenSource.Token calls (cold start, hard expiry,
+	// force=true 401 retry / AuthStatus) without holding mu so hot-path cache hits and
+	// Close() never block on a subprocess.
+	resolveMu sync.Mutex
+
 	mu      sync.Mutex
 	token   string
 	tokenAt time.Time
@@ -328,22 +333,39 @@ func notAuthenticated(err error) error {
 // TokenTTL but at or past TokenSoftTTL, the cached token is returned immediately while
 // at most one background goroutine refreshes it off the request path.
 func (r *HTTPRunner) resolveToken(ctx context.Context, force bool) (string, error) {
+	if !force {
+		r.mu.Lock()
+		now := r.opts.Now()
+		if r.token != "" {
+			age := now.Sub(r.tokenAt)
+			if age < r.opts.TokenTTL {
+				tok := r.token
+				if age >= r.opts.TokenSoftTTL && !r.refreshing && !r.closed &&
+					(r.refreshFailAt.IsZero() || now.Sub(r.refreshFailAt) >= bgRefreshRetry) {
+					r.refreshing = true
+					gen := r.tokenGen
+					r.bgWG.Add(1)
+					go r.refreshTokenBackground(gen)
+				}
+				r.mu.Unlock()
+				return tok, nil
+			}
+		}
+		r.mu.Unlock()
+	}
+
+	// Serialize synchronous resolutions so concurrent cold callers (e.g. WarmConnection +
+	// worker) never spawn duplicate `gh auth token` subprocesses and a slow non-forced
+	// resolution can never overwrite a newer forced (401/AuthStatus) token.
+	r.resolveMu.Lock()
+	defer r.resolveMu.Unlock()
+
 	r.mu.Lock()
 	now := r.opts.Now()
-	if !force && r.token != "" {
-		age := now.Sub(r.tokenAt)
-		if age < r.opts.TokenTTL {
-			tok := r.token
-			if age >= r.opts.TokenSoftTTL && !r.refreshing && !r.closed &&
-				(r.refreshFailAt.IsZero() || now.Sub(r.refreshFailAt) >= bgRefreshRetry) {
-				r.refreshing = true
-				gen := r.tokenGen
-				r.bgWG.Add(1)
-				go r.refreshTokenBackground(gen)
-			}
-			r.mu.Unlock()
-			return tok, nil
-		}
+	if !force && r.token != "" && now.Sub(r.tokenAt) < r.opts.TokenTTL {
+		tok := r.token
+		r.mu.Unlock()
+		return tok, nil
 	}
 	gen := r.tokenGen
 	r.mu.Unlock()

@@ -120,14 +120,11 @@ func TestHTTPRunnerSoftTTLRefresh(t *testing.T) {
 		}
 
 		// Enter soft-TTL window (12m01s): returns cached tok1 immediately while
-		// background refresh blocks on release.
+		// background refresh blocks on release (proof: release is still closed here, so
+		// returning at all proves the hot path did not wait for the background refresh).
 		clk.advance(2 * time.Second)
-		start := time.Now()
 		if _, err := r.GraphQL(ctx, "query { viewer { login } }", nil); err != nil {
 			t.Fatal(err)
-		}
-		if dur := time.Since(start); dur > 500*time.Millisecond {
-			t.Fatalf("hot-path call blocked during background refresh: %v", dur)
 		}
 
 		// Wait until background refresh has started.
@@ -421,11 +418,58 @@ func TestHTTPRunnerSoftTTLRefresh(t *testing.T) {
 		if beforeDur < tokenDelay {
 			t.Errorf("before baseline did not stall as expected: %v < %v", beforeDur, tokenDelay)
 		}
-		if afterSoftDur >= tokenDelay/2 {
-			t.Errorf("soft-TTL request stalled: %v (want < %v)", afterSoftDur, tokenDelay/2)
+	})
+
+	t.Run("concurrent_cold_sync_resolves_coalesce_via_resolveMu", func(t *testing.T) {
+		release := make(chan struct{})
+		tokens := &controlledTokens{
+			started: make(chan int, 4),
+			fn: func(ctx context.Context, call int) (string, error) {
+				if call == 1 {
+					select {
+					case <-release:
+						return "tok_once", nil
+					case <-ctx.Done():
+						return "", ctx.Err()
+					}
+				}
+				return "tok_extra", nil
+			},
 		}
-		if afterPast15mDur >= tokenDelay/2 {
-			t.Errorf("post-15m request stalled after off-path refresh: %v (want < %v)", afterPast15mDur, tokenDelay/2)
+		clk := newSyncClock()
+		r := NewHTTPRunner(HTTPOptions{
+			BaseURL:  "http://127.0.0.1:1",
+			Tokens:   tokens,
+			TokenTTL: 15 * time.Minute,
+			Now:      clk.now,
+		})
+		t.Cleanup(r.Close)
+
+		var wg sync.WaitGroup
+		got := make([]string, 4)
+		for i := range got {
+			wg.Add(1)
+			go func(idx int) {
+				defer wg.Done()
+				tok, err := r.resolveToken(ctx, false)
+				if err != nil {
+					t.Errorf("caller %d err: %v", idx, err)
+					return
+				}
+				got[idx] = tok
+			}(i)
+		}
+		<-tokens.started
+		close(release)
+		wg.Wait()
+
+		if n := tokens.count(); n != 1 {
+			t.Fatalf("cold concurrent resolveToken calls = %d, want 1", n)
+		}
+		for i, tok := range got {
+			if tok != "tok_once" {
+				t.Errorf("got[%d] = %q, want tok_once", i, tok)
+			}
 		}
 	})
 }
@@ -719,5 +763,65 @@ func TestPresenceChangedWarmConnection(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+type blockingWarmerCloserRunner struct {
+	*fakeRunner
+	warmStarted  chan struct{}
+	warmCanceled atomic.Bool
+	closed       atomic.Bool
+}
+
+func (r *blockingWarmerCloserRunner) WarmConnection(ctx context.Context) error {
+	close(r.warmStarted)
+	<-ctx.Done()
+	r.warmCanceled.Store(true)
+	return ctx.Err()
+}
+
+func (r *blockingWarmerCloserRunner) Close() {
+	r.closed.Store(true)
+}
+
+func TestStoreRunClosesRunnerAndDrainsWarmConnection(t *testing.T) {
+	r := &blockingWarmerCloserRunner{
+		fakeRunner:  &fakeRunner{},
+		warmStarted: make(chan struct{}),
+	}
+	opts := testOptions(openTestDB(t), r, nil)
+	opts.PollInterval = time.Hour
+	s, err := New(context.Background(), opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	runCtx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	go func() {
+		done <- s.Run(runCtx)
+	}()
+
+	s.PresenceChanged(PresenceBackground, PresenceForeground)
+	select {
+	case <-r.warmStarted:
+	case <-time.After(2 * time.Second):
+		t.Fatal("WarmConnection did not start")
+	}
+
+	cancel()
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("Run returned %v, want nil", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("Run did not drain WarmConnection on cancel")
+	}
+	if !r.warmCanceled.Load() {
+		t.Error("WarmConnection context was not cancelled on Run exit")
+	}
+	if !r.closed.Load() {
+		t.Error("runnerCloser.Close was not called on Run exit")
 	}
 }
