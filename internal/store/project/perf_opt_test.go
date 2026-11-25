@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -131,10 +132,10 @@ func TestFetchCoalescesWatcherBurst(t *testing.T) {
 	}
 }
 
-// mergedByContent runs automatically during status refreshes only for managed,
-// non-main, clean worktrees. When a dirty squash-merged managed worktree becomes clean
-// at the same (HEAD, base), it evaluates mergedByContent without re-running rev-list.
-func TestMergedByContentGuardAndDirtyToCleanTransition(t *testing.T) {
+// mergedByContent skips the main worktree (never a cleanup/leftover candidate) while
+// still evaluating non-main worktrees (including dirty and unmanaged worktrees so
+// Landed() stays accurate for "Worktrees without threads"), and memoizes per (head, base).
+func TestMergedByContentSkipsMainAndMemoizes(t *testing.T) {
 	f := newFixture(t)
 	cr := &countingRunner{next: ExecRunner{}, n: map[string]int{}}
 	h := startHarness(t, "", Options{Runner: cr, WorktreeRoot: filepath.Join(f.base, "wt")})
@@ -154,8 +155,8 @@ func TestMergedByContentGuardAndDirtyToCleanTransition(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Commit on each so all 4 are ahead; squash-merge managed-dirty into main so once
-	// cleaned its BaseMerged must flip to true.
+	// Commit on each so all 4 are ahead; squash-merge managed-dirty into main so its
+	// BaseMerged / Landed reports true even while dirty.
 	for _, pair := range [][2]string{
 		{unmanaged, "unmanaged.txt"},
 		{managedDirty.Path, "dirty.txt"},
@@ -165,14 +166,12 @@ func TestMergedByContentGuardAndDirtyToCleanTransition(t *testing.T) {
 		git(t, pair[0], "add", ".")
 		git(t, pair[0], "commit", "-q", "-m", pair[1])
 	}
-	// Make origin/main move on with a squash of managed-dirty, while main also diverges locally.
 	git(t, f.project, "merge", "-q", "--squash", "managed-dirty")
 	git(t, f.project, "commit", "-q", "-m", "squash managed-dirty")
 	git(t, f.project, "push", "-q", "origin", "main")
 	writeFile(t, filepath.Join(f.project, "local-main.txt"), "m\n")
 	git(t, f.project, "add", ".")
 	git(t, f.project, "commit", "-q", "-m", "local main ahead")
-	// Remote moves 1 more commit so main is also behind origin/main (ahead=1, behind=1).
 	git(t, f.other, "pull", "-q")
 	writeFile(t, filepath.Join(f.other, "r.txt"), "r\n")
 	git(t, f.other, "add", ".")
@@ -180,7 +179,6 @@ func TestMergedByContentGuardAndDirtyToCleanTransition(t *testing.T) {
 	git(t, f.other, "push", "-q")
 	git(t, f.project, "fetch", "-q")
 
-	// Dirty managed-dirty before Refresh.
 	wip := filepath.Join(managedDirty.Path, "wip.txt")
 	writeFile(t, wip, "wip\n")
 
@@ -188,16 +186,16 @@ func TestMergedByContentGuardAndDirtyToCleanTransition(t *testing.T) {
 	if err := h.store.Refresh(ctx, r.ID); err != nil {
 		t.Fatal(err)
 	}
-	if got := cr.count("merge-tree") - beforeMT; got != 1 {
-		t.Fatalf("merge-tree ran %d times across (main, unmanaged, managed-dirty, managed-clean), want 1", got)
+	// 3 non-main diverged worktrees run merge-tree; main is skipped.
+	if got := cr.count("merge-tree") - beforeMT; got != 3 {
+		t.Fatalf("merge-tree ran %d times across (main, unmanaged, managed-dirty, managed-clean), want 3 (main skipped)", got)
 	}
 	wtDirty, _ := h.store.Snapshot().Worktree(r.ID, managedDirty.Path)
-	if wtDirty.Status.BaseMerged {
-		t.Fatal("dirty managed worktree should not have run mergedByContent yet")
+	if !wtDirty.Status.BaseMerged || !wtDirty.Landed() {
+		t.Fatalf("dirty squash-merged worktree: BaseMerged=%v Landed=%v; want true", wtDirty.Status.BaseMerged, wtDirty.Landed())
 	}
 
-	// Clean managed-dirty at the exact same (HEAD, base): status should run merge-tree
-	// without re-running rev-list and discover BaseMerged == true.
+	// Cleaning at the exact same (HEAD, base) reuses the memo with 0 rev-list and 0 merge-tree.
 	if err := os.Remove(wip); err != nil {
 		t.Fatal(err)
 	}
@@ -208,13 +206,74 @@ func TestMergedByContentGuardAndDirtyToCleanTransition(t *testing.T) {
 	if got := cr.count("rev-list") - beforeRL; got != 0 {
 		t.Fatalf("dirty->clean transition re-ran rev-list %d times, want 0", got)
 	}
-	if got := cr.count("merge-tree") - beforeMT; got != 1 {
-		t.Fatalf("dirty->clean transition ran merge-tree %d times, want 1", got)
+	if got := cr.count("merge-tree") - beforeMT; got != 0 {
+		t.Fatalf("dirty->clean transition re-ran merge-tree %d times, want 0 (memoized)", got)
 	}
-	wtCleanNow, _ := h.store.Snapshot().Worktree(r.ID, managedDirty.Path)
-	if !wtCleanNow.Status.BaseMerged {
-		t.Fatal("cleaned squash-merged managed worktree did not report BaseMerged=true")
+}
+
+// A reconcile whose `git worktree list` ran before CreateWorktree's `git worktree add`
+// must not delete the newly registered worktree slot when it acquires g.mu afterwards.
+func TestCreateWorktreeSurvivesInFlightReconcile(t *testing.T) {
+	f := newFixture(t)
+	listed := make(chan struct{}, 1)
+	release := make(chan struct{})
+	var hold atomic.Bool
+	hook := &hookRunner{
+		next: ExecRunner{},
+		after: func(args []string) {
+			if hold.Load() && len(args) >= 2 && args[0] == "worktree" && args[1] == "list" {
+				hold.Store(false)
+				select {
+				case listed <- struct{}{}:
+				default:
+				}
+				<-release
+			}
+		},
 	}
+	h := startHarness(t, "", Options{Runner: hook, WorktreeRoot: filepath.Join(f.base, "wt")})
+	ctx := context.Background()
+	r, err := h.store.Register(ctx, f.project)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Start a reconcile and pause it right after `git worktree list` returns (before it locks g.mu).
+	hold.Store(true)
+	reconcileDone := make(chan struct{})
+	go func() {
+		defer close(reconcileDone)
+		h.store.reconcile(ctx, r.ID)
+	}()
+	<-listed
+
+	// Create a new worktree while that stale reconcile is paused.
+	wt, err := h.store.CreateWorktree(ctx, CreateWorktreeOptions{ProjectID: r.ID, Branch: "feat/raced"})
+	if err != nil {
+		close(release)
+		t.Fatalf("CreateWorktree: %v", err)
+	}
+
+	// Let the stale reconcile finish its locked section.
+	close(release)
+	<-reconcileDone
+
+	if _, ok := h.store.Snapshot().Worktree(r.ID, wt.Path); !ok {
+		t.Fatalf("stale reconcile deleted newly created worktree %s from snapshot", wt.Path)
+	}
+}
+
+type hookRunner struct {
+	next  Runner
+	after func(args []string)
+}
+
+func (h *hookRunner) Run(ctx context.Context, dir string, args ...string) ([]byte, error) {
+	out, err := h.next.Run(ctx, dir, args...)
+	if h.after != nil {
+		h.after(args)
+	}
+	return out, err
 }
 
 // A non-default remote ref moving (e.g. pushing a feature branch) refreshes only the

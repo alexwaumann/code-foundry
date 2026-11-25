@@ -249,7 +249,10 @@ type cachedFiles struct {
 	fileIdx   []int
 	// includeCapped: the included ignored files were cut at MaxIncludedFiles.
 	includeCapped bool
-	created       time.Time
+	// hasInclude: listed with non-empty Include patterns. WorktreeFilesChanged does not
+	// emit git-ignored files, so entries with include patterns keep the short FileCacheTTL.
+	hasInclude bool
+	created    time.Time
 	// sorted is the files alone, by path, made on the first text search of the entry
 	// (Files). A pointer, so every copy of the entry shares one.
 	sorted *sortedFiles
@@ -290,8 +293,10 @@ func NewFileIndex(log *slog.Logger) *FileIndex {
 }
 
 // SetWatched marks root as watched (or unwatched) by an external file watcher. Watched
-// roots use WatchedFileCacheTTL instead of FileCacheTTL and rely on Invalidate when
-// their file set changes.
+// roots use WatchedFileCacheTTL (for listings without IncludeIgnored patterns) instead
+// of FileCacheTTL and rely on Invalidate when their file set changes. Transitioning a
+// root to watched invalidates any pre-watch cached entry so it is not silently promoted
+// to the longer TTL.
 func (x *FileIndex) SetWatched(root string, watched bool) {
 	if root == "" {
 		return
@@ -300,13 +305,13 @@ func (x *FileIndex) SetWatched(root string, watched bool) {
 	x.mu.Lock()
 	defer x.mu.Unlock()
 	if watched {
-		x.watched[root] = true
+		if !x.watched[root] {
+			x.watched[root] = true
+			x.invalidateLocked(root)
+		}
 		return
 	}
 	delete(x.watched, root)
-	if !x.hasRootLocked(root) {
-		delete(x.gen, root)
-	}
 }
 
 // Invalidate drops every cached and in-flight listing for root so the next search
@@ -319,6 +324,10 @@ func (x *FileIndex) Invalidate(root string) {
 	root = filepath.Clean(root)
 	x.mu.Lock()
 	defer x.mu.Unlock()
+	x.invalidateLocked(root)
+}
+
+func (x *FileIndex) invalidateLocked(root string) {
 	x.gen[root]++
 	for k, e := range x.entries {
 		if e.dir == root {
@@ -332,22 +341,8 @@ func (x *FileIndex) Invalidate(root string) {
 	}
 }
 
-func (x *FileIndex) hasRootLocked(root string) bool {
-	for _, e := range x.entries {
-		if e.dir == root {
-			return true
-		}
-	}
-	for _, l := range x.inflight {
-		if l.dir == root {
-			return true
-		}
-	}
-	return false
-}
-
-func (x *FileIndex) ttlForLocked(dir string) time.Duration {
-	if x.watched[dir] {
+func (x *FileIndex) ttlForLocked(e cachedFiles) time.Duration {
+	if x.watched[e.dir] && !e.hasInclude {
 		return x.watchedTTL
 	}
 	return x.ttl
@@ -508,7 +503,7 @@ func (x *FileIndex) fill(ctx context.Context, key, dir string, git bool, include
 		// Stamp the entry when the listing is done: one slower than the TTL (a huge
 		// project) would otherwise be cached already expired and re-run on every keystroke.
 		now := x.now()
-		c = cachedFiles{key: key, dir: dir, files: files, paths: make([]string, len(files)), includeCapped: includeCapped, created: now, sorted: &sortedFiles{}}
+		c = cachedFiles{key: key, dir: dir, files: files, paths: make([]string, len(files)), includeCapped: includeCapped, hasInclude: len(include) > 0, created: now, sorted: &sortedFiles{}}
 		for i, f := range files {
 			c.paths[i] = f.Path
 			if !f.IsDir {
@@ -540,7 +535,7 @@ func (x *FileIndex) fill(ctx context.Context, key, dir string, git bool, include
 // dropExpired deletes the cached lists that are past their TTL at now. x.mu is held.
 func (x *FileIndex) dropExpired(now time.Time) {
 	for k, e := range x.entries {
-		if now.Sub(e.created) >= x.ttlForLocked(e.dir) {
+		if now.Sub(e.created) >= x.ttlForLocked(e) {
 			delete(x.entries, k)
 		}
 	}

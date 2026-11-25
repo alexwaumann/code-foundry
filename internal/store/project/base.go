@@ -11,11 +11,10 @@ import (
 // rerun the walks only when one side moves. HEAD comes from each status run; the base
 // sha is resolved once per project by jobBase, which owns projectState.base.
 //
-// jobBase runs wherever a status refresh of every worktree used to be requested: after
-// each reconcile (which fetch, FETCH_HEAD, packed-refs, and config changes trigger), on
-// any change under refs/remotes/origin, and on every backstop poll. It always ends by
-// requesting a status refresh of every worktree, so a status job that starts after a
-// base change reads the new sha. Its cost is one `git rev-parse` per project per round.
+// jobBase runs after reconcile, on FETCH_HEAD and remote-ref changes, and after
+// store-initiated fetches. When the resolved (ref, sha) moves, it fans out a status
+// refresh to every worktree; when unchanged, it refreshes only uninitialized worktrees.
+// Its cost is one `git rev-parse` per project per round.
 
 // projectBase is origin/<default> as last resolved for a project. A nil or empty sha means
 // there is no such ref (no remote, never fetched, or the project is in error).
@@ -32,10 +31,9 @@ type baseCount struct {
 	ahead, behind  int
 	merged         bool
 	// mergedChecked reports whether mergedByContent has been evaluated (or was
-	// unnecessary because the worktree is not both ahead and behind). A dirty,
-	// unmanaged, or main worktree skips mergedByContent; if a managed worktree later
-	// becomes clean at the same (head, base), mergedChecked=false ensures it runs
-	// mergedByContent without re-running rev-list.
+	// unnecessary because the worktree is not both ahead and behind). Main worktrees
+	// skip mergedByContent (they are never cleanup/leftover candidates); non-main
+	// worktrees evaluate and memoize it per (head, base).
 	mergedChecked bool
 }
 
@@ -90,9 +88,9 @@ func (g *Git) resolveBase(ctx context.Context, projectID string) {
 // baseCounts returns HEAD's ahead/behind against the project's base, reusing the
 // worktree's memo when neither HEAD nor the base moved. ok is false when there is no
 // base comparison (no base ref, unborn HEAD, or rev-list failed). reused reports a memo
-// hit. checkMerged gates mergedByContent (only managed, non-main, clean worktrees run
-// merge-tree automatically during status refreshes). Called only by the worktree's
-// status job, which owns slot.base.
+// hit. checkMerged gates mergedByContent (skipped for the main worktree, which is never
+// a leftover or cleanup candidate). Called only by the worktree's status job, which owns
+// slot.base.
 func (g *Git) baseCounts(ctx context.Context, st *projectState, slot *wtSlot, dir, head string, checkMerged bool) (c baseCount, ok, reused bool) {
 	b := st.base.Load()
 	if b == nil || b.sha == "" || head == "" {

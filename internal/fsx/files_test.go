@@ -714,3 +714,41 @@ func TestFileIndexInvalidateDuringInflight(t *testing.T) {
 		t.Fatalf("list calls = %d, want 2", n)
 	}
 }
+
+// Entries with Include patterns stay on FileCacheTTL (5s) even on watched roots because
+// WorktreeFilesChanged does not emit git-ignored files, and transitioning a root from
+// unwatched to watched invalidates any pre-watch cached entry.
+func TestFileIndexIncludeIgnoredKeepsShortTTLAndWatchInvalidates(t *testing.T) {
+	now := time.Unix(2000, 0)
+	x := NewFileIndex(nil)
+	x.now = func() time.Time { return now }
+	var calls atomic.Int32
+	x.list = func(_ context.Context, _ string, _ bool, _ []string) ([]FileEntry, bool, error) {
+		n := calls.Add(1)
+		return []FileEntry{{Path: fmt.Sprintf("v%d.env", n)}}, false, nil
+	}
+
+	// Unwatched root cached first; SetWatched(true) invalidates it instead of promoting to 5m.
+	if _, _, err := searchDir(context.Background(), x, "/w", true, "", 0); err != nil {
+		t.Fatal(err)
+	}
+	x.SetWatched("/w", true)
+	got, _, err := searchDir(context.Background(), x, "/w", true, "", 0)
+	if err != nil || !slices.Equal(paths(got), []string{"v2.env"}) {
+		t.Fatalf("after SetWatched(true): got %q, %v; want [v2.env]", paths(got), err)
+	}
+
+	// With Include patterns on a watched root, FileCacheTTL (5s) still applies.
+	src := []Source{{Dir: "/w", Git: true, Include: []string{".env"}}}
+	if _, _, _, err := x.SearchSources(context.Background(), src, "", 0, false); err != nil {
+		t.Fatal(err)
+	}
+	before := calls.Load()
+	now = now.Add(FileCacheTTL)
+	if _, _, _, err := x.SearchSources(context.Background(), src, "", 0, false); err != nil {
+		t.Fatal(err)
+	}
+	if calls.Load() != before+1 {
+		t.Fatalf("Include listing calls after FileCacheTTL = %d, want %d", calls.Load(), before+1)
+	}
+}

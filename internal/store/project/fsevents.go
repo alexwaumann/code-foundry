@@ -209,6 +209,16 @@ func (g *Git) onEvents(evs []fsevents.Event) {
 		}
 		for _, k := range keys {
 			addHit(k, tree, ev.Path, ev.Flags)
+			// packed-refs changes (e.g. `fetch --prune` deleting a packed remote ref)
+			// map to reconcile -> jobBase, which skips status fan-out when origin/<default>
+			// did not move. Queue worktree statuses directly so upstream/ahead-behind stay fresh.
+			if k.kind == jobReconcile && filepath.Base(clean) == "packed-refs" {
+				if st := g.projects[k.projectID]; st != nil {
+					for p := range st.wts {
+						addHit(jobKey{kind: jobStatus, projectID: k.projectID, path: p}, false, ev.Path, ev.Flags)
+					}
+				}
+			}
 		}
 		// When a non-default remote-tracking ref moves (e.g. `git push` or fetch on a
 		// feature branch), resolveBase will see an unchanged default base and skip

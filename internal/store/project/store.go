@@ -123,7 +123,7 @@ type projectState struct {
 	meta atomic.Pointer[projectMeta]
 	// base is origin/<default> resolved to a sha; written only by the project's jobBase.
 	base atomic.Pointer[projectBase]
-	// wts is guarded by Git.mu; only the project's reconcile job adds or removes slots.
+	// wts is guarded by Git.mu; reconcile and CreateWorktree add slots, reconcile removes them.
 	wts map[string]*wtSlot
 }
 
@@ -163,8 +163,8 @@ type Git struct {
 	mu       sync.RWMutex
 	projects map[string]*projectState
 	// routes is the fs event routing table (watch.go): every known directory of every
-	// project -> owner. Each project's entries are written only by its reconcile job
-	// (and dropped by Unregister).
+	// project -> owner. Each project's entries are written by reconcile and
+	// CreateWorktree (and dropped by Unregister).
 	routes map[string]watchTarget
 	// made is the worktrees the app made, by path (made.go); guarded by mu.
 	made map[string]madeWorktree
@@ -644,6 +644,7 @@ func (g *Git) Unregister(ctx context.Context, id string) error {
 		g.fs.sync(ctx) // the stream may drop the project's directories
 	}
 	g.forgetDetails(id)
+	g.fetches.forget(id)
 	g.log.Info("project unregistered", "id", id)
 	g.commit(func(*Snapshot) []Event { return []Event{ProjectRemoved{ID: id}} })
 	return nil
@@ -800,6 +801,14 @@ func (g *Git) CreateWorktree(ctx context.Context, opts CreateWorktreeOptions) (W
 		}
 	}
 	wt, ok := g.Snapshot().Worktree(m.ID, path)
+	if !ok {
+		// Fall back to a full reconcile if an external race dropped the slot.
+		if err := g.refresh(ctx, m.ID); err != nil {
+			undo()
+			return Worktree{}, err
+		}
+		wt, ok = g.Snapshot().Worktree(m.ID, path)
+	}
 	if !ok {
 		return Worktree{}, fmt.Errorf("project: created worktree %s is missing from git worktree list", path)
 	}
@@ -1273,8 +1282,15 @@ func (g *Git) reconcile(ctx context.Context, id string) {
 		}
 		wwts = append(wwts, watchWorktree{path: l.Path, isMain: isMain, admin: slot.admin})
 	}
-	for p := range st.wts {
+	for p, slot := range st.wts {
 		if !seen[p] {
+			// A worktree created by CreateWorktree after this reconcile's listing started
+			// will not be in `listed` yet; keep its slot and watch routes intact (same
+			// listedAt guard as staleMadeLocked).
+			if made, ok := g.made[p]; ok && made.projectID == id && made.at.After(listedAt) {
+				wwts = append(wwts, watchWorktree{path: p, isMain: false, admin: slot.admin})
+				continue
+			}
 			delete(st.wts, p)
 			removed = append(removed, p)
 			setChanged = true
@@ -1451,7 +1467,10 @@ func (g *Git) status(ctx context.Context, projectID, path string) {
 			Operation:  op.Op, OperationStep: op.Step, OperationTotal: op.Total,
 			RefreshedAt: now,
 		}
-		checkMerged := !next.IsMain && !next.Status.Dirty && next.Status.Operation == "" && g.isManaged(path)
+		// Main is never a leftover or cleanup candidate; non-main worktrees evaluate
+		// mergedByContent (memoized per (head, base)) so Landed() stays accurate for
+		// both dirty and unmanaged worktrees.
+		checkMerged := !next.IsMain
 		if c, ok, reused := g.baseCounts(ctx, st, slot, path, info.Head, checkMerged); ok {
 			next.Status.BaseRef, next.Status.BaseAhead, next.Status.BaseBehind = c.ref, c.ahead, c.behind
 			next.Status.BaseMerged = c.merged
@@ -1501,9 +1520,9 @@ func (g *Git) status(ctx context.Context, projectID, path string) {
 
 // republishAfter is how stale the main worktree's published RefreshedAt may get while
 // its status does not change: an unchanged refresh past it republishes the main
-// worktree so the project page's freshness stays current without waking subscribers
-// every minute or for linked worktrees.
-const republishAfter = 5 * time.Minute
+// worktree so the project page's freshness stays current while linked worktrees never
+// emit periodic unchanged wakeups.
+const republishAfter = time.Minute
 
 // publishedBefore reports whether the snapshot's RefreshedAt for the worktree is
 // before t (false when the worktree is not in the snapshot).
@@ -1536,6 +1555,9 @@ func (g *Git) fetch(ctx context.Context, id string) {
 	if _, err := g.runner.Run(fctx, m.Path, "fetch", "--prune", "--quiet"); err != nil {
 		if ctx.Err() == nil {
 			g.log.Warn("fetch failed", "project", id, "path", m.Path, "err", err)
+			// While running[id] was set, FSEvents jobBase notifications (e.g. an external
+			// push) were suppressed; run a low-priority jobBase so none are lost.
+			g.sched.requestPrio(jobKey{kind: jobBase, projectID: id}, prioLow)
 		}
 		return
 	}

@@ -58,6 +58,14 @@ func (p *fetchPool) markFetched(id string, at time.Time) {
 	p.doneAt[id] = at
 }
 
+// forget clears fetch coalescing state for an unregistered project.
+func (p *fetchPool) forget(id string) {
+	p.init()
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	delete(p.doneAt, id)
+}
+
 // suppressing reports whether FSEvents fetch markers (FETCH_HEAD, remote-tracking refs)
 // for project id are from our own in-flight or just-completed fetch and should be
 // absorbed because afterFetch handles base resolution directly.

@@ -68,14 +68,6 @@ func (g *Git) recordMade(ctx context.Context, projectID, path string) string {
 	return head
 }
 
-// isManaged reports whether path was made by Code Foundry (recorded in g.made).
-func (g *Git) isManaged(path string) bool {
-	g.mu.RLock()
-	defer g.mu.RUnlock()
-	_, ok := g.made[path]
-	return ok
-}
-
 // forgetMade drops the records of paths (removed worktrees) made at or before t, so a
 // worktree made again at one of them meanwhile (a thread resuming) keeps its new record.
 func (g *Git) forgetMade(ctx context.Context, t time.Time, paths ...string) {

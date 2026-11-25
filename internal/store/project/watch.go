@@ -161,6 +161,9 @@ func classify(kind watchKind, name string, o op) action {
 			return actStatus
 		}
 	case wkRemoteRefs:
+		if name == "HEAD" {
+			return actReconcile // git fetch creating/moving refs/remotes/origin/HEAD updates DefaultBranch
+		}
 		return actStatusAll // push/fetch moved a remote-tracking ref: ahead/behind
 	case wkWorktreesDir:
 		if o.has(opCreate | opRemove | opRename) {
