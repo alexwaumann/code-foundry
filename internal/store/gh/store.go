@@ -164,6 +164,7 @@ type Store struct {
 	queue                []*job
 	stopped              error           // why Run ended; nothing queues after it
 	lastEnd              time.Time       // when the previous request finished (primary or read lane)
+	lastStart            time.Time       // when the previous request started (for tokenless MinGap pacing)
 	allowance            gapAllowance    // short gaps / read-lane requests left (yield.go, read_lane.go)
 	primaryInFlightRead  bool            // primary worker is blocked inside a read-only request (read_lane.go)
 	primaryWriting       bool            // primary worker is waiting to run or running a write job (read_lane.go)
@@ -231,7 +232,10 @@ type job struct {
 	// promised: a client was told this fetch is coming (submitBackground), so it runs
 	// whoever gives up.
 	promised bool
-	waiters  []chan jobResult
+	// noDedup: always issue a fresh request rather than joining an in-flight read
+	// (LookupPullRequest's "ask GitHub now" contract).
+	noDedup bool
+	waiters []chan jobResult
 }
 
 func (j *job) key() string {
@@ -424,8 +428,8 @@ func (s *Store) PullRequest(ctx context.Context, slug string, number int) (PullR
 	}
 	k := fullKey{key, number}
 	now := s.opts.Now()
-	cached, ok, fromMem := s.cachedPullRequestDetail(k)
-	if ok && now.Sub(cached.FetchedAt) < s.opts.DetailTTL && !s.moved.movedSince(k, cached.FetchedAt) {
+	cached, fetchSeq, ok, fromMem := s.cachedPullRequestDetail(k)
+	if ok && now.Sub(cached.FetchedAt) < s.opts.DetailTTL && !s.moved.movedSinceSeq(k, cached.FetchedAt, fetchSeq) {
 		return cached, nil
 	}
 	if !fromMem {
@@ -455,8 +459,8 @@ func (s *Store) PullRequest(ctx context.Context, slug string, number int) (PullR
 
 // cachedPullRequestDetail returns k's best in-memory PullRequestDetail from prDetails
 // or a non-stale s.full entry without touching SQLite.
-func (s *Store) cachedPullRequestDetail(k fullKey) (d PullRequestDetail, ok, fromMem bool) {
-	d, ok = s.prDetails.get(k)
+func (s *Store) cachedPullRequestDetail(k fullKey) (d PullRequestDetail, fetchSeq uint64, ok, fromMem bool) {
+	d, fetchSeq, ok = s.prDetails.getWithSeq(k)
 	fromMem = ok
 	if e, hasFull := s.full.entry(k); hasFull && !e.stale && !e.checksStale && !e.written && !e.d.ChecksTruncated && e.d.LastError == "" {
 		fromFull := PullRequestDetail{
@@ -465,10 +469,10 @@ func (s *Store) cachedPullRequestDetail(k fullKey) (d PullRequestDetail, ok, fro
 			FetchedAt:   e.d.FetchedAt,
 		}
 		if !ok || fromFull.FetchedAt.After(d.FetchedAt) {
-			return clonePullRequestDetail(fromFull), true, true
+			return clonePullRequestDetail(fromFull), e.fetchSeq, true, true
 		}
 	}
-	return d, ok, fromMem
+	return d, fetchSeq, ok, fromMem
 }
 
 // submit queues an on-demand job (coalescing with an identical queued one) and waits
@@ -568,7 +572,7 @@ func (s *Store) pausedLocked() error {
 func (s *Store) enqueueLocked(j *job, ch chan jobResult) bool {
 	key := j.key()
 	if ch != nil && j.dedupInflight() {
-		if active, ok := s.inflight[key]; ok {
+		if active, ok := s.inflight[key]; ok && !active.background {
 			active.waiters = append(active.waiters, ch)
 			return true
 		}

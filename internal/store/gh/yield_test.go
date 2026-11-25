@@ -36,14 +36,17 @@ type yieldWorld struct {
 	logs   *bytes.Buffer
 	stop   func() // cancels Run and waits for it
 
-	mu       sync.Mutex
-	sent     []string
-	holdAt   string
-	after    bool // hold once the answer is computed, not before
-	noStats  bool // the next Poll answer loses its stats
-	entered  chan struct{}
-	release  chan struct{}
-	released sync.Once
+	mu           sync.Mutex
+	sent         []string
+	holdAt       string
+	after        bool // hold once the answer is computed, not before
+	noStats      bool // the next Poll answer loses its stats
+	activeReqs   int
+	activeWrites int
+	writeOverlap bool
+	entered      chan struct{}
+	release      chan struct{}
+	released     sync.Once
 }
 
 func newYieldWorld(t *testing.T, mod func(*Options)) *yieldWorld {
@@ -54,17 +57,20 @@ func newYieldWorld(t *testing.T, mod func(*Options)) *yieldWorld {
 	w := &yieldWorld{g: g, f: &fakeRunner{}, polled: bus.Subscribe[Polled](b, 256),
 		events: bus.Subscribe[PullRequestDetailUpdated](b, 256), logs: &bytes.Buffer{}}
 	w.f.setDoc(func(op, doc string, vars map[string]any) (json.RawMessage, error) {
-		w.note(op, true)
+		isWr := isMutation(doc)
+		w.noteOp(op, true, isWr)
 		var data json.RawMessage
 		var err error
 		if op == opLookup {
 			if err = g.takeFail(op); err == nil {
 				data = json.RawMessage(`{"repository":null}`)
 			}
+		} else if op == "TestWrite" {
+			data = json.RawMessage(`{"__typename":"Mutation"}`)
 		} else {
 			data, err = g.respond(op, doc, vars)
 		}
-		w.note(op, false)
+		w.noteOp(op, false, isWr)
 		if op == "Poll" && err == nil {
 			data = w.loseStats(data)
 		}
@@ -144,9 +150,27 @@ func (r rawYieldRunner) RESTRaw(context.Context, string, map[string]string, stri
 
 // note logs a request on its way out (start) and holds it where holdGitHub asked.
 func (w *yieldWorld) note(op string, start bool) {
+	w.noteOp(op, start, false)
+}
+
+func (w *yieldWorld) noteOp(op string, start, isWrite bool) {
 	w.mu.Lock()
 	if start {
 		w.sent = append(w.sent, op)
+		w.activeReqs++
+		if isWrite {
+			if w.activeReqs > 1 || w.activeWrites > 0 {
+				w.writeOverlap = true
+			}
+			w.activeWrites++
+		} else if w.activeWrites > 0 {
+			w.writeOverlap = true
+		}
+	} else {
+		w.activeReqs--
+		if isWrite {
+			w.activeWrites--
+		}
 	}
 	hold := op == w.holdAt && start != w.after
 	var entered, release chan struct{}
@@ -1514,8 +1538,8 @@ func TestIsMutation(t *testing.T) {
 }
 
 // Everything at once, for the race detector: polls back to back, clicks that stay and
-// clicks that leave, and background refreshes. At most two requests in flight (primary +
-// read lane), nobody left hanging.
+// clicks that leave, writes, and background refreshes. At most two requests in flight
+// (primary + read lane), and never a write concurrent with any other request.
 func TestQueueUnderLoad(t *testing.T) {
 	w := newYieldWorld(t, func(o *Options) { o.PollInterval = time.Millisecond })
 	var wg sync.WaitGroup
@@ -1527,11 +1551,16 @@ func TestQueueUnderLoad(t *testing.T) {
 					patience = time.Duration(i%5) * time.Millisecond
 				}
 				ctx, cancel := context.WithTimeout(context.Background(), patience)
-				switch i % 4 {
+				switch i % 5 {
 				case 0:
 					_ = w.s.refreshFull(fullKey{"o/r", 1})
 				case 1:
 					_, _ = w.s.FullPullRequest(ctx, "o/r", 1, true)
+				case 2:
+					_, _ = submitFunc(ctx, w.s, fmt.Sprintf("wr-%d-%d", g, i), func(ctx context.Context) (struct{}, error) {
+						_, err := w.s.callDoc(ctx, "TestWrite", "mutation TestWrite { __typename }", nil)
+						return struct{}{}, err
+					})
 				default:
 					_ = w.testJob(ctx, fmt.Sprintf("j%d", (g+i)%7))
 				}
@@ -1543,5 +1572,11 @@ func TestQueueUnderLoad(t *testing.T) {
 	settleWorker(t, w.s)
 	if n := w.maxInflight(); n < 1 || n > 2 {
 		t.Errorf("max in flight = %d, want 1..2", n)
+	}
+	w.mu.Lock()
+	overlap := w.writeOverlap
+	w.mu.Unlock()
+	if overlap {
+		t.Error("write overlapped with another request")
 	}
 }

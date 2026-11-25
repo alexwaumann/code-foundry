@@ -214,7 +214,7 @@ func (s *Store) LookupPullRequest(ctx context.Context, slug string, number int) 
 	if number <= 0 {
 		return PullRequest{}, fmt.Errorf("%w: pull request number %d", ErrInvalidArgument, number)
 	}
-	res := s.submit(ctx, &job{kind: jobPullRequest, slug: key, number: number, read: true})
+	res := s.submit(ctx, &job{kind: jobPullRequest, slug: key, number: number, read: true, noDedup: true})
 	if p := res.detail.PullRequest; p.Number > 0 {
 		return p, nil
 	}

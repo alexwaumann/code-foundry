@@ -1292,4 +1292,275 @@ func TestReadLanePollFingerprintCausality(t *testing.T) {
 			t.Errorf("entry stale = %v (ok=%v), want true when poll saw strictly newer UpdatedAt", e.stale, ok)
 		}
 	})
+
+	t.Run("strictly newer poll invalidates read-lane PullRequest detail", func(t *testing.T) {
+		g, r, s, polled := newReadLaneStore(t, func(o *Options) { o.DetailTTL = time.Hour })
+
+		pollEntered, pollRelease := make(chan struct{}), make(chan struct{})
+		var holdOnce, relOnce sync.Once
+		defer relOnce.Do(func() { close(pollRelease) })
+		r.mu.Lock()
+		r.onOp = func(_ context.Context, op string, _ bool) {
+			if op == "Poll" {
+				holdOnce.Do(func() {
+					close(pollEntered)
+					<-pollRelease
+				})
+			}
+		}
+		r.mu.Unlock()
+
+		if err := s.Refresh(context.Background(), ""); err != nil {
+			t.Fatal(err)
+		}
+		<-pollEntered
+
+		// Read lane fetches PullRequest (v1) while Poll hasn't read state yet.
+		d1, err := s.PullRequest(context.Background(), "o/r", 1)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// Now GitHub advances to v2 BEFORE Poll reads state.
+		wantUpdated := d1.PullRequest.UpdatedAt.Add(2 * time.Hour)
+		g.edit("PR_a", func(p *PullRequest) { p.UpdatedAt = wantUpdated })
+
+		relOnce.Do(func() { close(pollRelease) })
+		<-polled.C()
+
+		// Next PullRequest() MUST refetch v2 (not return stale v1 from cache).
+		d2, err := s.PullRequest(context.Background(), "o/r", 1)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !d2.PullRequest.UpdatedAt.Equal(wantUpdated) {
+			t.Fatalf("PullRequest UpdatedAt = %v, want %v (stale v1 was served)", d2.PullRequest.UpdatedAt, wantUpdated)
+		}
+	})
+
+	t.Run("equal UpdatedAt check change marks read-lane FullPullRequest checksStale", func(t *testing.T) {
+		var c fullCache
+		now := time.Now()
+		d := FullPullRequest{
+			PullRequest: PullRequest{
+				ID:        "PR_1",
+				Repo:      "o/r",
+				Number:    1,
+				State:     PullRequestOpen,
+				HeadSHA:   "sha1",
+				UpdatedAt: now,
+				Checks:    CheckRollup{State: RollupPending, Total: 2, Pending: 2},
+			},
+			FetchedAt: now,
+		}
+		c.putWithSeq(fullKey{"o/r", 1}, d, 10)
+		fp := prFingerprint{
+			ID:        "PR_1",
+			Repo:      "o/r",
+			Number:    1,
+			State:     PullRequestOpen,
+			HeadSHA:   "sha1",
+			UpdatedAt: now,
+			Checks:    CheckRollup{State: RollupSuccess, Total: 2, Passed: 2},
+		}
+		changed := c.applyPollAt([]prFingerprint{fp}, nil, 5, now.Add(time.Second))
+		if len(changed) != 1 {
+			t.Fatalf("changed = %v, want 1 key", changed)
+		}
+		e, ok := c.entry(fullKey{"o/r", 1})
+		if !ok || !e.checksStale {
+			t.Fatalf("entry = %+v (ok=%v), want checksStale=true", e, ok)
+		}
+	})
+
+	t.Run("late putWithSeq from before moving poll lands stale and never regresses newer seq", func(t *testing.T) {
+		var c fullCache
+		now := time.Now()
+		k := fullKey{"o/r", 1}
+		fp := prFingerprint{ID: "PR_1", Repo: "o/r", Number: 1, State: PullRequestOpen, HeadSHA: "sha2", UpdatedAt: now.Add(time.Minute)}
+		known := map[string]PullRequest{"PR_1": {ID: "PR_1", Repo: "o/r", Number: 1, State: PullRequestOpen, HeadSHA: "sha1", UpdatedAt: now}}
+		c.applyPollAt([]prFingerprint{fp}, known, 5, now.Add(time.Minute))
+
+		// Late fetch with seq=3 (< fpSeq=5) must land as stale.
+		c.putWithSeq(k, FullPullRequest{PullRequest: PullRequest{ID: "PR_1", Number: 1, HeadSHA: "sha1"}, FetchedAt: now.Add(2 * time.Minute)}, 3)
+		e, ok := c.entry(k)
+		if !ok || !e.stale {
+			t.Fatalf("late seq=3 entry = %+v, want stale=true", e)
+		}
+		// Newer seq=8 lands fresh; subsequent late seq=6 must NOT overwrite seq=8.
+		c.putWithSeq(k, FullPullRequest{PullRequest: PullRequest{ID: "PR_1", Number: 1, HeadSHA: "sha2"}, FetchedAt: now.Add(3 * time.Minute)}, 8)
+		c.putWithSeq(k, FullPullRequest{PullRequest: PullRequest{ID: "PR_1", Number: 1, HeadSHA: "sha1"}, FetchedAt: now.Add(4 * time.Minute)}, 6)
+		e, ok = c.entry(k)
+		if !ok || e.stale || e.d.PullRequest.HeadSHA != "sha2" {
+			t.Fatalf("after older seq=6 overwrite attempt: %+v, want fresh sha2", e)
+		}
+	})
+}
+
+// TestReadLaneMultiRequestDoesNotStallWhenBucketEmpties verifies that a multi-request
+// job claimed on the read lane with 1 token left paces its follow-up requests at MinGap
+// instead of stalling for the 10s token refill (and does not stall enterWrite).
+func TestReadLaneMultiRequestDoesNotStallWhenBucketEmpties(t *testing.T) {
+	_, r, s, _ := newReadLaneStore(t, func(o *Options) {
+		o.MinGap = 4 * time.Millisecond
+		o.UserGap = time.Millisecond
+	})
+	pollEntered, pollRelease := make(chan struct{}), make(chan struct{})
+	var holdOnce, relOnce sync.Once
+	defer relOnce.Do(func() { close(pollRelease) })
+	r.mu.Lock()
+	r.onOp = func(_ context.Context, op string, _ bool) {
+		if op == "Poll" {
+			holdOnce.Do(func() {
+				close(pollEntered)
+				<-pollRelease
+			})
+		}
+	}
+	r.customGraphQL = func(op, _ string, _ map[string]any) (json.RawMessage, error, bool) {
+		if op == "PublishOwners" {
+			return json.RawMessage(`{"rateLimit":{"cost":1,"remaining":4900,"limit":5000,"resetAt":"2099-01-01T00:00:00Z"},"viewer":{"login":"octocat","organizations":{"nodes":[{"login":"acme","viewerCanCreateRepositories":true},{"login":"beta","viewerCanCreateRepositories":true}]}}}`), nil, true
+		}
+		return nil, nil, false
+	}
+	r.customREST = func(path string, _ map[string]string) (json.RawMessage, error) {
+		if strings.HasPrefix(path, "orgs/") {
+			return json.RawMessage(`{"members_can_create_public_repositories":true,"members_can_create_private_repositories":true}`), nil
+		}
+		return json.RawMessage(`{"total_count":0}`), nil
+	}
+	r.mu.Unlock()
+
+	// Drain allowance down to exactly 1 token left.
+	now := s.opts.Now()
+	s.mu.Lock()
+	for range userGapBurst - 1 {
+		s.allowance.spend(now)
+	}
+	s.mu.Unlock()
+
+	if err := s.Refresh(context.Background(), ""); err != nil {
+		t.Fatal(err)
+	}
+	<-pollEntered
+
+	start := time.Now()
+	owners, err := s.PublishOwners(context.Background())
+	dur := time.Since(start)
+	relOnce.Do(func() { close(pollRelease) })
+	if err != nil {
+		t.Fatalf("PublishOwners: %v", err)
+	}
+	if len(owners) < 2 {
+		t.Fatalf("owners = %+v, want user + org", owners)
+	}
+	if dur > 2*time.Second {
+		t.Fatalf("multi-request PublishOwners with 1 token left stalled for %v (want MinGap pacing, not 10s refill)", dur)
+	}
+}
+
+// TestReadLaneDoesNotDuplicateInflightBackgroundRefresh verifies that a user-waited
+// FullPullRequest arriving while a background refreshFull for the same PR is already
+// in flight on the primary worker does NOT launch a concurrent duplicate request.
+func TestReadLaneDoesNotDuplicateInflightBackgroundRefresh(t *testing.T) {
+	_, r, s, _ := newReadLaneStore(t, nil)
+	if _, err := s.FullPullRequest(context.Background(), "o/r", 1, true); err != nil {
+		t.Fatal(err)
+	}
+	s.full.markWritten(fullKey{"o/r", 1})
+
+	bgEntered, bgRelease := make(chan struct{}), make(chan struct{})
+	var holdOnce, relOnce sync.Once
+	defer relOnce.Do(func() { close(bgRelease) })
+	var fullCalls atomic.Int32
+	r.mu.Lock()
+	r.onOp = func(_ context.Context, op string, _ bool) {
+		if op == "PullRequestFull" {
+			fullCalls.Add(1)
+			holdOnce.Do(func() {
+				close(bgEntered)
+				<-bgRelease
+			})
+		}
+	}
+	r.mu.Unlock()
+
+	if err := s.refreshFull(fullKey{"o/r", 1}); err != nil {
+		t.Fatal(err)
+	}
+	<-bgEntered
+
+	// User FullPullRequest arrives while background refreshFull is in flight on primary.
+	userDone := make(chan error, 1)
+	go func() {
+		_, err := s.FullPullRequest(context.Background(), "o/r", 1, true)
+		userDone <- err
+	}()
+	time.Sleep(25 * time.Millisecond)
+	if got := fullCalls.Load(); got != 1 {
+		relOnce.Do(func() { close(bgRelease) })
+		t.Fatalf("PullRequestFull calls while background refresh in flight = %d, want 1", got)
+	}
+	relOnce.Do(func() { close(bgRelease) })
+	if err := <-userDone; err != nil {
+		t.Fatalf("user FullPullRequest: %v", err)
+	}
+	if got := fullCalls.Load(); got != 1 {
+		t.Fatalf("total PullRequestFull calls = %d, want 1 (reused background outcome)", got)
+	}
+}
+
+// TestLookupPullRequestDoesNotDedupInflight verifies LookupPullRequest's "ask GitHub now"
+// contract: it does not coalesce onto an earlier in-flight PullRequest fetch.
+func TestLookupPullRequestDoesNotDedupInflight(t *testing.T) {
+	g, r, s, _ := newReadLaneStore(t, func(o *Options) { o.DetailTTL = 0 })
+
+	prEntered, prRelease := make(chan struct{}), make(chan struct{})
+	var holdOnce, relOnce sync.Once
+	defer relOnce.Do(func() { close(prRelease) })
+	var prCalls atomic.Int32
+	r.mu.Lock()
+	r.afterOp = func(_ context.Context, op string, data json.RawMessage, err error) (json.RawMessage, error) {
+		if op == "PullRequest" {
+			if prCalls.Add(1) == 1 {
+				holdOnce.Do(func() {
+					close(prEntered)
+					<-prRelease
+				})
+			}
+		}
+		return data, err
+	}
+	r.mu.Unlock()
+
+	firstDone := make(chan PullRequestDetail, 1)
+	go func() {
+		d, _ := s.PullRequest(context.Background(), "o/r", 1)
+		firstDone <- d
+	}()
+	<-prEntered
+
+	// Advance state after first PullRequest already read old state.
+	wantUpdated := time.Date(2027, 1, 2, 3, 4, 5, 0, time.UTC)
+	g.edit("PR_a", func(p *PullRequest) { p.UpdatedAt = wantUpdated })
+
+	lookupDone := make(chan PullRequest, 1)
+	go func() {
+		p, err := s.LookupPullRequest(context.Background(), "o/r", 1)
+		if err != nil {
+			t.Errorf("LookupPullRequest: %v", err)
+		}
+		lookupDone <- p
+	}()
+
+	time.Sleep(15 * time.Millisecond)
+	relOnce.Do(func() { close(prRelease) })
+
+	<-firstDone
+	got := <-lookupDone
+	if !got.UpdatedAt.Equal(wantUpdated) {
+		t.Fatalf("LookupPullRequest UpdatedAt = %v, want %v (must not join pre-existing in-flight read)", got.UpdatedAt, wantUpdated)
+	}
+	if prCalls.Load() < 2 {
+		t.Fatalf("PullRequest calls = %d, want >= 2", prCalls.Load())
+	}
 }

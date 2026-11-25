@@ -48,9 +48,11 @@ func (j *job) readLaneEligible() bool {
 }
 
 // dedupInflight reports whether callers submitting the same key while j is running
-// should coalesce onto j's result instead of sending a duplicate request.
+// should coalesce onto j's result instead of sending a duplicate request. Background
+// reads are still registered in s.inflight (see registerInflightLocked) so the read lane
+// never launches a concurrent duplicate of an in-flight background refresh.
 func (j *job) dedupInflight() bool {
-	return j.read && !j.background &&
+	return j.read && !j.noDedup &&
 		j.kind != jobPoll && j.kind != jobAuth && j.id != "poll_projects"
 }
 
@@ -211,7 +213,18 @@ func (s *Store) claimReadLane(ctx context.Context) (*job, time.Duration) {
 	if !s.primaryInFlightRead || s.primaryWriting || s.authBad || s.pausedLocked() != nil {
 		return nil, 0
 	}
-	i := slices.IndexFunc(s.queue, func(q *job) bool { return q.readLaneEligible() })
+	i := slices.IndexFunc(s.queue, func(q *job) bool {
+		if !q.readLaneEligible() {
+			return false
+		}
+		// Never run a read-lane copy of a key already in flight on the primary worker
+		// (e.g. a background refreshFull for the same PR): wait for primary to finish
+		// so runFullFetch reuses its outcome instead of sending a duplicate request.
+		if !q.noDedup && s.inflight[q.key()] != nil {
+			return false
+		}
+		return true
+	})
 	if i < 0 {
 		return nil, 0
 	}
@@ -255,8 +268,9 @@ func (s *Store) executeReadLane(ctx context.Context, j *job) {
 }
 
 // admitReadLane gates every request sent on the read lane: refuses writes, refuses
-// while paused (notSent), enforces UserGap spacing, and spends one token from the
-// shared gapAllowance on every dispatched request.
+// while paused (notSent), spends a gapAllowance token at UserGap spacing when available,
+// and falls back cleanly to shared MinGap pacing (never waiting up to 10s for token
+// refill) on follow-up pages of an already-claimed multi-request job.
 func (s *Store) admitReadLane(ctx context.Context, read bool) error {
 	if !read {
 		return fmt.Errorf("gh: write request attempted on read lane")
@@ -270,17 +284,25 @@ func (s *Store) admitReadLane(ctx context.Context, read bool) error {
 		return notSent{err}
 	}
 	now := s.opts.Now()
+	useToken := s.allowance.left(now)
 	var wait time.Duration
-	if !s.allowance.left(now) {
-		wait = s.allowance.nextRefill(now)
-	}
-	if !s.lastEnd.IsZero() {
-		if gap := s.lastEnd.Add(s.opts.UserGap).Sub(now); gap > wait {
-			wait = gap
+	if useToken {
+		if !s.lastEnd.IsZero() {
+			wait = s.lastEnd.Add(s.opts.UserGap).Sub(now)
+		}
+	} else {
+		base := laterOf(s.lastEnd, s.lastStart)
+		if !base.IsZero() {
+			wait = base.Add(s.opts.MinGap).Sub(now)
 		}
 	}
 	if wait <= 0 {
-		s.allowance.spend(now)
+		if useToken {
+			s.allowance.spend(now)
+		} else {
+			s.lastEnd = laterOf(s.lastEnd, now)
+		}
+		s.lastStart = laterOf(s.lastStart, now)
 		s.mu.Unlock()
 		return nil
 	}
@@ -295,13 +317,47 @@ func (s *Store) admitReadLane(ctx context.Context, read bool) error {
 	}
 
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	if err := ctx.Err(); err != nil {
+		s.mu.Unlock()
 		return err
 	}
 	if err := s.pausedLocked(); err != nil {
+		s.mu.Unlock()
 		return notSent{err}
 	}
-	s.allowance.spend(s.opts.Now())
+	after := s.opts.Now()
+	if useToken && s.allowance.left(after) {
+		s.allowance.spend(after)
+		s.lastStart = laterOf(s.lastStart, after)
+		s.mu.Unlock()
+		return nil
+	}
+	// Token ran out while waiting (or started tokenless): pace at shared MinGap so
+	// multi-request jobs never stall for the 10s refill and never exceed 1/MinGap.
+	if useToken {
+		if rem := laterOf(s.lastEnd, s.lastStart).Add(s.opts.MinGap).Sub(after); rem > 0 {
+			s.mu.Unlock()
+			t2 := time.NewTimer(rem)
+			select {
+			case <-ctx.Done():
+				t2.Stop()
+				return ctx.Err()
+			case <-t2.C:
+			}
+			s.mu.Lock()
+			if err := ctx.Err(); err != nil {
+				s.mu.Unlock()
+				return err
+			}
+			if err := s.pausedLocked(); err != nil {
+				s.mu.Unlock()
+				return notSent{err}
+			}
+			after = s.opts.Now()
+		}
+	}
+	s.lastEnd = laterOf(s.lastEnd, after)
+	s.lastStart = laterOf(s.lastStart, after)
+	s.mu.Unlock()
 	return nil
 }

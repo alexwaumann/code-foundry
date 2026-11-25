@@ -308,8 +308,8 @@ func (s *Store) pollProjects(ctx context.Context, cfg Config) {
 		}
 	}
 	s.summaries.putFingerprints(s.Snapshot(), fps, pollStart)
-	s.staleFullDetails(fps, fpSeq)
-	s.markMovedDetails(fps, known, fpSeq, pollStart)
+	s.staleFullDetails(fps, known, fpSeq)
+	s.markMovedDetails(fps, known, fpSeq)
 	for _, f := range fps {
 		k, ok := known[f.ID]
 		if _, dash := held[f.ID]; dash && fingerprintNeedsDetail(k, ok, f) || !dash && s.needsDetail(k, ok, f) {

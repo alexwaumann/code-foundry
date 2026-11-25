@@ -48,9 +48,10 @@ read-only primary request instead of blocking behind it.
 * **Context-carried lane marker**: `runReadLane` tags its context with `withReadLane(ctx)`.
   `callDocMeta`, `admit`, `restRaw`, and `orgPolicy` inspect `isReadLane(ctx)`:
   * Read-lane calls enter `admitReadLane(ctx, read)`, which rejects writes
-    (defense-in-depth), rejects paused state with `notSent{err}`, enforces `UserGap`, and
-    **spends 1 `gapAllowance` token on every dispatched request** (including paginated
-    `Checks` or multi-org `PublishOwners` follow-up calls).
+    (defense-in-depth), rejects paused state with `notSent{err}`, spends a `gapAllowance`
+    token at `UserGap` spacing when available, and falls back to shared `MinGap` pacing
+    (advancing `s.lastEnd`/`s.lastStart` under `s.mu` rather than waiting up to 10 s for
+    token refill) on follow-up pages of an already-claimed multi-request job.
   * Read-lane calls never read or write worker-only fields (`cycle`, `scheduled`,
     `forUser`, `ahead`, etc.).
 
@@ -70,11 +71,14 @@ read-only primary request instead of blocking behind it.
 
 ### In-flight deduplication and abandonment
 
-* Active user-waited read jobs claimed by either lane are registered in `s.inflight` (keyed
-  by `j.key()`, protected by `s.mu`).
-* `enqueueLocked` checks `s.inflight` first for user-waited reads: a concurrent caller for
-  the same key joins `active.waiters` directly instead of queuing a duplicate request on
-  the other lane.
+* Active read jobs claimed by either lane (including background `refreshFull`, excluding
+  `LookupPullRequest` which sets `noDedup` to preserve its "ask GitHub now" contract) are
+  registered in `s.inflight` (keyed by `j.key()`, protected by `s.mu`).
+* `enqueueLocked` checks `s.inflight` first for user-waited reads (when `!active.background`):
+  a concurrent caller for the same key joins `active.waiters` directly instead of queuing a
+  duplicate request. And `claimReadLane` refuses to claim a job whose key is already in
+  `s.inflight` on the primary worker (e.g. a background `refreshFull`), so a user read never
+  races an in-flight background refresh for the same pull request.
 * `abandon` removes a cancelled caller's channel from either `s.queue` or `s.inflight`;
   in-flight jobs finish normally for any remaining waiters and populate the cache.
 * `finishJob` atomically removes `j` from `s.inflight` and detaches `j.waiters` under
@@ -84,18 +88,20 @@ read-only primary request instead of blocking behind it.
 
 * Every GraphQL request captures a monotonic sequence number (`s.reqSeq.Add(1)`) and send
   timestamp (`start`) right after `admit` returns (`callDocMeta` / `callMeta`).
-* `fullEntry` (`s.full`) and `detailEntry` (`s.prDetails`) record `fetchSeq`.
-* `runPoll` and `pollProjects` pass their fingerprint request's `(fpSeq, pollStart)` into
-  `summaries.putFingerprints`, `staleFullDetails` (`fullCache.applyPollAt`), and
-  `markMovedDetails`:
-  * In `fullCache.applyPollAt`: if `fpSeq > 0 && e.fetchSeq > fpSeq && !f.UpdatedAt.After(e.d.PullRequest.UpdatedAt)`,
-    the detail fetch started *after* the poll fingerprint request was sent and the poll did
-    not observe a strictly newer `UpdatedAt`, so the overlapping older fingerprint leaves
-    the fresher entry untouched (neither marking it stale nor overwriting its check counts).
-    If the poll did observe a strictly newer `UpdatedAt`, the entry is still marked stale.
-  * In `markMovedDetails`: marks are skipped when `s.prDetails.newerThan(k, fpSeq, f.UpdatedAt)`
-    and otherwise stamped at `pollStart` rather than response arrival time, so concurrent
-    `PullRequest` fetches finishing after `pollStart` are never falsely invalidated.
+* `fullEntry` (`s.full`) and `detailEntry` (`s.prDetails`) record `fetchSeq`, and
+  `putWithSeq` never lets a late older-seq response overwrite a strictly newer-seq entry.
+* `runPoll` and `pollProjects` pass their fingerprint request's `(known, fpSeq)` into
+  `staleFullDetails` (`fullCache.applyPollAt`) and `markMovedDetails`:
+  * In `fullCache.applyPollAt`: moving fingerprints record `movedSeq[k] = fpSeq` so a late
+    response from `fetchSeq < fpSeq` lands as `stale: true`. Entries with `e.fetchSeq > fpSeq`
+    are left untouched when they have a strictly newer `UpdatedAt` or match `f`; when
+    `UpdatedAt` is equal but check counts/rollup differ (checks do not bump `UpdatedAt`),
+    `checksStale` is set so open panels refresh `checks.graphql` cheaply.
+  * In `markMovedDetails`: marks are stamped at apply time with `fpSeq` (`moved.markSeq`),
+    and skipped only when `s.prDetails.newerThan(k, fpSeq, f)` confirms an in-memory detail
+    fetched after `fpSeq` already reflects or supersedes `f`. `PullRequest` checks
+    `movedSinceSeq(k, cached.FetchedAt, fetchSeq)`, so late pre-poll fetches are also
+    invalidated.
 
 ## Thread-safety audit
 
@@ -141,12 +147,17 @@ Because both $R_{\text{short}}$ and $R_{\text{read}}$ draw from the **single sha
    $+1.0$ request directly. Therefore the worst case spends all 368 tokens on
    $R_{\text{read}}$ ($R_{\text{short}} = 0, R_{\text{read}} = 368$):
    * **At realistic minimum GitHub RTT ($d = 0.2\text{ s}$)**:
-     $$R_{\text{full}} \le \frac{3600}{1.2} = 3,000 \implies R_{\text{total}} \le 3,000 + 368 = \mathbf{3,368\text{ req/hr}} \ll 5,000\text{ pts/hr}$$
+     $$R_{\text{full}} \le \frac{3600}{1.2} = 3,000 \implies R_{\text{total}} \le 3,000 + 368 = \mathbf{3,368\text{ req/hr}}$$
    * **Even at theoretical zero RTT ($d = 0\text{ s}$, impossible over HTTPS)**:
-     $$R_{\text{full}} \le \frac{3600}{1.0} = 3,600 \implies R_{\text{total}} \le 3,600 + 368 = \mathbf{3,968\text{ req/hr}} < 5,000\text{ pts/hr}$$
-   * In addition, `noteResult` reads `rateLimit.remaining` from every GraphQL response on
-     either lane and pauses **both** lanes until `resetAt + 5 s` whenever
-     `remaining < MinRemaining (200)`.
+     $$R_{\text{full}} \le \frac{3600}{1.0} = 3,600 \implies R_{\text{total}} \le 3,600 + 368 = \mathbf{3,968\text{ req/hr}}$$
+   * Tokenless follow-up pages on an already-claimed multi-request read-lane job reserve a
+     full `MinGap` (1.0 s) slot on the shared `lastEnd`/`lastStart` pacing clock rather than
+     spending tokens, so they count inside $R_{\text{full}}$ and preserve the exact same
+     request bound without stalling up to 10 s for a token refill.
+   * Note: the pacing bound above is in **requests/hour** (1-point queries match points 1:1;
+     heavier multi-point queries are guarded by `noteResult`, which reads `rateLimit.remaining`
+     from every GraphQL response on either lane and pauses **both** lanes until `resetAt + 5 s`
+     whenever `remaining < MinRemaining (200)`).
 3. **Worst-case 1-minute (60 s) window (secondary limit)**:
    * Allowance tokens available in 60 s: $8 + \frac{60}{10} = 14$.
    * Primary lane in 60 s: $\frac{60}{1.2} = 50$ req/min at $d = 0.2\text{ s}$ (60 req/min at

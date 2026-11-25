@@ -172,6 +172,9 @@ func (w *writeMemos[K, T]) remember(k K, m writeMemo[T]) {
 type fullCache struct {
 	mu sync.Mutex
 	m  map[fullKey]*fullEntry
+	// movedSeq records the highest poll fpSeq that observed a move on k, so a late
+	// response from a fetch started before that poll lands as stale instead of fresh.
+	movedSeq map[fullKey]uint64
 	// reverts and merges answer repeats of a recent revert or merge (pr_actions.go,
 	// pr_merge.go); mergeLocks runs one merge, state change or description edit of a pull
 	// request at a time. reviews and comments answer an identical review or comment sent
@@ -200,11 +203,23 @@ func (c *fullCache) put(k fullKey, d FullPullRequest) (prev fullEntry, had bool)
 }
 
 // putWithSeq stores d as fresh with its monotonic request sequence and returns the
-// entry it replaced.
+// entry it replaced. A late response from an older sequence never overwrites a newer
+// cached fetch, and a response started before a moving poll lands as stale.
 func (c *fullCache) putWithSeq(k fullKey, d FullPullRequest, seq uint64) (prev fullEntry, had bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	return c.putLocked(k, &fullEntry{d: d, fetchSeq: seq})
+	if old, ok := c.m[k]; ok && seq > 0 && old.fetchSeq > seq {
+		return *old, true
+	}
+	stale := false
+	if seq > 0 && c.movedSeq != nil {
+		if mSeq := c.movedSeq[k]; mSeq > seq {
+			stale = true
+		} else if mSeq > 0 {
+			delete(c.movedSeq, k)
+		}
+	}
+	return c.putLocked(k, &fullEntry{d: d, stale: stale, fetchSeq: seq})
 }
 
 // putLocked stores e, evicting the least recently fetched beyond fullCacheMax. c.mu is
@@ -305,15 +320,45 @@ func (c *fullCache) fail(k fullKey, err error, now time.Time) bool {
 //   - Any other fresh entry whose fingerprint moved goes stale (returned).
 //   - Every unchanged fresh entry in fps is confirmed at now when confirmable.
 //   - When fpSeq > 0, entries fetched after the poll request started (e.fetchSeq > fpSeq)
-//     are left untouched unless the poll observed a strictly newer UpdatedAt, so an
-//     overlapping older poll fingerprint never stales a fresher read-lane fetch.
+//     are left untouched when they have a strictly newer UpdatedAt or match f; if
+//     UpdatedAt is equal but check counts/rollup differ (checks do not bump UpdatedAt),
+//     checksStale is set so open panels refresh checks.graphql cheaply.
 func (c *fullCache) applyPoll(fps []prFingerprint, now time.Time) []fullKey {
-	return c.applyPollAt(fps, 0, now)
+	return c.applyPollAt(fps, nil, 0, now)
 }
 
-func (c *fullCache) applyPollAt(fps []prFingerprint, fpSeq uint64, now time.Time) []fullKey {
+func (c *fullCache) applyPollAt(fps []prFingerprint, known map[string]PullRequest, fpSeq uint64, now time.Time) []fullKey {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	if fpSeq > 0 && known != nil {
+		for _, f := range fps {
+			if f.Repo == "" || f.Number <= 0 {
+				continue
+			}
+			if prev, ok := known[f.ID]; !ok || fingerprintMoved(prev, f) {
+				if c.movedSeq == nil {
+					c.movedSeq = map[fullKey]uint64{}
+				}
+				k := fullKey{f.Repo, f.Number}
+				if fpSeq > c.movedSeq[k] {
+					c.movedSeq[k] = fpSeq
+				}
+			}
+		}
+		if len(c.movedSeq) > fullCacheMax*4 {
+			for len(c.movedSeq) > fullCacheMax*2 {
+				var minK fullKey
+				var minV uint64
+				first := true
+				for k, v := range c.movedSeq {
+					if first || v < minV {
+						minK, minV, first = k, v, false
+					}
+				}
+				delete(c.movedSeq, minK)
+			}
+		}
+	}
 	if len(c.m) == 0 {
 		return nil
 	}
@@ -326,7 +371,17 @@ func (c *fullCache) applyPollAt(fps []prFingerprint, fpSeq uint64, now time.Time
 		f, ok := byID[e.d.PullRequest.ID]
 		switch {
 		case !ok || e.stale:
-		case fpSeq > 0 && e.fetchSeq > fpSeq && !f.UpdatedAt.After(e.d.PullRequest.UpdatedAt):
+		case fpSeq > 0 && e.fetchSeq > fpSeq && e.d.PullRequest.UpdatedAt.After(f.UpdatedAt):
+		case fpSeq > 0 && e.fetchSeq > fpSeq && e.d.PullRequest.UpdatedAt.Equal(f.UpdatedAt):
+			switch {
+			case prMatchesFingerprint(e.d.PullRequest, f):
+				if confirmable(e.d) && !e.checksStale {
+					e.confirmed = now
+				}
+			case e.d.PullRequest.Checks != f.Checks:
+				e.checksStale = true
+				out = append(out, k)
+			}
 		case pendingCheckCountsOnly(e.d.PullRequest, f):
 			e.d.PullRequest.Checks = f.Checks
 			e.checksStale = true
@@ -655,8 +710,8 @@ func (s *Store) fetchFull(ctx context.Context, k fullKey, announce bool) (FullPu
 // staleFullDetails is the poll's hook: cached details whose pull request's fingerprint
 // moved go stale (or have pending check counts patched in place), and clients hear about
 // it; the others it saw are confirmed.
-func (s *Store) staleFullDetails(fps []prFingerprint, fpSeq uint64) {
-	for _, k := range s.full.applyPollAt(fps, fpSeq, s.opts.Now()) {
+func (s *Store) staleFullDetails(fps []prFingerprint, known map[string]PullRequest, fpSeq uint64) {
+	for _, k := range s.full.applyPollAt(fps, known, fpSeq, s.opts.Now()) {
 		if e, ok := s.full.entry(k); ok && e.stale {
 			s.reviewers.invalidatePR(k)
 		}

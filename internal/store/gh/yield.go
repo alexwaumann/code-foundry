@@ -79,6 +79,7 @@ wait:
 	if short && now.Before(s.lastEnd.Add(s.opts.MinGap)) {
 		s.allowance.spend(now)
 	}
+	s.lastStart = laterOf(s.lastStart, now)
 	s.mu.Unlock()
 	if s.scheduled {
 		s.ahead = 0
@@ -155,14 +156,6 @@ type gapAllowance struct{ owed time.Time }
 // left reports whether a short gap is available at now.
 func (a gapAllowance) left(now time.Time) bool {
 	return a.owed.Sub(now) <= (userGapBurst-1)*userGapRefill
-}
-
-// nextRefill reports how long until left(now) becomes true (0 when already available).
-func (a gapAllowance) nextRefill(now time.Time) time.Duration {
-	if wait := a.owed.Sub(now) - (userGapBurst-1)*userGapRefill; wait > 0 {
-		return wait
-	}
-	return 0
 }
 
 // spend takes one short gap at now.

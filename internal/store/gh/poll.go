@@ -367,8 +367,8 @@ func (s *Store) applyPoll(ctx context.Context, cfg Config, plan *pollPlan, res *
 		}
 	}
 	s.summaries.putFingerprints(snap, fps, pollStart)
-	s.staleFullDetails(fps, fpSeq)                   // cached detail panels: what moved goes stale, the rest is confirmed (pr_detail.go)
-	s.markMovedDetails(fps, known, fpSeq, pollStart) // and PullRequest's cached copies (detail_moved.go)
+	s.staleFullDetails(fps, known, fpSeq) // cached detail panels: what moved goes stale, the rest is confirmed (pr_detail.go)
+	s.markMovedDetails(fps, known, fpSeq) // and PullRequest's cached copies (detail_moved.go)
 	var need []prFingerprint
 	for _, f := range fps {
 		k, ok := known[f.ID]
