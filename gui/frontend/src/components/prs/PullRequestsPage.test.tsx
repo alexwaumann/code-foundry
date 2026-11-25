@@ -462,4 +462,41 @@ describe("the Pull Requests page", () => {
     await settle();
     expect(world.reads.dashboard).toBe(reads);
   });
+
+  it("sets watchProjects only while PullRequestsPage is mounted and shows cached rows without error when returning stale", async () => {
+    const now = Date.now();
+    // Returning after being away: dashboard is fresh, projects are stale (20m old).
+    world.dashboard = { ...world.dashboard, fetchedAtMs: now - 5_000, projectsFetchedAtMs: now - 20 * 60_000, projectsLastError: "" };
+    render(<Harness />);
+    await settle();
+    // Sidebar mounted alone never watches projects.
+    expect(world.reads.dashboardWatch).toEqual([false]);
+
+    // Mounting PullRequestsPage immediately signals watchProjects: true and renders cached data without an error banner.
+    act(() => {
+      useUiStore.getState().select(PR_PAGE);
+    });
+    await settle();
+    expect(world.reads.dashboardWatch).toEqual([false, true]);
+    expect(screen.queryByRole("status")).toBeNull();
+    expect(rows("else")).toHaveLength(5);
+    expect(screen.getByTestId("prs-updated").dataset.freshness).toBe("stale");
+
+    // Triggered background PollProjects lands and emits Polled: freshness turns fresh.
+    gh({ kind: "polled", fetchedAtMs: now, lastError: "", projectsFetchedAtMs: now, projectsLastError: "" });
+    expect(screen.getByTestId("prs-updated").dataset.freshness).toBe("fresh");
+
+    // Dashboard updates while mounted continue passing watchProjects: true.
+    gh({ kind: "dashboard" });
+    await settle();
+    expect(world.reads.dashboardWatch.at(-1)).toBe(true);
+
+    // Unmounting PullRequestsPage stops watching projects on future dashboard reads.
+    act(() => {
+      useUiStore.setState({ selection: { kind: "none" } });
+    });
+    gh({ kind: "dashboard" });
+    await settle();
+    expect(world.reads.dashboardWatch.at(-1)).toBe(false);
+  });
 });

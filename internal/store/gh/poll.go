@@ -615,8 +615,13 @@ func (s *Store) applyPoll(ctx context.Context, cfg Config, plan *pollPlan, res *
 	if err := s.cache.saveActivity(ctx, activityPoll, now, pollRow{FetchedAt: now}); err != nil {
 		s.log.Warn("gh cache write failed", "err", err)
 	}
-	// The Pull Requests page's project-wide lists: same cycle, own request.
-	s.pollProjects(ctx, cfg)
+	// The Pull Requests page's project-wide lists: same cycle, own request, only while
+	// watched (when dashboards are off or nothing is tracked, clear any cached lists).
+	if s.projectsWatched(now) {
+		s.pollProjects(ctx, cfg)
+	} else if !cfg.Dashboards || len(s.projectSlugs()) == 0 {
+		s.setProjects(ctx, ProjectPullRequests{})
+	}
 	if ctx.Err() != nil {
 		return
 	}

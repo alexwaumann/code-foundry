@@ -11,7 +11,7 @@
 import { Code, ConnectError } from "@connectrpc/connect";
 import type { CommandView, InvokeResultView, UiContextView } from "@/api/command";
 import { confirmationRequiredError } from "@/api/commandErrors";
-import type { BranchPullRequestsView, RepoActivityView } from "@/api/gh";
+import type { BranchPullRequestsQuery, BranchPullRequestsView, RepoActivityView } from "@/api/gh";
 import type { WorktreeDetailView } from "@/api/worktreeDetail";
 
 /** One CommandService.Invoke the GUI made. */
@@ -90,6 +90,10 @@ export const ghFakes = {
   getRepoActivity: (slug: string): Promise<RepoActivityView> => Promise.resolve(daemon.repoActivity.get(slug) ?? { repoSlug: slug, defaultBranch: null }),
   getBranchPullRequests: (repoSlug: string, branch: string): Promise<BranchPullRequestsView> =>
     Promise.resolve(daemon.branchPullRequests.get(`${repoSlug.toLowerCase()}\u0000${branch}`) ?? { pullRequests: [], fetchedAtMs: null, lastError: "" }),
+  getBranchesPullRequests: (branches: readonly BranchPullRequestsQuery[]): Promise<BranchPullRequestsView[]> =>
+    Promise.resolve(
+      branches.map((b) => daemon.branchPullRequests.get(`${b.repoSlug.toLowerCase()}\u0000${b.headRef}`) ?? { pullRequests: [], fetchedAtMs: null, lastError: "" }),
+    ),
   getViewer: () => notFound("viewer"),
 };
 

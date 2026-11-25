@@ -136,6 +136,89 @@ func (s *Store) projectSlugs() []string {
 	return slices.Sorted(maps.Keys(seen))
 }
 
+// projectsWatched reports whether the Pull Requests page has active interest in
+// Snapshot.Projects within ProjectsWatch.
+func (s *Store) projectsWatched(now time.Time) bool {
+	s.mu.Lock()
+	until := s.projectsWatchedUntil
+	s.mu.Unlock()
+	return !until.IsZero() && !now.After(until)
+}
+
+// WatchProjects implements Service. It extends the project-wide lists' poll lease and,
+// when the cached lists are absent or older than the poll interval, triggers a coalesced
+// out-of-band PollProjects refresh without blocking the caller.
+func (s *Store) WatchProjects() {
+	now := s.opts.Now()
+	s.mu.Lock()
+	until := now.Add(s.opts.ProjectsWatch)
+	if until.After(s.projectsWatchedUntil) {
+		s.projectsWatchedUntil = until
+	}
+	tracked := len(s.tracked)
+	authBad := s.authBad
+	pollNext := s.pollNext
+	s.mu.Unlock()
+
+	cfg := s.config()
+	if !cfg.Dashboards || tracked == 0 || authBad {
+		return
+	}
+	p := s.Snapshot().Projects
+	if !p.FetchedAt.IsZero() && now.Sub(p.FetchedAt) < cfg.PollInterval {
+		return
+	}
+	// When the initial startup poll is already due now, let it carry pollProjects in
+	// that cycle instead of running a separate request right before it.
+	if !pollNext.After(now) && s.Snapshot().Poll.FetchedAt.IsZero() {
+		s.nudge()
+		return
+	}
+	_ = s.submitBackground(&job{
+		kind: jobFunc,
+		id:   "poll_projects",
+		run: func(ctx context.Context) (any, error) {
+			s.runPollProjectsNow(ctx)
+			return nil, nil
+		},
+	})
+}
+
+// runPollProjectsNow executes a coalesced out-of-band PollProjects refresh on the
+// worker goroutine after WatchProjects noticed absent or stale project lists.
+func (s *Store) runPollProjectsNow(ctx context.Context) {
+	now := s.opts.Now()
+	if !s.projectsWatched(now) {
+		return
+	}
+	cfg := s.config()
+	if !cfg.Dashboards || len(s.projectSlugs()) == 0 {
+		s.setProjects(ctx, ProjectPullRequests{})
+		return
+	}
+	s.mu.Lock()
+	blocked := s.authBad || now.Before(s.pauseUntil)
+	s.mu.Unlock()
+	if blocked {
+		return
+	}
+	p := s.Snapshot().Projects
+	if !p.FetchedAt.IsZero() && now.Sub(p.FetchedAt) < cfg.PollInterval {
+		return
+	}
+	// Run with scheduled semantics so admit calls letWaitingIn between PollProjects and
+	// its detail batches, yielding to any user-waited PR open/action immediately.
+	prevScheduled := s.scheduled
+	s.scheduled = true
+	defer func() { s.scheduled = prevScheduled }()
+	s.pollProjects(ctx, cfg)
+	if ctx.Err() != nil {
+		return
+	}
+	poll := s.Snapshot().Poll
+	publish(s, s.polled(poll.FetchedAt, poll.LastError))
+}
+
 // pollProjects refreshes Snapshot.Projects: the poll calls it after its own request,
 // before Polled. DashboardUpdated goes out when the lists, totals, queries or error
 // changed (not for the fetch time alone; Polled carries it).

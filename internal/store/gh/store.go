@@ -55,6 +55,9 @@ type Options struct {
 	// BranchWatch is how long a branch stays in the poll after BranchPullRequests
 	// asked for it.
 	BranchWatch time.Duration
+	// ProjectsWatch is how long PollProjects stays active in the poll after
+	// WatchProjects declared interest (Pull Requests page mounted).
+	ProjectsWatch time.Duration
 	// SearchAs replaces @me in the viewer searches and stats with this login (and the
 	// branch filter with it). A development aid for capturing populated dashboards
 	// from an account that has no pull requests; empty in normal use.
@@ -105,6 +108,7 @@ func (o *Options) setDefaults() {
 	o.MaxPages = cmp.Or(o.MaxPages, DefaultMaxPages)
 	o.DetailBatch = cmp.Or(o.DetailBatch, DefaultDetailBatch)
 	def(&o.BranchWatch, DefaultBranchWatch)
+	def(&o.ProjectsWatch, DefaultProjectsWatch)
 	if o.StatsInterval == 0 {
 		o.StatsInterval = DefaultStatsInterval
 	}
@@ -132,26 +136,27 @@ type Store struct {
 	snapMu sync.Mutex // serializes snapshot writers
 	snap   atomic.Pointer[Snapshot]
 
-	mu             sync.Mutex
-	tracked        map[string]bool
-	watches        branchWatches
-	prWatches      map[PullRequestRef]prWatch // WatchPullRequests (pr_watch.go)
-	pollNext       time.Time
-	pollAgain      bool // a poll was asked for while one was running
-	pollFailures   int
-	lastPoll       time.Time // when the last poll ended (or the cached poll's time after New)
-	statsNext      time.Time
-	statsAsked     bool // stats were asked for since the last plan (askStatsLocked)
-	statsFailures  int
-	authBad        bool
-	authNext       time.Time
-	authFailures   int
-	pauseUntil     time.Time
-	pauseErr       error
-	globalFailures int
-	lastResetAt    time.Time // rateLimit.resetAt of the last successful response
-	queue          []*job
-	stopped        error // why Run ended; nothing queues after it
+	mu                   sync.Mutex
+	tracked              map[string]bool
+	watches              branchWatches
+	projectsWatchedUntil time.Time                  // WatchProjects lease expiry (poll_projects.go)
+	prWatches            map[PullRequestRef]prWatch // WatchPullRequests (pr_watch.go)
+	pollNext             time.Time
+	pollAgain            bool // a poll was asked for while one was running
+	pollFailures         int
+	lastPoll             time.Time // when the last poll ended (or the cached poll's time after New)
+	statsNext            time.Time
+	statsAsked           bool // stats were asked for since the last plan (askStatsLocked)
+	statsFailures        int
+	authBad              bool
+	authNext             time.Time
+	authFailures         int
+	pauseUntil           time.Time
+	pauseErr             error
+	globalFailures       int
+	lastResetAt          time.Time // rateLimit.resetAt of the last successful response
+	queue                []*job
+	stopped              error // why Run ended; nothing queues after it
 
 	branches  branchStates   // per-branch results (activity.go)
 	summaries prSummaryCache // canonical slug#number -> PullRequest summary index (pr_cache.go)

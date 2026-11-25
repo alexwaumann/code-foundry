@@ -51,6 +51,14 @@ type Service interface {
 	// branch head of the repository, and keeps that branch in the poll for a while
 	// (activity.go). It never waits on GitHub.
 	BranchPullRequests(ctx context.Context, slug, head string) (BranchPullRequests, error)
+	// BranchesPullRequests is the batched form of BranchPullRequests: it validates and
+	// deduplicates queries, keeps every requested branch in the poll, triggers at most
+	// one poll wakeup for newly watched branches, and returns results in input order.
+	BranchesPullRequests(ctx context.Context, queries []BranchQuery) ([]BranchPullRequests, error)
+	// WatchProjects extends the project-wide lists' poll lease (poll_projects.go) and,
+	// when the cached lists are missing or stale, queues a coalesced background refresh
+	// without blocking.
+	WatchProjects()
 	// FullPullRequest returns everything the detail panel shows about one pull request.
 	// Any cached copy answers at once, Refreshing with a fetch behind it when it is not
 	// current; only nothing cached, refresh, and the read after this store's own write

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { PullRequestView } from "@/api/gh";
 import { fresher } from "@/components/sidebar/linkedPrTag";
-import { branchPullRequestsResource, DASHBOARD_KEY, dashboardResource, pullRequestKey } from "@/stores/gh";
+import { branchPullRequestsResource, DASHBOARD_KEY, dashboardResource, isProjectsWatched, pullRequestKey } from "@/stores/gh";
 import { dashboardLists, freshestRow } from "./seed";
 
 /**
@@ -13,7 +13,7 @@ import { dashboardLists, freshestRow } from "./seed";
 export function useSeedRow(key: string, wanted: boolean): PullRequestView | null {
   const dashboard = dashboardResource.store((s) => {
     const d = wanted ? s.entries[DASHBOARD_KEY]?.data : null;
-    return d ? freshestRow(dashboardLists(d), key) : null;
+    return d ? freshestRow(dashboardLists(d, isProjectsWatched()), key) : null;
   });
   const branches = branchPullRequestsResource.store((s) => (wanted ? freshestRow(Object.values(s.entries).flatMap((e) => (e.data ? [e.data.pullRequests] : [])), key) : null));
   const live = fresher(dashboard, branches);

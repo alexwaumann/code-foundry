@@ -460,7 +460,7 @@ class PrWorld {
   readonly candidates = new Map<string, Candidate[]>();
   dashboard: DashboardView;
   /** Reads of the dashboard (GetDashboard) and of a detail (GetPullRequestDetail), by key. */
-  readonly reads = { dashboard: 0, detail: new Map<string, number>(), candidates: [] as string[] };
+  readonly reads = { dashboard: 0, dashboardWatch: [] as boolean[], detail: new Map<string, number>(), candidates: [] as string[] };
   /** Commands whose next run fails (the mock's POST /__mock/gh/pr-fail?command=…). */
   readonly failNext = new Set<string>();
   /** Threads pr.task --thread finds removed (the daemon's removedWaitResult: exit 1, no thread id, nothing sent). */
@@ -809,8 +809,9 @@ export const prGhFakes = {
     }
   },
   listReviewerCandidates: (slug: string, number: number, query: string): Promise<ReviewerCandidatesView> => Promise.resolve(prWorld.listCandidates(slug, number, query)),
-  getDashboard: (): Promise<DashboardView> => {
+  getDashboard: (_conn?: unknown, _signal?: AbortSignal, opts?: { watchProjects?: boolean }): Promise<DashboardView> => {
     prWorld.reads.dashboard++;
+    prWorld.reads.dashboardWatch.push(opts?.watchProjects === true);
     return Promise.resolve(structuredClone(prWorld.dashboard));
   },
   getViewer: () => Promise.resolve({ login: VIEWER, name: "Alex", url: `https://github.com/${VIEWER}` }),

@@ -495,6 +495,18 @@ export class GhWorld {
     return { pullRequests: prs, fetchedAt: this.at(30_000), lastError: "" };
   }
 
+  getBranchesPullRequests(branches: readonly { repoSlug: string; headRef: string }[]) {
+    this.count("GetBranchesPullRequests");
+    const at = this.at(30_000);
+    return {
+      entries: branches.map((b) => {
+        const slug = b.repoSlug.toLowerCase();
+        const prs = this.branches.get(`${slug}\u0000${b.headRef}`) ?? [];
+        return { repoSlug: slug, headRef: b.headRef, pullRequests: prs, fetchedAt: at, lastError: "" };
+      }),
+    };
+  }
+
   getWorktreeDetail(projectId: string, path: string): DetailInit | null {
     this.count("GetWorktreeDetail");
     return this.details.get(path) ?? (path.startsWith(HOME) ? { projectId, path, baseRef: "", files: [], computedAt: timestampFromDate(new Date()) } : null);

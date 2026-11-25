@@ -80,3 +80,47 @@ func (s *Store) BranchPullRequests(_ context.Context, slug, head string) (gh.Bra
 	}
 	return b, nil
 }
+
+// BranchesPullRequests implements gh.Service.
+func (s *Store) BranchesPullRequests(_ context.Context, queries []gh.BranchQuery) ([]gh.BranchPullRequests, error) {
+	if len(queries) == 0 {
+		return nil, nil
+	}
+	type pair struct{ slug, head string }
+	norm := make([]pair, len(queries))
+	seen := make(map[pair]bool, len(queries))
+	var unique []pair
+	for i, q := range queries {
+		key, err := gh.NormalizeSlug(q.Slug)
+		if err != nil {
+			return nil, err
+		}
+		head := strings.TrimSpace(q.HeadRef)
+		if head == "" {
+			return nil, fmt.Errorf("%w: empty head", gh.ErrInvalidArgument)
+		}
+		p := pair{key, head}
+		norm[i] = p
+		if !seen[p] {
+			seen[p] = true
+			unique = append(unique, p)
+		}
+	}
+	s.record("branches %d", len(unique))
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := make([]gh.BranchPullRequests, len(queries))
+	for i, p := range norm {
+		b, ok := s.branch[p.slug+"@"+p.head]
+		if !ok {
+			b = gh.BranchPullRequests{Slug: p.slug, HeadRef: p.head}
+		}
+		out[i] = b
+	}
+	return out, nil
+}
+
+// WatchProjects implements gh.Service.
+func (s *Store) WatchProjects() {
+	s.record("watch_projects")
+}

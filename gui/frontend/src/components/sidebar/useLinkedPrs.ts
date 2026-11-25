@@ -1,6 +1,6 @@
 import { useEffect, useMemo } from "react";
 import { useShallow } from "zustand/react/shallow";
-import type { ProjectPullRequestsView, PullRequestView } from "@/api/gh";
+import type { PullRequestView } from "@/api/gh";
 import { branchPullRequestsResource, DASHBOARD_KEY, dashboardResource, pullRequestDetailResource, pullRequestKey } from "@/stores/gh";
 import { useThreadsStore } from "@/stores/threads";
 import { findLinkedPr, fresher, linkedPrState, type LinkedPrFact } from "./linkedPrTag";
@@ -28,14 +28,13 @@ export function useLinkKeys(id: string): string[] {
 
 const numberOf = (key: string): number => Number(key.slice(key.lastIndexOf("#") + 1));
 
-const projectPrs = (p: ProjectPullRequestsView | undefined): readonly PullRequestView[] => (p ? p.pullRequests : []);
-
 /**
- * What the summary caches (dashboard lists and branch lists) hold on each linked PR,
- * without watching or fetching full PullRequestDetail.
- * With `watchedOnly: true`, only actively polled sources count (core dashboard lists
- * plus currently watched branch keys) so stale unwatched branch entries or gated project
- * lists never suppress watching `pullRequestDetailResource`.
+ * What the summary caches (core viewer dashboard lists and branch lists) hold on each
+ * linked PR, without watching or fetching full PullRequestDetail. Project-wide lists
+ * (`projectOpen` / `projectMerged`) are excluded because they are gated on Pull Requests
+ * page interest and can be frozen when that page is closed.
+ * With `watchedOnly: true`, only currently watched branch keys count so stale unwatched
+ * branch entries never suppress watching `pullRequestDetailResource`.
  * `keys` must be stable between renders.
  */
 export function useSummaryPrViews(keys: readonly string[], opts?: { watchedOnly?: boolean }): (PullRequestView | null)[] {
@@ -43,11 +42,7 @@ export function useSummaryPrViews(keys: readonly string[], opts?: { watchedOnly?
   const dashboard = dashboardResource.store(
     useShallow((s) => {
       const d = s.entries[DASHBOARD_KEY]?.data;
-      const lists = d
-        ? watchedOnly
-          ? [d.authored, d.reviewRequested, d.reviewed, d.recentlyMerged]
-          : [d.authored, d.reviewRequested, d.reviewed, d.recentlyMerged, projectPrs(d.projectOpen), projectPrs(d.projectMerged)]
-        : [];
+      const lists = d ? [d.authored, d.reviewRequested, d.reviewed, d.recentlyMerged] : [];
       return keys.map((k) => findLinkedPr(lists, k));
     }),
   );

@@ -11,7 +11,7 @@ import type { BridgeSource } from "@/lib/bridge";
 import { useActionsStore } from "./actions";
 import { emberBoardHeld, useEmberStore } from "./ember";
 import { onDaemonEvent } from "./events";
-import { DASHBOARD_KEY, dashboardResource } from "./gh";
+import { DASHBOARD_KEY, dashboardResource, watchProjects } from "./gh";
 import { usePluginsStore } from "./plugins";
 import { useProjectsStore } from "./projects";
 import { useSettingsStore } from "./settings";
@@ -76,9 +76,11 @@ export const bridgeSources: Record<BridgeSource, SourceSpec> = {
     snapshot: () => dashboardResource.store.getState().entries[DASHBOARD_KEY]?.data ?? undefined,
     subscribe: (_threadId, cb) => {
       const release = dashboardResource.watch(DASHBOARD_KEY);
+      const releaseProjects = watchProjects();
       const stop = dashboardResource.store.subscribe(cb);
       return () => {
         stop();
+        releaseProjects();
         release();
       };
     },
