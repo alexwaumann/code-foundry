@@ -39,6 +39,7 @@ func TestLayoutWayBack(t *testing.T) {
 		`INSERT INTO thread_tidy (thread_id, auto_saved_after_ms) VALUES ('s-1', 259200000)`,
 		`INSERT INTO page_owners (path, thread_id, how, first_at, updated_at) VALUES ('/web/a.html', 's-1', 'shown', 1, 1)`,
 		`INSERT INTO page_consent (path, allowed, updated_at) VALUES ('/web/b.html', 1, 1)`,
+		`INSERT INTO gh_pr_diffs (repo_slug, number, head_sha, base_sha, diff, truncated, fetched_at) VALUES ('o/r', 1, 'a', 'b', 'diff', 0, 1)`,
 	} {
 		if _, err := db.ExecContext(ctx, q); err != nil {
 			t.Fatal(err)
@@ -55,7 +56,7 @@ func TestLayoutWayBack(t *testing.T) {
 	if err := Migrate(ctx, db, old); err != nil {
 		t.Fatalf("an old build after the way back: %v", err)
 	}
-	for _, table := range []string{"layout_spaces", "layout_threads", "layout_meta", "project_include_ignored", "notifications", "thread_snooze_events", "snooze_recent_events", "thread_tidy", "page_owners", "page_consent", "page_storage_carry"} {
+	for _, table := range []string{"layout_spaces", "layout_threads", "layout_meta", "project_include_ignored", "notifications", "thread_snooze_events", "snooze_recent_events", "thread_tidy", "page_owners", "page_consent", "page_storage_carry", "gh_pr_diffs"} {
 		var n int
 		if err := db.QueryRowContext(ctx, `SELECT count(*) FROM sqlite_master WHERE type = 'table' AND name = ?`, table).Scan(&n); err != nil || n != 0 {
 			t.Errorf("%s: %d, %v; want it gone", table, n, err)

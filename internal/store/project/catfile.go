@@ -213,6 +213,100 @@ func (p *catFilePool) readBlobByOID(ctx context.Context, repoDir, commonDir, oid
 	return v, fallback, err
 }
 
+// commitsExist reports whether every SHA in shas resolves to a local commit object in
+// repoDir via a pooled cat-file worker. When fallback is true, the caller should fall
+// back to g.runner.Run.
+func (p *catFilePool) commitsExist(ctx context.Context, repoDir, commonDir string, shas ...string) (present, fallback bool, err error) {
+	if p.disabled.Load() {
+		return false, true, nil
+	}
+	if err := ctx.Err(); err != nil {
+		return false, false, err
+	}
+	present = true
+	err = p.withWorker(ctx, repoDir, commonDir, func(w *catFileWorker) error {
+		for _, sha := range shas {
+			info, ierr := w.info(sha + "^{commit}")
+			if ierr != nil {
+				return ierr
+			}
+			if info.missing || info.kind != "commit" {
+				present = false
+				return nil
+			}
+		}
+		return nil
+	})
+	if errors.Is(err, errCatFileUnsupported) {
+		return false, true, nil
+	}
+	if err != nil {
+		return false, false, err
+	}
+	return present, false, nil
+}
+
+// readCommitFile verifies commitSHA is a local commit and reads filePath at that commit
+// via a pooled cat-file worker, matching GitHub's raw file semantics: trees and
+// submodules return notFound=true, missing paths return notFound=true only when the
+// repository is not a partial clone, and blobs are capped at maxBytes.
+func (p *catFilePool) readCommitFile(ctx context.Context, repoDir, commonDir, commitSHA, filePath string, maxBytes int) (contents []byte, truncated, binary, notFound, ok, fallback bool, err error) {
+	if p.disabled.Load() {
+		return nil, false, false, false, false, true, nil
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, false, false, false, false, false, err
+	}
+	err = p.withWorker(ctx, repoDir, commonDir, func(w *catFileWorker) error {
+		cinfo, cerr := w.info(commitSHA + "^{commit}")
+		if cerr != nil {
+			return cerr
+		}
+		if cinfo.missing || cinfo.kind != "commit" {
+			return nil
+		}
+		info, ierr := w.info(commitSHA + ":" + filePath)
+		if ierr != nil {
+			return ierr
+		}
+		if info.missing {
+			if w.partialClone {
+				// In a partial clone, a missing promisor object is indistinguishable from
+				// an absent path in cat-file --batch-command; fall back to GitHub REST.
+				return nil
+			}
+			notFound, ok = true, true
+			return nil
+		}
+		switch info.kind {
+		case "tree", "commit", "submodule":
+			// Directories and submodules are not raw files (GitHub returns JSON -> NotFound).
+			notFound, ok = true, true
+			return nil
+		case "blob":
+			if info.size > blobReadMax {
+				truncated, ok = true, true
+				return nil
+			}
+			bv, berr := w.readBlobMax(info.oid, maxBytes)
+			if berr != nil {
+				return berr
+			}
+			contents, truncated, binary, ok = bv.Contents, bv.Truncated, bv.Binary, true
+			return nil
+		default:
+			return nil
+		}
+	})
+	if errors.Is(err, errCatFileUnsupported) {
+		return nil, false, false, false, false, true, nil
+	}
+	if err != nil {
+		return nil, false, false, false, false, false, err
+	}
+	return contents, truncated, binary, notFound, ok, false, nil
+}
+
 // withWorker acquires an idle worker (or spawns one), runs fn with ctx cancellation and
 // DefaultGitTimeout wired to kill the worker, retries once on a fresh worker if a pooled
 // worker died, and falls back (disabling the pool) when the host git rejects
@@ -638,6 +732,12 @@ func parseCatFileHeader(header, spec string) (catFileInfo, error) {
 // readBlob runs `contents <oid>\0`, keeping at most FileDiffMax bytes and draining any
 // remainder directly into io.Discard so large blobs never spike daemon memory.
 func (w *catFileWorker) readBlob(oid string) (FileVersion, error) {
+	return w.readBlobMax(oid, FileDiffMax)
+}
+
+// readBlobMax runs `contents <oid>\0`, keeping at most maxBytes bytes and draining any
+// remainder directly into io.Discard so large blobs never spike daemon memory.
+func (w *catFileWorker) readBlobMax(oid string, maxBytes int) (FileVersion, error) {
 	if _, err := w.stdin.WriteString("contents "); err != nil {
 		return FileVersion{}, err
 	}
@@ -662,7 +762,7 @@ func (w *catFileWorker) readBlob(oid string) (FileVersion, error) {
 	if info.missing || info.kind != "blob" {
 		return FileVersion{}, errors.New("project: cat-file contents missing blob " + oid)
 	}
-	keep := min(info.size, int64(FileDiffMax))
+	keep := min(info.size, int64(maxBytes))
 	buf := make([]byte, keep)
 	if _, err := io.ReadFull(w.stdout, buf); err != nil {
 		return FileVersion{}, err
@@ -683,7 +783,7 @@ func (w *catFileWorker) readBlob(oid string) (FileVersion, error) {
 	return FileVersion{
 		Present:   true,
 		Contents:  buf,
-		Truncated: info.size > FileDiffMax,
+		Truncated: info.size > int64(maxBytes),
 		Binary:    fsx.LooksBinary(buf),
 	}, nil
 }

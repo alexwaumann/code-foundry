@@ -226,7 +226,7 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, threadEnv 
 	// CODE_FOUNDRY_GH_SEARCH_AS is a development aid (see gh.Options.SearchAs).
 	// The github.* settings apply live: the store reads them before every poll.
 	ghOpts := gh.Options{
-		DB: s.db, Bus: s.bus, Log: log.With("store", "gh"), PollInterval: cfg.GhPollInterval(),
+		DB: s.db, Bus: s.bus, Log: log.With("store", "gh"), LocalGit: newGhLocalGit(s.project), PollInterval: cfg.GhPollInterval(),
 		SearchAs: os.Getenv("CODE_FOUNDRY_GH_SEARCH_AS"),
 		Presence: func() gh.Presence { return pres.Current().Kind },
 		Config: func() gh.Config {

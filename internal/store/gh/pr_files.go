@@ -15,8 +15,19 @@ import (
 )
 
 // A pull request's diff and its files at a commit, for the file viewer's PR scope
-// (GetPullRequestDiff, GetPullRequestFile). Both are REST GETs in a custom media type
-// through the paced worker, cached in memory only.
+// (GetPullRequestDiff, GetPullRequestFile). Served from local git clones via
+// Options.LocalGit when the required objects are present locally, then (for diffs) from
+// the bounded SQLite cache (gh_pr_diffs), and otherwise fetched via REST GETs in a custom
+// media type through the paced worker.
+
+// LocalGitProvider serves pull request diffs and commit files from locally cloned
+// repositories when the required git objects are present on disk. When ok is false
+// (repository not registered locally, missing commits, shallow boundary, partial clone
+// missing objects, etc.), Store falls back seamlessly to SQLite and GitHub REST.
+type LocalGitProvider interface {
+	LocalPRDiff(ctx context.Context, slug, baseSHA, headSHA string, maxBytes int) (diff []byte, truncated bool, ok bool)
+	LocalPRFile(ctx context.Context, slug, commitSHA, filePath string, maxBytes int) (contents []byte, truncated, binary, notFound, ok bool)
+}
 
 const (
 	// PullRequestDiffMax caps GetPullRequestDiff's text.
@@ -64,9 +75,11 @@ type prFilesCache struct {
 
 type fileKey struct{ slug, ref, path string }
 
-// PullRequestDiff implements Service. The diff for the pull request's cached head
-// commit (FullPullRequest's, from memory or SQLite) is served from memory unless
-// refresh is set; a pull request whose head is not cached is always fetched.
+// PullRequestDiff implements Service. The diff for the pull request's cached head and
+// base commits (from FullPullRequest or polled summary) is served from memory unless
+// refresh is set; on a memory miss (with !refresh), local git is tried first, then the
+// bounded SQLite cache (gh_pr_diffs), and finally GitHub REST (which persists to SQLite).
+// A pull request whose head is not cached is always fetched from GitHub.
 func (s *Store) PullRequestDiff(ctx context.Context, slug string, number int, refresh bool) (PullRequestDiff, error) {
 	k, err := fullKeyOf(slug, number)
 	if err != nil {
@@ -76,8 +89,37 @@ func (s *Store) PullRequestDiff(ctx context.Context, slug string, number int, re
 	if e, ok := s.cachedFull(ctx, k); ok {
 		head, base = e.d.PullRequest.HeadSHA, e.d.PullRequest.BaseSHA
 	}
-	if d, ok := s.prFiles.diff(k); ok && !refresh && head != "" && d.HeadSHA == head {
-		return d, nil
+	if head == "" || base == "" {
+		if p, ok := s.summaries.get(k); ok && p.HeadSHA != "" {
+			if head == "" {
+				head, base = p.HeadSHA, p.BaseSHA
+			} else if p.HeadSHA == head && base == "" {
+				base = p.BaseSHA
+			}
+		}
+	}
+	if !refresh && head != "" {
+		if d, ok := s.prFiles.diff(k); ok && d.HeadSHA == head && d.BaseSHA == base {
+			return d, nil
+		}
+		if s.opts.LocalGit != nil && IsCommitSHA(base) && IsCommitSHA(head) {
+			localSlug := s.localRepoSlug(k.slug)
+			if diff, truncated, ok := s.opts.LocalGit.LocalPRDiff(ctx, localSlug, strings.ToLower(base), strings.ToLower(head), PullRequestDiffMax); ok {
+				body := trimDiffLines(diff, truncated)
+				d := PullRequestDiff{Diff: string(body), HeadSHA: head, BaseSHA: base, Truncated: truncated, FetchedAt: s.opts.Now()}
+				s.prFiles.putDiff(k, d)
+				return d, nil
+			}
+			if err := ctx.Err(); err != nil {
+				return PullRequestDiff{}, err
+			}
+		}
+		if row, found, err := s.cache.loadPRDiff(ctx, k.slug, k.number); err != nil {
+			s.log.Warn("gh diff cache read failed", "slug", k.slug, "number", k.number, "err", err)
+		} else if found && row.HeadSHA == head && row.BaseSHA == base {
+			s.prFiles.putDiff(k, row)
+			return row, nil
+		}
 	}
 	rr, ok := s.opts.Runner.(RawRESTRunner)
 	if !ok {
@@ -90,20 +132,21 @@ func (s *Store) PullRequestDiff(ctx context.Context, slug string, number int, re
 		if err != nil {
 			return PullRequestDiff{}, err
 		}
-		body := res.Body
-		if res.Truncated { // keep whole lines
-			if i := bytes.LastIndexByte(body, '\n'); i >= 0 {
-				body = body[:i+1]
-			}
-		}
+		body := trimDiffLines(res.Body, res.Truncated)
 		d := PullRequestDiff{Diff: string(body), HeadSHA: head, BaseSHA: base, Truncated: res.Truncated, FetchedAt: s.opts.Now()}
 		s.prFiles.putDiff(k, d)
+		if head != "" {
+			if err := s.cache.savePRDiff(ctx, k.slug, k.number, d); err != nil {
+				s.log.Warn("gh diff cache write failed", "slug", k.slug, "number", k.number, "err", err)
+			}
+		}
 		return d, nil
 	})
 }
 
 // PullRequestFile implements Service. ref must be a full commit SHA, so a cached
-// file never goes stale.
+// file never goes stale. Local git is tried before GitHub REST when Options.LocalGit is
+// configured.
 func (s *Store) PullRequestFile(ctx context.Context, slug, ref, filePath string) (PullRequestFile, error) {
 	key, err := NormalizeSlug(slug)
 	if err != nil {
@@ -119,6 +162,17 @@ func (s *Store) PullRequestFile(ctx context.Context, slug, ref, filePath string)
 	fk := fileKey{slug: key, ref: strings.ToLower(ref), path: clean}
 	if f, ok := s.prFiles.file(fk); ok {
 		return f, nil
+	}
+	if s.opts.LocalGit != nil {
+		localSlug := s.localRepoSlug(key)
+		if contents, truncated, binary, notFound, ok := s.opts.LocalGit.LocalPRFile(ctx, localSlug, fk.ref, clean, PullRequestFileMax); ok {
+			f := PullRequestFile{Contents: contents, Truncated: truncated, Binary: binary, NotFound: notFound}
+			s.prFiles.putFile(fk, f)
+			return f, nil
+		}
+		if err := ctx.Err(); err != nil {
+			return PullRequestFile{}, err
+		}
 	}
 	rr, ok := s.opts.Runner.(RawRESTRunner)
 	if !ok {
@@ -147,6 +201,22 @@ func (s *Store) PullRequestFile(ctx context.Context, slug, ref, filePath string)
 		s.prFiles.putFile(fk, f)
 		return f, nil
 	})
+}
+
+func (s *Store) localRepoSlug(slug string) string {
+	if snap := s.Snapshot(); snap != nil {
+		return snap.LocalRepo(slug)
+	}
+	return slug
+}
+
+func trimDiffLines(body []byte, truncated bool) []byte {
+	if truncated { // keep whole lines
+		if i := bytes.LastIndexByte(body, '\n'); i >= 0 {
+			body = body[:i+1]
+		}
+	}
+	return body
 }
 
 // restRaw sends one paced raw REST GET and applies its global effects (auth state,
