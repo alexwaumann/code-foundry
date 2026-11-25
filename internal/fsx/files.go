@@ -36,8 +36,12 @@ const (
 	// MaxSearchSources bounds the checkouts of one search (below maxCachedCheckouts, so
 	// one search never evicts its own lists).
 	MaxSearchSources = 16
-	// FileCacheTTL is how long a checkout's candidate list is reused.
+	// FileCacheTTL is how long an unwatched checkout's candidate list is reused.
 	FileCacheTTL = 5 * time.Second
+	// WatchedFileCacheTTL is how long a watched checkout's candidate list is reused
+	// before a backstop refresh; FSEvents invalidations clear it immediately on
+	// structural changes (create, remove, rename, .gitignore, HEAD/branch).
+	WatchedFileCacheTTL = 5 * time.Minute
 	// maxCachedCheckouts bounds the cache; the oldest entry goes first.
 	maxCachedCheckouts = 32
 )
@@ -219,9 +223,10 @@ const listTimeout = 30 * time.Second
 // single listing. Safe for concurrent use. The zero value is not ready; use
 // NewFileIndex.
 type FileIndex struct {
-	ttl time.Duration
-	now func() time.Time
-	log *slog.Logger
+	ttl        time.Duration
+	watchedTTL time.Duration
+	now        func() time.Time
+	log        *slog.Logger
 	// list produces a checkout's candidates and whether the included ignored files were
 	// cut at MaxIncludedFiles (listFiles; tests replace it).
 	list func(ctx context.Context, dir string, git bool, include []string) ([]FileEntry, bool, error)
@@ -229,10 +234,13 @@ type FileIndex struct {
 	mu       sync.Mutex
 	entries  map[string]cachedFiles
 	inflight map[string]*listing
+	watched  map[string]bool
+	gen      map[string]uint64
 }
 
 type cachedFiles struct {
 	key   string
+	dir   string
 	files []FileEntry
 	paths []string // files[i].Path, for fuzzy.RankSources
 	// filePaths are the paths of the files alone (no directories); fileIdx[i] is
@@ -241,7 +249,10 @@ type cachedFiles struct {
 	fileIdx   []int
 	// includeCapped: the included ignored files were cut at MaxIncludedFiles.
 	includeCapped bool
-	created       time.Time
+	// hasInclude: listed with non-empty Include patterns. WorktreeFilesChanged does not
+	// emit git-ignored files, so entries with include patterns keep the short FileCacheTTL.
+	hasInclude bool
+	created    time.Time
 	// sorted is the files alone, by path, made on the first text search of the entry
 	// (Files). A pointer, so every copy of the entry shares one.
 	sorted *sortedFiles
@@ -255,19 +266,86 @@ type sortedFiles struct {
 
 // listing is one in-flight listing of a checkout; c and err are set before done closes.
 type listing struct {
+	dir  string
 	done chan struct{}
 	c    cachedFiles
 	err  error
 }
 
-// NewFileIndex returns an index with FileCacheTTL. A nil log discards.
+// NewFileIndex returns an index with FileCacheTTL for unwatched checkouts and
+// WatchedFileCacheTTL for watched checkouts. A nil log discards.
 func NewFileIndex(log *slog.Logger) *FileIndex {
 	if log == nil {
 		log = slog.New(slog.DiscardHandler)
 	}
-	x := &FileIndex{ttl: FileCacheTTL, now: time.Now, log: log, entries: map[string]cachedFiles{}, inflight: map[string]*listing{}}
+	x := &FileIndex{
+		ttl:        FileCacheTTL,
+		watchedTTL: WatchedFileCacheTTL,
+		now:        time.Now,
+		log:        log,
+		entries:    map[string]cachedFiles{},
+		inflight:   map[string]*listing{},
+		watched:    map[string]bool{},
+		gen:        map[string]uint64{},
+	}
 	x.list = x.listFiles
 	return x
+}
+
+// SetWatched marks root as watched (or unwatched) by an external file watcher. Watched
+// roots use WatchedFileCacheTTL (for listings without IncludeIgnored patterns) instead
+// of FileCacheTTL and rely on Invalidate when their file set changes. Transitioning a
+// root to watched invalidates any pre-watch cached entry so it is not silently promoted
+// to the longer TTL.
+func (x *FileIndex) SetWatched(root string, watched bool) {
+	if root == "" {
+		return
+	}
+	root = filepath.Clean(root)
+	x.mu.Lock()
+	defer x.mu.Unlock()
+	if watched {
+		if !x.watched[root] {
+			x.watched[root] = true
+			x.invalidateLocked(root)
+		}
+		return
+	}
+	delete(x.watched, root)
+}
+
+// Invalidate drops every cached and in-flight listing for root so the next search
+// re-lists it. Any in-flight listing started before Invalidate still completes for its
+// existing waiters, without storing its stale result back into the cache.
+func (x *FileIndex) Invalidate(root string) {
+	if root == "" {
+		return
+	}
+	root = filepath.Clean(root)
+	x.mu.Lock()
+	defer x.mu.Unlock()
+	x.invalidateLocked(root)
+}
+
+func (x *FileIndex) invalidateLocked(root string) {
+	x.gen[root]++
+	for k, e := range x.entries {
+		if e.dir == root {
+			delete(x.entries, k)
+		}
+	}
+	for k, l := range x.inflight {
+		if l.dir == root {
+			delete(x.inflight, k)
+		}
+	}
+}
+
+func (x *FileIndex) ttlForLocked(e cachedFiles) time.Duration {
+	if x.watched[e.dir] && !e.hasInclude {
+		return x.watchedTTL
+	}
+	return x.ttl
 }
 
 // Source is one checkout of a search.
@@ -387,7 +465,7 @@ func (c cachedFiles) sortedFiles() []FileEntry {
 // fresh, else the one in flight for it, starting one if there is none. The key holds
 // the include patterns, so a list made with other patterns is never served.
 func (x *FileIndex) start(ctx context.Context, src Source) *listing {
-	dir, git, include := src.Dir, src.Git, src.Include
+	dir, git, include := filepath.Clean(src.Dir), src.Git, src.Include
 	if !git {
 		include = nil // no ignore notion without git
 	}
@@ -400,21 +478,23 @@ func (x *FileIndex) start(ctx context.Context, src Source) *listing {
 	defer x.mu.Unlock()
 	x.dropExpired(now)
 	if c, ok := x.entries[key]; ok {
-		l := &listing{done: make(chan struct{}), c: c}
+		l := &listing{dir: dir, done: make(chan struct{}), c: c}
 		close(l.done)
 		return l
 	}
 	l, ok := x.inflight[key]
 	if !ok {
-		l = &listing{done: make(chan struct{})}
+		l = &listing{dir: dir, done: make(chan struct{})}
 		x.inflight[key] = l
-		go x.fill(context.WithoutCancel(ctx), key, dir, git, slices.Clone(include), l)
+		startGen := x.gen[dir]
+		go x.fill(context.WithoutCancel(ctx), key, dir, git, slices.Clone(include), startGen, l)
 	}
 	return l
 }
 
-// fill lists dir, caches the list under key on success, and finishes l.
-func (x *FileIndex) fill(ctx context.Context, key, dir string, git bool, include []string, l *listing) {
+// fill lists dir, caches the list under key on success (unless invalidated while in
+// flight), and finishes l.
+func (x *FileIndex) fill(ctx context.Context, key, dir string, git bool, include []string, startGen uint64, l *listing) {
 	ctx, cancel := context.WithTimeout(ctx, listTimeout)
 	defer cancel()
 	files, includeCapped, err := x.list(ctx, dir, git, include)
@@ -423,7 +503,7 @@ func (x *FileIndex) fill(ctx context.Context, key, dir string, git bool, include
 		// Stamp the entry when the listing is done: one slower than the TTL (a huge
 		// project) would otherwise be cached already expired and re-run on every keystroke.
 		now := x.now()
-		c = cachedFiles{key: key, files: files, paths: make([]string, len(files)), includeCapped: includeCapped, created: now, sorted: &sortedFiles{}}
+		c = cachedFiles{key: key, dir: dir, files: files, paths: make([]string, len(files)), includeCapped: includeCapped, hasInclude: len(include) > 0, created: now, sorted: &sortedFiles{}}
 		for i, f := range files {
 			c.paths[i] = f.Path
 			if !f.IsDir {
@@ -434,8 +514,10 @@ func (x *FileIndex) fill(ctx context.Context, key, dir string, git bool, include
 	}
 
 	x.mu.Lock()
-	delete(x.inflight, key)
-	if err == nil {
+	if x.inflight[key] == l {
+		delete(x.inflight, key)
+	}
+	if err == nil && x.gen[dir] == startGen {
 		x.dropExpired(c.created)
 		if len(x.entries) >= maxCachedCheckouts {
 			oldest := slices.MinFunc(slices.Collect(maps.Values(x.entries)), func(a, b cachedFiles) int {
@@ -450,10 +532,10 @@ func (x *FileIndex) fill(ctx context.Context, key, dir string, git bool, include
 	close(l.done)
 }
 
-// dropExpired deletes the cached lists that are past the TTL at now. x.mu is held.
+// dropExpired deletes the cached lists that are past their TTL at now. x.mu is held.
 func (x *FileIndex) dropExpired(now time.Time) {
 	for k, e := range x.entries {
-		if now.Sub(e.created) >= x.ttl {
+		if now.Sub(e.created) >= x.ttlForLocked(e) {
 			delete(x.entries, k)
 		}
 	}

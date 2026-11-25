@@ -2,8 +2,18 @@ package project
 
 import (
 	"context"
+	"slices"
 	"sync"
 	"time"
+)
+
+// priority orders jobs in the scheduler: prioHigh is for user-waited calls and active
+// worktrees; prioLow is for background polls, startup reconciles, and idle worktrees.
+type priority uint8
+
+const (
+	prioLow priority = iota
+	prioHigh
 )
 
 type jobKind uint8
@@ -46,20 +56,24 @@ type jobKey struct {
 }
 
 type jobState struct {
-	queued  bool
-	running bool
-	rerun   bool
+	queued    bool
+	running   bool
+	rerun     bool
+	prio      priority // priority of queued entry
+	rerunPrio priority // highest priority requested for pending rerun
 	// waiters are released when a run that starts after they were added finishes.
 	waiters []chan struct{}
 }
 
-// scheduler is a bounded worker pool over deduplicated job keys. Requests for a key
-// that is already queued coalesce; requests for a key that is running schedule one
-// rerun after it finishes.
+// scheduler is a bounded worker pool over deduplicated job keys with two priority tiers
+// (prioHigh before prioLow). Requests for a key that is already queued coalesce (and a
+// prioHigh request promotes a queued prioLow job); requests for a key that is running
+// schedule one rerun after it finishes at the highest requested priority.
 type scheduler struct {
 	mu     sync.Mutex
 	cond   *sync.Cond
-	queue  []jobKey
+	high   []jobKey
+	low    []jobKey
 	jobs   map[jobKey]*jobState
 	closed bool
 	wg     sync.WaitGroup
@@ -74,9 +88,20 @@ func newScheduler(ctx context.Context, workers int, run func(context.Context, jo
 	return s
 }
 
-// request schedules k and returns a channel closed once a run of k that started after
-// this call has finished (or the scheduler closed).
+// request schedules k at prioLow and returns a channel closed once a run of k that
+// started after this call has finished (or the scheduler closed).
 func (s *scheduler) request(k jobKey) <-chan struct{} {
+	return s.requestPrio(k, prioLow)
+}
+
+// requestHigh schedules k at prioHigh, promoting it if already queued at prioLow.
+func (s *scheduler) requestHigh(k jobKey) <-chan struct{} {
+	return s.requestPrio(k, prioHigh)
+}
+
+// requestPrio schedules k at priority p and returns a channel closed once a run of k
+// that started after this call has finished (or the scheduler closed).
+func (s *scheduler) requestPrio(k jobKey, p priority) <-chan struct{} {
 	ch := make(chan struct{})
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -93,19 +118,42 @@ func (s *scheduler) request(k jobKey) <-chan struct{} {
 	switch {
 	case st.running:
 		st.rerun = true
-	case !st.queued:
+		if p > st.rerunPrio {
+			st.rerunPrio = p
+		}
+	case st.queued:
+		if p > st.prio {
+			// Promote from low to high queue.
+			if idx := slices.Index(s.low, k); idx >= 0 {
+				s.low = slices.Delete(s.low, idx, idx+1)
+			}
+			st.prio = p
+			s.high = append(s.high, k)
+			s.cond.Signal()
+		}
+	default:
 		st.queued = true
-		s.queue = append(s.queue, k)
+		st.prio = p
+		if p == prioHigh {
+			s.high = append(s.high, k)
+		} else {
+			s.low = append(s.low, k)
+		}
 		s.cond.Signal()
 	}
 	return ch
 }
 
-// wait requests every key and blocks until all have run or ctx is done.
+// wait requests every key at prioHigh and blocks until all have run or ctx is done.
 func (s *scheduler) wait(ctx context.Context, keys ...jobKey) error {
+	return s.waitPrio(ctx, prioHigh, keys...)
+}
+
+// waitPrio requests every key at priority p and blocks until all have run or ctx is done.
+func (s *scheduler) waitPrio(ctx context.Context, p priority, keys ...jobKey) error {
 	chans := make([]<-chan struct{}, len(keys))
 	for i, k := range keys {
-		chans[i] = s.request(k)
+		chans[i] = s.requestPrio(k, p)
 	}
 	for _, ch := range chans {
 		select {
@@ -117,18 +165,36 @@ func (s *scheduler) wait(ctx context.Context, keys ...jobKey) error {
 	return nil
 }
 
+func (s *scheduler) popLocked() jobKey {
+	if len(s.high) > 0 {
+		k := s.high[0]
+		s.high[0] = jobKey{}
+		s.high = s.high[1:]
+		if len(s.high) == 0 {
+			s.high = nil
+		}
+		return k
+	}
+	k := s.low[0]
+	s.low[0] = jobKey{}
+	s.low = s.low[1:]
+	if len(s.low) == 0 {
+		s.low = nil
+	}
+	return k
+}
+
 func (s *scheduler) work(ctx context.Context, run func(context.Context, jobKey)) {
 	for {
 		s.mu.Lock()
-		for len(s.queue) == 0 && !s.closed {
+		for len(s.high) == 0 && len(s.low) == 0 && !s.closed {
 			s.cond.Wait()
 		}
 		if s.closed {
 			s.mu.Unlock()
 			return
 		}
-		k := s.queue[0]
-		s.queue = s.queue[1:]
+		k := s.popLocked()
 		st := s.jobs[k]
 		st.queued, st.running = false, true
 		waiters := st.waiters
@@ -145,7 +211,13 @@ func (s *scheduler) work(ctx context.Context, run func(context.Context, jobKey))
 		switch {
 		case st.rerun && !s.closed:
 			st.rerun, st.queued = false, true
-			s.queue = append(s.queue, k)
+			st.prio = st.rerunPrio
+			st.rerunPrio = prioLow
+			if st.prio == prioHigh {
+				s.high = append(s.high, k)
+			} else {
+				s.low = append(s.low, k)
+			}
 			s.cond.Signal()
 		case len(st.waiters) == 0:
 			delete(s.jobs, k)
@@ -164,7 +236,8 @@ func (s *scheduler) close() {
 		}
 		st.waiters = nil
 	}
-	s.queue = nil
+	s.high = nil
+	s.low = nil
 	s.cond.Broadcast()
 	s.mu.Unlock()
 	s.wg.Wait()

@@ -48,9 +48,9 @@ func (g *Git) loadMade(ctx context.Context) (map[string]madeWorktree, error) {
 }
 
 // recordMade records the worktree CreateWorktree just added at path (resolved), with its
-// HEAD now. A failure is logged: the worktree then stays unmanaged, which only means
-// cleanup never removes it.
-func (g *Git) recordMade(ctx context.Context, projectID, path string) {
+// HEAD now, and returns that HEAD. A failure is logged: the worktree then stays
+// unmanaged, which only means cleanup never removes it.
+func (g *Git) recordMade(ctx context.Context, projectID, path string) string {
 	head := ""
 	if out, err := g.runner.Run(ctx, path, "rev-parse", "--verify", "--quiet", "HEAD"); err == nil {
 		head = string(trimNL(out))
@@ -60,11 +60,12 @@ func (g *Git) recordMade(ctx context.Context, projectID, path string) {
 		VALUES (?, ?, ?, ?) ON CONFLICT (path) DO UPDATE SET project_id = excluded.project_id, head = excluded.head,
 		created_at = excluded.created_at`, path, projectID, head, w.at.UnixMilli()); err != nil {
 		g.log.Warn("recording a made worktree failed; cleanup will not remove it", "project", projectID, "path", path, "err", err)
-		return
+		return head
 	}
 	g.mu.Lock()
 	g.made[path] = w
 	g.mu.Unlock()
+	return head
 }
 
 // forgetMade drops the records of paths (removed worktrees) made at or before t, so a

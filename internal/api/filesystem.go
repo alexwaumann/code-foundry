@@ -32,6 +32,7 @@ type Filesystem struct {
 	temp     []string
 	projects project.Store
 	files    *fsx.FileIndex
+	engine   *ripgrep.Engine
 	text     *textsearch.Searcher
 	grants   *preview.Grants
 	writer   *fsx.Writer
@@ -61,16 +62,28 @@ var _ codefoundryv1connect.FilesystemServiceHandler = (*Filesystem)(nil)
 func NewFilesystem(root string, projects project.Store, grants *preview.Grants) *Filesystem {
 	log := slog.Default().With("api", "filesystem")
 	files := fsx.NewFileIndex(log)
+	engine := ripgrep.NewEngine(nil)
 	return &Filesystem{
-		root: root, projects: projects, files: files, grants: grants,
-		text:   textsearch.New(files, ripgrep.NewEngine(nil), log),
+		root: root, projects: projects, files: files, engine: engine, grants: grants,
+		text:   textsearch.New(files, engine, log),
 		writer: &fsx.Writer{Root: root, Protected: grants.ConfigHome}, log: log,
 	}
+}
+
+// WithFileIndex uses files for SearchFiles and SearchText so the daemon can connect
+// the index to the project store's FSEvents stream for cache invalidation.
+func (h *Filesystem) WithFileIndex(files *fsx.FileIndex) *Filesystem {
+	if files != nil {
+		h.files = files
+		h.text = textsearch.New(h.files, h.engine, h.log)
+	}
+	return h
 }
 
 // WithRipgrep makes SearchText run engine's ripgrep (the daemon's one Engine, which its
 // startup check warms) over the same file lists as SearchFiles.
 func (h *Filesystem) WithRipgrep(engine *ripgrep.Engine) *Filesystem {
+	h.engine = engine
 	h.text = textsearch.New(h.files, engine, h.log)
 	return h
 }

@@ -119,6 +119,10 @@ type stores struct {
 	// stopProjectActivity stops the glue that tells project which worktrees have live
 	// threads and when a thread edited files (projectactivity.go).
 	stopProjectActivity func()
+	// files is the daemon's file-search candidate index, invalidated from project
+	// FSEvents (fileindex_watch.go); stopFileIndexWatch stops its subscriber.
+	files              *fsx.FileIndex
+	stopFileIndexWatch func()
 	// stopWorkspaceContents stops the glue that has the workspace store read a managed
 	// dir again when one of its threads ends a turn (workspace_contents.go).
 	stopWorkspaceContents func()
@@ -217,6 +221,8 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, threadEnv 
 	}); err != nil {
 		return nil, err
 	}
+	s.files = fsx.NewFileIndex(log.With("component", "file-index"))
+	s.stopFileIndexWatch = startFileIndexWatch(ctx, log.With("component", "file-index"), s.project.Snapshot, s.files, s.bus)
 	// CODE_FOUNDRY_GH_SEARCH_AS is a development aid (see gh.Options.SearchAs).
 	// The github.* settings apply live: the store reads them before every poll.
 	ghOpts := gh.Options{
@@ -584,6 +590,9 @@ func (s *stores) close() error {
 	}
 	if s.stopGh != nil {
 		s.stopGh()
+	}
+	if s.stopFileIndexWatch != nil {
+		s.stopFileIndexWatch()
 	}
 	if s.project != nil {
 		errs = append(errs, s.project.Close())

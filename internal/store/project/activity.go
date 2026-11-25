@@ -20,9 +20,10 @@ import (
 // interval runs now rather than at the next tick. Threads also drive status refreshes
 // directly: Touch (a file-editing tool result, debounced) and TouchNow (a turn end).
 
-// Defaults for the idle tier and Touch.
+// Defaults for the idle tier and Touch. Idle poll aligns with IdleFetchInterval (15m)
+// so idle projects do not stagger redundant background sweeps.
 const (
-	DefaultIdlePollInterval  = 10 * time.Minute
+	DefaultIdlePollInterval  = 15 * time.Minute
 	DefaultIdleFetchInterval = 15 * time.Minute
 	// DefaultTouchDebounce is Touch's per-worktree window: the first touch arms it,
 	// later ones in the window are absorbed, and one status refresh runs when it ends.
@@ -154,20 +155,40 @@ func tierName(live bool) string {
 	return "idle"
 }
 
-// poll is the backstop poll of one project: a reconcile, which re-lists its worktrees
-// and metadata, re-syncs the stream (retrying one that failed to start), then requests
-// jobBase, which re-resolves the base and refreshes every worktree's status. So nothing
-// the stream should have reported stays stale past a poll interval, whether its event
-// came late, was dropped without a rescan flag (a stream replaced while it held
-// undelivered events), or never came (a stream that failed to start). It also covers
-// ref moves the stream does not route (fsevents-watcher.md), recovers a project in
-// error, and notices .git created in a project without git. The cost is a few small
-// git commands per project per round (worktree list, remote, get-url, symbolic-ref).
+// poll is the backstop poll of one project: a reconcile (worktrees, metadata, stream
+// sync, base resolution) plus low-priority status refreshes of its worktrees. Because
+// resolveBase no longer fans out status when the base is unchanged, poll explicitly
+// requests low-priority status refreshes so nothing the stream missed stays stale past
+// a poll interval (a dropped event, a stream that failed to start, or reftable refs).
 func (g *Git) poll(_ context.Context, id string) {
 	if g.project(id) == nil {
 		return
 	}
-	g.sched.request(jobKey{kind: jobReconcile, projectID: id})
+	g.sched.requestPrio(jobKey{kind: jobReconcile, projectID: id}, prioLow)
+	for _, k := range g.statusKeys(id) {
+		g.sched.requestPrio(k, prioLow)
+	}
+}
+
+// worktreeActive reports whether the worktree at path is active (has a live thread or a
+// recent WorktreeDetail watch).
+func (g *Git) worktreeActive(projectID, path string) bool {
+	return g.isLive(path) || g.detailWatched(projectID, path, g.now())
+}
+
+// eventPrio returns prioHigh for jobs targeting an active worktree (or a live project
+// for project-wide jobs) and prioLow for idle worktrees and projects.
+func (g *Git) eventPrio(k jobKey) priority {
+	if k.path != "" {
+		if g.worktreeActive(k.projectID, k.path) {
+			return prioHigh
+		}
+		return prioLow
+	}
+	if k.projectID != "" && g.projectLive(k.projectID, g.now()) {
+		return prioHigh
+	}
+	return prioLow
 }
 
 // projectLive reports whether project id has a live worktree at now: one in the live
@@ -261,7 +282,7 @@ func (g *Git) TouchNow(path string) {
 	if k, ok := g.statusKey(path); ok {
 		g.log.Debug("worktree touched", "path", k.path, "debounced", false)
 		g.touch.cancel(k) // this refresh covers a pending debounced one
-		g.sched.request(k)
+		g.sched.requestHigh(k)
 	}
 }
 

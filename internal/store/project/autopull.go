@@ -81,13 +81,15 @@ func AutoPullCandidates(p Project) []Worktree {
 }
 
 // afterFetch follows a successful scheduled fetch of project id. With auto pull on
-// and the project live, a pass refreshes the project and pulls its candidates in the
-// background; otherwise it requests the reconcile every fetch is followed by. The
-// fetch loop skips a project while its pass runs (fetch), so passes never overlap.
+// and the project live, a pass resolves the base, refreshes default-branch checkouts,
+// and pulls candidates in the background; otherwise it requests jobBase (at prioLow),
+// which only fans out status refreshes if the resolved base moved. Cancels any pending
+// debounced jobBase so FSEvents from this fetch do not trigger a second pass.
 func (g *Git) afterFetch(ctx context.Context, id string) {
+	g.deb.cancel(jobKey{kind: jobBase, projectID: id})
 	a := g.autoPullHooks()
 	if !a.on() || !g.projectLive(id, g.now()) || !g.startAutoPull(id) {
-		g.sched.request(jobKey{kind: jobReconcile, projectID: id})
+		g.sched.requestPrio(jobKey{kind: jobBase, projectID: id}, prioLow)
 		return
 	}
 	g.wg.Go(func() {
@@ -122,12 +124,17 @@ func (g *Git) endAutoPull(id string) {
 	delete(g.autoPull.running, id)
 }
 
-// autoPullPass refreshes project id (reconcile, base, every status), then pulls each
-// candidate that is not busy, one at a time. A refused pull is logged and left for
-// the next fetch; a pulled checkout's status is refreshed at once.
+// autoPullPass resolves the project's base, refreshes any checkout on its default
+// branch, and pulls each candidate that is not busy, one at a time. A refused pull is
+// logged and left for the next fetch; a pulled checkout's status is refreshed at once.
 func (g *Git) autoPullPass(ctx context.Context, id string, a AutoPull) {
 	rctx, cancel := context.WithTimeout(ctx, fetchTimeout)
-	err := g.refresh(rctx, id)
+	err := g.sched.waitPrio(rctx, prioLow, jobKey{kind: jobBase, projectID: id})
+	if err == nil {
+		if keys := g.defaultBranchStatusKeys(id); len(keys) > 0 {
+			err = g.sched.waitPrio(rctx, prioLow, keys...)
+		}
+	}
 	cancel()
 	if err != nil {
 		return // shutting down, or the refresh hung: the next fetch tries again

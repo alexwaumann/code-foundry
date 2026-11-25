@@ -47,7 +47,7 @@ func TestClassify(t *testing.T) {
 		{wkCommon, "index", c, actStatus},
 		{wkCommon, "index", n, actStatus}, // index.lock renamed onto index
 		{wkCommon, "index", r, actStatus},
-		{wkCommon, "FETCH_HEAD", w, actReconcile},
+		{wkCommon, "FETCH_HEAD", w, actStatusAll},
 		{wkCommon, "packed-refs", c, actReconcile},
 		{wkCommon, "config", w, actReconcile},
 		{wkCommon, "worktrees", c, actReconcile},
@@ -183,7 +183,7 @@ func TestEventKeys(t *testing.T) {
 		{"/h/p/.git/index.lock", modified | fsevents.ItemRenamed, nil},
 		{"/h/p/.git/HEAD", renamed, []jobKey{status("/h/p")}},
 		{"/h/p/.git/logs/HEAD", modified, []jobKey{status("/h/p")}},
-		{"/h/p/.git/FETCH_HEAD", modified, []jobKey{recP}},
+		{"/h/p/.git/FETCH_HEAD", modified, []jobKey{base}},
 		{"/h/p/.git/packed-refs", renamed, []jobKey{recP}},
 		{"/h/p/.git/config.lock", modified, []jobKey{recP}},
 		{"/h/p/.git/MERGE_HEAD", removed, []jobKey{status("/h/p")}},

@@ -163,6 +163,15 @@ func (g *Git) WorktreeDetail(ctx context.Context, projectID, path string) (Workt
 	return d, nil
 }
 
+// detailWatched reports whether path in projectID has an unexpired WorktreeDetail watch.
+func (g *Git) detailWatched(projectID, path string, now time.Time) bool {
+	ds := &g.details
+	ds.mu.Lock()
+	defer ds.mu.Unlock()
+	at, ok := ds.requested[wtKey{projectID, path}]
+	return ok && now.Sub(at) <= DetailWatch
+}
+
 // detailAfterStatus schedules a detail recomputation after a status refresh of a
 // worktree someone looked at recently.
 func (g *Git) detailAfterStatus(projectID, path string) {
@@ -175,7 +184,7 @@ func (g *Git) detailAfterStatus(projectID, path string) {
 	}
 	ds.mu.Unlock()
 	if ok {
-		g.sched.request(jobKey{kind: jobDetail, projectID: projectID, path: path})
+		g.sched.requestHigh(jobKey{kind: jobDetail, projectID: projectID, path: path})
 	}
 }
 

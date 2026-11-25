@@ -611,3 +611,144 @@ func TestFileIndexIncludeCapped(t *testing.T) {
 		})
 	}
 }
+
+// Watched checkouts reuse their cached file list past FileCacheTTL up to
+// WatchedFileCacheTTL, and Invalidate clears them immediately (including preventing an
+// in-flight pre-invalidation listing from poisoning the cache).
+func TestFileIndexWatchedTTLAndInvalidate(t *testing.T) {
+	dir := gitRepo(t)
+	now := time.Unix(1000, 0)
+	x := NewFileIndex(nil)
+	x.now = func() time.Time { return now }
+	var listings atomic.Int32
+	origList := x.list
+	x.list = func(ctx context.Context, d string, g bool, inc []string) ([]FileEntry, bool, error) {
+		listings.Add(1)
+		return origList(ctx, d, g, inc)
+	}
+	x.SetWatched(dir, true)
+
+	if _, _, err := searchDir(context.Background(), x, dir, true, "new.go", 0); err != nil {
+		t.Fatal(err)
+	}
+	write(t, filepath.Join(dir, "new.go"), "package x\n")
+
+	// Past 5s FileCacheTTL, still cached because dir is watched.
+	now = now.Add(30 * time.Second)
+	if got, _, err := searchDir(context.Background(), x, dir, true, "new.go", 0); err != nil || len(got) != 0 {
+		t.Fatalf("within WatchedFileCacheTTL: got %q, err %v", paths(got), err)
+	}
+	if n := listings.Load(); n != 1 {
+		t.Fatalf("listings = %d, want 1", n)
+	}
+
+	// Explicit Invalidate clears immediately.
+	x.Invalidate(dir)
+	if got, _, err := searchDir(context.Background(), x, dir, true, "new.go", 0); err != nil || !slices.Equal(paths(got), []string{"new.go"}) {
+		t.Fatalf("after Invalidate: got %q, err %v", paths(got), err)
+	}
+	if n := listings.Load(); n != 2 {
+		t.Fatalf("listings = %d, want 2", n)
+	}
+
+	// Past WatchedFileCacheTTL, expires as backstop.
+	write(t, filepath.Join(dir, "later.go"), "package x\n")
+	now = now.Add(WatchedFileCacheTTL)
+	if got, _, err := searchDir(context.Background(), x, dir, true, "later.go", 0); err != nil || !slices.Equal(paths(got), []string{"later.go"}) {
+		t.Fatalf("after WatchedFileCacheTTL: got %q, err %v", paths(got), err)
+	}
+
+	// Marking unwatched restores FileCacheTTL.
+	x.SetWatched(dir, false)
+	write(t, filepath.Join(dir, "unwatched.go"), "package x\n")
+	now = now.Add(FileCacheTTL)
+	if got, _, err := searchDir(context.Background(), x, dir, true, "unwatched.go", 0); err != nil || !slices.Equal(paths(got), []string{"unwatched.go"}) {
+		t.Fatalf("after SetWatched(false) + FileCacheTTL: got %q, err %v", paths(got), err)
+	}
+}
+
+// An Invalidate while a listing is in flight prevents that stale listing from being
+// cached and lets a subsequent search start a fresh listing immediately.
+func TestFileIndexInvalidateDuringInflight(t *testing.T) {
+	x := NewFileIndex(nil)
+	x.SetWatched("/w", true)
+	started := make(chan struct{})
+	release := make(chan struct{})
+	var call atomic.Int32
+	x.list = func(context.Context, string, bool, []string) ([]FileEntry, bool, error) {
+		n := call.Add(1)
+		if n == 1 {
+			close(started)
+			<-release
+			return []FileEntry{{Path: "old.go"}}, false, nil
+		}
+		return []FileEntry{{Path: "fresh.go"}}, false, nil
+	}
+
+	firstDone := make(chan []string, 1)
+	go func() {
+		got, _, _ := searchDir(context.Background(), x, "/w", true, "", 0)
+		firstDone <- paths(got)
+	}()
+	<-started
+
+	// Invalidate while first listing is still running.
+	x.Invalidate("/w")
+
+	// Second search starts a new listing immediately and gets fresh.go.
+	got2, _, err := searchDir(context.Background(), x, "/w", true, "", 0)
+	if err != nil || !slices.Equal(paths(got2), []string{"fresh.go"}) {
+		t.Fatalf("second search = %q, %v; want [fresh.go]", paths(got2), err)
+	}
+
+	// Release the stale first listing: its waiter gets old.go, but the cache keeps fresh.go.
+	close(release)
+	if got1 := <-firstDone; !slices.Equal(got1, []string{"old.go"}) {
+		t.Fatalf("first waiter = %q, want [old.go]", got1)
+	}
+	got3, _, err := searchDir(context.Background(), x, "/w", true, "", 0)
+	if err != nil || !slices.Equal(paths(got3), []string{"fresh.go"}) {
+		t.Fatalf("cached search = %q, %v; want [fresh.go]", paths(got3), err)
+	}
+	if n := call.Load(); n != 2 {
+		t.Fatalf("list calls = %d, want 2", n)
+	}
+}
+
+// Entries with Include patterns stay on FileCacheTTL (5s) even on watched roots because
+// WorktreeFilesChanged does not emit git-ignored files, and transitioning a root from
+// unwatched to watched invalidates any pre-watch cached entry.
+func TestFileIndexIncludeIgnoredKeepsShortTTLAndWatchInvalidates(t *testing.T) {
+	now := time.Unix(2000, 0)
+	x := NewFileIndex(nil)
+	x.now = func() time.Time { return now }
+	var calls atomic.Int32
+	x.list = func(_ context.Context, _ string, _ bool, _ []string) ([]FileEntry, bool, error) {
+		n := calls.Add(1)
+		return []FileEntry{{Path: fmt.Sprintf("v%d.env", n)}}, false, nil
+	}
+
+	// Unwatched root cached first; SetWatched(true) invalidates it instead of promoting to 5m.
+	if _, _, err := searchDir(context.Background(), x, "/w", true, "", 0); err != nil {
+		t.Fatal(err)
+	}
+	x.SetWatched("/w", true)
+	got, _, err := searchDir(context.Background(), x, "/w", true, "", 0)
+	if err != nil || !slices.Equal(paths(got), []string{"v2.env"}) {
+		t.Fatalf("after SetWatched(true): got %q, %v; want [v2.env]", paths(got), err)
+	}
+
+	// With Include patterns on a watched root, FileCacheTTL (5s) still applies.
+	src := []Source{{Dir: "/w", Git: true, Include: []string{".env"}}}
+	if _, _, _, err := x.SearchSources(context.Background(), src, "", 0, false); err != nil {
+		t.Fatal(err)
+	}
+	before := calls.Load()
+	now = now.Add(FileCacheTTL)
+	if _, _, _, err := x.SearchSources(context.Background(), src, "", 0, false); err != nil {
+		t.Fatal(err)
+	}
+	if calls.Load() != before+1 {
+		t.Fatalf("Include listing calls after FileCacheTTL = %d, want %d", calls.Load(), before+1)
+	}
+}
