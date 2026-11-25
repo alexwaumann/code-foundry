@@ -176,7 +176,7 @@ func snapshotPopulated(snap *Snapshot, wantProjects, wantWorktrees int) (project
 			projectsReady++
 		}
 		for _, w := range p.Worktrees {
-			if w.Branch != "" && !w.Status.RefreshedAt.IsZero() {
+			if w.Branch != "" && w.Head != "" {
 				worktreesReady++
 			}
 		}

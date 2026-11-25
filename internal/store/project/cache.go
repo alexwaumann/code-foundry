@@ -19,7 +19,7 @@ import (
 
 const (
 	snapshotCacheVersion   = 1
-	defaultCacheFlushDelay = time.Second
+	defaultCacheFlushDelay = 5 * time.Second
 	cacheWriteTimeout      = 5 * time.Second
 )
 
@@ -87,10 +87,11 @@ func cachedWorktreeFrom(w Worktree) cachedWorktree {
 }
 
 func (cw cachedWorktree) toWorktree(projectID string) Worktree {
-	var refreshedAt time.Time
-	if cw.Status.RefreshedAtMs > 0 {
-		refreshedAt = time.UnixMilli(cw.Status.RefreshedAtMs)
-	}
+	// Keep RefreshedAt zero on hydrated worktrees: CleanupVerdict, dry-run Cleanup,
+	// detail.go clean checks, and gitops treat a zero RefreshedAt as "status not yet
+	// verified live", preventing unverified cached status (with stripped Operation)
+	// from showing a dirtied or mid-rebase worktree as removable before the first live
+	// git status completes.
 	return Worktree{
 		ProjectID: projectID,
 		Path:      cw.Path,
@@ -99,19 +100,18 @@ func (cw cachedWorktree) toWorktree(projectID string) Worktree {
 		IsMain:    cw.IsMain,
 		Detached:  cw.Detached,
 		Status: Status{
-			Upstream:    cw.Status.Upstream,
-			Ahead:       cw.Status.Ahead,
-			Behind:      cw.Status.Behind,
-			Staged:      cw.Status.Staged,
-			Modified:    cw.Status.Modified,
-			Untracked:   cw.Status.Untracked,
-			Conflicted:  cw.Status.Conflicted,
-			Dirty:       cw.Status.Dirty,
-			BaseRef:     cw.Status.BaseRef,
-			BaseAhead:   cw.Status.BaseAhead,
-			BaseBehind:  cw.Status.BaseBehind,
-			BaseMerged:  cw.Status.BaseMerged,
-			RefreshedAt: refreshedAt,
+			Upstream:   cw.Status.Upstream,
+			Ahead:      cw.Status.Ahead,
+			Behind:     cw.Status.Behind,
+			Staged:     cw.Status.Staged,
+			Modified:   cw.Status.Modified,
+			Untracked:  cw.Status.Untracked,
+			Conflicted: cw.Status.Conflicted,
+			Dirty:      cw.Status.Dirty,
+			BaseRef:    cw.Status.BaseRef,
+			BaseAhead:  cw.Status.BaseAhead,
+			BaseBehind: cw.Status.BaseBehind,
+			BaseMerged: cw.Status.BaseMerged,
 		},
 	}
 }

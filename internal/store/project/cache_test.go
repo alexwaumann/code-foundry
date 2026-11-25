@@ -6,13 +6,12 @@ import (
 	"path/filepath"
 	"slices"
 	"testing"
-	"time"
 )
 
 // TestSnapshotCacheHydratesImmediatelyOnRestart verifies that after a clean Close, a
-// restarted store immediately exposes cached project metadata and worktrees (including
-// statuses and RefreshedAt) in Snapshot() before any git command completes, while keeping
-// transient Error/Operation cleared and statusStamp nil.
+// restarted store immediately exposes cached project metadata and worktrees in Snapshot()
+// before any git command completes, while keeping transient Error/Operation cleared and
+// RefreshedAt/statusStamp unverified until a live git status completes.
 func TestSnapshotCacheHydratesImmediatelyOnRestart(t *testing.T) {
 	f := newFixture(t)
 	git(t, f.project, "remote", "set-url", "origin", "https://github.com/acme/proj.git")
@@ -67,8 +66,10 @@ func TestSnapshotCacheHydratesImmediatelyOnRestart(t *testing.T) {
 		gotWT.Status.Error != "" || gotWT.Status.Operation != "" {
 		t.Fatalf("hydrated worktree = %+v", gotWT)
 	}
-	if !gotWT.Status.RefreshedAt.Equal(beforeWT.Status.RefreshedAt.Truncate(time.Millisecond)) {
-		t.Errorf("hydrated RefreshedAt = %v, want %v", gotWT.Status.RefreshedAt, beforeWT.Status.RefreshedAt.Truncate(time.Millisecond))
+	// Hydrated slots keep RefreshedAt zero so CleanupVerdict/clean guards treat them as
+	// unverified until the first live git status completes.
+	if !gotWT.Status.RefreshedAt.IsZero() {
+		t.Errorf("hydrated RefreshedAt = %v, want zero", gotWT.Status.RefreshedAt)
 	}
 	// Hydrated slots must have nil statusStamp so CompareWorktree never trusts unverified
 	// Conflicted == 0 before a live git status completes.

@@ -1,12 +1,16 @@
 package project
 
 import (
+	"bytes"
 	"cmp"
+	"context"
 	"errors"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
+	"time"
 )
 
 // Direct git metadata reader: parses <commonDir>/config and git ref files in Go to avoid
@@ -20,9 +24,17 @@ import (
 // g.runner.Run.
 
 type directGitMeta struct {
+	runner ExecRunner
 	// env mirrors ExecRunner.env: when non-nil, env vars are read from it instead of
 	// os.LookupEnv so direct reads observe the exact environment ExecRunner passes to git.
 	env []string
+
+	// Lazily discovered config file origins from `git config --list --show-origin -z`
+	// run once from a non-repo directory (catches Xcode, CommandLineTools, Nix, MacPorts
+	// and other compiled-in system gitconfig paths).
+	originsOnce   sync.Once
+	originPaths   []string
+	originsFailed bool
 }
 
 func (d *directGitMeta) lookupEnv(key string) (string, bool) {
@@ -144,6 +156,38 @@ func resolveGitDirs(dir string) (gitDir, commonDir string, ok bool) {
 	return "", "", false
 }
 
+// discoverConfigOrigins queries git once from a non-repo directory to learn the exact
+// system/prefix config files compiled into this git binary (for example Apple Xcode's
+// /Applications/Xcode.app/.../git-core/gitconfig or Nix/MacPorts prefixes).
+func (d *directGitMeta) discoverConfigOrigins() ([]string, bool) {
+	d.originsOnce.Do(func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		out, err := d.runner.Run(ctx, os.TempDir(), "config", "--list", "--show-origin", "-z")
+		if err != nil {
+			// `git config --list` exits 0 even when empty; any error means bad config or
+			// an unusable git binary, so fall back conservatively.
+			d.originsFailed = true
+			return
+		}
+		seen := map[string]struct{}{}
+		parts := bytes.Split(out, []byte{0})
+		for i := 0; i+1 < len(parts); i += 2 {
+			origin := string(parts[i])
+			p, ok := strings.CutPrefix(origin, "file:")
+			if !ok || p == "" {
+				continue
+			}
+			if _, dup := seen[p]; dup {
+				continue
+			}
+			seen[p] = struct{}{}
+			d.originPaths = append(d.originPaths, p)
+		}
+	})
+	return d.originPaths, !d.originsFailed
+}
+
 // hasExternalConfigOverrides reports whether environment variables, system gitconfig, or
 // global gitconfig might define remotes, includes, or URL rewrites (insteadOf /
 // pushInsteadOf) that alter `git remote` or `git remote get-url origin`.
@@ -159,29 +203,45 @@ func (d *directGitMeta) hasExternalConfigOverrides() bool {
 	}
 
 	var paths []string
+	seen := map[string]struct{}{}
+	addPath := func(p string) {
+		if p == "" {
+			return
+		}
+		if _, dup := seen[p]; dup {
+			return
+		}
+		seen[p] = struct{}{}
+		paths = append(paths, p)
+	}
 	noSys, _ := d.lookupEnv("GIT_CONFIG_NOSYSTEM")
 	if !isGitTruthy(noSys) {
 		if sys, set := d.lookupEnv("GIT_CONFIG_SYSTEM"); set {
-			if sys != "" {
-				paths = append(paths, sys)
-			}
+			addPath(sys)
 		} else {
-			paths = append(paths, "/etc/gitconfig", "/opt/homebrew/etc/gitconfig", "/usr/local/etc/gitconfig")
+			discovered, ok := d.discoverConfigOrigins()
+			if !ok {
+				return true
+			}
+			for _, p := range discovered {
+				addPath(p)
+			}
+			addPath("/etc/gitconfig")
+			addPath("/opt/homebrew/etc/gitconfig")
+			addPath("/usr/local/etc/gitconfig")
 		}
 	}
 	if global, set := d.lookupEnv("GIT_CONFIG_GLOBAL"); set {
-		if global != "" {
-			paths = append(paths, global)
-		}
+		addPath(global)
 	} else {
 		home, _ := d.lookupEnv("HOME")
 		if xdg, _ := d.lookupEnv("XDG_CONFIG_HOME"); xdg != "" {
-			paths = append(paths, filepath.Join(xdg, "git", "config"))
+			addPath(filepath.Join(xdg, "git", "config"))
 		} else if home != "" {
-			paths = append(paths, filepath.Join(home, ".config", "git", "config"))
+			addPath(filepath.Join(home, ".config", "git", "config"))
 		}
 		if home != "" {
-			paths = append(paths, filepath.Join(home, ".gitconfig"))
+			addPath(filepath.Join(home, ".gitconfig"))
 		}
 	}
 
@@ -226,6 +286,9 @@ type parsedRemote struct {
 // parseGitConfig parses a git INI config file. It returns ok=false on syntax errors or
 // deprecated/ambiguous forms so callers fall back to git.
 func parseGitConfig(data []byte) (parsedGitConfig, bool) {
+	if bytes.IndexByte(data, 0) >= 0 {
+		return parsedGitConfig{}, false
+	}
 	cfg := parsedGitConfig{remotes: map[string]*parsedRemote{}}
 	i := 0
 	if len(data) >= 3 && data[0] == 0xef && data[1] == 0xbb && data[2] == 0xbf {
@@ -352,7 +415,8 @@ func parseGitConfig(data []byte) (parsedGitConfig, bool) {
 				i++
 			}
 		case data[i] == '#' || data[i] == ';':
-			skipComment()
+			// Git rejects `key ; comment` without '=' as a bad config line.
+			return parsedGitConfig{}, false
 		case data[i] == '=':
 			i++
 			hasVal = true
@@ -525,7 +589,7 @@ func extractRemotesAndOrigin(cfg parsedGitConfig) (remotes []string, originURL s
 			if !r.hasKey {
 				continue
 			}
-			if name == "" || hasASCIIWhitespace(name) {
+			if name == "" || hasASCIIWhitespace(name) || strings.HasPrefix(name, "/") {
 				return nil, "", false
 			}
 			remotes = append(remotes, name)

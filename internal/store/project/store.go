@@ -281,7 +281,7 @@ func Start(ctx context.Context, opts Options) (*Git, error) {
 	g.compareCache = newCompareCaches()
 	if er, ok := execRunnerOf(g.runner); ok {
 		g.catFiles = newCatFilePool(er, g.now)
-		g.directMeta = &directGitMeta{env: er.env}
+		g.directMeta = &directGitMeta{runner: er, env: er.env}
 	}
 	metas, err := g.load(ctx)
 	if err != nil {
@@ -296,6 +296,7 @@ func Start(ctx context.Context, opts Options) (*Git, error) {
 		return nil, err
 	}
 	g.hydrateSnapshots(ctx)
+	g.snapCache = newSnapshotCache(g.db, g.log, g.now, defaultCacheFlushDelay, g.buildCachedProject)
 
 	ctx, g.cancel = context.WithCancel(context.WithoutCancel(ctx))
 	g.sched = newScheduler(ctx, cmp.Or(opts.Workers, DefaultWorkers), g.runJob)
@@ -331,7 +332,6 @@ func Start(ctx context.Context, opts Options) (*Git, error) {
 		g.wg.Go(func() { g.tierLoop(ctx, "poll", s, t.live, g.pollNudge, nil, g.poll) })
 	}
 	g.wg.Go(func() { g.runWakeMonitor(ctx) })
-	g.snapCache = newSnapshotCache(g.db, g.log, g.now, defaultCacheFlushDelay, g.buildCachedProject)
 
 	g.commit(nil)
 	for _, m := range metas {
