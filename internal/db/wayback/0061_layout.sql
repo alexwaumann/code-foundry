@@ -25,7 +25,8 @@
 -- what is left to carry into its storage) goes with them. The pages' storage on disk stays
 -- (page-file-storage/), and the older build reads a thread's page's storage from the thread's
 -- own file again (page-storage/), which 0068 never rewrote (docs/notes/page-storage-per-file.md);
--- 0069 (cached pull request diffs) is disposable cache state and is dropped cleanly.
+-- 0069 (cached pull request diffs) is disposable cache state and is dropped cleanly;
+-- 0070 (project cold-start snapshot cache) drops its cached rows, which the store rebuilds on start.
 BEGIN;
 DROP TABLE IF EXISTS layout_spaces;
 DROP TABLE IF EXISTS layout_threads;
@@ -39,5 +40,6 @@ DROP TABLE IF EXISTS page_owners;
 DROP TABLE IF EXISTS page_consent;
 DROP TABLE IF EXISTS page_storage_carry;
 DROP TABLE IF EXISTS gh_pr_diffs;
-DELETE FROM schema_migrations WHERE version IN (61, 62, 63, 64, 65, 66, 67, 68, 69);
+DROP TABLE IF EXISTS project_snapshot_cache;
+DELETE FROM schema_migrations WHERE version IN (61, 62, 63, 64, 65, 66, 67, 68, 69, 70);
 COMMIT;
