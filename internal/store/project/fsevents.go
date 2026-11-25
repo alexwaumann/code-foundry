@@ -188,8 +188,9 @@ func (g *Git) onEvents(evs []fsevents.Event) {
 	}
 	hits := map[routed]*hit{}
 	var (
-		order    []routed
-		treeHits []treeHit
+		order     []routed
+		treeHits  []treeHit
+		refsDirty map[string]bool
 	)
 	addHit := func(k jobKey, tree bool, path string, flags fsevents.EventFlags) {
 		r := routed{key: k, tree: tree}
@@ -200,15 +201,27 @@ func (g *Git) onEvents(evs []fsevents.Event) {
 		hits[r] = &hit{path: path, flags: flags, n: 1}
 		order = append(order, r)
 	}
+	markRefsDirty := func(pid string) {
+		if refsDirty == nil {
+			refsDirty = map[string]bool{}
+		}
+		refsDirty[pid] = true
+	}
 	g.mu.RLock()
 	for _, ev := range evs {
 		clean := filepath.Clean(ev.Path)
+		if pid, ok := refsChangedProject(g.routes, clean, ev.Flags); ok {
+			markRefsDirty(pid)
+		}
 		keys, tree := eventKeys(g.routes, clean, ev.Flags)
 		if tree {
 			treeHits = append(treeHits, treeHit{key: keys[0], path: clean, flags: ev.Flags})
 		}
 		for _, k := range keys {
 			addHit(k, tree, ev.Path, ev.Flags)
+			if ev.Flags&rescanFlags != 0 && k.projectID != "" {
+				markRefsDirty(k.projectID)
+			}
 			// packed-refs changes (e.g. `fetch --prune` deleting a packed remote ref)
 			// map to reconcile -> jobBase, which skips status fan-out when origin/<default>
 			// did not move. Queue worktree statuses directly so upstream/ahead-behind stay fresh.
@@ -239,6 +252,9 @@ func (g *Git) onEvents(evs []fsevents.Event) {
 		}
 	}
 	g.mu.RUnlock()
+	for pid := range refsDirty {
+		g.refsCache.invalidate(pid)
+	}
 	now := time.Now()
 	fetchSuppress := max(2*g.deb.window, 500*time.Millisecond)
 	for _, r := range order {
@@ -254,7 +270,7 @@ func (g *Git) onEvents(evs []fsevents.Event) {
 				"project", k.projectID, "worktree", k.path, "tree", r.tree, "events", h.n)
 		}
 		if r.tree {
-			g.treeDeb.trigger(k)
+			g.treeDeb.triggerWindow(k, g.treeWindow(k))
 		} else {
 			g.deb.trigger(k)
 		}
@@ -284,7 +300,7 @@ func (g *Git) onEvents(evs []fsevents.Event) {
 	}
 	for _, fk := range filesOrder {
 		g.files.addAll(fk, files[fk], now)
-		g.treeDeb.trigger(fk)
+		g.treeDeb.triggerWindow(fk, g.treeWindow(fk))
 	}
 }
 

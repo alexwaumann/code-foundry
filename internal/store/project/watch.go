@@ -320,6 +320,41 @@ func remoteRefFor(dirs map[string]watchTarget, path string, flags fsevents.Event
 	}
 }
 
+// refsChangedProject reports whether an FSEvents event at path (already cleaned) touches
+// a project's refs/ subtree, packed-refs, or FETCH_HEAD, returning that project's ID so
+// its ListRefs cache can be invalidated.
+func refsChangedProject(dirs map[string]watchTarget, path string, flags fsevents.EventFlags) (string, bool) {
+	if flags&rescanFlags != 0 {
+		return "", false
+	}
+	if opsOf(flags) == opChmod {
+		return "", false
+	}
+	for d := filepath.Dir(path); ; d = filepath.Dir(d) {
+		if t, found := dirs[d]; found {
+			switch t.kind {
+			case wkRemoteRefs:
+				return t.projectID, true
+			case wkCommon:
+				rel, err := filepath.Rel(d, path)
+				if err != nil {
+					return "", false
+				}
+				rel = filepath.ToSlash(rel)
+				if rel == "packed-refs" || rel == "FETCH_HEAD" || rel == "refs" || strings.HasPrefix(rel, "refs/") {
+					return t.projectID, true
+				}
+				return "", false
+			default:
+				return "", false
+			}
+		}
+		if filepath.Dir(d) == d {
+			return "", false
+		}
+	}
+}
+
 // watchWorktree is the input to desiredWatches for one worktree.
 type watchWorktree struct {
 	path   string

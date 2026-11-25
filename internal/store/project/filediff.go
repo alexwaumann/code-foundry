@@ -62,20 +62,25 @@ type currentBase struct{ head, baseRef, mergeBase string }
 // currentBase reads them: HEAD now, not the snapshot's, as a commit the status job has
 // not seen yet would otherwise pair a fresh working tree with a stale merge base. The
 // base and merge base are the detail's (detailBase, mergeBaseOf).
-func (g *Git) currentBase(ctx context.Context, st *projectState, slot *wtSlot, projectID, path string, run func(...string) ([]byte, error)) (currentBase, error) {
+func (g *Git) currentBase(ctx context.Context, st *projectState, slot *wtSlot, projectID, path, gitDir, commonDir string, run func(...string) ([]byte, error)) (currentBase, error) {
 	wt := *slot.cur.Load()
-	out, err := run("rev-parse", "--verify", "--quiet", "HEAD^{commit}")
-	switch {
-	case err == nil:
-		wt.Head = string(trimNL(out))
-	case isExit(err, 1): // unborn branch
-		wt.Head = ""
-	default:
-		return currentBase{}, err
+	if head, ok := readHeadFast(gitDir, commonDir); ok {
+		wt.Head = head
+	} else {
+		out, err := run("rev-parse", "--verify", "--quiet", "HEAD^{commit}")
+		switch {
+		case err == nil:
+			wt.Head = string(trimNL(out))
+		case isExit(err, 1): // unborn branch
+			wt.Head = ""
+		default:
+			return currentBase{}, err
+		}
 	}
 	b := currentBase{head: wt.Head}
 	var baseSHA string
 	b.baseRef, baseSHA = g.detailBase(ctx, st, wt)
+	var err error
 	if b.mergeBase, err = g.mergeBaseOf(wtKey{projectID, path}, headKey{head: wt.Head, baseRef: b.baseRef, baseSHA: baseSHA}, run); err != nil {
 		return currentBase{}, err
 	}

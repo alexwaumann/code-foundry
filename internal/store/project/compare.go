@@ -9,9 +9,11 @@ import (
 	"io"
 	"io/fs"
 	"os"
+	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"unicode"
 	"unicode/utf8"
@@ -220,6 +222,12 @@ func comparePath(p string) (string, error) {
 
 // comparison is two sources resolved in one worktree.
 type comparison struct {
+	g          *Git
+	projectID  string
+	repoDir    string
+	commonDir  string
+	gitDir     string
+	slot       *wtSlot
 	dir        string
 	run        func(args ...string) ([]byte, error)
 	base, head ResolvedSource
@@ -229,8 +237,20 @@ type comparison struct {
 	err        string // a source that names nothing; see WorktreeCompare.Error
 }
 
-// openCompare checks both sources and resolves them in the worktree.
-func (g *Git) openCompare(ctx context.Context, projectID, path string, base, head DiffSource) (*comparison, error) {
+func refUsesHead(s DiffSource) bool {
+	if s.Kind != SourceRef {
+		return false
+	}
+	r := s.Ref
+	if idx := strings.IndexAny(r, "~^@{"); idx >= 0 {
+		r = r[:idx]
+	}
+	return r == "HEAD" || r == "@"
+}
+
+// openCompare checks both sources and resolves them in the worktree. When needBase is
+// false, currentBase (HEAD + merge-base) is skipped because neither side uses it.
+func (g *Git) openCompare(ctx context.Context, projectID, path string, base, head DiffSource, needBase bool) (*comparison, error) {
 	if err := checkSource(base); err != nil {
 		return nil, err
 	}
@@ -241,12 +261,58 @@ func (g *Git) openCompare(ctx context.Context, projectID, path string, base, hea
 	if err != nil {
 		return nil, err
 	}
+	m := st.meta.Load()
+	repoDir, commonDir := m.Path, m.commonDir()
+	g.mu.RLock()
+	gitDir := slot.gitDir
+	g.mu.RUnlock()
 	run := func(args ...string) ([]byte, error) { return g.runner.Run(ctx, dir, args...) }
-	b, err := g.currentBase(ctx, st, slot, projectID, dir, run)
-	if err != nil {
-		return nil, err
+
+	dependsOnBase := needBase || base.Kind == SourceMergeBase || head.Kind == SourceMergeBase
+	dependsOnHead := dependsOnBase || refUsesHead(base) || refUsesHead(head)
+	var (
+		wtHead    string
+		hasWTHead bool
+		projBase  projectBase
+	)
+	if dependsOnHead {
+		wtHead, hasWTHead = readHeadFast(gitDir, commonDir)
 	}
-	c := &comparison{dir: dir, run: run, baseRef: b.baseRef, mergeBase: b.mergeBase, headSHA: b.head}
+	if dependsOnBase {
+		if pb := st.base.Load(); pb != nil {
+			projBase = *pb
+		}
+	}
+
+	openKey := openCompareKey{projectID: projectID, dir: dir, base: base, head: head, needBase: needBase}
+	if g.compareCache != nil {
+		if e, ok := g.compareCache.open.get(openKey); ok {
+			valid := g.now().Sub(e.cachedAt) <= openCompareTTL &&
+				(!dependsOnBase || e.projBase == projBase) &&
+				(!dependsOnHead || (e.hasWTHead && hasWTHead && e.wtHead == wtHead)) &&
+				stampsMatch(e.stamps)
+			if valid {
+				return &comparison{
+					g: g, projectID: projectID, repoDir: repoDir, commonDir: commonDir,
+					gitDir: gitDir, slot: slot, dir: dir, run: run,
+					base: e.base, head: e.head, baseRef: e.baseRef,
+					mergeBase: e.mergeBase, headSHA: e.headSHA,
+				}, nil
+			}
+		}
+	}
+
+	var b currentBase
+	if dependsOnBase {
+		if b, err = g.currentBase(ctx, st, slot, projectID, dir, gitDir, commonDir, run); err != nil {
+			return nil, err
+		}
+	}
+	c := &comparison{
+		g: g, projectID: projectID, repoDir: repoDir, commonDir: commonDir,
+		gitDir: gitDir, slot: slot, dir: dir, run: run,
+		baseRef: b.baseRef, mergeBase: b.mergeBase, headSHA: b.head,
+	}
 	// Both, even when the first names nothing: a caller shows each side's label either way.
 	var headWhy string
 	if c.base, c.err, err = c.resolve(base, b); err != nil {
@@ -256,6 +322,20 @@ func (g *Git) openCompare(ctx context.Context, projectID, path string, base, hea
 		return nil, err
 	}
 	c.err = cmp.Or(c.err, headWhy)
+
+	if c.err == "" && g.compareCache != nil && (!dependsOnHead || hasWTHead) {
+		baseStamps, okB := refStampsFor(base, gitDir, commonDir)
+		headStamps, okH := refStampsFor(head, gitDir, commonDir)
+		if okB && okH {
+			stamps := append(baseStamps, headStamps...)
+			g.compareCache.open.put(openKey, openCompareEntry{
+				base: c.base, head: c.head, baseRef: c.baseRef,
+				mergeBase: c.mergeBase, headSHA: c.headSHA,
+				wtHead: wtHead, hasWTHead: hasWTHead, projBase: projBase,
+				stamps: stamps, cachedAt: g.now(),
+			}, 0)
+		}
+	}
 	return c, nil
 }
 
@@ -274,6 +354,12 @@ func (c *comparison) resolve(s DiffSource, b currentBase) (_ ResolvedSource, why
 			r.SHA, r.Label = emptyTree, "Empty tree"
 			return r, "", nil
 		}
+		if isSHA(s.Ref) && c.g != nil && c.g.compareCache != nil {
+			if _, ok := c.g.compareCache.verified.get(commitBodyKey{projectID: c.projectID, sha: s.Ref}); ok {
+				r.SHA = s.Ref
+				return r, "", nil
+			}
+		}
 		// The sha, not the ref, is what every later command gets.
 		out, err := c.run("rev-parse", "--verify", "--quiet", "--end-of-options", s.Ref+"^{commit}")
 		switch {
@@ -286,6 +372,9 @@ func (c *comparison) resolve(s DiffSource, b currentBase) (_ ResolvedSource, why
 		if r.SHA = string(trimNL(out)); !isSHA(r.SHA) {
 			r.SHA = ""
 			return r, fmt.Sprintf("%s does not name a commit in this checkout", s.Ref), nil
+		}
+		if c.g != nil && c.g.compareCache != nil {
+			c.g.compareCache.verified.put(commitBodyKey{projectID: c.projectID, sha: r.SHA}, struct{}{}, 0)
 		}
 	default:
 		r.Label = "HEAD"
@@ -460,6 +549,43 @@ func parseUnmergedZ(out []byte) []string {
 	return paths
 }
 
+// statusCurrentForIndex reports whether the worktree's last `git status` is fresh enough
+// to trust its Conflicted count: RefreshedAt set, no error, HEAD matches, and .git/index
+// has not changed since right before that status ran.
+func (c *comparison) statusCurrentForIndex() (Worktree, *statusDiskStamp, bool) {
+	if c.slot == nil || c.gitDir == "" {
+		return Worktree{}, nil, false
+	}
+	wt := *c.slot.cur.Load()
+	stamp := c.slot.statusStamp.Load()
+	if wt.Status.RefreshedAt.IsZero() || wt.Status.Error != "" || stamp == nil || wt.Head != c.headSHA {
+		return Worktree{}, nil, false
+	}
+	if !stamp.index.exists || statStamp(filepath.Join(c.gitDir, "index")) != stamp.index {
+		return Worktree{}, nil, false
+	}
+	return wt, stamp, true
+}
+
+func (c *comparison) canSkipUnmerged() bool {
+	wt, _, ok := c.statusCurrentForIndex()
+	return ok && wt.Status.Conflicted == 0
+}
+
+func (c *comparison) canSkipUntracked() bool {
+	wt, stamp, ok := c.statusCurrentForIndex()
+	if !ok || wt.Status.Untracked != 0 {
+		return false
+	}
+	if !stamp.root.exists || statStamp(c.dir) != stamp.root {
+		return false
+	}
+	if c.g != nil && c.g.hasPendingStatus(c.projectID, c.dir) {
+		return false
+	}
+	return true
+}
+
 // changes lists what differs between the two sources, unsorted and unfiltered.
 func (c *comparison) changes() ([]CompareChange, error) {
 	if sameSource(c.base, c.head) {
@@ -471,7 +597,7 @@ func (c *comparison) changes() ([]CompareChange, error) {
 	}
 	list := c.dropUnchanged(parseCompareZ(out))
 	touchesIndex := c.base.SHA == "" || c.head.SHA == "" // the working tree reads through it too
-	if touchesIndex {
+	if touchesIndex && !c.canSkipUnmerged() {
 		if out, err = c.run("ls-files", "--unmerged", "-z"); err != nil {
 			return nil, err
 		}
@@ -480,10 +606,21 @@ func (c *comparison) changes() ([]CompareChange, error) {
 	if c.base.Kind != SourceWorkingTree && c.head.Kind != SourceWorkingTree {
 		return list, nil
 	}
+	if c.canSkipUntracked() {
+		return list, nil
+	}
 	if out, err = c.run("ls-files", "--others", "--exclude-standard", "-z"); err != nil {
 		return nil, err
 	}
-	return addUntracked(c.dir, list, splitZ(out), c.base.Kind == SourceWorkingTree), nil
+	var prevMemo lineMemo
+	if c.g != nil && c.projectID != "" {
+		prevMemo = c.g.getLineMemo(wtKey{c.projectID, c.dir})
+	}
+	list, nextMemo := addUntracked(c.dir, list, splitZ(out), c.base.Kind == SourceWorkingTree, prevMemo)
+	if nextMemo != nil && c.g != nil && c.projectID != "" {
+		c.g.setLineMemo(wtKey{c.projectID, c.dir}, nextMemo)
+	}
+	return list, nil
 }
 
 // dropUnchanged leaves out the binary rows whose file hashes to what is stored. `git diff`
@@ -530,17 +667,22 @@ func markUnmerged(list []CompareChange, unmerged []string) []CompareChange {
 // all: added on the head side, deleted with the working tree as base (reversed). One the
 // diff already lists (`git rm --cached` leaves D and the file on disk) is on both sides.
 // An embedded repository comes as "dir/" and stays so, as the detail lists it: a row with
-// nothing to count.
-func addUntracked(dir string, list []CompareChange, untracked []string, reversed bool) []CompareChange {
+// nothing to count. Reuses prev's lineMemo for unchanged regular files and returns a
+// fresh immutable lineMemo for the untracked files counted.
+func addUntracked(dir string, list []CompareChange, untracked []string, reversed bool, prev lineMemo) ([]CompareChange, lineMemo) {
+	if len(untracked) == 0 {
+		return list, nil
+	}
 	root, err := os.OpenRoot(dir)
 	if err != nil {
-		return list
+		return list, nil
 	}
 	defer func() { _ = root.Close() }()
 	listed := make(map[string]int, len(list))
 	for i, c := range list {
 		listed[c.Path] = i
 	}
+	var next lineMemo
 	budget := int64(untrackedCountMax)
 	for _, p := range untracked {
 		if i, ok := listed[strings.TrimSuffix(p, "/")]; ok {
@@ -548,17 +690,36 @@ func addUntracked(dir string, list []CompareChange, untracked []string, reversed
 			continue
 		}
 		c := CompareChange{Path: p, Status: "?", Submodule: strings.HasSuffix(p, "/"), untracked: true}
-		if !c.Submodule {
-			lines, binary, read := countRootLines(root, p, budget)
-			budget -= read
-			c.Added, c.Binary = lines, binary
+		if !c.Submodule && budget > 0 {
+			if fi, lerr := root.Lstat(p); lerr == nil {
+				if fi.Mode()&fs.ModeSymlink != 0 {
+					c.Added = 1
+				} else if lc, ok := prev[p]; ok && lc.size == fi.Size() && lc.mtime.Equal(fi.ModTime()) {
+					c.Added, c.Binary = lc.lines, lc.binary
+					if next == nil {
+						next = lineMemo{}
+					}
+					next[p] = lc
+				} else {
+					lines, binary, read := countRootLines(root, p, budget)
+					budget -= read
+					c.Added, c.Binary = lines, binary
+					// Only memoize counts that were not truncated by the aggregate budget.
+					if budget > 0 || read < untrackedReadMax {
+						if next == nil {
+							next = lineMemo{}
+						}
+						next[p] = lineCount{size: fi.Size(), mtime: fi.ModTime(), lines: lines, binary: binary}
+					}
+				}
+			}
 		}
 		if reversed {
 			c.Status, c.Added, c.Deleted = "D", 0, c.Added
 		}
 		list = append(list, c)
 	}
-	return list
+	return list, next
 }
 
 // countRootLines counts an untracked file's lines (countReader), reading at most limit
@@ -621,13 +782,22 @@ func (g *Git) CompareWorktree(ctx context.Context, req CompareRequest) (Worktree
 		}
 		paths[i] = c
 	}
-	c, err := g.openCompare(ctx, req.ProjectID, req.Path, req.Base, req.Head)
+	c, err := g.openCompare(ctx, req.ProjectID, req.Path, req.Base, req.Head, true)
 	if err != nil {
 		return WorktreeCompare{}, err
 	}
 	res := WorktreeCompare{Base: c.base, Head: c.head, BaseRef: c.baseRef, MergeBase: c.mergeBase, Error: c.err}
 	if c.err != "" {
 		return res, nil
+	}
+	immutable := c.base.SHA != "" && c.head.SHA != ""
+	var cacheKey compareWorktreeKey
+	if immutable && g.compareCache != nil {
+		cacheKey = compareWorktreeKey{projectID: req.ProjectID, baseSHA: c.base.SHA, headSHA: c.head.SHA}
+		if cached, ok := g.compareCache.worktree.get(cacheKey); ok {
+			res.fill(slices.Clone(cached), paths, CompareFilesMax)
+			return res, nil
+		}
 	}
 	list, err := c.changes()
 	if isMissingObject(err) {
@@ -636,6 +806,10 @@ func (g *Git) CompareWorktree(ctx context.Context, req CompareRequest) (Worktree
 	}
 	if err != nil {
 		return WorktreeCompare{}, err
+	}
+	if immutable && g.compareCache != nil {
+		stored := slices.Clone(list)
+		g.compareCache.worktree.put(cacheKey, stored, compareChangesWeight(stored))
 	}
 	res.fill(list, paths, CompareFilesMax)
 	return res, nil
@@ -711,16 +885,61 @@ func (g *Git) CompareFile(ctx context.Context, req CompareFileRequest) (CompareS
 			return CompareSides{}, err
 		}
 	}
-	c, err := g.openCompare(ctx, req.ProjectID, req.Path, req.Base, req.Head)
+	// Fast path: two full commit/tree SHAs already in the immutable CompareFile LRU cache.
+	if g.compareCache != nil && req.Base.Kind == SourceRef && req.Head.Kind == SourceRef &&
+		(isSHA(req.Base.Ref) || req.Base.Ref == emptyTree) && (isSHA(req.Head.Ref) || req.Head.Ref == emptyTree) {
+		if err := checkSource(req.Base); err != nil {
+			return CompareSides{}, err
+		}
+		if err := checkSource(req.Head); err != nil {
+			return CompareSides{}, err
+		}
+		if _, _, _, err := g.gitWorktree(req.ProjectID, req.Path); err != nil {
+			return CompareSides{}, err
+		}
+		key := compareFileKey{projectID: req.ProjectID, baseSHA: req.Base.Ref, headSHA: req.Head.Ref, oldPath: oldPath, file: file}
+		if cached, ok := g.compareCache.files.get(key); ok {
+			return cloneCompareSides(cached), nil
+		}
+	}
+	needBase := req.Base.Kind == SourceMergeBase || req.Head.Kind == SourceMergeBase
+	c, err := g.openCompare(ctx, req.ProjectID, req.Path, req.Base, req.Head, needBase)
 	if err != nil {
 		return CompareSides{}, err
 	}
 	if c.err != "" {
 		return CompareSides{Error: c.err}, nil
 	}
+	immutable := c.base.SHA != "" && c.head.SHA != ""
+	var cacheKey compareFileKey
+	if immutable && g.compareCache != nil {
+		cacheKey = compareFileKey{projectID: req.ProjectID, baseSHA: c.base.SHA, headSHA: c.head.SHA, oldPath: oldPath, file: file}
+		if cached, ok := g.compareCache.files.get(cacheKey); ok {
+			return cloneCompareSides(cached), nil
+		}
+	}
 	var res CompareSides
-	if res.Old, err = g.readSide(ctx, c, c.base, oldPath); err == nil {
-		res.New, err = g.readSide(ctx, c, c.head, file)
+	if sameSource(c.base, c.head) && oldPath == file {
+		res.Old, err = g.readSide(ctx, c, c.base, oldPath)
+		if err == nil {
+			res.New = res.Old
+			res.New.Contents = bytes.Clone(res.Old.Contents)
+		}
+	} else {
+		var (
+			oldSide, newSide FileVersion
+			oldErr, newErr   error
+			wg               sync.WaitGroup
+		)
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			oldSide, oldErr = g.readSide(ctx, c, c.base, oldPath)
+		}()
+		newSide, newErr = g.readSide(ctx, c, c.head, file)
+		wg.Wait()
+		res.Old, res.New = oldSide, newSide
+		err = cmp.Or(oldErr, newErr)
 	}
 	if isMissingObject(err) {
 		return CompareSides{Error: objectsMissing}, nil
@@ -729,6 +948,10 @@ func (g *Git) CompareFile(ctx context.Context, req CompareFileRequest) (CompareS
 		return CompareSides{}, err
 	}
 	res.Status = diffStatus(res.Old, res.New, oldPath != file)
+	if immutable && g.compareCache != nil {
+		stored := cloneCompareSides(res)
+		g.compareCache.files.put(cacheKey, stored, compareSidesWeight(stored))
+	}
 	return res, nil
 }
 
@@ -744,6 +967,16 @@ func (g *Git) readSide(ctx context.Context, c *comparison, s ResolvedSource, fil
 		if e.mode == submoduleMode {
 			return submoduleVersion(e.oid), nil
 		}
+		if g.catFiles != nil {
+			repoDir := cmp.Or(c.repoDir, c.dir)
+			v, fallback, err := g.catFiles.readBlobByOID(ctx, repoDir, c.commonDir, e.oid)
+			if err != nil {
+				return FileVersion{}, err
+			}
+			if !fallback {
+				return v, nil
+			}
+		}
 		out, err := g.runner.Run(ctx, c.dir, "cat-file", "-s", e.oid)
 		if err != nil {
 			return FileVersion{}, err
@@ -754,13 +987,30 @@ func (g *Git) readSide(ctx context.Context, c *comparison, s ResolvedSource, fil
 		}
 		return g.readObject(ctx, c.dir, e.oid, size)
 	}
-	return g.readRevSide(ctx, c.dir, s.SHA, file)
+	return g.readRevSideIn(ctx, cmp.Or(c.repoDir, c.dir), c.commonDir, c.dir, s.SHA, file)
 }
 
-// readRevSide reads file at rev: `ls-tree` for its type and size (exit 0 with no output
-// when the path is not there), then the blob, or a submodule at the path as the commit it
-// points at. A tree at the path is not present.
+// readRevSide reads file at rev in dir.
 func (g *Git) readRevSide(ctx context.Context, dir, rev, file string) (FileVersion, error) {
+	return g.readRevSideIn(ctx, dir, "", dir, rev, file)
+}
+
+// readRevSideIn reads file at rev: via the pooled `git cat-file --batch-command` workers
+// when using ExecRunner, falling back to `ls-tree` + `cat-file blob` for custom test
+// runners or partial clones with missing promisor objects.
+func (g *Git) readRevSideIn(ctx context.Context, repoDir, commonDir, dir, rev, file string) (FileVersion, error) {
+	if rev == emptyTree || file == "." {
+		return FileVersion{}, nil
+	}
+	if g.catFiles != nil {
+		v, fallback, err := g.catFiles.readRevSide(ctx, repoDir, commonDir, rev, file)
+		if err != nil {
+			return FileVersion{}, err
+		}
+		if !fallback {
+			return v, nil
+		}
+	}
 	out, err := g.runner.Run(ctx, dir, "--literal-pathspecs", "ls-tree", "-z", "--long", "--full-tree", rev, "--", file)
 	if err != nil {
 		return FileVersion{}, err

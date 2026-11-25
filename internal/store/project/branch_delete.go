@@ -127,6 +127,7 @@ func (g *Git) DeleteBranch(ctx context.Context, o DeleteBranchOptions) (DeleteBr
 		}
 		return res, fmt.Errorf("%w: no branch %s in %s %s", ErrNotFound, o.Branch, m.Name, where)
 	}
+	g.refsCache.invalidate(m.ID)
 	return res, nil
 }
 
