@@ -253,10 +253,13 @@ func (c *fullCache) markWritten(k fullKey) {
 	}
 }
 
-// patch updates a copy of k's cached detail in place when present and marks the entry
-// fresh and confirmed at now so an immediate FullPullRequest read serves it with zero
-// GitHub round-trips. Returns the patched copy and true when k was cached in memory.
-func (c *fullCache) patch(k fullKey, now time.Time, mutate func(*FullPullRequest)) (FullPullRequest, bool) {
+// patch updates a copy of k's cached detail in place when present while preserving its
+// existing staleness, confirmation, failure, and FetchedAt (only clearing written so
+// clients get the patched copy immediately without blocking). An aged or poll-stale
+// entry still surfaces Refreshing=true and reconciles in the background, and leaving
+// PullRequest.UpdatedAt at its fetch-time value lets the next poll catch any external
+// edits that landed before the mutation. Returns the patched copy and true when cached.
+func (c *fullCache) patch(k fullKey, mutate func(*FullPullRequest)) (FullPullRequest, bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	e, ok := c.m[k]
@@ -265,9 +268,10 @@ func (c *fullCache) patch(k fullKey, now time.Time, mutate func(*FullPullRequest
 	}
 	d := e.d
 	mutate(&d)
-	d.FetchedAt = now
-	d.LastError, d.FetchFailed, d.Refreshing = "", false, false
-	c.m[k] = &fullEntry{d: d, confirmed: now}
+	next := *e
+	next.d = d
+	next.written = false
+	c.m[k] = &next
 	return d, true
 }
 
@@ -652,19 +656,20 @@ func (s *Store) invalidateFull(k fullKey) {
 	publish(s, PullRequestDetailUpdated{Slug: k.slug, Number: k.number})
 }
 
-// patchFull updates k's cached detail in place from a mutation response, marks it fresh
-// and confirmed so the panel's immediate GetPullRequestDetail read returns the patched
-// copy in 0 ms with 0 extra GitHub round-trips, persists it to SQLite, updates the
-// summary cache, and publishes PullRequestDetailUpdated. When k is not cached in memory
-// it falls back to invalidateFull so any SQLite row is not trusted and clients still
-// hear PullRequestDetailUpdated.
+// patchFull updates k's cached detail in place from a mutation response while preserving
+// its existing staleness/age (so current entries serve the patched copy in 0 ms with 0
+// blocking round-trips, while aged or poll-stale entries still surface Refreshing=true
+// and reconcile in the background). It marks the separate PullRequest() cache moved via
+// s.moved.markWrite, persists to SQLite, updates the summary cache, and publishes
+// PullRequestDetailUpdated. When k is not cached in memory it falls back to invalidateFull.
 func (s *Store) patchFull(ctx context.Context, k fullKey, mutate func(*FullPullRequest)) {
 	now := s.opts.Now()
-	d, ok := s.full.patch(k, now, mutate)
+	d, ok := s.full.patch(k, mutate)
 	if !ok {
 		s.invalidateFull(k)
 		return
 	}
+	s.moved.markWrite(k, now, s.opts.DetailTTL)
 	s.summaries.put(k, d.PullRequest)
 	if err := s.cache.saveActivity(ctx, activityFull+k.String(), d.FetchedAt, d); err != nil {
 		s.log.Warn("gh cache write failed", "err", err)

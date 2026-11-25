@@ -102,7 +102,6 @@ func (s *Store) SetPullRequestDraft(ctx context.Context, slug string, number int
 			if det.Draft {
 				d.AutoMerge, d.AutoMergeMethod = false, ""
 			}
-			advanceUpdatedAt(&d.PullRequest.UpdatedAt, det.UpdatedAt)
 		})
 		s.markDraft(k, det.Draft, det.MergeStateStatus, det.UpdatedAt)
 	})
@@ -192,7 +191,6 @@ func (s *Store) SetPullRequestAutoMerge(ctx context.Context, slug string, number
 		s.patchFull(ctx, k, func(d *FullPullRequest) {
 			d.AutoMerge = det.Enabled
 			d.AutoMergeMethod = det.Method
-			advanceUpdatedAt(&d.PullRequest.UpdatedAt, det.UpdatedAt)
 		})
 	})
 	if err != nil {

@@ -188,7 +188,6 @@ func patchReviewRequests(d *FullPullRequest, det requestedReviewersOutcome) {
 	}
 	sortReviewers(revs)
 	d.Reviewers = revs
-	advanceUpdatedAt(&d.PullRequest.UpdatedAt, det.UpdatedAt)
 }
 
 // checkReviewRequest reports whether GitHub's pending requests after a write (logins

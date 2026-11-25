@@ -410,3 +410,126 @@ func TestLocalOverlayCloseReopenDraftReviewAndBranches(t *testing.T) {
 		t.Errorf("remaining marks after TTL = %d, want 0", remaining)
 	}
 }
+
+func TestPatchFullPreservesStalenessAndReconcilesExternalEdits(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("aged entry serves patched comment immediately with Refreshing=true and reconciles external edits", func(t *testing.T) {
+		g, w, s, clk, _ := mergeWorld(t)
+		if _, err := s.FullPullRequest(ctx, "o/r", 1, false); err != nil {
+			t.Fatal(err)
+		}
+		// Age past PollInterval and simulate an external title + head edit before our comment.
+		clk.advance(2 * time.Hour)
+		newHead := fmt.Sprintf("%040d", 99)
+		g.edit("PR_1", func(p *PullRequest) {
+			p.Title = "Externally retitled"
+			p.HeadSHA = newHead
+		})
+
+		if _, err := s.AddPullRequestComment(ctx, "o/r", 1, "my comment"); err != nil {
+			t.Fatal(err)
+		}
+		// Immediate read returns patched comment without blocking, while preserving age
+		// so Refreshing=true triggers a background PullRequestFull to pick up the new title/head.
+		d1, err := s.FullPullRequest(ctx, "o/r", 1, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !d1.Refreshing {
+			t.Fatalf("aged entry Refreshing = false after patchFull, want true")
+		}
+		if !slices.ContainsFunc(d1.Comments, func(c Comment) bool { return c.Body == "my comment" }) {
+			t.Fatalf("patched comment missing from immediate aged read: %+v", d1.Comments)
+		}
+		settleWorker(t, s)
+		d2, err := s.FullPullRequest(ctx, "o/r", 1, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if d2.PullRequest.Title != "Externally retitled" || d2.PullRequest.HeadSHA != newHead {
+			t.Fatalf("background refresh did not pick up external edit: title=%q head=%q", d2.PullRequest.Title, d2.PullRequest.HeadSHA)
+		}
+		_ = w
+	})
+
+	t.Run("warm entry leaves UpdatedAt at fetch-time so next poll reconciles prior external edits", func(t *testing.T) {
+		g, w, s, clk, _ := mergeWorld(t)
+		if err := s.Track("o/r"); err != nil {
+			t.Fatal(err)
+		}
+		pollOnce(t, s, w.fakeRunner)
+		d0, err := s.FullPullRequest(ctx, "o/r", 1, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		origUpdated := d0.PullRequest.UpdatedAt
+
+		// External edit lands before our comment.
+		clk.advance(5 * time.Second)
+		g.edit("PR_1", func(p *PullRequest) {
+			p.Title = "Edited before comment"
+			p.UpdatedAt = clk.now()
+		})
+		if _, err := s.AddPullRequestComment(ctx, "o/r", 1, "warm comment"); err != nil {
+			t.Fatal(err)
+		}
+		d1, err := s.FullPullRequest(ctx, "o/r", 1, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if d1.Refreshing {
+			t.Fatalf("warm entry Refreshing = true, want false")
+		}
+		if !d1.PullRequest.UpdatedAt.Equal(origUpdated) {
+			t.Fatalf("UpdatedAt advanced to %v (was %v); must stay at fetch-time so next poll reconciles", d1.PullRequest.UpdatedAt, origUpdated)
+		}
+		// Next poll sees poll.UpdatedAt != origUpdated and marks the cached detail stale.
+		pollOnce(t, s, w.fakeRunner)
+		e, ok := s.full.entry(fullKey{slug: "o/r", number: 1})
+		if !ok || !e.stale {
+			t.Fatalf("expected poll after mutation to mark detail stale (ok=%v stale=%v)", ok, e.stale)
+		}
+	})
+
+	t.Run("patchFull marks moved so Store.PullRequest invalidates its separate detail cache", func(t *testing.T) {
+		_, _, s, _, _ := mergeWorld(t)
+		if _, err := s.FullPullRequest(ctx, "o/r", 1, false); err != nil {
+			t.Fatal(err)
+		}
+		k := fullKey{slug: "o/r", number: 1}
+		before := s.opts.Now()
+		if _, err := s.SetPullRequestDraft(ctx, "o/r", 1, true); err != nil {
+			t.Fatal(err)
+		}
+		if !s.moved.movedSince(k, before.Add(-time.Second)) {
+			t.Fatalf("expected s.moved.markWrite after patched mutation")
+		}
+	})
+
+	t.Run("COMMENTED review does not overwrite prior APPROVED state in reviewers", func(t *testing.T) {
+		g, _, s, _, _ := mergeWorld(t)
+		g.edit("PR_1", func(p *PullRequest) { p.Author = "kim" })
+		if _, err := s.FullPullRequest(ctx, "o/r", 1, false); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := s.SubmitPullRequestReview(ctx, "o/r", 1, ReviewSubmission{Event: ReviewEventApprove, Body: "approved"}); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := s.SubmitPullRequestReview(ctx, "o/r", 1, ReviewSubmission{Event: ReviewEventComment, Body: "nit"}); err != nil {
+			t.Fatal(err)
+		}
+		d, err := s.FullPullRequest(ctx, "o/r", 1, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		idx := slices.IndexFunc(d.Reviewers, func(r Reviewer) bool { return r.Login == "octocat" })
+		if idx < 0 || d.Reviewers[idx].State != "APPROVED" {
+			t.Fatalf("reviewer state after follow-up COMMENTED = %+v, want APPROVED preserved", d.Reviewers)
+		}
+		lidx := slices.IndexFunc(d.PullRequest.LatestReviews, func(r Review) bool { return r.Author == "octocat" })
+		if lidx < 0 || d.PullRequest.LatestReviews[lidx].State != "APPROVED" {
+			t.Fatalf("latestReviews state after follow-up COMMENTED = %+v, want APPROVED preserved", d.PullRequest.LatestReviews)
+		}
+	})
+}

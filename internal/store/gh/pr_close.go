@@ -54,7 +54,7 @@ func (s *Store) SetPullRequestClosed(ctx context.Context, slug string, number in
 	if e, ok := s.full.entry(k); ok && e.d.PullRequest.ID != "" && !look(&e.d) {
 		id = e.d.PullRequest.ID
 	} else if !ok {
-		if p, has := s.summaries.get(k); has && p.ID != "" && p.State != "" && refusal(&FullPullRequest{PullRequest: p}) == "" {
+		if p, has := s.summaries.get(k); has && !p.Partial && p.ID != "" && p.State != "" && refusal(&FullPullRequest{PullRequest: p}) == "" {
 			id = p.ID
 		}
 	}
@@ -95,7 +95,6 @@ func (s *Store) SetPullRequestClosed(ctx context.Context, slug string, number in
 			if det.State != PullRequestOpen {
 				d.AutoMerge, d.AutoMergeMethod = false, ""
 			}
-			advanceUpdatedAt(&d.PullRequest.UpdatedAt, det.UpdatedAt)
 		})
 		s.markClosed(k, det.State, det.UpdatedAt)
 	})

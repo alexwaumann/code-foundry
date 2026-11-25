@@ -163,7 +163,6 @@ func (s *Store) MergePullRequest(ctx context.Context, slug string, number int, r
 				}
 				d.AutoMerge, d.AutoMergeMethod = false, ""
 				d.ViewerCanReopen = false
-				advanceUpdatedAt(&d.PullRequest.UpdatedAt, o.UpdatedAt)
 			})
 			s.statsDueNow("merged", "pr", k.String())
 			// The searches trail the merge: show it now (pr_merged_overlay.go).

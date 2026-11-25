@@ -76,10 +76,9 @@ func (s *Store) SetPullRequestCheckbox(ctx context.Context, slug string, number 
 	}
 	what := fmt.Sprintf("changing task %d", r.Index+1)
 	if _, err := s.stateWrite(ctx, k, what, queryUpdatePullRequestBody, map[string]any{"id": id, "body": next}, writeRefused, func(ctx context.Context, data []byte) {
-		body, updatedAt := decodeUpdatedBody(data, next)
+		body, _ := decodeUpdatedBody(data, next)
 		s.patchFull(ctx, k, func(d *FullPullRequest) {
 			d.Body = body
-			advanceUpdatedAt(&d.PullRequest.UpdatedAt, updatedAt)
 		})
 	}); err != nil {
 		return CheckboxResult{}, err

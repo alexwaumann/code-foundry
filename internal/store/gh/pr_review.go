@@ -127,7 +127,6 @@ func (s *Store) AddPullRequestComment(ctx context.Context, slug string, number i
 					d.Comments = append(slices.Clone(d.Comments), det.Comment)
 					d.PullRequest.Comments++
 				}
-				advanceUpdatedAt(&d.PullRequest.UpdatedAt, cmp.Or(det.UpdatedAt, det.Comment.CreatedAt))
 			})
 		})
 	if err != nil {
@@ -380,12 +379,17 @@ func patchPullRequestReview(d *FullPullRequest, det reviewDetail) {
 	if sub.Author != "" && sub.State != "PENDING" {
 		commitSHA := cmp.Or(det.CommitSHA, d.PullRequest.HeadSHA)
 		stale := d.PullRequest.HeadSHA != "" && commitSHA != "" && commitSHA != d.PullRequest.HeadSHA
+		opinionated := func(st string) bool { return st == "APPROVED" || st == "CHANGES_REQUESTED" }
 		revs := slices.Clone(d.Reviewers)
 		if idx := slices.IndexFunc(revs, func(r Reviewer) bool { return !r.Team && strings.EqualFold(r.Login, sub.Author) }); idx >= 0 {
-			revs[idx].State = sub.State
-			revs[idx].SubmittedAt = sub.SubmittedAt
+			// A follow-up COMMENTED review never replaces an existing opinionated review
+			// (APPROVED / CHANGES_REQUESTED) in GitHub's reviewer summary.
+			if !(sub.State == "COMMENTED" && opinionated(revs[idx].State)) {
+				revs[idx].State = sub.State
+				revs[idx].SubmittedAt = sub.SubmittedAt
+				revs[idx].Stale = stale
+			}
 			revs[idx].Requested = false
-			revs[idx].Stale = stale
 			if det.AuthorAvatar != "" {
 				revs[idx].AvatarURL = det.AuthorAvatar
 			}
@@ -405,7 +409,9 @@ func patchPullRequestReview(d *FullPullRequest, det reviewDetail) {
 		latest := slices.Clone(d.PullRequest.LatestReviews)
 		rev := Review{Author: sub.Author, State: sub.State, SubmittedAt: sub.SubmittedAt, CommitSHA: commitSHA}
 		if idx := slices.IndexFunc(latest, func(r Review) bool { return strings.EqualFold(r.Author, sub.Author) }); idx >= 0 {
-			latest[idx] = rev
+			if !(sub.State == "COMMENTED" && opinionated(latest[idx].State)) {
+				latest[idx] = rev
+			}
 		} else {
 			latest = append(latest, rev)
 		}
@@ -420,7 +426,6 @@ func patchPullRequestReview(d *FullPullRequest, det reviewDetail) {
 	if det.ReviewDecision != "" {
 		d.PullRequest.ReviewDecision = det.ReviewDecision
 	}
-	advanceUpdatedAt(&d.PullRequest.UpdatedAt, cmp.Or(det.UpdatedAt, sub.SubmittedAt))
 }
 
 type commentDetail struct {

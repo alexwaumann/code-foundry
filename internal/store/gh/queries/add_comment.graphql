@@ -10,7 +10,6 @@ mutation AddComment($id: ID!, $body: String!) {
         createdAt
         updatedAt
         url
-        viewerDidAuthor
       }
     }
   }

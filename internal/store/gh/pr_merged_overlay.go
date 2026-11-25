@@ -151,7 +151,6 @@ func (o *localOverlay) apply(polled Dashboard, now time.Time) Dashboard {
 	defer o.mu.Unlock()
 	if len(o.marks) == 0 {
 		o.polled = nil
-		o.polledProjects = nil
 		return polled
 	}
 	d := polled
@@ -160,7 +159,6 @@ func (o *localOverlay) apply(polled Dashboard, now time.Time) Dashboard {
 	o.marks = next
 	if len(o.marks) == 0 {
 		o.polled = nil
-		o.polledProjects = nil
 	}
 	return out
 }
