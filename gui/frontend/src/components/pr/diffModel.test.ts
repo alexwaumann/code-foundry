@@ -1,6 +1,6 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { PullRequestFileView } from "@/api/prDiff";
-import { COLLAPSE_OVER, oldFromNew, parsePrDiff, prFileLoader } from "./diffModel";
+import { cachedParsePrDiff, clearPrDiffModelCache, COLLAPSE_OVER, oldFromNew, parsePrDiff, PR_DIFF_MODEL_CACHE_MAX, prFileLoader } from "./diffModel";
 
 const lines = (n: number) => Array.from({ length: n }, (_, i) => `line ${String(i + 1)}\n`);
 /** f.txt before: "line 1" … "line 30". */
@@ -96,6 +96,36 @@ describe("parsePrDiff", () => {
 
   it("reads an empty diff as no files", () => {
     expect(parsePrDiff("", "h")).toEqual({ files: [], added: 0, deleted: 0 });
+  });
+});
+
+describe("cachedParsePrDiff", () => {
+  afterEach(() => {
+    clearPrDiffModelCache();
+  });
+
+  it("reuses the parsed model for the same (prKey, headSha, diff) and re-parses when headSha or diff changes", () => {
+    const first = cachedParsePrDiff("acme/r#1", CHANGE, "sha1");
+    const hit = cachedParsePrDiff("acme/r#1", CHANGE.slice(), "sha1");
+    expect(hit).toBe(first);
+
+    const newSha = cachedParsePrDiff("acme/r#1", CHANGE, "sha2");
+    expect(newSha).not.toBe(first);
+
+    const newDiff = cachedParsePrDiff("acme/r#1", OTHERS, "sha2");
+    expect(newDiff).not.toBe(newSha);
+  });
+
+  it("evicts the least-recently-used entry past PR_DIFF_MODEL_CACHE_MAX", () => {
+    const first = cachedParsePrDiff("acme/r#0", CHANGE, "sha");
+    const second = cachedParsePrDiff("acme/r#1", CHANGE, "sha");
+    // Touch #0 so #1 becomes the LRU entry.
+    expect(cachedParsePrDiff("acme/r#0", CHANGE, "sha")).toBe(first);
+    for (let i = 2; i <= PR_DIFF_MODEL_CACHE_MAX; i++) {
+      cachedParsePrDiff(`acme/r#${String(i)}`, CHANGE, "sha");
+    }
+    expect(cachedParsePrDiff("acme/r#0", CHANGE, "sha")).toBe(first);
+    expect(cachedParsePrDiff("acme/r#1", CHANGE, "sha")).not.toBe(second);
   });
 });
 

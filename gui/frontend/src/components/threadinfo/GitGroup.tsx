@@ -21,7 +21,8 @@ import { CopyIcon } from "@/components/copy/CopyButton";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { Tip } from "@/components/ui/tooltip";
 import { fileTotals } from "@/components/diff/files";
-import { useLinkedPrViews } from "@/components/sidebar/useLinkedPrs";
+import { fresher } from "@/components/sidebar/linkedPrTag";
+import { useSummaryPrViews } from "@/components/sidebar/useLinkedPrs";
 import {
   commits,
   files,
@@ -233,7 +234,12 @@ function PrRowView({ row }: { row: PrRow }) {
   );
 }
 
-/** The thread's linked pull requests as rows (lib/threadInfo prRows): each detail watched while the card shows, the freshest read of each used. */
+/**
+ * The thread's linked pull requests as rows (lib/threadInfo prRows): resolved from
+ * dashboard and branch summary caches first so open thread info cards do not watch full
+ * PullRequestDetail (GraphQL + 60s keep-alive) for PRs already in memory; falls back to
+ * watching pullRequestDetailResource only for linked PRs absent from those caches.
+ */
 function usePrRows(threadId: string): PrRow[] {
   const { cwdProjectId, members } = useMembers(threadId);
   const links = useThreadsStore(useShallow((s) => (s.byId[threadId]?.linkedPullRequests ?? []).map((l) => [l.slug, String(l.number), l.url].join(SEP))));
@@ -245,8 +251,11 @@ function usePrRows(threadId: string): PrRow[] {
       }),
     [links],
   );
-  useWatchKeys(pullRequestDetailResource.watch, keys);
-  const views = useLinkedPrViews(keys);
+  const summary = useSummaryPrViews(keys);
+  const missingKeys = useMemo(() => keys.filter((_k, i) => summary[i] === null), [keys, summary]);
+  useWatchKeys(pullRequestDetailResource.watch, missingKeys);
+  const detail = pullRequestDetailResource.store(useShallow((s) => keys.map((k) => s.entries[k]?.data?.pullRequest ?? null)));
+  const views = useMemo(() => keys.map((_, i) => fresher(detail[i] ?? null, summary[i] ?? null)), [keys, detail, summary]);
   const projectKey = useProjectsStore(useShallow((s) => members.map((id) => [id, s.byId[id]?.name ?? id, s.byId[id]?.githubSlug ?? ""].join(SEP))));
   return useMemo(() => {
     const projects = new Map<string, { id: string; name: string }>();

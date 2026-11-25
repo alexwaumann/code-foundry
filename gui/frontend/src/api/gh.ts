@@ -196,7 +196,8 @@ export type GhEventView =
   | { kind: "dashboard" }
   | { kind: "repoActivity"; repoSlug: string }
   | { kind: "branchPullRequests"; repoSlug: string; headRef: string }
-  | { kind: "pullRequestDetail"; repoSlug: string; number: number };
+  | { kind: "pullRequestDetail"; repoSlug: string; number: number }
+  | { kind: "pullRequestChanged"; repoSlug: string; number: number; headRef: string; pullRequest: PullRequestView };
 
 // ---- Pull request detail panel (GetPullRequestDetail, ListReviewerCandidates) ------
 // Reads only. Its actions are daemon commands (pr.revert, pr.review.request, pr.review, pr.refresh):
@@ -477,6 +478,16 @@ export function toGhEventView(e: GhEvent): GhEventView | null {
       return { kind: "branchPullRequests", repoSlug: g.value.repoSlug, headRef: g.value.headRef };
     case "pullRequestDetailUpdated":
       return { kind: "pullRequestDetail", repoSlug: g.value.repoSlug, number: g.value.number };
+    case "pullRequestChanged":
+      return g.value.pullRequest
+        ? {
+            kind: "pullRequestChanged",
+            repoSlug: g.value.repoSlug,
+            number: g.value.number,
+            headRef: g.value.headRef,
+            pullRequest: toPullRequestView(g.value.pullRequest),
+          }
+        : null;
     default:
       return null;
   }

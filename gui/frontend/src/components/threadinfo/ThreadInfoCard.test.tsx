@@ -11,7 +11,7 @@ import { tooltipText } from "@/test/tooltip";
 import type { DashboardView } from "@/api/gh";
 import type { McpServerView } from "@/api/mcp";
 import { useActionDialogStore } from "@/stores/actionDialog";
-import { DASHBOARD_KEY, dashboardResource } from "@/stores/gh";
+import { branchKey, branchPullRequestsResource, DASHBOARD_KEY, dashboardResource, pullRequestDetailResource } from "@/stores/gh";
 import { useProjectsStore } from "@/stores/projects";
 import { useThreadsStore } from "@/stores/threads";
 import { useUiStore } from "@/stores/ui";
@@ -452,6 +452,33 @@ describe("ThreadInfoCard: other scenarios", () => {
         expect(screen.getAllByTestId("ti-pr").map((r) => r.dataset.number)).toEqual(["78", "63"]);
       });
       expect(screen.getAllByTestId("ti-pr-title")[0]?.textContent).toBe("From the dashboard");
+    });
+
+    it("resolves linked PRs from dashboard and branch caches without watching pullRequestDetailResource, falling back only for missing PRs", async () => {
+      const id = seedSingle();
+      updateThread(id, { linkedPullRequests: [linkTo(101), linkTo(102), linkTo(103), linkTo(104)] });
+      const pr101 = pullRequest({ repoSlug: SLUG, number: 101, title: "Base PR", headRef: "b1" });
+      const pr102 = pullRequest({ repoSlug: SLUG, number: 102, title: "Stacked PR", headRef: "b2", baseRef: "b1" });
+      const pr103 = pullRequest({ repoSlug: SLUG, number: 103, title: "Branch cached PR", headRef: "b3" });
+      const pr104 = pullRequest({ repoSlug: SLUG, number: 104, title: "Uncached old merged", headRef: "b4", state: "merged" });
+      dashboardResource.set(DASHBOARD_KEY, {
+        data: { authored: [pr101], reviewRequested: [], reviewed: [], recentlyMerged: [], projectOpen: { pullRequests: [pr102], totalCount: 1, searchUrl: "" }, projectMerged: { pullRequests: [], totalCount: 0, searchUrl: "" } } as unknown as DashboardView,
+      });
+      branchPullRequestsResource.set(branchKey(SLUG, "b3"), { data: { pullRequests: [pr103], fetchedAtMs: Date.now(), lastError: "" } });
+      card.prDetails.set(`${SLUG}#104`, pr104);
+
+      const watchSpy = vi.spyOn(pullRequestDetailResource, "watch");
+      try {
+        await renderCard(id);
+        await waitFor(() => {
+          expect(screen.getAllByTestId("ti-pr")).toHaveLength(4);
+        });
+        expect(watchSpy.mock.calls.map((c) => c[0])).toEqual([`${SLUG}#104`]);
+        expect(oneLine(screen.getByTestId("ti-pr-stacked"))).toBe("#101");
+      } finally {
+        watchSpy.mockRestore();
+        branchPullRequestsResource.store.setState({ entries: {} });
+      }
     });
   });
 

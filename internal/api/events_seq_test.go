@@ -258,3 +258,63 @@ func TestEventsWorkspaceConnectReadsFolders(t *testing.T) {
 		t.Errorf("EnsureDirs ran %d times, want once per connect (2)", n)
 	}
 }
+
+// A GUI client resuming at the newest seq gets an immediate heartbeat carrying the
+// daemon's epoch (no snapshots, no 5s wait before knowing the resume succeeded), and a
+// mismatched since_epoch falls back to snapshots.
+func TestEventsGuiResumeAtHeadSendsHeartbeatImmediately(t *testing.T) {
+	f := newEventsFixture(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	first := f.watch(t, ctx, v1.EventSource_EVENT_SOURCE_PROJECT)
+	snap := first.next()
+	epoch := snap.GetEpoch()
+	if epoch == "" {
+		t.Fatal("snapshot carried empty epoch")
+	}
+	f.project.Put(projectNamed("one"))
+	live := first.nextLive()
+	last := live.GetSeq()
+
+	resumed, err := f.client.Watch(ctx, connect.NewRequest(&v1.WatchEventsRequest{
+		Sources:    []v1.EventSource{v1.EventSource_EVENT_SOURCE_PROJECT},
+		SinceSeq:   last,
+		SinceEpoch: epoch,
+		ClientKind: v1.ClientKind_CLIENT_KIND_GUI,
+		ClientId:   "gui-resume-1",
+		Visible:    true,
+		Focused:    true,
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = resumed.Close() })
+	rs := &eventStream{t: t, s: resumed}
+	ack := rs.next()
+	if ack.GetHeartbeat() == nil || ack.GetEpoch() != epoch || ack.GetSeq() != 0 {
+		t.Fatalf("gui resume ack = %q epoch=%q seq=%d, want heartbeat with epoch %q", describe(ack), ack.GetEpoch(), ack.GetSeq(), epoch)
+	}
+	f.project.Put(projectNamed("two"))
+	if ev := rs.nextLive(); describe(ev) != "project.updated two" || ev.GetSeq() <= last {
+		t.Fatalf("after gui resume: got %q seq %d", describe(ev), ev.GetSeq())
+	}
+
+	// Mismatched epoch (restarted daemon) falls back to full snapshots.
+	restarted, err := f.client.Watch(ctx, connect.NewRequest(&v1.WatchEventsRequest{
+		Sources:    []v1.EventSource{v1.EventSource_EVENT_SOURCE_PROJECT},
+		SinceSeq:   last,
+		SinceEpoch: "other-daemon",
+		ClientKind: v1.ClientKind_CLIENT_KIND_GUI,
+		ClientId:   "gui-resume-2",
+		Visible:    true,
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = restarted.Close() })
+	ss := &eventStream{t: t, s: restarted}
+	if ev := ss.next(); describe(ev) != "project.snapshot(2)" || ev.GetSeq() != 0 {
+		t.Fatalf("mismatched epoch first event = %q seq %d, want project.snapshot(2)", describe(ev), ev.GetSeq())
+	}
+}

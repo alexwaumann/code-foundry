@@ -32,40 +32,173 @@ export interface TabRead<T> {
   replace: (data: T) => void;
 }
 
+/** One entry in a bounded LRU TabReadCache. */
+export interface TabReadCacheEntry<T> {
+  data: T;
+  stale: boolean;
+  /** Monotonic revision bumped on set and invalidate so hooks know whether their state settled after invalidation. */
+  rev: number;
+}
+
+/**
+ * Bounded LRU cache shared across mounts of a tab read (Diff file switches, tab switches,
+ * SourcePicker refs). Invalidated entries remain readable for immediate stale-while-revalidate
+ * rendering and trigger a background fetch on next mount/visit.
+ */
+export interface TabReadCache<T> {
+  /** Read-only lookup (safe during render). */
+  peek: (key: string) => TabReadCacheEntry<T> | undefined;
+  /** Lookup that refreshes LRU recency. */
+  get: (key: string) => TabReadCacheEntry<T> | undefined;
+  /** Stores fresh data and refreshes LRU recency, evicting the oldest entry past max. */
+  set: (key: string, data: T) => number;
+  /** Marks matching entries (or all entries) stale so the next read revalidates. */
+  invalidate: (keyOrPred?: string | ((key: string) => boolean)) => void;
+  /** Removes matching entries (or all entries) completely. */
+  clear: (keyOrPred?: string | ((key: string) => boolean)) => void;
+  size: () => number;
+}
+
+export function createTabReadCache<T>({ max = 32 }: { max?: number } = {}): TabReadCache<T> {
+  const map = new Map<string, TabReadCacheEntry<T>>();
+  let nextRev = 0;
+  const match = (key: string, keyOrPred?: string | ((k: string) => boolean)): boolean => {
+    if (keyOrPred === undefined) return true;
+    return typeof keyOrPred === "string" ? key === keyOrPred : keyOrPred(key);
+  };
+  return {
+    peek: (key) => map.get(key),
+    get: (key) => {
+      const hit = map.get(key);
+      if (!hit) return undefined;
+      map.delete(key);
+      map.set(key, hit);
+      return hit;
+    },
+    set: (key, data) => {
+      const rev = ++nextRev;
+      if (map.has(key)) map.delete(key);
+      map.set(key, { data, stale: false, rev });
+      while (map.size > max) {
+        const oldest = map.keys().next().value;
+        if (oldest === undefined) break;
+        map.delete(oldest);
+      }
+      return rev;
+    },
+    invalidate: (keyOrPred) => {
+      if (typeof keyOrPred === "string") {
+        const hit = map.get(keyOrPred);
+        if (hit) {
+          hit.stale = true;
+          hit.rev = ++nextRev;
+        }
+        return;
+      }
+      for (const [k, entry] of map) {
+        if (match(k, keyOrPred)) {
+          entry.stale = true;
+          entry.rev = ++nextRev;
+        }
+      }
+    },
+    clear: (keyOrPred) => {
+      if (keyOrPred === undefined) {
+        map.clear();
+        return;
+      }
+      if (typeof keyOrPred === "string") {
+        map.delete(keyOrPred);
+        return;
+      }
+      for (const k of [...map.keys()]) {
+        if (keyOrPred(k)) map.delete(k);
+      }
+    },
+    size: () => map.size,
+  };
+}
+
+export interface UseTabReadOptions<T> {
+  cache?: TabReadCache<T>;
+  /**
+   * "revalidate" (default): render cached data immediately while revalidating in the background.
+   * "fresh": skip fetching when a non-stale cache entry exists; still fetches on miss, stale
+   * entry, or explicit reload().
+   */
+  mode?: "revalidate" | "fresh";
+}
+
 /** How long event-driven re-reads wait for more events. */
 export const REFRESH_DEBOUNCE_MS = 250;
 
 /**
  * Runs `read` for `key` on mount, whenever the key changes (the previous read is
  * aborted), and on reload(). `read` may change identity freely: the latest one runs.
+ * With `opts.cache`, cached data renders immediately on remount/revisit (and skips
+ * re-fetching when `mode: "fresh"` and not stale).
  */
-export function useTabRead<T>(key: string, read: (signal: AbortSignal) => Promise<T>): TabRead<T> {
-  const [nonce, setNonce] = useState(0);
-  const [state, setState] = useState<{ key: string; nonce: number; data: T | null; error: string | null }>({ key: "", nonce: -1, data: null, error: null });
+export function useTabRead<T>(key: string, read: (signal: AbortSignal) => Promise<T>, opts?: UseTabReadOptions<T>): TabRead<T> {
+  const cache = opts?.cache;
+  const mode = opts?.mode ?? "revalidate";
+  const [reloadReq, setReloadReq] = useState<{ key: string; n: number }>({ key: "", n: 0 });
+  const force = reloadReq.key === key ? reloadReq.n : 0;
+  const [state, setState] = useState<{ key: string; force: number; rev: number; data: T | null; error: string | null }>(() => {
+    const hit = cache?.peek(key);
+    return hit
+      ? { key, force: mode === "fresh" && !hit.stale ? 0 : -1, rev: hit.rev, data: hit.data, error: null }
+      : { key: "", force: -1, rev: 0, data: null, error: null };
+  });
+  const keyRef = useRef(key);
+  const cacheRef = useRef(cache);
+  useEffect(() => {
+    keyRef.current = key;
+    cacheRef.current = cache;
+  }, [key, cache]);
   const run = useEffectEvent((signal: AbortSignal) => read(signal));
   useEffect(() => {
+    const hit = cache?.get(key);
+    if (force === 0 && mode === "fresh" && hit !== undefined && !hit.stale) {
+      return;
+    }
     const c = new AbortController();
     run(c.signal)
       .then((data) => {
-        if (!c.signal.aborted) setState({ key, nonce, data, error: null });
+        if (c.signal.aborted) return;
+        const rev = cache ? cache.set(key, data) : 0;
+        setState({ key, force, rev, data, error: null });
       })
       .catch((err: unknown) => {
         if (c.signal.aborted || isAbort(err)) return;
-        setState((s) => ({ key, nonce, data: s.key === key ? s.data : null, error: errorMessage(err) }));
+        const entry = cache?.peek(key);
+        setState((s) => ({ key, force, rev: entry?.rev ?? 0, data: s.key === key ? s.data : (entry?.data ?? null), error: errorMessage(err) }));
       });
     return () => {
       c.abort();
     };
-  }, [key, nonce]);
+  }, [key, force, cache, mode]);
   const reload = useCallback(() => {
-    setNonce((n) => n + 1);
+    const k = keyRef.current;
+    cacheRef.current?.invalidate(k);
+    setReloadReq((r) => ({ key: k, n: (r.key === k ? r.n : 0) + 1 }));
   }, []);
   const replace = useCallback((data: T) => {
-    setState((s) => ({ ...s, data, error: null }));
+    const k = keyRef.current;
+    const rev = cacheRef.current ? cacheRef.current.set(k, data) : 0;
+    setState((s) => ({ ...s, key: k, rev, data, error: null }));
   }, []);
-  // Another key's answer is not this one's: until the new key answers there is nothing.
+  // Another key's answer is not this one's: fall back to a cached entry for the new key if present.
+  const cached = cache?.peek(key);
   const same = state.key === key;
-  return { data: same ? state.data : null, error: same ? state.error : null, loading: !same || state.nonce !== nonce, reload, replace };
+  const freshHit = force === 0 && mode === "fresh" && cached !== undefined && !cached.stale;
+  const settled = same && state.force === force && state.rev === (cached?.rev ?? 0);
+  return {
+    data: freshHit ? cached.data : same ? state.data : (cached?.data ?? null),
+    error: freshHit ? null : same ? state.error : null,
+    loading: freshHit ? false : !settled,
+    reload,
+    replace,
+  };
 }
 
 /** `f` (stable) debounced by `ms`; the pending call is dropped on unmount. */

@@ -100,6 +100,7 @@ vi.mock("@pierre/diffs", async (orig) => {
 });
 
 const { DiffView, RAIL_MIN } = await import("./DiffView");
+const { clearDiffReadCaches } = await import("./diffCaches");
 const { appliedOps, layoutSettled, resetFakeLayout, threadSeed } = await import("@/test/fakeLayout");
 const { tabPlace, useTabPlace } = await import("@/shell/host");
 
@@ -166,6 +167,7 @@ const rowOf = (path: string) => screen.getByTestId("diff-file-list").querySelect
 const rowKeys = () => [...screen.getByTestId("diff-file-list").querySelectorAll("[data-nav-key]")].map((e) => e.getAttribute("data-nav-key"));
 
 beforeEach(() => {
+  clearDiffReadCaches();
   intoView.mockClear();
   Element.prototype.scrollIntoView = intoView;
   api.view = null;
@@ -244,6 +246,31 @@ describe("file by file", () => {
     });
     expect(tabNow()?.params.path).toBe("b.ts");
     expect(api.reads).toEqual(["a.ts", "b.ts"]);
+  });
+
+  it("revisiting a previously viewed file serves from the LRU cache without re-reading until invalidated", async () => {
+    list([file("a.ts"), file("b.ts")]);
+    api.sides.set("a.ts", changed("old-a\n", "new-a\n"));
+    api.sides.set("b.ts", changed("old-b\n", "new-b\n"));
+    await show();
+    expect(api.reads).toEqual(["a.ts"]);
+    fireEvent.click(rowOf("b.ts"));
+    await waitFor(() => {
+      expect(screen.getByTestId("diff-file").getAttribute("data-path")).toBe("b.ts");
+    });
+    expect(api.reads).toEqual(["a.ts", "b.ts"]);
+    // Switching back to a.ts reuses the cached sides with 0 extra RPCs.
+    fireEvent.click(rowOf("a.ts"));
+    await waitFor(() => {
+      expect(screen.getByTestId("diff-file").getAttribute("data-path")).toBe("a.ts");
+    });
+    expect(api.reads).toEqual(["a.ts", "b.ts"]);
+    // A worktree status change invalidates the worktree's cache, so switching back to b.ts revalidates it.
+    await again([file("a.ts"), file("b.ts")]);
+    fireEvent.click(rowOf("b.ts"));
+    await waitFor(() => {
+      expect(api.reads.at(-1)).toBe("b.ts");
+    });
   });
 
   it("a rename reads both its paths and keeps its source in the tab", async () => {

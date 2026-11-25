@@ -1,6 +1,6 @@
 import { useEffect, useMemo } from "react";
 import { useShallow } from "zustand/react/shallow";
-import type { PullRequestView } from "@/api/gh";
+import type { ProjectPullRequestsView, PullRequestView } from "@/api/gh";
 import { branchPullRequestsResource, DASHBOARD_KEY, dashboardResource, pullRequestDetailResource, pullRequestKey } from "@/stores/gh";
 import { useThreadsStore } from "@/stores/threads";
 import { findLinkedPr, fresher, linkedPrState, type LinkedPrFact } from "./linkedPrTag";
@@ -28,19 +28,20 @@ export function useLinkKeys(id: string): string[] {
 
 const numberOf = (key: string): number => Number(key.slice(key.lastIndexOf("#") + 1));
 
+const projectPrs = (p: ProjectPullRequestsView | undefined): readonly PullRequestView[] => (p ? p.pullRequests : []);
+
 /**
- * What the GUI already holds on each linked pull request, without reading anything new:
- * its cached detail (the thread info card's and the PR tab's reads), the
- * viewer's dashboard and any branch's list on screen; the freshest read wins, null when
- * none has it. Each selector returns the stores' own objects, so a row re-renders only
- * when one of its pull requests is re-read. `keys` must be stable between renders.
+ * What the summary caches (dashboard lists and any watched branch's list) already hold
+ * on each linked pull request, without watching or fetching full PullRequestDetail.
+ * `keys` must be stable between renders.
  */
-export function useLinkedPrViews(keys: readonly string[]): (PullRequestView | null)[] {
-  const detail = pullRequestDetailResource.store(useShallow((s) => keys.map((k) => s.entries[k]?.data?.pullRequest ?? null)));
+export function useSummaryPrViews(keys: readonly string[]): (PullRequestView | null)[] {
   const dashboard = dashboardResource.store(
     useShallow((s) => {
       const d = s.entries[DASHBOARD_KEY]?.data;
-      const lists = d ? [d.authored, d.reviewRequested, d.reviewed, d.recentlyMerged] : [];
+      const lists = d
+        ? [d.authored, d.reviewRequested, d.reviewed, d.recentlyMerged, projectPrs(d.projectOpen), projectPrs(d.projectMerged)]
+        : [];
       return keys.map((k) => findLinkedPr(lists, k));
     }),
   );
@@ -50,7 +51,20 @@ export function useLinkedPrViews(keys: readonly string[]): (PullRequestView | nu
       return keys.map((k) => findLinkedPr(lists, k));
     }),
   );
-  return useMemo(() => keys.map((_, i) => fresher(detail[i] ?? null, fresher(dashboard[i] ?? null, branches[i] ?? null))), [keys, detail, dashboard, branches]);
+  return useMemo(() => keys.map((_, i) => fresher(dashboard[i] ?? null, branches[i] ?? null)), [keys, dashboard, branches]);
+}
+
+/**
+ * What the GUI already holds on each linked pull request, without reading anything new:
+ * its cached detail (the thread info card's and the PR tab's reads), the
+ * viewer's dashboard and any branch's list on screen; the freshest read wins, null when
+ * none has it. Each selector returns the stores' own objects, so a row re-renders only
+ * when one of its pull requests is re-read. `keys` must be stable between renders.
+ */
+export function useLinkedPrViews(keys: readonly string[]): (PullRequestView | null)[] {
+  const detail = pullRequestDetailResource.store(useShallow((s) => keys.map((k) => s.entries[k]?.data?.pullRequest ?? null)));
+  const summary = useSummaryPrViews(keys);
+  return useMemo(() => keys.map((_, i) => fresher(detail[i] ?? null, summary[i] ?? null)), [keys, detail, summary]);
 }
 
 /** The tag's and the sidebar card's facts on each linked pull request (useLinkedPrViews). */

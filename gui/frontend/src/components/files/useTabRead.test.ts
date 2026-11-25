@@ -2,7 +2,7 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { ThreadItemView } from "@/api/thread";
 import type { ThreadLog } from "@/stores/thread";
-import { editsOf, useDebounced, useTabRead, useThrottled } from "./useTabRead";
+import { createTabReadCache, editsOf, useDebounced, useTabRead, useThrottled } from "./useTabRead";
 
 function tool(id: string, name: string, input: Record<string, unknown>, status: "running" | "done" | "error" = "done", isError = false): ThreadItemView {
   return { id, ordinal: 0, kind: "tool", toolUseId: id, name, inputJson: JSON.stringify(input), status, output: "", isError, resultJson: "" } as unknown as ThreadItemView;
@@ -65,6 +65,40 @@ describe("useTabRead", () => {
     expect(result.current.data).toBe("ok");
     rerender({ k: "b" });
     expect(result.current).toMatchObject({ data: null, error: null, loading: true });
+  });
+
+  it("fresh cache skips fetching on revisit until invalidated or reloaded, and revalidate renders cached data immediately", async () => {
+    const cache = createTabReadCache<string>({ max: 2 });
+    let count = 0;
+    const read = vi.fn((k: string) => Promise.resolve(`${k}:${String(++count)}`));
+
+    const { result, rerender } = renderHook(({ k }) => useTabRead(k, () => read(k), { cache, mode: "fresh" }), { initialProps: { k: "a" } });
+    await waitFor(() => {
+      expect(result.current.data).toBe("a:1");
+    });
+    rerender({ k: "b" });
+    await waitFor(() => {
+      expect(result.current.data).toBe("b:2");
+    });
+    // Revisit "a": fresh hit skips RPC completely.
+    rerender({ k: "a" });
+    expect(result.current).toMatchObject({ data: "a:1", loading: false });
+    expect(read).toHaveBeenCalledTimes(2);
+
+    // Invalidating marks stale: renders cached data immediately and revalidates in background.
+    cache.invalidate("b");
+    rerender({ k: "b" });
+    expect(result.current).toMatchObject({ data: "b:2", loading: true });
+    await waitFor(() => {
+      expect(result.current).toMatchObject({ data: "b:3", loading: false });
+    });
+
+    // LRU eviction past max=2: touch "a", insert "c" -> "b" evicted.
+    cache.get("a");
+    cache.set("c", "c:9");
+    expect(cache.peek("a")?.data).toBe("a:1");
+    expect(cache.peek("b")).toBeUndefined();
+    expect(cache.size()).toBe(2);
   });
 });
 
