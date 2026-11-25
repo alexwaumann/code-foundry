@@ -44,7 +44,7 @@ func isReadLane(ctx context.Context) bool {
 // readLaneEligible reports whether j may be dispatched on the read-only lane.
 func (j *job) readLaneEligible() bool {
 	return j.read && !j.background && len(j.waiters) > 0 &&
-		j.kind != jobPoll && j.kind != jobAuth && j.id != "poll_projects"
+		j.kind != jobPoll && j.kind != jobAuth && j.kind != jobHotPoll && j.id != "poll_projects"
 }
 
 // dedupInflight reports whether callers submitting the same key while j is running
@@ -53,7 +53,7 @@ func (j *job) readLaneEligible() bool {
 // never launches a concurrent duplicate of an in-flight background refresh.
 func (j *job) dedupInflight() bool {
 	return j.read && !j.noDedup &&
-		j.kind != jobPoll && j.kind != jobAuth && j.id != "poll_projects"
+		j.kind != jobPoll && j.kind != jobAuth && j.kind != jobHotPoll && j.id != "poll_projects"
 }
 
 // isWriteJob reports whether j is a non-read job (a GraphQL mutation, REST write, or

@@ -1,0 +1,15 @@
+# Fast-poll fingerprint for actively viewed hot open pull requests (hot_poll.go).
+# Costs 1 GraphQL point for up to maxHotPRs (8) PRs and skips body, comments,
+# commits, reviews, threads, and individual check runs.
+query PullRequestHot($ids: [ID!]!) {
+  rateLimit { ...RateLimitFields }
+  nodes(ids: $ids) {
+    __typename
+    ... on PullRequest {
+      ...PullRequestFingerprint
+      isDraft
+      mergeable
+      mergeStateStatus
+    }
+  }
+}

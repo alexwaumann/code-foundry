@@ -35,6 +35,9 @@ type Options struct {
 	UserGap time.Duration
 	// PollInterval is the default for Config().PollInterval.
 	PollInterval time.Duration
+	// HotPollInterval is how often foreground fast-polling checks hot open pull
+	// requests (hot_poll.go). Zero takes DefaultHotPollInterval; negative disables.
+	HotPollInterval time.Duration
 	// IdleInterval is the poll cadence while dashboards are off and nothing is tracked
 	// or watched.
 	IdleInterval     time.Duration
@@ -104,6 +107,9 @@ func (o *Options) setDefaults() {
 	def(&o.UserGap, o.MinGap/userGapDivisor)
 	o.UserGap = min(o.UserGap, o.MinGap)
 	def(&o.PollInterval, DefaultPollInterval)
+	if o.HotPollInterval == 0 {
+		o.HotPollInterval = DefaultHotPollInterval
+	}
 	def(&o.IdleInterval, DefaultIdleInterval)
 	def(&o.AuthRetry, DefaultAuthRetry)
 	def(&o.NetworkBackoff, DefaultNetworkBackoff)
@@ -151,6 +157,8 @@ type Store struct {
 	pollAgain            bool // a poll was asked for while one was running
 	pollFailures         int
 	lastPoll             time.Time // when the last poll ended (or the cached poll's time after New)
+	hotNext              time.Time // next foreground hot-PR fast poll (hot_poll.go)
+	hotFailures          int
 	statsNext            time.Time
 	statsAsked           bool // stats were asked for since the last plan (askStatsLocked)
 	statsFailures        int
@@ -176,6 +184,7 @@ type Store struct {
 	summaries prSummaryCache // canonical slug#number -> PullRequest summary index (pr_cache.go)
 	prDetails detailCache    // in-memory PullRequestDetail cache (pr_cache.go)
 	full      fullCache      // pull request detail panel cache (pr_detail.go)
+	hot       hotPRs         // foreground hot-PR fast-poll leases (hot_poll.go)
 	reviewers reviewerCache  // repo assignable users and PR review requests (reviewer_search.go)
 	owners    ownersCache    // publish owners (owners.go)
 	prFiles   prFilesCache   // pull request diffs and files (pr_files.go)
@@ -213,6 +222,7 @@ type jobKind int
 const (
 	jobPoll jobKind = iota
 	jobAuth
+	jobHotPoll
 	jobPullRequest
 	// jobFunc runs job.run; job.id identifies it for coalescing (pr_detail.go).
 	jobFunc
@@ -491,7 +501,7 @@ func (s *Store) submit(ctx context.Context, j *job) jobResult {
 	s.mu.Unlock()
 	if !joinedInflight {
 		s.nudge()
-		if j.read && j.kind != jobPoll && j.kind != jobAuth {
+		if j.read && j.kind != jobPoll && j.kind != jobAuth && j.kind != jobHotPoll {
 			s.nudgeReadLane()
 		}
 	}
@@ -676,6 +686,8 @@ func (s *Store) Run(ctx context.Context) error {
 // request's end, and scheduled work waits out a rate-limit or network pause.
 func (s *Store) next() (*job, time.Duration) {
 	now := s.opts.Now()
+	pres := s.presence()
+	hotEligible := s.opts.HotPollInterval > 0 && pres == PresenceForeground && s.hasEligibleHot(now)
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	var sched *job
@@ -683,12 +695,12 @@ func (s *Store) next() (*job, time.Duration) {
 	if s.authBad {
 		sched, at = &job{kind: jobAuth}, laterOf(s.authNext, s.pauseUntil)
 	} else {
-		sched, at = &job{kind: jobPoll}, laterOf(s.pollNext, s.pauseUntil)
+		sched, at = s.nextScheduledLocked(now, pres, hotEligible)
 	}
 	due := !at.After(now)
 	if len(s.queue) > 0 && !(due && s.ahead >= maxJobsAhead) {
 		j := s.queue[0]
-		user := !j.background && j.kind != jobPoll
+		user := !j.background && j.kind != jobPoll && j.kind != jobHotPoll
 		if wait := s.lastEnd.Add(s.gapLocked(user, now)).Sub(now); wait > 0 {
 			return j, wait
 		}
@@ -726,7 +738,7 @@ func (j *job) reply(r jobResult) {
 func (s *Store) execute(ctx context.Context, j *job) {
 	scheduled, forUser := s.scheduled, s.forUser
 	defer func() { s.scheduled, s.forUser = scheduled, forUser }()
-	s.scheduled = j.kind == jobPoll || j.kind == jobAuth
+	s.scheduled = j.kind == jobPoll || j.kind == jobAuth || j.kind == jobHotPoll
 	s.forUser = !s.scheduled && !j.background
 	if isWriteJob(j) {
 		prevWriting := s.enterWrite(ctx)
@@ -743,6 +755,8 @@ func (s *Store) execute(ctx context.Context, j *job) {
 		res.err = s.poll(ctx)
 	case jobAuth:
 		s.checkAuth(ctx)
+	case jobHotPoll:
+		s.hotPoll(ctx)
 	case jobPullRequest:
 		res.detail, res.err = s.fetchPullRequest(ctx, j.slug, j.number)
 	case jobFunc:

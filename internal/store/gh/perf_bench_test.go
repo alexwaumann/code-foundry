@@ -745,3 +745,227 @@ func (r *timingRunner) GraphQL(ctx context.Context, query string, vars map[strin
 	}
 	return r.HTTPRunner.GraphQL(ctx, query, vars)
 }
+
+// BenchmarkHotPollDetectionLatency measures before (HotPollInterval: -1, waiting for the
+// regular poll) vs after (HotPollInterval: 1/4 of PollInterval, matching 15s vs 60s at
+// 100x time scale: 150ms vs 600ms) detection latency from a GitHub CI or mergeability
+// transition to PullRequestDetailUpdated firing on an open PR panel.
+func BenchmarkHotPollDetectionLatency(b *testing.B) {
+	const (
+		scaledPoll = 600 * time.Millisecond // 100x scaled 60s
+		scaledHot  = 150 * time.Millisecond // 100x scaled 15s
+		flipOffset = 50 * time.Millisecond  // 100x scaled 5s after last poll
+	)
+	scenarios := []struct {
+		name  string
+		setup func(*PullRequest)
+		flip  func(*PullRequest)
+	}{
+		{
+			name: "ci_pending_to_success",
+			setup: func(p *PullRequest) {
+				p.Checks = CheckRollup{State: RollupPending, Total: 8, Passed: 2, Pending: 6}
+			},
+			flip: func(p *PullRequest) {
+				p.Checks = CheckRollup{State: RollupSuccess, Total: 8, Passed: 8}
+			},
+		},
+		{
+			name: "mergeable_unknown_to_mergeable",
+			setup: func(p *PullRequest) {
+				p.Checks = CheckRollup{State: RollupSuccess, Total: 4, Passed: 4}
+				p.Mergeable = MergeableUnknown
+				p.MergeStateStatus = "UNKNOWN"
+			},
+			flip: func(p *PullRequest) {
+				p.Mergeable = MergeableMergeable
+				p.MergeStateStatus = "CLEAN"
+			},
+		},
+	}
+	for _, sc := range scenarios {
+		for _, mode := range []struct {
+			name   string
+			hotInt time.Duration
+		}{{"before_poll_only", -1}, {"after_hot_poll", scaledHot}} {
+			b.Run(sc.name+"/"+mode.name, func(b *testing.B) {
+				var totalDetect time.Duration
+				var totalPolls, totalHot int64
+				b.ResetTimer()
+				for range b.N {
+					b.StopTimer()
+					g, _ := changeDrivenWorld()
+					g.edit("PR_a", sc.setup)
+					f := (&fakeRunner{}).serve(g)
+					busObj := bus.New()
+					polled := bus.Subscribe[Polled](busObj, 16)
+					detailSub := bus.Subscribe[PullRequestDetailUpdated](busObj, 16)
+					opts := Options{
+						DB:              openBenchDB(b),
+						Runner:          f,
+						Bus:             busObj,
+						MinGap:          10 * time.Millisecond,
+						UserGap:         5 * time.Millisecond,
+						PollInterval:    scaledPoll,
+						HotPollInterval: mode.hotInt,
+						IdleInterval:    time.Hour,
+						StatsInterval:   -1,
+					}
+					s, err := New(context.Background(), opts)
+					if err != nil {
+						b.Fatal(err)
+					}
+					runCtx, cancel := context.WithCancel(context.Background())
+					runDone := make(chan struct{})
+					go func() { defer close(runDone); _ = s.Run(runCtx) }()
+					if err := s.Track("o/r"); err != nil {
+						b.Fatal(err)
+					}
+					<-polled.C()
+					if _, err := s.FullPullRequest(context.Background(), "o/r", 1, false); err != nil {
+						b.Fatal(err)
+					}
+					// Wait for one clean poll cycle boundary so pollNext = +scaledPoll, hotNext = +scaledHot.
+					<-polled.C()
+					pollsBefore := f.count("Poll")
+					hotBefore := f.count("PullRequestHot")
+
+					time.Sleep(flipOffset)
+					b.StartTimer()
+					tFlip := time.Now()
+					g.edit("PR_a", sc.flip)
+					// Before mode on mergeable resolution without UpdatedAt bump relies on
+					// regular poll recheck or detail age; wait for PullRequestDetailUpdated or
+					// next Polled when no PullRequestDetailUpdated fires.
+					detected := false
+					timeout := time.NewTimer(2 * scaledPoll)
+					for !detected {
+						select {
+						case ev := <-detailSub.C():
+							if ev.Slug == "o/r" && ev.Number == 1 {
+								detected = true
+							}
+						case <-polled.C():
+							if mode.hotInt < 0 && sc.name == "mergeable_unknown_to_mergeable" {
+								// Regular Poll's fingerprint does not select mergeable, so a
+								// mergeable-only transition without UpdatedAt bump waits for
+								// the poll cycle / detail TTL.
+								detected = true
+							}
+						case <-timeout.C:
+							b.Fatal("timed out waiting for transition detection")
+						}
+					}
+					elapsed := time.Since(tFlip)
+					timeout.Stop()
+					b.StopTimer()
+
+					totalDetect += elapsed
+					totalPolls += int64(f.count("Poll") - pollsBefore)
+					totalHot += int64(f.count("PullRequestHot") - hotBefore)
+					cancel()
+					<-runDone
+				}
+				b.ReportMetric(float64(totalDetect.Milliseconds())/float64(b.N), "detect_ms/op")
+				b.ReportMetric(float64(totalPolls)/float64(b.N), "poll_calls/op")
+				b.ReportMetric(float64(totalHot)/float64(b.N), "hot_poll_calls/op")
+			})
+		}
+	}
+}
+
+// TestHotPollLiveMeasurement runs opt-in read-only measurements against live GitHub
+// (alexwaumann/code-foundry) when GH_LIVE_MEASURE=1 is set: compares PullRequestHot
+// (1 PR and 5 PRs) RTT, payload bytes, and GraphQL cost against a full Poll query.
+func TestHotPollLiveMeasurement(t *testing.T) {
+	if os.Getenv("GH_LIVE_MEASURE") != "1" {
+		t.Skip("set GH_LIVE_MEASURE=1 to run live read-only GitHub measurement")
+	}
+	ctx := context.Background()
+	httpRunner := NewHTTPRunner(HTTPOptions{UserAgent: "code-foundry-hot-bench"})
+	defer httpRunner.Close()
+
+	// Discover up to 5 recent PR node IDs on alexwaumann/code-foundry via a single read-only query.
+	const listDoc = `query ListRecentPRs($owner: String!, $name: String!) {
+  repository(owner: $owner, name: $name) {
+    pullRequests(first: 5, orderBy: {field: UPDATED_AT, direction: DESC}) {
+      nodes { id number state }
+    }
+  }
+}`
+	rawList, err := httpRunner.GraphQL(ctx, listDoc, map[string]any{"owner": "alexwaumann", "name": "code-foundry"})
+	if err != nil {
+		t.Fatalf("list recent PRs: %v", err)
+	}
+	var listResp struct {
+		Repository struct {
+			PullRequests struct {
+				Nodes []struct {
+					ID     string `json:"id"`
+					Number int    `json:"number"`
+					State  string `json:"state"`
+				} `json:"nodes"`
+			} `json:"pullRequests"`
+		} `json:"repository"`
+	}
+	if err := json.Unmarshal(rawList, &listResp); err != nil {
+		t.Fatal(err)
+	}
+	var ids []string
+	for _, n := range listResp.Repository.PullRequests.Nodes {
+		if n.ID != "" {
+			ids = append(ids, n.ID)
+		}
+	}
+	if len(ids) == 0 {
+		t.Fatal("no PR IDs found on alexwaumann/code-foundry")
+	}
+
+	hotDoc, err := query(queryPullRequestHot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	measureHot := func(label string, batch []string) {
+		t.Helper()
+		start := time.Now()
+		data, err := httpRunner.GraphQL(ctx, hotDoc, map[string]any{"ids": batch})
+		dur := time.Since(start)
+		if err != nil {
+			t.Fatalf("PullRequestHot(%s): %v", label, err)
+		}
+		var env struct {
+			RateLimit rateLimitJSON `json:"rateLimit"`
+		}
+		_ = json.Unmarshal(data, &env)
+		nodes, err := decodeHotNodes(data)
+		if err != nil {
+			t.Fatalf("decodeHotNodes(%s): %v", label, err)
+		}
+		t.Logf("LIVE PullRequestHot(%s): ids=%d decoded=%d rtt_ms=%d bytes=%d cost=%d remaining=%d",
+			label, len(batch), len(nodes), dur.Milliseconds(), len(data), env.RateLimit.Cost, env.RateLimit.Remaining)
+	}
+	measureHot("1_pr", ids[:1])
+	measureHot(fmt.Sprintf("%d_prs", len(ids)), ids)
+
+	// Measure one full Poll query (dashboards + tracked alexwaumann/code-foundry) for comparison.
+	plan := pollPlan{
+		sections: dashboardSections("@me", time.Now()),
+		repos:    []repoPlan{{slug: "alexwaumann/code-foundry", defaultBranch: true}},
+	}
+	pollDoc, pollVars, err := plan.build()
+	if err != nil {
+		t.Fatal(err)
+	}
+	pStart := time.Now()
+	pData, pErr := httpRunner.GraphQL(ctx, pollDoc, pollVars)
+	pDur := time.Since(pStart)
+	if pErr != nil && !isPartial(pErr) {
+		t.Fatalf("Poll: %v", pErr)
+	}
+	var pEnv struct {
+		RateLimit rateLimitJSON `json:"rateLimit"`
+	}
+	_ = json.Unmarshal(pData, &pEnv)
+	t.Logf("LIVE Poll(dashboards+1_repo): rtt_ms=%d bytes=%d cost=%d remaining=%d",
+		pDur.Milliseconds(), len(pData), pEnv.RateLimit.Cost, pEnv.RateLimit.Remaining)
+}

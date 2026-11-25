@@ -327,6 +327,35 @@ func (c *fullCache) applyPoll(fps []prFingerprint, now time.Time) []fullKey {
 	return c.applyPollAt(fps, nil, 0, now)
 }
 
+func (c *fullCache) recordMovedSeqLocked(k fullKey, fpSeq uint64) {
+	if fpSeq == 0 {
+		return
+	}
+	if c.movedSeq == nil {
+		c.movedSeq = map[fullKey]uint64{}
+	}
+	if fpSeq > c.movedSeq[k] {
+		c.movedSeq[k] = fpSeq
+	}
+}
+
+func (c *fullCache) pruneMovedSeqLocked() {
+	if len(c.movedSeq) <= fullCacheMax*4 {
+		return
+	}
+	for len(c.movedSeq) > fullCacheMax*2 {
+		var minK fullKey
+		var minV uint64
+		first := true
+		for k, v := range c.movedSeq {
+			if first || v < minV {
+				minK, minV, first = k, v, false
+			}
+		}
+		delete(c.movedSeq, minK)
+	}
+}
+
 func (c *fullCache) applyPollAt(fps []prFingerprint, known map[string]PullRequest, fpSeq uint64, now time.Time) []fullKey {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -336,28 +365,10 @@ func (c *fullCache) applyPollAt(fps []prFingerprint, known map[string]PullReques
 				continue
 			}
 			if prev, ok := known[f.ID]; !ok || fingerprintMoved(prev, f) {
-				if c.movedSeq == nil {
-					c.movedSeq = map[fullKey]uint64{}
-				}
-				k := fullKey{f.Repo, f.Number}
-				if fpSeq > c.movedSeq[k] {
-					c.movedSeq[k] = fpSeq
-				}
+				c.recordMovedSeqLocked(fullKey{f.Repo, f.Number}, fpSeq)
 			}
 		}
-		if len(c.movedSeq) > fullCacheMax*4 {
-			for len(c.movedSeq) > fullCacheMax*2 {
-				var minK fullKey
-				var minV uint64
-				first := true
-				for k, v := range c.movedSeq {
-					if first || v < minV {
-						minK, minV, first = k, v, false
-					}
-				}
-				delete(c.movedSeq, minK)
-			}
-		}
+		c.pruneMovedSeqLocked()
 	}
 	if len(c.m) == 0 {
 		return nil
@@ -437,11 +448,18 @@ func (s *Store) FullPullRequest(ctx context.Context, slug string, number int, re
 	e, ok := s.cachedFull(ctx, k)
 	switch {
 	case !ok, refresh, e.written:
-		return s.fetchOrCached(ctx, k, e, ok)
+		d, err := s.fetchOrCached(ctx, k, e, ok)
+		if err == nil {
+			s.touchHot(k, d.PullRequest, false)
+		}
+		return d, err
 	case s.current(e):
+		s.touchHot(k, e.d.PullRequest, false)
 		return e.d, nil
 	}
-	return s.staleFirst(k, e), nil
+	d := s.staleFirst(k, e)
+	s.touchHot(k, d.PullRequest, false)
+	return d, nil
 }
 
 // currentFull returns k's detail for a decision (merge, revert, a state change): the
@@ -636,6 +654,9 @@ func (s *Store) fetchChecksOnly(ctx context.Context, k fullKey, base FullPullReq
 	d.ChecksTruncated = next.HasNextPage
 	d.FetchedAt = s.opts.Now()
 	prev, had := s.full.putWithSeq(k, d, fetchSeq)
+	if d.PullRequest.State != PullRequestOpen {
+		s.hot.drop(k)
+	}
 	s.summaries.put(k, d.PullRequest)
 	if err := s.cache.saveActivity(ctx, activityFull+k.String(), d.FetchedAt, d); err != nil {
 		s.log.Warn("gh cache write failed", "err", err)
@@ -694,6 +715,9 @@ func (s *Store) fetchFull(ctx context.Context, k fullKey, announce bool) (FullPu
 	d.ChecksTruncated = next.HasNextPage
 	d.FetchedAt = s.opts.Now()
 	prev, had := s.full.putWithSeq(k, d, fetchSeq)
+	if d.PullRequest.State != PullRequestOpen {
+		s.hot.drop(k)
+	}
 	s.summaries.put(k, d.PullRequest)
 	if err := s.cache.saveActivity(ctx, activityFull+k.String(), d.FetchedAt, d); err != nil {
 		s.log.Warn("gh cache write failed", "err", err)
@@ -723,6 +747,7 @@ func (s *Store) staleFullDetails(fps []prFingerprint, known map[string]PullReque
 // clients to re-read; that read waits for the fetch, so it shows the change.
 func (s *Store) invalidateFull(k fullKey) {
 	s.full.markWritten(k)
+	s.touchHotMutated(k)
 	s.moved.markWrite(k, s.opts.Now(), s.opts.DetailTTL)
 	s.reviewers.invalidatePR(k)
 	publish(s, PullRequestDetailUpdated{Slug: k.slug, Number: k.number})
@@ -741,6 +766,7 @@ func (s *Store) patchFull(ctx context.Context, k fullKey, mutate func(*FullPullR
 		s.invalidateFull(k)
 		return
 	}
+	s.touchHot(k, d.PullRequest, true)
 	s.moved.markWrite(k, now, s.opts.DetailTTL)
 	s.summaries.put(k, d.PullRequest)
 	if err := s.cache.saveActivity(ctx, activityFull+k.String(), d.FetchedAt, d); err != nil {

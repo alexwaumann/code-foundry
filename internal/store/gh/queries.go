@@ -17,6 +17,7 @@ const (
 	queryPullRequest         = "pull_request"
 	queryChecks              = "checks"
 	queryPullRequestDetails  = "pull_request_details"
+	queryPullRequestHot      = "pull_request_hot"
 	queryPoll                = "poll"                  // built by pollPlan.build
 	queryPollStats           = "poll_stats"            // the closed months: pollPlan.build with statsOnly
 	queryPollProjects        = "poll_projects"         // the project-wide searches: pollPlan.build with projects

@@ -194,6 +194,16 @@ func (g *fakeGitHub) respond(op, doc string, vars map[string]any) (json.RawMessa
 			}
 			data[list] = nodes
 		}
+	case "PullRequestHot":
+		nodes := []any{}
+		for _, id := range anyStrings(vars["ids"]) {
+			if p, ok := g.prs[id]; ok {
+				nodes = append(nodes, prJSON(p))
+			} else {
+				nodes = append(nodes, nil)
+			}
+		}
+		data["nodes"] = nodes
 	case "DefaultBranchChecks":
 		for i := 0; ; i++ {
 			a := repoAlias(i)
