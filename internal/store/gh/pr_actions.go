@@ -35,20 +35,53 @@ var (
 )
 
 // ReviewerCandidates implements Service. An empty (or blank) query skips the search:
-// only the pending requests come back.
+// only the pending requests come back. For repositories whose assignable user list fits
+// in one page (!hasNextPage), subsequent non-empty search keystrokes filter locally
+// from the in-memory cache with zero GitHub requests.
 func (s *Store) ReviewerCandidates(ctx context.Context, slug string, number int, query string) (ReviewerCandidates, error) {
 	k, err := fullKeyOf(slug, number)
 	if err != nil {
 		return ReviewerCandidates{}, err
 	}
-	owner, name := splitSlug(k.slug)
 	query = strings.TrimSpace(query)
+	now := s.opts.Now()
+	if query != "" {
+		if repoUsers, repoTruncated, repoCached := s.reviewers.repo(k.slug, now); repoCached && !repoTruncated {
+			if author, requested, prOK := s.reviewers.pr(k, now); prOK {
+				return localReviewerCandidates(author, requested, repoUsers, query), nil
+			}
+		}
+	}
+	owner, name := splitSlug(k.slug)
 	return submitRead(ctx, s, "candidates|"+k.String()+"|"+query, func(ctx context.Context) (ReviewerCandidates, error) {
-		data, err := s.call(ctx, queryReviewerCandidates, reviewerCandidatesVars(owner, name, k.number, query))
+		now := s.opts.Now()
+		repoUsers, repoTruncated, repoCached := s.reviewers.repo(k.slug, now)
+		if query != "" && repoCached && !repoTruncated {
+			if author, requested, prOK := s.reviewers.pr(k, now); prOK {
+				return localReviewerCandidates(author, requested, repoUsers, query), nil
+			}
+		}
+		fetchAll := !repoCached
+		doSearch := query != "" && (!repoCached || repoTruncated)
+		vars := reviewerCandidatesVarsWith(owner, name, k.number, query, fetchAll, doSearch)
+		data, err := s.call(ctx, queryReviewerCandidates, vars)
 		if err != nil && !isPartial(err) {
 			return ReviewerCandidates{}, err
 		}
-		return decodeReviewerCandidates(data, reviewerSearchTokens(query))
+		dec, err := decodeReviewerCandidatesFull(data, reviewerSearchTokens(query))
+		if err != nil {
+			return ReviewerCandidates{}, err
+		}
+		fetchedAt := s.opts.Now()
+		if dec.hasAll {
+			s.reviewers.putRepo(k.slug, dec.allUsers, dec.allTruncated, fetchedAt)
+			repoUsers, repoTruncated, repoCached = dec.allUsers, dec.allTruncated, true
+		}
+		s.reviewers.putPR(k, dec.author, dec.requested, fetchedAt)
+		if query != "" && !doSearch && repoCached && !repoTruncated {
+			return localReviewerCandidates(dec.author, dec.requested, repoUsers, query), nil
+		}
+		return dec.result, nil
 	})
 }
 

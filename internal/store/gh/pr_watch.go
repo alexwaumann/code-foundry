@@ -120,6 +120,11 @@ func (s *Store) resolveWatchedHeads(ctx context.Context) {
 	for _, r := range todo {
 		head := known[r].HeadRef
 		if head == "" {
+			if p, ok := s.summaries.get(fullKey{r.Slug, r.Number}); ok && p.HeadRef != "" {
+				head = p.HeadRef
+			}
+		}
+		if head == "" {
 			if d, ok, err := s.cache.loadDetail(ctx, r.Slug, r.Number); err == nil && ok {
 				head = d.PullRequest.HeadRef
 			}

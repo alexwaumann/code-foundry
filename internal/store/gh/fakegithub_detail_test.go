@@ -104,6 +104,21 @@ func (g *fakeGitHub) detailOp(op string, vars map[string]any, data map[string]an
 			}
 			return map[string]any{"nodes": users}
 		}
+		if all, _ := vars["all"].(bool); all {
+			users := []any{}
+			hasNext := false
+			for i, u := range g.detail.assignable {
+				if i >= 100 {
+					hasNext = true
+					break
+				}
+				users = append(users, map[string]any{"id": u.ID, "login": u.Login, "name": u.Name, "avatarUrl": u.AvatarURL})
+			}
+			repo["allAssignable"] = map[string]any{
+				"pageInfo": map[string]any{"hasNextPage": hasNext},
+				"nodes":    users,
+			}
+		}
 		if vars["search"].(bool) {
 			repo["assignableUsers"] = search(vars["query"].(string))
 		}

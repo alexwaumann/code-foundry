@@ -219,12 +219,22 @@ func (c *fullCache) putLocked(k fullKey, e *fullEntry) (prev fullEntry, had bool
 // adopt stores d (loaded from SQLite) as stale and unconfirmed unless an entry exists,
 // in one step, and returns the entry cached afterwards.
 func (c *fullCache) adopt(k fullKey, d FullPullRequest) fullEntry {
+	return c.adoptWith(k, d, true, time.Time{})
+}
+
+// adoptConfirmed stores d (loaded from SQLite and validated against a live poll) as
+// fresh and confirmed at confirmed unless an entry already exists.
+func (c *fullCache) adoptConfirmed(k fullKey, d FullPullRequest, confirmed time.Time) fullEntry {
+	return c.adoptWith(k, d, false, confirmed)
+}
+
+func (c *fullCache) adoptWith(k fullKey, d FullPullRequest, stale bool, confirmed time.Time) fullEntry {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if e, ok := c.m[k]; ok {
 		return *e
 	}
-	e := &fullEntry{d: d, stale: true}
+	e := &fullEntry{d: d, stale: stale, confirmed: confirmed}
 	c.putLocked(k, e)
 	return *e
 }
@@ -252,9 +262,12 @@ func (c *fullCache) fail(k fullKey, err error, now time.Time) bool {
 	return news
 }
 
-// applyPoll records what a poll saw: every fresh entry whose pull request's fingerprint
-// in fps moved goes stale (their keys are returned), and every other fresh one in fps
-// is confirmed at now when its detail allows (confirmable).
+// applyPoll records what a poll saw:
+//   - A fresh entry whose only change is check counts while checks remain PENDING (no new
+//     failure) has its summary Checks patched in place without going stale, is confirmed
+//     when confirmable, and is returned so clients hear about the updated counts.
+//   - Any other fresh entry whose fingerprint moved goes stale (returned).
+//   - Every unchanged fresh entry in fps is confirmed at now when confirmable.
 func (c *fullCache) applyPoll(fps []prFingerprint, now time.Time) []fullKey {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -270,6 +283,12 @@ func (c *fullCache) applyPoll(fps []prFingerprint, now time.Time) []fullKey {
 		f, ok := byID[e.d.PullRequest.ID]
 		switch {
 		case !ok || e.stale:
+		case pendingCheckCountsOnly(e.d.PullRequest, f):
+			e.d.PullRequest.Checks = f.Checks
+			if confirmable(e.d) {
+				e.confirmed = now
+			}
+			out = append(out, k)
 		case fingerprintMoved(e.d.PullRequest, f):
 			e.stale = true
 			out = append(out, k)
@@ -278,6 +297,24 @@ func (c *fullCache) applyPoll(fps []prFingerprint, now time.Time) []fullKey {
 		}
 	}
 	return out
+}
+
+// pendingCheckCountsOnly reports whether f differs from p solely in its check counts
+// while checks remain PENDING with no new failure. Patching the summary counts in place
+// avoids refetching the whole FullPullRequest while CI ticks; once CI settles or a check
+// fails (or any non-check field moves), the detail goes stale and refetches so check-run
+// rows stay accurate.
+func pendingCheckCountsOnly(p PullRequest, f prFingerprint) bool {
+	if !p.UpdatedAt.Equal(f.UpdatedAt) || p.State != f.State || p.HeadSHA != f.HeadSHA {
+		return false
+	}
+	if !f.HasChecks || p.Checks == f.Checks {
+		return false
+	}
+	return p.Checks.State == RollupPending &&
+		f.Checks.State == RollupPending &&
+		f.Checks.Pending > 0 &&
+		f.Checks.Failed == p.Checks.Failed
 }
 
 // fingerprintMoved reports whether the poll's fingerprint of a pull request differs
@@ -290,12 +327,6 @@ func fingerprintMoved(p PullRequest, f prFingerprint) bool {
 		return true
 	}
 	return false
-}
-
-// sameFull compares everything clients see except FetchedAt.
-func sameFull(a, b FullPullRequest) bool {
-	a.FetchedAt, b.FetchedAt = time.Time{}, time.Time{}
-	return sameJSON(a, b)
 }
 
 // FullPullRequest implements Service. It waits for GitHub only with nothing cached, for
@@ -372,6 +403,9 @@ func (s *Store) staleFirst(k fullKey, e fullEntry) FullPullRequest {
 }
 
 // cachedFull returns the cached entry of k from memory or, failing that, SQLite.
+// When loading from SQLite, if a live poll has already confirmed that the pull request
+// has not changed since row.FetchedAt (and no local write or move invalidated it), the
+// row is adopted as fresh and confirmed so no redundant GraphQL fetch is triggered.
 func (s *Store) cachedFull(ctx context.Context, k fullKey) (fullEntry, bool) {
 	if e, ok := s.full.entry(k); ok {
 		return e, true
@@ -382,6 +416,15 @@ func (s *Store) cachedFull(ctx context.Context, k fullKey) (fullEntry, bool) {
 	}
 	if !found {
 		return fullEntry{}, false
+	}
+	s.summaries.put(k, row.PullRequest)
+	if polled, polledAt, hasChecks, ok := s.summaries.polledSummary(k); ok &&
+		!polledAt.Before(row.FetchedAt) &&
+		confirmable(row) &&
+		!s.moved.movedSince(k, row.FetchedAt) &&
+		!s.moved.writtenSince(k, row.FetchedAt) &&
+		prMatchesPollSummary(row.PullRequest, polled, hasChecks) {
+		return s.full.adoptConfirmed(k, row, polledAt), true
 	}
 	return s.full.adopt(k, row), true
 }
@@ -487,6 +530,7 @@ func (s *Store) fetchFull(ctx context.Context, k fullKey, announce bool) (FullPu
 	d.ChecksTruncated = next.HasNextPage
 	d.FetchedAt = s.opts.Now()
 	prev, had := s.full.put(k, d)
+	s.summaries.put(k, d.PullRequest)
 	if err := s.cache.saveActivity(ctx, activityFull+k.String(), d.FetchedAt, d); err != nil {
 		s.log.Warn("gh cache write failed", "err", err)
 	}
@@ -500,9 +544,13 @@ func (s *Store) fetchFull(ctx context.Context, k fullKey, announce bool) (FullPu
 }
 
 // staleFullDetails is the poll's hook: cached details whose pull request's fingerprint
-// moved go stale, and clients hear about it; the others it saw are confirmed.
+// moved go stale (or have pending check counts patched in place), and clients hear about
+// it; the others it saw are confirmed.
 func (s *Store) staleFullDetails(fps []prFingerprint) {
 	for _, k := range s.full.applyPoll(fps, s.opts.Now()) {
+		if e, ok := s.full.entry(k); ok && e.stale {
+			s.reviewers.invalidatePR(k)
+		}
 		publish(s, PullRequestDetailUpdated{Slug: k.slug, Number: k.number})
 	}
 }
@@ -511,7 +559,8 @@ func (s *Store) staleFullDetails(fps []prFingerprint) {
 // clients to re-read; that read waits for the fetch, so it shows the change.
 func (s *Store) invalidateFull(k fullKey) {
 	s.full.markWritten(k)
-	s.moved.mark(k, s.opts.Now(), s.opts.DetailTTL)
+	s.moved.markWrite(k, s.opts.Now(), s.opts.DetailTTL)
+	s.reviewers.invalidatePR(k)
 	publish(s, PullRequestDetailUpdated{Slug: k.slug, Number: k.number})
 }
 

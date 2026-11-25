@@ -150,11 +150,14 @@ type Store struct {
 	queue          []*job
 	stopped        error // why Run ended; nothing queues after it
 
-	branches branchStates // per-branch results (activity.go)
-	full     fullCache    // pull request detail panel cache (pr_detail.go)
-	owners   ownersCache  // publish owners (owners.go)
-	prFiles  prFilesCache // pull request diffs and files (pr_files.go)
-	moved    movedDetails // when the poll saw a pull request move (detail_moved.go)
+	branches  branchStates   // per-branch results (activity.go)
+	summaries prSummaryCache // canonical slug#number -> PullRequest summary index (pr_cache.go)
+	prDetails detailCache    // in-memory PullRequestDetail cache (pr_cache.go)
+	full      fullCache      // pull request detail panel cache (pr_detail.go)
+	reviewers reviewerCache  // repo assignable users and PR review requests (reviewer_search.go)
+	owners    ownersCache    // publish owners (owners.go)
+	prFiles   prFilesCache   // pull request diffs and files (pr_files.go)
+	moved     movedDetails   // when the poll saw a pull request move (detail_moved.go)
 	// mergedShown shows this store's merges before the searches do (pr_merged_overlay.go).
 	mergedShown mergedOverlay
 
@@ -249,6 +252,8 @@ func New(ctx context.Context, opts Options) (*Store, error) {
 	s.loadActivity(ctx, snap)
 	s.loadOwners(ctx)
 	s.snap.Store(snap)
+	s.summaries.putDashboard(snap, snap.Dashboard, time.Time{})
+	s.summaries.putProjects(snap, snap.Projects, time.Time{})
 	// A recent poll in the cache (with the viewer's id, which stats need) waits out its
 	// interval, so restarts do not poll in a burst.
 	s.pollNext = now
@@ -384,12 +389,25 @@ func (s *Store) PullRequest(ctx context.Context, slug string, number int) (PullR
 	if number <= 0 {
 		return PullRequestDetail{}, fmt.Errorf("%w: pull request number %d", ErrInvalidArgument, number)
 	}
-	cached, ok, err := s.cache.loadDetail(ctx, key, number)
-	if err != nil {
-		s.log.Warn("gh cache read failed", "err", err)
-	}
-	if ok && s.opts.Now().Sub(cached.FetchedAt) < s.opts.DetailTTL && !s.moved.movedSince(fullKey{key, number}, cached.FetchedAt) {
+	k := fullKey{key, number}
+	now := s.opts.Now()
+	cached, ok, fromMem := s.cachedPullRequestDetail(k)
+	if ok && now.Sub(cached.FetchedAt) < s.opts.DetailTTL && !s.moved.movedSince(k, cached.FetchedAt) {
 		return cached, nil
+	}
+	if !fromMem {
+		row, found, err := s.cache.loadDetail(ctx, key, number)
+		if err != nil {
+			s.log.Warn("gh cache read failed", "err", err)
+		}
+		if found {
+			s.prDetails.put(k, row)
+			s.summaries.put(k, row.PullRequest)
+			cached, ok = row, true
+			if now.Sub(cached.FetchedAt) < s.opts.DetailTTL && !s.moved.movedSince(k, cached.FetchedAt) {
+				return cached, nil
+			}
+		}
 	}
 	res := s.submit(ctx, &job{kind: jobPullRequest, slug: key, number: number, read: true})
 	if res.err != nil {
@@ -400,6 +418,24 @@ func (s *Store) PullRequest(ctx context.Context, slug string, number int) (PullR
 		return PullRequestDetail{}, res.err
 	}
 	return res.detail, nil
+}
+
+// cachedPullRequestDetail returns k's best in-memory PullRequestDetail from prDetails
+// or a non-stale s.full entry without touching SQLite.
+func (s *Store) cachedPullRequestDetail(k fullKey) (d PullRequestDetail, ok, fromMem bool) {
+	d, ok = s.prDetails.get(k)
+	fromMem = ok
+	if e, hasFull := s.full.entry(k); hasFull && !e.stale && !e.written && e.d.LastError == "" {
+		fromFull := PullRequestDetail{
+			PullRequest: e.d.PullRequest,
+			Checks:      e.d.Checks,
+			FetchedAt:   e.d.FetchedAt,
+		}
+		if !ok || fromFull.FetchedAt.After(d.FetchedAt) {
+			return clonePullRequestDetail(fromFull), true, true
+		}
+	}
+	return d, ok, fromMem
 }
 
 // submit queues an on-demand job (coalescing with an identical queued one) and waits
