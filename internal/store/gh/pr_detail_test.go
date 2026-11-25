@@ -366,7 +366,7 @@ func TestSetReviewRequestREST(t *testing.T) {
 					t.Errorf("body = %s, want %s", r.body, tt.body)
 				}
 			}
-			_, stale, _ := s.full.get(k)
+			d, stale, _ := s.full.get(k)
 			if tt.err != nil {
 				if !errors.Is(err, tt.err) || !strings.Contains(err.Error(), tt.errContain) {
 					t.Errorf("err = %v, want %v containing %q", err, tt.err, tt.errContain)
@@ -379,8 +379,8 @@ func TestSetReviewRequestREST(t *testing.T) {
 			if err != nil || !slices.Equal(got, tt.want) {
 				t.Errorf("got %v, %v; want %v", got, err, tt.want)
 			}
-			if !stale || drain(events) != 1 {
-				t.Errorf("detail stale %v; want stale with one event", stale)
+			if stale || drain(events) != 1 || !slices.Equal(d.PullRequest.ReviewRequests, tt.want) {
+				t.Errorf("detail stale %v requests %v; want fresh with requests %v and one event", stale, d.PullRequest.ReviewRequests, tt.want)
 			}
 		})
 	}

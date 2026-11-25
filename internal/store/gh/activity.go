@@ -303,7 +303,7 @@ func (s *Store) BranchesPullRequests(ctx context.Context, queries []BranchQuery)
 
 	out := make([]BranchPullRequests, len(queries))
 	for i, k := range keys {
-		st := results[k]
+		st := s.localShown.applyBranch(results[k], now)
 		st.Slug, st.HeadRef = k.slug, k.head
 		out[i] = st
 	}

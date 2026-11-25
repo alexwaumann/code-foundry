@@ -17,7 +17,7 @@ func TestOverlayMerges(t *testing.T) {
 	merged := open
 	merged.State, merged.MergedAt = PullRequestMerged, t0
 	k := fullKey{"o/r", 1}
-	marks := map[fullKey]mergeMark{k: {pr: merged, at: t0}}
+	marks := map[fullKey]localMark{k: {state: PullRequestMerged, stateAt: t0, pr: merged, wasInDashboard: true}}
 	numbers := func(prs []PullRequest) string {
 		var out []string
 		for _, p := range prs {
@@ -58,7 +58,7 @@ func TestOverlayMerges(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			before := numbers(tt.d.Authored)
-			got, done := overlayMerges(tt.d, marks, tt.now)
+			got, _, done := overlayDashboard(tt.d, marks, tt.now)
 			if a := numbers(got.Authored); a != tt.authored {
 				t.Errorf("authored = %s, want %s", a, tt.authored)
 			}
@@ -146,9 +146,9 @@ func TestMergeShownBeforeTheSearches(t *testing.T) {
 	g.mu.Unlock()
 	pollOnce(t, s, w.fakeRunner)
 	shownMerged("after the searches agree")
-	s.mergedShown.mu.Lock()
-	marks, polled := len(s.mergedShown.marks), s.mergedShown.polled
-	s.mergedShown.mu.Unlock()
+	s.localShown.mu.Lock()
+	marks, polled := len(s.localShown.marks), s.localShown.polled
+	s.localShown.mu.Unlock()
 	if marks != 0 || polled != nil {
 		t.Errorf("marks = %d, polled = %v, want none once the searches agree", marks, polled != nil)
 	}

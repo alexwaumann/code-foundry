@@ -1,6 +1,9 @@
 package gh
 
-import "fmt"
+import (
+	"fmt"
+	"time"
+)
 
 // fakeBody is the fake GitHub's description reads and writes for
 // SetPullRequestCheckbox: the operations in order ("read id", "write id"), the bodies
@@ -75,5 +78,9 @@ func (g *fakeGitHub) bodyOp(op string, vars map[string]any, data map[string]any,
 		g.detail.body = map[string]string{}
 	}
 	g.detail.body[id] = body
-	data["updatePullRequest"] = map[string]any{"pullRequest": map[string]any{"id": id}}
+	data["updatePullRequest"] = map[string]any{"pullRequest": map[string]any{
+		"id":        id,
+		"body":      body,
+		"updatedAt": time.Now().UTC().Format(time.RFC3339),
+	}}
 }

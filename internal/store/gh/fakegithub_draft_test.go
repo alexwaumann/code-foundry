@@ -1,6 +1,9 @@
 package gh
 
-import "strings"
+import (
+	"strings"
+	"time"
+)
 
 // fakeState is the fake GitHub's draft and auto-merge state beyond the pull requests:
 // whether the repository allows auto-merge, the method of each enabled auto-merge (the
@@ -104,13 +107,30 @@ func (g *fakeGitHub) stateOp(op string, vars map[string]any, data map[string]any
 		refuse("UNPROCESSABLE", "Pull request is "+strings.ToLower(string(p.State)))
 		return
 	}
+	updatedAt := p.UpdatedAt
+	if updatedAt.IsZero() {
+		updatedAt = time.Now().UTC()
+	}
+	ts := updatedAt.UTC().Format(time.RFC3339)
 	switch op {
 	case "MarkReadyForReview":
 		p.Draft = false
-		data[field] = map[string]any{"pullRequest": map[string]any{"isDraft": false}}
+		if p.MergeStateStatus == "DRAFT" {
+			p.MergeStateStatus = "CLEAN"
+		}
+		data[field] = map[string]any{"pullRequest": map[string]any{
+			"isDraft":          false,
+			"updatedAt":        ts,
+			"mergeStateStatus": cmpString(string(p.MergeStateStatus), "CLEAN"),
+		}}
 	case "ConvertToDraft":
 		p.Draft = true
-		data[field] = map[string]any{"pullRequest": map[string]any{"isDraft": true}}
+		p.MergeStateStatus = "DRAFT"
+		data[field] = map[string]any{"pullRequest": map[string]any{
+			"isDraft":          true,
+			"updatedAt":        ts,
+			"mergeStateStatus": "DRAFT",
+		}}
 	case "EnableAutoMerge":
 		switch {
 		case st.autoMergeOff:
@@ -121,10 +141,10 @@ func (g *fakeGitHub) stateOp(op string, vars map[string]any, data map[string]any
 			refuse("UNPROCESSABLE", "Pull request Pull request is in clean status")
 		default:
 			g.setAutoMergeLocked(id, method)
-			data[field] = map[string]any{"pullRequest": map[string]any{"autoMergeRequest": g.autoMergeJSON(id)}}
+			data[field] = map[string]any{"pullRequest": map[string]any{"autoMergeRequest": g.autoMergeJSON(id), "updatedAt": ts}}
 		}
 	case "DisableAutoMerge":
 		g.setAutoMergeLocked(id, "")
-		data[field] = map[string]any{"pullRequest": map[string]any{"autoMergeRequest": nil}}
+		data[field] = map[string]any{"pullRequest": map[string]any{"autoMergeRequest": nil, "updatedAt": ts}}
 	}
 }

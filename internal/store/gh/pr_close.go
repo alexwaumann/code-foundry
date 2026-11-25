@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 )
 
 // Closing and reopening a pull request (SetPullRequestClosed, docs/notes/pr-close-reopen.md):
@@ -49,19 +50,55 @@ func (s *Store) SetPullRequestClosed(ctx context.Context, slug string, number in
 	// A cached copy without the permission (a row from before it was fetched reads
 	// false) gets a fresh look too.
 	look := func(d *FullPullRequest) bool { return refusal(d) != "" || !viewerMay(d, closed) }
-	d, err := s.freshFor(ctx, k, look, refusal)
-	if err != nil {
-		return ClosedResult{}, err
+	var id string
+	if e, ok := s.full.entry(k); ok && e.d.PullRequest.ID != "" && !look(&e.d) {
+		id = e.d.PullRequest.ID
+	} else if !ok {
+		if p, has := s.summaries.get(k); has && p.ID != "" && p.State != "" && refusal(&FullPullRequest{PullRequest: p}) == "" {
+			id = p.ID
+		}
 	}
-	if !viewerMay(&d, closed) {
-		return ClosedResult{}, fmt.Errorf("%w: GitHub does not let you %s pull request #%d in %s (it takes the author, or triage access or more)",
-			ErrPermissionDenied, closeVerb(closed), k.number, k.slug)
+	if id == "" {
+		d, err := s.freshFor(ctx, k, look, refusal)
+		if err != nil {
+			return ClosedResult{}, err
+		}
+		if !viewerMay(&d, closed) {
+			return ClosedResult{}, fmt.Errorf("%w: GitHub does not let you %s pull request #%d in %s (it takes the author, or triage access or more)",
+				ErrPermissionDenied, closeVerb(closed), k.number, k.slug)
+		}
+		id = d.PullRequest.ID
 	}
 	doc, what := queryReopenPullRequest, "reopening it"
 	if closed {
 		doc, what = queryClosePullRequest, "closing it"
 	}
-	data, err := s.stateWrite(ctx, k, what, doc, map[string]any{"id": d.PullRequest.ID}, writeRefused)
+	data, err := s.stateWrite(ctx, k, what, doc, map[string]any{"id": id}, writeRefused, func(ctx context.Context, data []byte) {
+		det, err := decodeClosedDetail(data, closed)
+		if err != nil {
+			s.invalidateFull(k)
+			return
+		}
+		s.patchFull(ctx, k, func(d *FullPullRequest) {
+			d.PullRequest.State = det.State
+			d.ClosedAt = det.ClosedAt
+			if det.ViewerCanClose != nil {
+				d.ViewerCanClose = *det.ViewerCanClose
+			}
+			if det.ViewerCanReopen != nil {
+				d.ViewerCanReopen = *det.ViewerCanReopen
+			} else if det.State == PullRequestClosed {
+				d.ViewerCanReopen = d.ViewerCanClose
+			} else {
+				d.ViewerCanReopen = false
+			}
+			if det.State != PullRequestOpen {
+				d.AutoMerge, d.AutoMergeMethod = false, ""
+			}
+			advanceUpdatedAt(&d.PullRequest.UpdatedAt, det.UpdatedAt)
+		})
+		s.markClosed(k, det.State, det.UpdatedAt)
+	})
 	if err != nil {
 		return ClosedResult{}, err
 	}
@@ -119,11 +156,31 @@ func closeVerb(closed bool) string {
 	return "reopen"
 }
 
+type closedDetail struct {
+	State           PullRequestState
+	ClosedAt        time.Time
+	UpdatedAt       time.Time
+	ViewerCanClose  *bool
+	ViewerCanReopen *bool
+}
+
 // decodeClosed maps a ClosePullRequest or ReopenPullRequest response.
 func decodeClosed(data []byte, closed bool) (ClosedResult, error) {
+	det, err := decodeClosedDetail(data, closed)
+	if err != nil {
+		return ClosedResult{}, err
+	}
+	return ClosedResult{State: det.State}, nil
+}
+
+func decodeClosedDetail(data []byte, closed bool) (closedDetail, error) {
 	type payload struct {
 		PullRequest *struct {
-			State string `json:"state"`
+			State           string    `json:"state"`
+			ClosedAt        time.Time `json:"closedAt"`
+			UpdatedAt       time.Time `json:"updatedAt"`
+			ViewerCanClose  *bool     `json:"viewerCanClose"`
+			ViewerCanReopen *bool     `json:"viewerCanReopen"`
 		} `json:"pullRequest"`
 	}
 	var d struct {
@@ -131,14 +188,20 @@ func decodeClosed(data []byte, closed bool) (ClosedResult, error) {
 		Reopen *payload `json:"reopenPullRequest"`
 	}
 	if err := json.Unmarshal(data, &d); err != nil {
-		return ClosedResult{}, fmt.Errorf("decode close: %w", err)
+		return closedDetail{}, fmt.Errorf("decode close: %w", err)
 	}
 	p := d.Reopen
 	if closed {
 		p = d.Close
 	}
 	if p == nil || p.PullRequest == nil || p.PullRequest.State == "" {
-		return ClosedResult{}, errors.New("decode close: no pull request in the response")
+		return closedDetail{}, errors.New("decode close: no pull request in the response")
 	}
-	return ClosedResult{State: PullRequestState(p.PullRequest.State)}, nil
+	return closedDetail{
+		State:           PullRequestState(p.PullRequest.State),
+		ClosedAt:        p.PullRequest.ClosedAt,
+		UpdatedAt:       p.PullRequest.UpdatedAt,
+		ViewerCanClose:  p.PullRequest.ViewerCanClose,
+		ViewerCanReopen: p.PullRequest.ViewerCanReopen,
+	}, nil
 }

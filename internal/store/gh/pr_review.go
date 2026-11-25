@@ -1,6 +1,7 @@
 package gh
 
 import (
+	"cmp"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -8,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"slices"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -82,7 +84,19 @@ func (s *Store) SubmitPullRequestReview(ctx context.Context, slug string, number
 	if r.Body != "" {
 		vars["body"] = r.Body
 	}
-	res, err := writeOnPullRequest(ctx, s, k, &s.full.reviews, "review|"+string(r.Event), r.Body, "review", queryAddPullRequestReview, vars, decodeReview)
+	res, err := writeOnPullRequest(ctx, s, k, &s.full.reviews, "review|"+string(r.Event), r.Body, "review", queryAddPullRequestReview, vars, decodeReview,
+		func(ctx context.Context, _ SubmittedReview, data []byte) {
+			det, err := decodeReviewDetail(data, r.Body)
+			if err != nil {
+				s.invalidateFull(k)
+				return
+			}
+			s.reviewers.invalidatePR(k)
+			s.patchFull(ctx, k, func(d *FullPullRequest) {
+				patchPullRequestReview(d, det)
+			})
+			s.markReviewDecision(k, det.ReviewDecision, det.UpdatedAt)
+		})
 	if err != nil {
 		return SubmittedReview{}, err
 	}
@@ -101,7 +115,21 @@ func (s *Store) AddPullRequestComment(ctx context.Context, slug string, number i
 	if body, err = NormalizeComment(body); err != nil {
 		return PostedComment{}, err
 	}
-	res, err := writeOnPullRequest(ctx, s, k, &s.full.comments, "comment", body, "comment", queryAddComment, map[string]any{"body": body}, decodeComment)
+	res, err := writeOnPullRequest(ctx, s, k, &s.full.comments, "comment", body, "comment", queryAddComment, map[string]any{"body": body}, decodeComment,
+		func(ctx context.Context, _ PostedComment, data []byte) {
+			det, err := decodeCommentDetail(data, body)
+			if err != nil {
+				s.invalidateFull(k)
+				return
+			}
+			s.patchFull(ctx, k, func(d *FullPullRequest) {
+				if !slices.ContainsFunc(d.Comments, func(c Comment) bool { return c.ID == det.Comment.ID }) {
+					d.Comments = append(slices.Clone(d.Comments), det.Comment)
+					d.PullRequest.Comments++
+				}
+				advanceUpdatedAt(&d.PullRequest.UpdatedAt, cmp.Or(det.UpdatedAt, det.Comment.CreatedAt))
+			})
+		})
 	if err != nil {
 		return PostedComment{}, err
 	}
@@ -130,7 +158,7 @@ type writeKey struct {
 // Afterwards, and when GitHub refused in the pull request's state, could not find it,
 // or did not answer, the detail is invalidated so clients re-read.
 func writeOnPullRequest[T any](ctx context.Context, s *Store, k fullKey, memo *writeMemos[writeKey, T], op, body, what, doc string,
-	vars map[string]any, decode func([]byte) (T, error)) (T, error) {
+	vars map[string]any, decode func([]byte) (T, error), onSuccess func(context.Context, T, []byte)) (T, error) {
 	var zero T
 	sum := sha256.Sum256([]byte(body))
 	wk := writeKey{k: k, sig: op + "|" + hex.EncodeToString(sum[:8])}
@@ -142,8 +170,8 @@ func writeOnPullRequest[T any](ctx context.Context, s *Store, k fullKey, memo *w
 		return zero, err
 	}
 	vars["id"] = id
-	// The job id carries the hash, never the body. Invalidation runs on the worker too:
-	// a caller that stopped waiting still leaves clients re-reading.
+	// The job id carries the hash, never the body. Patching/invalidation runs on the
+	// worker too: a caller that stopped waiting still leaves clients updated.
 	return submitFunc(ctx, s, op+"|"+k.String()+"|"+wk.sig, func(ctx context.Context) (T, error) {
 		if m, ok := memo.recent(wk, s.opts.Now()); ok {
 			return m.res, m.err
@@ -169,27 +197,37 @@ func writeOnPullRequest[T any](ctx context.Context, s *Store, k fullKey, memo *w
 		case err != nil:
 			return zero, err
 		}
-		s.invalidateFull(k)
 		res, err := decode(data)
 		if err != nil {
-			// Posted, but unreadable: still never post it again.
+			// Posted, but unreadable: invalidate so clients re-read, and still never post again.
+			s.invalidateFull(k)
 			err = fmt.Errorf("pull request #%d: GitHub posted the %s but its answer could not be read: %w", k.number, what, err)
+		} else if onSuccess != nil {
+			onSuccess(ctx, res, data)
+		} else {
+			s.invalidateFull(k)
 		}
 		memo.remember(wk, writeMemo[T]{res: res, err: err, at: s.opts.Now()})
 		return res, err
 	})
 }
 
-// nodeID returns k's GraphQL node id from the cached detail, whatever its age (the id
-// never changes), or fetches the detail when nothing is cached; that fetch must succeed.
+// nodeID returns k's GraphQL node id from in-memory detail cache, summary cache, or
+// SQLite detail cache (whatever its age: the id never changes), or fetches the detail
+// when nothing is cached; that fetch must succeed.
 func (s *Store) nodeID(ctx context.Context, k fullKey) (string, error) {
-	e, ok := s.cachedFull(ctx, k)
-	d := e.d
-	if !ok || d.PullRequest.ID == "" {
-		var err error
-		if d, err = s.fetchFullJob(ctx, k); err != nil {
-			return "", err
-		}
+	if e, ok := s.full.entry(k); ok && e.d.PullRequest.ID != "" {
+		return e.d.PullRequest.ID, nil
+	}
+	if p, ok := s.summaries.get(k); ok && p.ID != "" {
+		return p.ID, nil
+	}
+	if e, ok := s.cachedFull(ctx, k); ok && e.d.PullRequest.ID != "" {
+		return e.d.PullRequest.ID, nil
+	}
+	d, err := s.fetchFullJob(ctx, k)
+	if err != nil {
+		return "", err
 	}
 	if d.PullRequest.ID == "" {
 		return "", fmt.Errorf("pull request #%d: no node id", k.number)
@@ -257,54 +295,184 @@ func loggedVars(vars map[string]any) map[string]any {
 	return out
 }
 
+type reviewDetail struct {
+	Submitted      SubmittedReview
+	Body           string
+	AuthorBot      bool
+	AuthorAvatar   string
+	CommitSHA      string
+	ReviewDecision ReviewDecision
+	UpdatedAt      time.Time
+}
+
 // decodeReview maps an AddPullRequestReview mutation response.
 func decodeReview(data []byte) (SubmittedReview, error) {
+	det, err := decodeReviewDetail(data, "")
+	if err != nil {
+		return SubmittedReview{}, err
+	}
+	return det.Submitted, nil
+}
+
+func decodeReviewDetail(data []byte, fallbackBody string) (reviewDetail, error) {
 	var d struct {
 		AddPullRequestReview *struct {
 			PullRequestReview *struct {
-				ID          string    `json:"id"`
-				URL         string    `json:"url"`
-				State       string    `json:"state"`
-				SubmittedAt time.Time `json:"submittedAt"`
-				Author      *struct {
-					Login string `json:"login"`
-				} `json:"author"`
+				ID          string     `json:"id"`
+				URL         string     `json:"url"`
+				State       string     `json:"state"`
+				Body        string     `json:"body"`
+				SubmittedAt time.Time  `json:"submittedAt"`
+				Author      *actorJSON `json:"author"`
+				Commit      *oidJSON   `json:"commit"`
+				PullRequest *struct {
+					ReviewDecision ReviewDecision `json:"reviewDecision"`
+					UpdatedAt      time.Time      `json:"updatedAt"`
+				} `json:"pullRequest"`
 			} `json:"pullRequestReview"`
 		} `json:"addPullRequestReview"`
 	}
 	if err := json.Unmarshal(data, &d); err != nil {
-		return SubmittedReview{}, fmt.Errorf("decode review: %w", err)
+		return reviewDetail{}, fmt.Errorf("decode review: %w", err)
 	}
 	if d.AddPullRequestReview == nil || d.AddPullRequestReview.PullRequestReview == nil || d.AddPullRequestReview.PullRequestReview.ID == "" {
-		return SubmittedReview{}, errors.New("decode review: no review in the response")
+		return reviewDetail{}, errors.New("decode review: no review in the response")
 	}
 	r := d.AddPullRequestReview.PullRequestReview
-	out := SubmittedReview{ID: r.ID, URL: r.URL, State: r.State, SubmittedAt: r.SubmittedAt}
+	out := reviewDetail{
+		Submitted: SubmittedReview{ID: r.ID, URL: r.URL, State: r.State, SubmittedAt: r.SubmittedAt},
+		Body:      cmp.Or(r.Body, fallbackBody),
+	}
 	if r.Author != nil {
-		out.Author = r.Author.Login
+		out.Submitted.Author = r.Author.Login
+		out.AuthorBot = r.Author.Typename == "Bot"
+		out.AuthorAvatar = r.Author.AvatarURL
+	}
+	if r.Commit != nil {
+		out.CommitSHA = r.Commit.Oid
+	}
+	if r.PullRequest != nil {
+		out.ReviewDecision = r.PullRequest.ReviewDecision
+		out.UpdatedAt = r.PullRequest.UpdatedAt
 	}
 	return out, nil
 }
 
+// patchPullRequestReview applies a submitted review onto a FullPullRequest copy.
+func patchPullRequestReview(d *FullPullRequest, det reviewDetail) {
+	sub := det.Submitted
+	if !(sub.State == "PENDING" || (sub.State == "COMMENTED" && strings.TrimSpace(det.Body) == "")) {
+		c := Comment{
+			ID:           sub.ID,
+			Kind:         CommentReview,
+			Author:       sub.Author,
+			AuthorBot:    det.AuthorBot,
+			AuthorAvatar: det.AuthorAvatar,
+			Body:         det.Body,
+			CreatedAt:    sub.SubmittedAt,
+			URL:          sub.URL,
+			ReviewState:  sub.State,
+		}
+		if !slices.ContainsFunc(d.Comments, func(x Comment) bool { return x.ID == c.ID }) {
+			d.Comments = append(slices.Clone(d.Comments), c)
+		}
+	}
+	if sub.Author != "" && sub.State != "PENDING" {
+		commitSHA := cmp.Or(det.CommitSHA, d.PullRequest.HeadSHA)
+		stale := d.PullRequest.HeadSHA != "" && commitSHA != "" && commitSHA != d.PullRequest.HeadSHA
+		revs := slices.Clone(d.Reviewers)
+		if idx := slices.IndexFunc(revs, func(r Reviewer) bool { return !r.Team && strings.EqualFold(r.Login, sub.Author) }); idx >= 0 {
+			revs[idx].State = sub.State
+			revs[idx].SubmittedAt = sub.SubmittedAt
+			revs[idx].Requested = false
+			revs[idx].Stale = stale
+			if det.AuthorAvatar != "" {
+				revs[idx].AvatarURL = det.AuthorAvatar
+			}
+		} else {
+			revs = append(revs, Reviewer{
+				Login:       sub.Author,
+				Bot:         det.AuthorBot,
+				AvatarURL:   det.AuthorAvatar,
+				State:       sub.State,
+				SubmittedAt: sub.SubmittedAt,
+				Stale:       stale,
+			})
+		}
+		sortReviewers(revs)
+		d.Reviewers = revs
+
+		latest := slices.Clone(d.PullRequest.LatestReviews)
+		rev := Review{Author: sub.Author, State: sub.State, SubmittedAt: sub.SubmittedAt, CommitSHA: commitSHA}
+		if idx := slices.IndexFunc(latest, func(r Review) bool { return strings.EqualFold(r.Author, sub.Author) }); idx >= 0 {
+			latest[idx] = rev
+		} else {
+			latest = append(latest, rev)
+		}
+		d.PullRequest.LatestReviews = latest
+		if len(d.PullRequest.ReviewRequests) > 0 {
+			d.PullRequest.ReviewRequests = slices.DeleteFunc(slices.Clone(d.PullRequest.ReviewRequests), func(login string) bool {
+				return !strings.Contains(login, "/") && strings.EqualFold(login, sub.Author)
+			})
+		}
+	}
+	d.PullRequest.Reviews++
+	if det.ReviewDecision != "" {
+		d.PullRequest.ReviewDecision = det.ReviewDecision
+	}
+	advanceUpdatedAt(&d.PullRequest.UpdatedAt, cmp.Or(det.UpdatedAt, sub.SubmittedAt))
+}
+
+type commentDetail struct {
+	Posted    PostedComment
+	Comment   Comment
+	UpdatedAt time.Time
+}
+
 // decodeComment maps an AddComment mutation response.
 func decodeComment(data []byte) (PostedComment, error) {
+	det, err := decodeCommentDetail(data, "")
+	if err != nil {
+		return PostedComment{}, err
+	}
+	return det.Posted, nil
+}
+
+func decodeCommentDetail(data []byte, fallbackBody string) (commentDetail, error) {
 	var d struct {
 		AddComment *struct {
 			CommentEdge *struct {
 				Node *struct {
-					ID        string    `json:"id"`
-					URL       string    `json:"url"`
-					CreatedAt time.Time `json:"createdAt"`
+					ID        string     `json:"id"`
+					Author    *actorJSON `json:"author"`
+					Body      string     `json:"body"`
+					URL       string     `json:"url"`
+					CreatedAt time.Time  `json:"createdAt"`
+					UpdatedAt time.Time  `json:"updatedAt"`
 				} `json:"node"`
 			} `json:"commentEdge"`
 		} `json:"addComment"`
 	}
 	if err := json.Unmarshal(data, &d); err != nil {
-		return PostedComment{}, fmt.Errorf("decode comment: %w", err)
+		return commentDetail{}, fmt.Errorf("decode comment: %w", err)
 	}
 	if d.AddComment == nil || d.AddComment.CommentEdge == nil || d.AddComment.CommentEdge.Node == nil || d.AddComment.CommentEdge.Node.ID == "" {
-		return PostedComment{}, errors.New("decode comment: no comment in the response")
+		return commentDetail{}, errors.New("decode comment: no comment in the response")
 	}
 	n := d.AddComment.CommentEdge.Node
-	return PostedComment{ID: n.ID, URL: n.URL, CreatedAt: n.CreatedAt}, nil
+	c := Comment{
+		ID:        n.ID,
+		Kind:      CommentIssue,
+		Body:      cmp.Or(n.Body, fallbackBody),
+		CreatedAt: n.CreatedAt,
+		URL:       n.URL,
+	}
+	if n.Author != nil {
+		c.Author, c.AuthorBot, c.AuthorAvatar = n.Author.Login, n.Author.Typename == "Bot", n.Author.AvatarURL
+	}
+	return commentDetail{
+		Posted:    PostedComment{ID: n.ID, URL: n.URL, CreatedAt: n.CreatedAt},
+		Comment:   c,
+		UpdatedAt: n.UpdatedAt,
+	}, nil
 }

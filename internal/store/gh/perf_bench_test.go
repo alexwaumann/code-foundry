@@ -278,4 +278,183 @@ func TestPerfMeasurements(t *testing.T) {
 		projectsCount := f.countSince(from, "PollProjects")
 		t.Logf("METRIC background_5_poll_cycles_unwatched: total_graphql=%d poll=%d poll_projects=%d", total, pollCount, projectsCount)
 	})
+
+	t.Run("mutations_warm_panel_and_read", func(t *testing.T) {
+		head1 := fmt.Sprintf("%040d", 1)
+		nonPollCalls := func(w *fakeWriter, from int) (total, fullFetches int) {
+			calls, _ := w.snapshot()
+			for _, c := range calls[from:] {
+				if c.op == "Poll" || c.op == "PullRequestDetails" || c.op == "DefaultBranchChecks" || c.op == "PollProjects" {
+					continue
+				}
+				total++
+				if c.op == "PullRequestFull" {
+					fullFetches++
+				}
+			}
+			return total, fullFetches
+		}
+		measure := func(name string, prNum int, setup func(*fakeGitHub), mutate func(*Store) error) {
+			t.Helper()
+			g, w, s, _, _ := mergeWorld(t)
+			g.edit("PR_1", func(p *PullRequest) { p.Author = "kim" })
+			g.setBody("PR_1", "- [ ] task one\n")
+			if setup != nil {
+				setup(g)
+			}
+			if _, err := s.FullPullRequest(ctx, "o/r", prNum, false); err != nil {
+				t.Fatal(err)
+			}
+			from := w.ncalls()
+			if err := mutate(s); err != nil {
+				t.Fatalf("%s mutate: %v", name, err)
+			}
+			if _, err := s.FullPullRequest(ctx, "o/r", prNum, false); err != nil {
+				t.Fatalf("%s post-read: %v", name, err)
+			}
+			settleWorker(t, s)
+			totalGQL, fullFetches := nonPollCalls(w, from)
+			t.Logf("METRIC mutation_warm_%s: graphql_requests=%d pull_request_full=%d", name, totalGQL, fullFetches)
+		}
+		measure("add_comment", 1, nil, func(s *Store) error {
+			_, err := s.AddPullRequestComment(ctx, "o/r", 1, "looks good")
+			return err
+		})
+		measure("submit_review", 1, nil, func(s *Store) error {
+			_, err := s.SubmitPullRequestReview(ctx, "o/r", 1, ReviewSubmission{Event: ReviewEventApprove, Body: "lgtm"})
+			return err
+		})
+		measure("set_draft", 1, nil, func(s *Store) error {
+			_, err := s.SetPullRequestDraft(ctx, "o/r", 1, true)
+			return err
+		})
+		measure("set_closed", 1, nil, func(s *Store) error {
+			_, err := s.SetPullRequestClosed(ctx, "o/r", 1, true)
+			return err
+		})
+		measure("set_auto_merge", 1, nil, func(s *Store) error {
+			_, err := s.SetPullRequestAutoMerge(ctx, "o/r", 1, AutoMergeChange{Enabled: true, Method: MergeSquash, ExpectedHeadSHA: head1})
+			return err
+		})
+		measure("merge", 1, nil, func(s *Store) error {
+			_, err := s.MergePullRequest(ctx, "o/r", 1, MergeRequest{Method: MergeSquash, ExpectedHeadSHA: head1})
+			return err
+		})
+		measure("set_checkbox", 1, nil, func(s *Store) error {
+			_, err := s.SetPullRequestCheckbox(ctx, "o/r", 1, CheckboxChange{Index: 0, Text: "task one", Checked: true})
+			return err
+		})
+	})
+
+	t.Run("mutations_cold_detail_after_poll", func(t *testing.T) {
+		head1 := fmt.Sprintf("%040d", 1)
+		nonPollCalls := func(w *fakeWriter, from int) (total, fullFetches int) {
+			calls, _ := w.snapshot()
+			for _, c := range calls[from:] {
+				if c.op == "Poll" || c.op == "PullRequestDetails" || c.op == "DefaultBranchChecks" || c.op == "PollProjects" {
+					continue
+				}
+				total++
+				if c.op == "PullRequestFull" {
+					fullFetches++
+				}
+			}
+			return total, fullFetches
+		}
+		measure := func(name string, mutate func(*Store) error) {
+			t.Helper()
+			g, w, s, _, _ := mergeWorld(t)
+			g.edit("PR_1", func(p *PullRequest) { p.Author = "kim" })
+			if err := s.Track("o/r"); err != nil {
+				t.Fatal(err)
+			}
+			pollOnce(t, s, w.fakeRunner)
+			from := w.ncalls()
+			if err := mutate(s); err != nil {
+				t.Fatalf("%s mutate: %v", name, err)
+			}
+			totalGQL, fullFetches := nonPollCalls(w, from)
+			t.Logf("METRIC mutation_cold_polled_%s: graphql_requests=%d pull_request_full=%d", name, totalGQL, fullFetches)
+		}
+		measure("add_comment", func(s *Store) error {
+			_, err := s.AddPullRequestComment(ctx, "o/r", 1, "looks good")
+			return err
+		})
+		measure("submit_review", func(s *Store) error {
+			_, err := s.SubmitPullRequestReview(ctx, "o/r", 1, ReviewSubmission{Event: ReviewEventApprove, Body: "lgtm"})
+			return err
+		})
+		measure("set_draft", func(s *Store) error {
+			_, err := s.SetPullRequestDraft(ctx, "o/r", 1, true)
+			return err
+		})
+		measure("set_closed", func(s *Store) error {
+			_, err := s.SetPullRequestClosed(ctx, "o/r", 1, true)
+			return err
+		})
+		measure("set_auto_merge", func(s *Store) error {
+			_, err := s.SetPullRequestAutoMerge(ctx, "o/r", 1, AutoMergeChange{Enabled: true, Method: MergeSquash, ExpectedHeadSHA: head1})
+			return err
+		})
+		measure("merge", func(s *Store) error {
+			_, err := s.MergePullRequest(ctx, "o/r", 1, MergeRequest{Method: MergeSquash, ExpectedHeadSHA: head1})
+			return err
+		})
+	})
+
+	t.Run("mutations_aged_panel_and_read", func(t *testing.T) {
+		head1 := fmt.Sprintf("%040d", 1)
+		nonPollCalls := func(w *fakeWriter, from int) (total, fullFetches int) {
+			calls, _ := w.snapshot()
+			for _, c := range calls[from:] {
+				if c.op == "Poll" || c.op == "PullRequestDetails" || c.op == "DefaultBranchChecks" || c.op == "PollProjects" {
+					continue
+				}
+				total++
+				if c.op == "PullRequestFull" {
+					fullFetches++
+				}
+			}
+			return total, fullFetches
+		}
+		measure := func(name string, mutate func(*Store) error) {
+			t.Helper()
+			g, w, s, clk, _ := mergeWorld(t)
+			g.edit("PR_1", func(p *PullRequest) { p.Author = "kim" })
+			if _, err := s.FullPullRequest(ctx, "o/r", 1, false); err != nil {
+				t.Fatal(err)
+			}
+			clk.advance(2 * time.Hour)
+			from := w.ncalls()
+			if err := mutate(s); err != nil {
+				t.Fatalf("%s mutate: %v", name, err)
+			}
+			if _, err := s.FullPullRequest(ctx, "o/r", 1, false); err != nil {
+				t.Fatalf("%s post-read: %v", name, err)
+			}
+			settleWorker(t, s)
+			totalGQL, fullFetches := nonPollCalls(w, from)
+			t.Logf("METRIC mutation_aged_%s: graphql_requests=%d pull_request_full=%d", name, totalGQL, fullFetches)
+		}
+		measure("add_comment", func(s *Store) error {
+			_, err := s.AddPullRequestComment(ctx, "o/r", 1, "looks good")
+			return err
+		})
+		measure("submit_review", func(s *Store) error {
+			_, err := s.SubmitPullRequestReview(ctx, "o/r", 1, ReviewSubmission{Event: ReviewEventApprove, Body: "lgtm"})
+			return err
+		})
+		measure("set_draft", func(s *Store) error {
+			_, err := s.SetPullRequestDraft(ctx, "o/r", 1, true)
+			return err
+		})
+		measure("set_closed", func(s *Store) error {
+			_, err := s.SetPullRequestClosed(ctx, "o/r", 1, true)
+			return err
+		})
+		measure("set_auto_merge", func(s *Store) error {
+			_, err := s.SetPullRequestAutoMerge(ctx, "o/r", 1, AutoMergeChange{Enabled: true, Method: MergeSquash, ExpectedHeadSHA: head1})
+			return err
+		})
+	})
 }

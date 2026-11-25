@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 )
 
 // Ticking a task-list box of a pull request's description from the panel
@@ -74,11 +75,36 @@ func (s *Store) SetPullRequestCheckbox(ctx context.Context, slug string, number 
 		return CheckboxResult{Message: fmt.Sprintf("Task %d on #%d was already %s", r.Index+1, k.number, strings.ToLower(word))}, nil
 	}
 	what := fmt.Sprintf("changing task %d", r.Index+1)
-	if _, err := s.stateWrite(ctx, k, what, queryUpdatePullRequestBody, map[string]any{"id": id, "body": next}, writeRefused); err != nil {
+	if _, err := s.stateWrite(ctx, k, what, queryUpdatePullRequestBody, map[string]any{"id": id, "body": next}, writeRefused, func(ctx context.Context, data []byte) {
+		body, updatedAt := decodeUpdatedBody(data, next)
+		s.patchFull(ctx, k, func(d *FullPullRequest) {
+			d.Body = body
+			advanceUpdatedAt(&d.PullRequest.UpdatedAt, updatedAt)
+		})
+	}); err != nil {
 		return CheckboxResult{}, err
 	}
 	s.log.Info("gh pull request task set", "pr", k.String(), "index", r.Index, "checked", r.Checked)
 	return CheckboxResult{Changed: true, Message: fmt.Sprintf("%s task %d on #%d", word, r.Index+1, k.number)}, nil
+}
+
+func decodeUpdatedBody(data []byte, fallback string) (string, time.Time) {
+	var d struct {
+		UpdatePullRequest *struct {
+			PullRequest *struct {
+				Body      *string   `json:"body"`
+				UpdatedAt time.Time `json:"updatedAt"`
+			} `json:"pullRequest"`
+		} `json:"updatePullRequest"`
+	}
+	if json.Unmarshal(data, &d) != nil || d.UpdatePullRequest == nil || d.UpdatePullRequest.PullRequest == nil {
+		return fallback, time.Time{}
+	}
+	p := d.UpdatePullRequest.PullRequest
+	if p.Body != nil {
+		return *p.Body, p.UpdatedAt
+	}
+	return fallback, p.UpdatedAt
 }
 
 // freshBody reads k's node id and description from GitHub.

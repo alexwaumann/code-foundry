@@ -1,5 +1,7 @@
 package gh
 
+import "time"
+
 // fakeClose is whether the viewer may close and reopen pull requests: GitHub's
 // viewerCanClose (any state) and viewerCanReopen (closed only).
 type fakeClose struct {
@@ -57,5 +59,19 @@ func (g *fakeGitHub) closeOp(op string, vars map[string]any, data map[string]any
 			return
 		}
 	}
-	data[field] = map[string]any{"pullRequest": map[string]any{"state": string(p.State)}}
+	var closedAt any
+	if p.State == PullRequestClosed {
+		closedAt = time.Now().UTC().Format(time.RFC3339)
+	}
+	updatedAt := p.UpdatedAt
+	if updatedAt.IsZero() {
+		updatedAt = time.Now().UTC()
+	}
+	data[field] = map[string]any{"pullRequest": map[string]any{
+		"state":           string(p.State),
+		"closedAt":        closedAt,
+		"updatedAt":       updatedAt.UTC().Format(time.RFC3339),
+		"viewerCanClose":  !g.detail.close.denied,
+		"viewerCanReopen": !g.detail.close.denied && p.State == PullRequestClosed,
+	}}
 }

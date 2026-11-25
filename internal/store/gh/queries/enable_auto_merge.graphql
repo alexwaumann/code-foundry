@@ -4,6 +4,6 @@
 # when the branch moved since, so commits nobody saw never merge by themselves.
 mutation EnableAutoMerge($id: ID!, $method: PullRequestMergeMethod!, $head: GitObjectID!) {
   enablePullRequestAutoMerge(input: { pullRequestId: $id, mergeMethod: $method, expectedHeadOid: $head }) {
-    pullRequest { autoMergeRequest { enabledAt mergeMethod } }
+    pullRequest { autoMergeRequest { enabledAt mergeMethod } updatedAt }
   }
 }

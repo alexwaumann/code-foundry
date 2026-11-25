@@ -253,6 +253,24 @@ func (c *fullCache) markWritten(k fullKey) {
 	}
 }
 
+// patch updates a copy of k's cached detail in place when present and marks the entry
+// fresh and confirmed at now so an immediate FullPullRequest read serves it with zero
+// GitHub round-trips. Returns the patched copy and true when k was cached in memory.
+func (c *fullCache) patch(k fullKey, now time.Time, mutate func(*FullPullRequest)) (FullPullRequest, bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	e, ok := c.m[k]
+	if !ok {
+		return FullPullRequest{}, false
+	}
+	d := e.d
+	mutate(&d)
+	d.FetchedAt = now
+	d.LastError, d.FetchFailed, d.Refreshing = "", false, false
+	c.m[k] = &fullEntry{d: d, confirmed: now}
+	return d, true
+}
+
 // fail records that a fetch of k failed at now; it reports whether that is news: the
 // entry exists and its last fetch had not failed.
 func (c *fullCache) fail(k fullKey, err error, now time.Time) bool {
@@ -632,6 +650,33 @@ func (s *Store) invalidateFull(k fullKey) {
 	s.moved.markWrite(k, s.opts.Now(), s.opts.DetailTTL)
 	s.reviewers.invalidatePR(k)
 	publish(s, PullRequestDetailUpdated{Slug: k.slug, Number: k.number})
+}
+
+// patchFull updates k's cached detail in place from a mutation response, marks it fresh
+// and confirmed so the panel's immediate GetPullRequestDetail read returns the patched
+// copy in 0 ms with 0 extra GitHub round-trips, persists it to SQLite, updates the
+// summary cache, and publishes PullRequestDetailUpdated. When k is not cached in memory
+// it falls back to invalidateFull so any SQLite row is not trusted and clients still
+// hear PullRequestDetailUpdated.
+func (s *Store) patchFull(ctx context.Context, k fullKey, mutate func(*FullPullRequest)) {
+	now := s.opts.Now()
+	d, ok := s.full.patch(k, now, mutate)
+	if !ok {
+		s.invalidateFull(k)
+		return
+	}
+	s.summaries.put(k, d.PullRequest)
+	if err := s.cache.saveActivity(ctx, activityFull+k.String(), d.FetchedAt, d); err != nil {
+		s.log.Warn("gh cache write failed", "err", err)
+	}
+	publish(s, PullRequestDetailUpdated{Slug: k.slug, Number: k.number})
+}
+
+// advanceUpdatedAt updates *dst to t when t is non-zero and newer (or *dst is zero).
+func advanceUpdatedAt(dst *time.Time, t time.Time) {
+	if !t.IsZero() && (dst.IsZero() || t.After(*dst)) {
+		*dst = t
+	}
 }
 
 // submitFunc queues run as an on-demand job (coalescing with a queued job of the same

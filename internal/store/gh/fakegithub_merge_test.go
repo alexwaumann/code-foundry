@@ -84,9 +84,17 @@ func (g *fakeGitHub) mergeOp(vars map[string]any, data map[string]any, errs *[]m
 	case g.detail.merge.disallowed[MergeMethod(method)]:
 		refuse("UNPROCESSABLE", "Merge method "+strings.ToLower(method)+" merging is not allowed on this repository")
 	default:
-		p.State, p.MergedAt = PullRequestMerged, time.Now()
+		now := time.Now().UTC()
+		p.State, p.MergedAt = PullRequestMerged, now
+		ts := now.Format(time.RFC3339)
 		data["mergePullRequest"] = map[string]any{"pullRequest": map[string]any{
-			"merged": true, "state": "MERGED", "mergeCommit": map[string]any{"oid": "5e1f" + strings.Repeat("0", 36)}}}
+			"merged":      true,
+			"state":       "MERGED",
+			"mergedAt":    ts,
+			"mergedBy":    map[string]any{"login": g.viewer.Login},
+			"mergeCommit": map[string]any{"oid": "5e1f" + strings.Repeat("0", 36)},
+			"updatedAt":   ts,
+		}}
 	}
 }
 

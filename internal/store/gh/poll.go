@@ -331,9 +331,9 @@ func (s *Store) pollFailed(ctx context.Context, cfg Config, err error, retryNow 
 func (s *Store) applyPoll(ctx context.Context, cfg Config, plan *pollPlan, res *pollResult, idle bool) {
 	s.applyViewer(ctx, res)
 	snap := s.Snapshot()
-	// The dashboard as the last poll left it, without merges shown early
+	// The dashboard as the last poll left it, without local mutations shown early
 	// (pr_merged_overlay.go): the baseline of this poll's diffs.
-	prevDash := s.mergedShown.basis(snap.Dashboard)
+	prevDash := s.localShown.basis(snap.Dashboard)
 
 	// 1. Pull requests: everything the lists reference, resolved to details.
 	known := knownPullRequests(prevDash, &s.branches)
@@ -515,6 +515,7 @@ func (s *Store) applyPoll(ctx context.Context, cfg Config, plan *pollPlan, res *
 			changed := !had || prev.FetchedAt.IsZero() || prev.LastError != st.LastError || !samePullRequestsStrictNil(prev.PullRequests, st.PullRequests)
 			s.branches.set(k, st)
 			if st.LastError == "" {
+				s.localShown.confirmBranches(st.PullRequests, now)
 				s.summaries.putBranch(s.Snapshot(), rp.slug, st.PullRequests)
 			}
 			if changed {
@@ -525,8 +526,8 @@ func (s *Store) applyPoll(ctx context.Context, cfg Config, plan *pollPlan, res *
 
 	var repoChanged []string
 	s.updateSnapshot(func(n *Snapshot) {
-		// Under the snapshot's lock, so a merge shown meanwhile is not lost.
-		shown := s.mergedShown.apply(newDash, now)
+		// Under the snapshot's lock, so a local mutation shown meanwhile is not lost.
+		shown := s.localShown.apply(newDash, now)
 		dashChanged = !sameDashboard(n.Dashboard, shown)
 		n.Dashboard = shown
 		n.Poll = PollState{FetchedAt: now, LastError: pollErr}
