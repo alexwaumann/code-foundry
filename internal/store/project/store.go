@@ -847,12 +847,19 @@ func (g *Git) CreateWorktree(ctx context.Context, opts CreateWorktreeOptions) (W
 		adding.Head = g.revParse(ctx, m.Path, base)
 	}
 	opts.report(adding)
-	// Killed, git cannot clean up after itself. Nobody has seen this worktree yet.
+	// Killed, git cannot clean up after itself. Subscribers may have seen the worktree
+	// by then (registerCreatedWorktree publishes it before its status is known, and a
+	// reconcile may list it), so once it is gone from disk its slot goes too, with the
+	// events a reconcile sends for a removed worktree. A worktree undoAdd could not
+	// remove keeps its slot: it is still there.
 	undo := func() {
 		if ctx.Err() != nil {
-			if err := g.undoAdd(context.WithoutCancel(ctx), m, AbandonWorktreeOptions{Path: path, Branch: adding.Branch, Head: adding.Head}); err != nil {
+			bg := context.WithoutCancel(ctx)
+			if err := g.undoAdd(bg, m, AbandonWorktreeOptions{Path: path, Branch: adding.Branch, Head: adding.Head}); err != nil {
 				g.log.Warn("a killed worktree add left something behind", "project", m.ID, "path", path, "err", err)
+				return
 			}
+			g.dropUndoneWorktree(bg, st, m.ID, path)
 		}
 	}
 	if _, err := g.runner.Run(ctx, m.Path, args...); err != nil {
@@ -906,13 +913,11 @@ func (g *Git) registerCreatedWorktree(ctx context.Context, st *projectState, m *
 		g.mu.Unlock()
 		return fmt.Errorf("%w: project %s was unregistered concurrently", ErrNotFound, m.ID)
 	}
-	added := false
 	slot := st.wts[path]
 	if slot == nil {
 		slot = &wtSlot{}
 		slot.cur.Store(&Worktree{ProjectID: m.ID, Path: path, Branch: branch, Head: head})
 		st.wts[path] = slot
-		added = true
 	}
 	slot.admin = admin
 	slot.gitDir = admin
@@ -923,37 +928,46 @@ func (g *Git) registerCreatedWorktree(ctx context.Context, st *projectState, m *
 	}
 	g.mu.Unlock()
 
-	rollback := func() {
-		if !added {
-			return
-		}
-		g.mu.Lock()
-		if g.projects[m.ID] == st && st.wts[path] == slot {
-			delete(st.wts, path)
-			delete(g.routes, path)
-			if admin != "" {
-				delete(g.routes, admin)
-				delete(g.routes, filepath.Join(admin, "logs"))
-			}
-		}
-		g.mu.Unlock()
-		g.commit(nil)
-	}
-
+	// Published now, before its status: a failed wait below leaves the slot to
+	// CreateWorktree's undo, which removes the worktree from disk and then tells
+	// subscribers (dropUndoneWorktree).
 	g.fs.sync(ctx)
 	g.commit(projectUpdated(m.ID))
 	g.snapCache.markDirty(m.ID)
 	if st.base.Load() == nil || fetched {
 		if err := g.sched.wait(ctx, jobKey{kind: jobBase, projectID: m.ID}); err != nil {
-			rollback()
 			return err
 		}
 	}
-	if err := g.sched.wait(ctx, jobKey{kind: jobStatus, projectID: m.ID, path: path}); err != nil {
-		rollback()
-		return err
+	return g.sched.wait(ctx, jobKey{kind: jobStatus, projectID: m.ID, path: path})
+}
+
+// dropUndoneWorktree forgets a worktree CreateWorktree made and then removed from disk
+// (undoAdd): its slot and watch routes go, and subscribers get what reconcile sends
+// for a worktree that left the list, WorktreeRemoved then ProjectUpdated, so nobody
+// keeps one they were shown. Nothing is sent when no slot was added for it. A
+// reconcile is queued (low priority) because one whose listing ran before undoAdd can
+// commit after this and add the slot back; the queued one lists after undoAdd.
+func (g *Git) dropUndoneWorktree(ctx context.Context, st *projectState, id, path string) {
+	g.mu.Lock()
+	if g.projects[id] != st || st.wts[path] == nil {
+		g.mu.Unlock()
+		return
 	}
-	return nil
+	delete(st.wts, path)
+	for dir, t := range g.routes {
+		if t.projectID == id && t.wtPath == path {
+			delete(g.routes, dir)
+		}
+	}
+	g.mu.Unlock()
+	g.forgetDetails(id, path)
+	g.fs.sync(ctx)
+	g.commit(func(s *Snapshot) []Event {
+		return append([]Event{WorktreeRemoved{ProjectID: id, Path: path}}, projectUpdated(id)(s)...)
+	})
+	g.snapCache.markDirty(id)
+	g.sched.requestPrio(jobKey{kind: jobReconcile, projectID: id}, prioLow)
 }
 
 // ensureBorn makes the empty initial commit in the main checkout when it has no
