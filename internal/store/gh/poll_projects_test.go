@@ -524,11 +524,23 @@ func TestPollProjectsGatingAndLease(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+	// advance moves the clock without making the store's scheduled poll due: the polls
+	// this test counts are the ones it asks for (pollOnce). Otherwise the worker, still
+	// finishing the previous job, can look at its queue after the clock moved and
+	// before pollOnce's Refresh is queued, and run the due scheduled poll first: a
+	// second Poll (and PollProjects while watched) in the counted window, about 1 run
+	// in 2,400 under load.
+	advance := func(d time.Duration) {
+		s.mu.Lock()
+		s.pollNext = clk.now().Add(d + time.Hour)
+		s.mu.Unlock()
+		clk.advance(d)
+	}
 
 	// 1. Unwatched poll runs dashboard only (1 GraphQL Poll, 0 PollProjects).
 	pollOnce(t, s, f)
 	from := f.ncalls()
-	clk.advance(time.Minute)
+	advance(time.Minute)
 	pollOnce(t, s, f)
 	if got := f.countSince(from, "Poll"); got != 1 {
 		t.Errorf("unwatched Poll calls = %d, want 1", got)
@@ -586,7 +598,7 @@ func TestPollProjectsGatingAndLease(t *testing.T) {
 
 	// 3. Regular poll while watched runs both Poll and PollProjects (including via Refresh).
 	from = f.ncalls()
-	clk.advance(time.Minute)
+	advance(time.Minute)
 	pollOnce(t, s, f)
 	if got := f.countSince(from, "Poll"); got != 1 {
 		t.Errorf("watched Poll calls = %d, want 1", got)
@@ -596,7 +608,7 @@ func TestPollProjectsGatingAndLease(t *testing.T) {
 	}
 
 	// 4. After lease expires, polls stop running PollProjects again while preserving cached Projects.
-	clk.advance(10*time.Minute + time.Second)
+	advance(10*time.Minute + time.Second)
 	from = f.ncalls()
 	pollOnce(t, s, f)
 	if got := f.countSince(from, "Poll"); got != 1 {
