@@ -440,6 +440,9 @@ func (c *fullCache) applyHotAt(nodes []hotNode, fpSeq uint64, now time.Time) (ch
 		case hotPendingCheckCountsOnly(e.d.PullRequest, h):
 			e.d.PullRequest.Checks = h.fp.Checks
 			e.checksStale = true
+			if confirmable(e.d) { // as applyPollAt: only pending counts moved
+				e.confirmed = now
+			}
 			changes = append(changes, hotChange{key: k, checksStale: true, pr: e.d.PullRequest, fp: h.fp})
 		case hotMetaOnlyRegressedToUnknown(e.d.PullRequest, h):
 			// Avoid flickering a resolved entry back to UNKNOWN while GitHub recomputes.
