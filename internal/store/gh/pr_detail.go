@@ -79,8 +79,13 @@ type fullEntry struct {
 	// checks.graphql instead of the full pull_request_full document so check-run rows
 	// stay accurate without re-reading comments, commits, reviews, and threads.
 	checksStale bool
+	// checksAt is when a checks-only refresh last landed on d (fetchChecksOnly); zero
+	// when none has since d was fetched whole. d.FetchedAt stays the whole fetch's time:
+	// the checks are newer than the rest of d, which ages as fetched.
+	checksAt time.Time
 	// confirmed is when a poll last saw the pull request's fingerprint unchanged since d
-	// was fetched; zero until one does.
+	// was fetched (or moved only in pending check counts, which it patched in); zero
+	// until one does.
 	confirmed time.Time
 	// written: this store's own write changed the pull request, so d is known wrong, not
 	// just old. Reads wait for the fetch (read your writes); a failed fetch clears it.
@@ -220,6 +225,32 @@ func (c *fullCache) putWithSeq(k fullKey, d FullPullRequest, seq uint64) (prev f
 		}
 	}
 	return c.putLocked(k, &fullEntry{d: d, stale: stale, fetchSeq: seq})
+}
+
+// putChecks lays a checks-only refresh, sent at seq for the head of base (the entry it
+// started from), onto k's entry as it is now: a full fetch may have landed meanwhile.
+// Only the checks change (apply). The rest keeps its fetch time (FetchedAt), its
+// confirmation and its request sequence, so the refresh never makes it look fresher
+// than it is and a full fetch sent before this one still lands over it. The refresh is
+// dropped when the entry is on another head or came from a fetch sent after it. It
+// returns the entry cached afterwards and the one it replaced.
+func (c *fullCache) putChecks(k fullKey, base fullEntry, seq uint64, now time.Time, apply func(*FullPullRequest)) (cur, prev fullEntry, had bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	old, ok := c.m[k]
+	if !ok {
+		old = &base // evicted meanwhile
+	} else if (seq > 0 && old.fetchSeq > seq) || old.d.PullRequest.HeadSHA != base.d.PullRequest.HeadSHA {
+		return *old, *old, true
+	}
+	next := *old
+	apply(&next.d)
+	next.checksStale, next.checksAt, next.failure, next.failedAt = false, now, nil, time.Time{}
+	if seq > 0 && c.movedSeq[k] > seq {
+		next.stale = true // a poll sent after this request saw the pull request move
+	}
+	prev, had = c.putLocked(k, &next)
+	return next, prev, had
 }
 
 // putLocked stores e, evicting the least recently fetched beyond fullCacheMax. c.mu is
@@ -394,8 +425,14 @@ func (c *fullCache) applyPollAt(fps []prFingerprint, known map[string]PullReques
 				out = append(out, k)
 			}
 		case pendingCheckCountsOnly(e.d.PullRequest, f):
+			// Nothing but pending counts moved: the poll vouches for the rest as an
+			// unchanged one would, so the checks-only refresh this queues leaves an entry
+			// that is current without refetching the whole detail.
 			e.d.PullRequest.Checks = f.Checks
 			e.checksStale = true
+			if confirmable(e.d) {
+				e.confirmed = now
+			}
 			out = append(out, k)
 		case fingerprintMoved(e.d.PullRequest, f):
 			e.stale, e.checksStale = true, false
@@ -571,9 +608,16 @@ func (s *Store) refreshFull(k fullKey) error {
 // event, which goes out however this ends. forceFull forces PullRequestFull even when
 // only checksStale is set (explicit refresh or post-write read).
 func (s *Store) runFullFetch(ctx context.Context, k fullKey, submitted time.Time, background, forceFull bool) (FullPullRequest, error) {
+	// A read someone waits for wants the whole detail, also when it joined a queued
+	// background refresh and runs that one's func (enqueueLocked): on the read lane only
+	// such reads run, and on the worker forUser says the job has waiters.
+	forceFull = forceFull || isReadLane(ctx) || s.forUser
 	e, hasEntry := s.full.entry(k)
 	if hasEntry {
-		fetched := !e.stale && !e.checksStale && e.d.FetchedAt.After(submitted)
+		// A checks-only refresh since counts for a background job, while the entry it
+		// left is current; a forced job wants a whole fetch since.
+		checked := !forceFull && e.checksAt.After(submitted) && s.current(e)
+		fetched := !e.stale && !e.checksStale && (e.d.FetchedAt.After(submitted) || checked)
 		failed := e.failure != nil && e.failedAt.After(submitted)
 		if fetched || failed {
 			if background {
@@ -591,11 +635,16 @@ func (s *Store) runFullFetch(ctx context.Context, k fullKey, submitted time.Time
 		err   error
 		query = queryPullRequestFull
 	)
-	if !forceFull && hasEntry && e.checksStale && !e.stale && !e.written && e.d.PullRequest.HeadSHA != "" {
+	// Checks only while the rest of the entry is still current: a checks refresh keeps
+	// its age, so one past it is fetched whole even when the checks also moved.
+	rest := e
+	rest.checksStale = false
+	if !forceFull && hasEntry && e.checksStale && !e.stale && !e.written && e.d.PullRequest.HeadSHA != "" && s.current(rest) {
 		query = queryChecks
-		d, err = s.fetchChecksOnly(ctx, k, e.d, background)
-		if errors.Is(err, ErrNotFound) {
-			// The commit may have been force-pushed away; fall back to full detail fetch.
+		d, err = s.fetchChecksOnly(ctx, k, e, background)
+		if errors.Is(err, ErrNotFound) || errors.Is(err, errChecksMovedMerge) {
+			// The commit may have been force-pushed away, or CI settled or failed, which
+			// moves the merge state only a full fetch reads: fetch the whole detail.
 			query = queryPullRequestFull
 			d, err = s.fetchFull(ctx, k, background)
 		}
@@ -617,12 +666,30 @@ func (s *Store) runFullFetch(ctx context.Context, k fullKey, submitted time.Time
 	return d, err
 }
 
+// errChecksMovedMerge: a checks-only refresh found the rollup moved in a way that can
+// move the merge state (checksMoveMerge); runFullFetch fetches the whole detail instead.
+var errChecksMovedMerge = errors.New("gh: checks moved past pending")
+
+// checksMoveMerge reports whether a check rollup going from was to now can move the
+// pull request's mergeable / mergeStateStatus (BLOCKED -> CLEAN once CI settles), which
+// only the full detail reads and no fingerprint covers: the rollup left its state (left
+// PENDING, settled) or a check failed. A refresh with no rollup keeps was.
+func checksMoveMerge(was, now CheckRollup) bool {
+	if now.Total == 0 && now.State == "" {
+		return false
+	}
+	return now.State != was.State || now.Failed != was.Failed
+}
+
 // fetchChecksOnly refreshes only the commit's check-run rows (checks.graphql) for a
 // checksStale entry, keeping the panel's Checks list up to date without refetching the
-// full pull_request_full document (comments, commits, reviews, review threads).
-func (s *Store) fetchChecksOnly(ctx context.Context, k fullKey, base FullPullRequest, announce bool) (FullPullRequest, error) {
+// full pull_request_full document (comments, commits, reviews, review threads). It
+// lands on the entry as it is by then (putChecks), keeping the rest of the detail's age.
+// When CI settled or a check failed it stores nothing and returns errChecksMovedMerge.
+func (s *Store) fetchChecksOnly(ctx context.Context, k fullKey, base fullEntry, announce bool) (FullPullRequest, error) {
 	owner, name := splitSlug(k.slug)
-	data, fetchSeq, _, err := s.callMeta(ctx, queryChecks, map[string]any{"owner": owner, "name": name, "ref": base.PullRequest.HeadSHA, "after": nil})
+	head := base.d.PullRequest.HeadSHA
+	data, fetchSeq, _, err := s.callMeta(ctx, queryChecks, map[string]any{"owner": owner, "name": name, "ref": head, "after": nil})
 	if err != nil {
 		return FullPullRequest{}, err
 	}
@@ -630,30 +697,34 @@ func (s *Store) fetchChecksOnly(ctx context.Context, k fullKey, base FullPullReq
 	if err != nil {
 		return FullPullRequest{}, err
 	}
-	d := base
-	d.LastError, d.FetchFailed = "", false
-	if page.Rollup.Total > 0 || page.Rollup.State != "" {
-		d.PullRequest.Checks = page.Rollup
+	if checksMoveMerge(base.d.PullRequest.Checks, page.Rollup) {
+		return FullPullRequest{}, errChecksMovedMerge
 	}
+	lastError := ""
 	runs, next := page.Runs, page.Next
 	for p := 1; next.HasNextPage && next.EndCursor != "" && p < s.opts.MaxPages; p++ {
-		data, err := s.call(ctx, queryChecks, map[string]any{"owner": owner, "name": name, "ref": d.PullRequest.HeadSHA, "after": next.EndCursor})
+		data, err := s.call(ctx, queryChecks, map[string]any{"owner": owner, "name": name, "ref": head, "after": next.EndCursor})
 		var cp checksPage
 		if err == nil {
 			cp, err = decodeChecks(data)
 		}
 		if err != nil {
 			s.log.Warn("gh pull request detail checks page failed", "pr", k.String(), "err", err)
-			d.LastError = fmt.Sprintf("checks after the first %d: %v", len(runs), err)
+			lastError = fmt.Sprintf("checks after the first %d: %v", len(runs), err)
 			break
 		}
 		runs, next = append(runs, cp.Runs...), cp.Next
 	}
 	sortRuns(runs)
-	d.Checks = runs
-	d.ChecksTruncated = next.HasNextPage
-	d.FetchedAt = s.opts.Now()
-	prev, had := s.full.putWithSeq(k, d, fetchSeq)
+	cur, prev, had := s.full.putChecks(k, base, fetchSeq, s.opts.Now(), func(d *FullPullRequest) {
+		d.LastError, d.FetchFailed = lastError, false
+		if page.Rollup.Total > 0 || page.Rollup.State != "" {
+			d.PullRequest.Checks = page.Rollup
+		}
+		d.Checks = runs
+		d.ChecksTruncated = next.HasNextPage
+	})
+	d := cur.d
 	if d.PullRequest.State != PullRequestOpen {
 		s.hot.drop(k)
 	}
