@@ -98,6 +98,14 @@ type PullRequestChanged struct {
 	// PullRequest is the summary after the change (Partial only when the poll knows
 	// only its fingerprint, which never happens with ChangeAppeared).
 	PullRequest PullRequest
+	// Shown is PullRequest with this store's own mutations that GitHub's searches do not
+	// show yet laid over it (pr_merged_overlay.go): the row GetDashboard and
+	// BranchPullRequests show. Clients get this one (internal/api/gh_changes.go), so an
+	// event never takes back a close, reopen, draft or review the user just made. The
+	// daemon's own consumers (thread wakes, plugin checks) read PullRequest and Changes,
+	// which say what the poll saw, so a wake still fires when GitHub shows the change.
+	// Zero (a fake's event) means PullRequest.
+	Shown PullRequest
 	// Changes in ChangeKinds order; never empty.
 	Changes []Change
 }

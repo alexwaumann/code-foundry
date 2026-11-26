@@ -15,10 +15,16 @@ const ghChangedBuffer = 512
 
 // ghPullRequestChangedEvent maps gh.PullRequestChanged; shared by GhService.Watch and
 // EventService (and so the CLI's events verb and plugin feeds).
+// The pull request is the row clients are shown (gh.PullRequestChanged.Shown), with the
+// user's own mutations on it, as GetDashboard has it.
 func ghPullRequestChangedEvent(e gh.PullRequestChanged) *v1.GhEvent {
+	pr := e.Shown
+	if pr.ID == "" && pr.Number == 0 {
+		pr = e.PullRequest
+	}
 	out := &v1.GhEvent_PullRequestChanged{
 		RepoSlug: e.Slug, Number: int32(e.Number), Url: e.URL, HeadRef: e.HeadRef,
-		PullRequest: pullRequestToProto(e.Slug, &e.PullRequest),
+		PullRequest: pullRequestToProto(e.Slug, &pr),
 	}
 	for _, c := range e.Changes {
 		out.Changes = append(out.Changes, pullRequestChangeToProto(c))

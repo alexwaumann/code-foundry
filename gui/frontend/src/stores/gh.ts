@@ -13,6 +13,7 @@ import {
   type BranchPullRequestsView,
   type GhEventView,
   type ProjectPullRequestsView,
+  type PrChangeKindView,
   type PullRequestView,
 } from "@/api/gh";
 import { errorMessage } from "@/api/stream";
@@ -324,35 +325,75 @@ export const pullRequestDetailResource = createResource(
 );
 
 /**
- * Replaces the PR matching `targetKey` in `list`; returns `list` unchanged when absent.
- * Never downgrades a locally overlaid "merged" PR back to "open" from a lagging poll event.
+ * The fields of a summary row each change kind of pull_request_changed speaks for. The event's
+ * row is the daemon's shown row (the user's own close, reopen, draft or review laid over the
+ * poll's, as GetDashboard has it), but only these fields are news: the rest may be older than
+ * the cached row (a re-read after a write) or absent from a closed or merged summary.
  */
-function patchPrList(list: PullRequestView[], targetKey: string, next: PullRequestView): PullRequestView[] {
-  const idx = list.findIndex((p) => pullRequestKey(p.repoSlug, p.number) === targetKey);
-  if (idx === -1) return list;
-  const cur = list[idx];
-  if (cur?.state === "merged" && next.state === "open") return list;
-  const out = list.slice();
-  out[idx] = next;
-  return out;
+const CHANGED_FIELDS: Readonly<Record<PrChangeKindView, readonly (keyof PullRequestView)[]>> = {
+  appeared: [],
+  merged: ["state", "mergedAtMs"],
+  closed: ["state"],
+  reopened: ["state"],
+  headPushed: ["headSha"],
+  checks: ["checks"],
+  reviewDecision: ["review"],
+  reviews: ["reviews", "latestReviews"],
+  comments: ["comments"],
+  reviewRequested: ["reviewRequests"],
+  draft: ["draft", "mergeState"],
+  title: ["title"],
+};
+
+/** Whether two plain view values are equal (rows are JSON-shaped data). */
+function sameValue(a: unknown, b: unknown): boolean {
+  return Object.is(a, b) || JSON.stringify(a) === JSON.stringify(b);
 }
 
-function patchProjectList(list: ProjectPullRequestsView | undefined, targetKey: string, next: PullRequestView): ProjectPullRequestsView | undefined {
+/** `cur` with `fields` taken from `next`; `cur` itself when none of them differs. */
+function mergeChangedFields(cur: PullRequestView, next: PullRequestView, fields: readonly (keyof PullRequestView)[]): PullRequestView {
+  const changed = fields.filter((f) => !sameValue(cur[f], next[f]));
+  if (changed.length === 0) return cur;
+  const out: Record<string, unknown> = { ...cur };
+  for (const f of changed) out[f] = next[f];
+  if (next.updatedAtMs !== null && (cur.updatedAtMs === null || next.updatedAtMs > cur.updatedAtMs)) out.updatedAtMs = next.updatedAtMs;
+  return out as unknown as PullRequestView;
+}
+
+/** `list` with the row matching `targetKey` merged with `next`'s changed fields; `list` itself when nothing moved. */
+function patchPrList(list: PullRequestView[], targetKey: string, next: PullRequestView, fields: readonly (keyof PullRequestView)[]): PullRequestView[] {
+  let out: PullRequestView[] | null = null;
+  for (const [i, p] of list.entries()) {
+    if (pullRequestKey(p.repoSlug, p.number) !== targetKey) continue;
+    const merged = mergeChangedFields(p, next, fields);
+    if (merged === p) continue;
+    out ??= list.slice();
+    out[i] = merged;
+  }
+  return out ?? list;
+}
+
+function patchProjectList(list: ProjectPullRequestsView | undefined, targetKey: string, next: PullRequestView, fields: readonly (keyof PullRequestView)[]): ProjectPullRequestsView | undefined {
   if (!list) return list;
-  const pullRequests = patchPrList(list.pullRequests, targetKey, next);
+  const pullRequests = patchPrList(list.pullRequests, targetKey, next, fields);
   return pullRequests === list.pullRequests ? list : { ...list, pullRequests };
 }
 
 /**
- * Patches matching PR rows in-place across dashboard, branch PR lists, and PR detail
- * caches when `pull_request_changed` arrives, without triggering extra unary RPCs or
- * cancelling any in-flight refresh.
+ * Patches the PR's rows in the dashboard and branch caches when `pull_request_changed`
+ * arrives, with the fields its changes name only (CHANGED_FIELDS), without an RPC. The
+ * daemon published DashboardUpdated and BranchPullRequestsUpdated before it, so their
+ * re-reads land one round trip later and write the same overlaid rows. The detail cache is
+ * not patched: only the daemon knows whether its copy is older than the poll, and it says so
+ * with pull_request_detail_updated (docs/notes/gh-pr-changed-overlay.md).
  */
-function patchPullRequestInCaches(repoSlug: string, number: number, headRef: string, pr: PullRequestView): void {
+function patchPullRequestInCaches(repoSlug: string, number: number, headRef: string, pr: PullRequestView, changes: readonly PrChangeKindView[]): void {
   if (pr.partial) return;
   const slug = pr.repoSlug || repoSlug;
   const num = pr.number || number;
   if (!slug || !num) return;
+  const fields = [...new Set(changes.flatMap((c) => CHANGED_FIELDS[c]))];
+  if (fields.length === 0) return;
   const patched: PullRequestView = pr.repoSlug && pr.number && (pr.headRef || !headRef) ? pr : { ...pr, repoSlug: slug, number: num, headRef: pr.headRef || headRef };
   const targetKey = pullRequestKey(slug, num);
 
@@ -363,12 +404,12 @@ function patchPullRequestInCaches(repoSlug: string, number: number, headRef: str
   for (const [key, entry] of Object.entries(dashEntries)) {
     const d = entry.data;
     if (!d) continue;
-    const authored = patchPrList(d.authored, targetKey, patched);
-    const reviewRequested = patchPrList(d.reviewRequested, targetKey, patched);
-    const reviewed = patchPrList(d.reviewed, targetKey, patched);
-    const recentlyMerged = patchPrList(d.recentlyMerged, targetKey, patched);
-    const projectOpen = patchProjectList(d.projectOpen, targetKey, patched);
-    const projectMerged = patchProjectList(d.projectMerged, targetKey, patched);
+    const authored = patchPrList(d.authored, targetKey, patched, fields);
+    const reviewRequested = patchPrList(d.reviewRequested, targetKey, patched, fields);
+    const reviewed = patchPrList(d.reviewed, targetKey, patched, fields);
+    const recentlyMerged = patchPrList(d.recentlyMerged, targetKey, patched, fields);
+    const projectOpen = patchProjectList(d.projectOpen, targetKey, patched, fields);
+    const projectMerged = patchProjectList(d.projectMerged, targetKey, patched, fields);
     if (
       authored !== d.authored ||
       reviewRequested !== d.reviewRequested ||
@@ -401,26 +442,13 @@ function patchPullRequestInCaches(repoSlug: string, number: number, headRef: str
   for (const [key, entry] of Object.entries(branchEntries)) {
     const b = entry.data;
     if (!b) continue;
-    const pullRequests = patchPrList(b.pullRequests, targetKey, patched);
+    const pullRequests = patchPrList(b.pullRequests, targetKey, patched, fields);
     if (pullRequests !== b.pullRequests) {
       nextBranchEntries[key] = { ...entry, data: { ...b, pullRequests } };
       branchChanged = true;
     }
   }
   if (branchChanged) branchPullRequestsResource.store.setState({ entries: nextBranchEntries });
-
-  // 3. Cached pull request detail: update pullRequest in-place while keeping comments/commits/reviews,
-  // never downgrading an overlaid "merged" PR back to "open".
-  const detailEntries = pullRequestDetailResource.store.getState().entries;
-  const detailEntry = detailEntries[targetKey];
-  if (detailEntry?.data && !(detailEntry.data.pullRequest.state === "merged" && patched.state === "open")) {
-    pullRequestDetailResource.store.setState({
-      entries: {
-        ...detailEntries,
-        [targetKey]: { ...detailEntry, data: { ...detailEntry.data, pullRequest: patched } },
-      },
-    });
-  }
 }
 
 /**
@@ -454,7 +482,7 @@ export function applyGhEvent(ev: GhEventView): void {
       pullRequestDetailResource.invalidate(pullRequestKey(ev.repoSlug, ev.number));
       break;
     case "pullRequestChanged":
-      patchPullRequestInCaches(ev.repoSlug, ev.number, ev.headRef, ev.pullRequest);
+      patchPullRequestInCaches(ev.repoSlug, ev.number, ev.headRef, ev.pullRequest, ev.changes);
       break;
   }
 }

@@ -17,6 +17,7 @@ Six targeted latency and RPC-reduction improvements across the event stream, Git
 3. **In-place frontend cache patching from `pull_request_changed`** (`gui/frontend/src/api/gh.ts`, `gui/frontend/src/stores/gh.ts`)
    - Mapped `GhEvent.pullRequestChanged` in `toGhEventView` (previously returned `null`).
    - Added `patchPullRequestInCaches` in `applyGhEvent` to update matching PR rows in-place across `dashboardResource`, `branchPullRequestsResource`, and `pullRequestDetailResource` (keeping `body`, `comments`, `commits`, `reviews` intact) while never downgrading an overlaid `"merged"` PR back to `"open"` from a lagging poll event.
+   - Since changed (docs/notes/gh-pr-changed-overlay.md): the event carries the daemon's overlaid row, the patch merges only the fields the event's change kinds name, and the detail cache is no longer patched.
 
 4. **Bounded LRU cache for parsed `PrDiffView` models** (`gui/frontend/src/components/pr/diffModel.ts`, `gui/frontend/src/components/diff/PrDiffView.tsx`)
    - Added `cachedParsePrDiff(prKey, diff, headSha)` backed by an 8-entry module-level LRU `Map` keyed by `(prKey, headSha)` and verified against `diff` equality.
@@ -35,7 +36,7 @@ Six targeted latency and RPC-reduction improvements across the event stream, Git
 |---|---|---|
 | Fresh connect unary list RPCs (`listProjects` + `listTerminals` + `listThreads`) | 3 (6 after 1 reconnect) | **0** (**0** after 1 reconnect) |
 | Reconnect after blip (`seq=2, epoch="ep-1"`) | `sinceSeq=0`, 3 snapshots, 0 replayed | `sinceSeq=2, sinceEpoch="ep-1"`, **0 snapshots**, **1 incremental replay** |
-| `pull_request_changed` cache propagation (dashboard, branch, detail) | `toGhEventView` returned `null`; 0 updated | Updated in-place (`body` preserved, merged state never downgraded), **0 extra RPCs** |
+| `pull_request_changed` cache propagation (dashboard, branch, detail) | `toGhEventView` returned `null`; 0 updated | Updated in-place (`body` preserved, merged state never downgraded), **0 extra RPCs** (detail no longer patched since gh-pr-changed-overlay.md) |
 | `PrDiffView` `parsePatchFiles` count (334 KB / 60-file diff: mount + remount + unchanged re-read) | **4** parses | **1** parse (**0** remount, **0** re-read) |
 | Isolated `parsePrDiff` vs `cachedParsePrDiff` hit (919 KB / 100-file diff, 10-run avg) | 5.128 ms/call | **0.003 ms/call** |
 | `GitGroup.tsx` `pullRequestDetailResource.watch` calls (5 linked PRs: 3 core dashboard/watched branch, 2 uncached/unwatched) | **5** watches | **2** watches (only uncached/unwatched PRs) |
