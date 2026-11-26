@@ -4,6 +4,7 @@ import { reportClientState, watchEvents, type EventEnvelope, type EventView } fr
 import { listThreads } from "@/api/threads";
 import { errorMessage, HEARTBEAT_MS, isAbort, onPageStateChange, runStream, type StreamStatus } from "@/api/stream";
 import type { TerminalView } from "@/api/terminal";
+import { notify } from "@/lib/notify";
 import { applyActionEvent, useActionsStore } from "./actions";
 import { onActionRunFinished } from "./actionActions";
 import { applyGhEvent, invalidateWatchedGhOnReconnect } from "./gh";
@@ -139,9 +140,24 @@ export function onDaemonEvent(cb: (ev: EventView) => void): () => void {
   };
 }
 
+/**
+ * Each tap hears the event on its own: one that throws is logged and the rest still hear it.
+ * The slice already took the event, so a tap's failure is not a reason to resync it.
+ */
+function tellTaps(ev: EventView): void {
+  for (const tap of taps) {
+    try {
+      tap(ev);
+    } catch (err) {
+      console.error(`code-foundry: a ${ev.source} event tap failed`, err);
+    }
+  }
+}
+
+/** Applies the event to its slice, then tells the taps. A slice handler's throw reaches the caller. */
 export function dispatchEvent(ev: EventView): void {
   (handlers[ev.source] as (e: EventView["event"]) => void)(ev.event);
-  for (const tap of taps) tap(ev);
+  tellTaps(ev);
 }
 
 /**
@@ -154,7 +170,22 @@ const OBSERVED: ReadonlySet<EventView["source"]> = new Set(["project", "workspac
 /** dispatchEvent for an observer: the observed slices only; every tap still hears every event (the ui source's intents reach a page that way). */
 export function dispatchObserved(ev: EventView): void {
   if (OBSERVED.has(ev.source)) (handlers[ev.source] as (e: EventView["event"]) => void)(ev.event);
-  for (const tap of taps) tap(ev);
+  tellTaps(ev);
+}
+
+/**
+ * How often a slice handler's throw may restart the stream from snapshots
+ * (docs/notes/event-handler-throw-resync.md). A throw within it, or on a snapshot event, is
+ * contained: logged, and the stream carries on past the event.
+ */
+export const HANDLER_RESYNC_COOLDOWN_MS = 60_000;
+
+/** Ends an attempt whose slice handler threw on a live event, so the next one starts from snapshots. */
+class HandlerFailedError extends Error {
+  constructor(source: EventView["source"]) {
+    super(`a ${source} update failed; reloading state`);
+    this.name = "HandlerFailedError";
+  }
 }
 
 /** Lists threads without failing the resync: a failed List keeps the threads it has. */
@@ -197,6 +228,18 @@ export function startEventSync({ observer = false }: { observer?: boolean } = {}
   let ghSnapshotInvalidated = false;
 
   let schemaLoadedEpoch: string | null = null;
+  // A slice handler's throw (see HANDLER_RESYNC_COOLDOWN_MS): when it last restarted the stream
+  // from snapshots, and whether a live event was skipped since without one.
+  let handlerResyncAt: number | null = null;
+  let skippedLive = false;
+  const resyncAfterThrow = (source: EventView["source"]): HandlerFailedError => {
+    handlerResyncAt = Date.now();
+    skippedLive = false;
+    // Forget the cursor: resuming would replay the event that threw.
+    lastSeq = 0n;
+    if (!observer) notify({ id: "event-handler-failed", level: "error", title: "A live update failed", description: "Code Foundry reloaded its state from the daemon. The console has the details." });
+    return new HandlerFailedError(source);
+  };
 
   const onEnvelope = (meta: EventEnvelope): void => {
     if (meta.epoch) {
@@ -231,6 +274,8 @@ export function startEventSync({ observer = false }: { observer?: boolean } = {}
       // and collect terminal snapshot IDs to prune any terminals that exited while disconnected.
       lastSeq = 0n;
       snapshotTerminals = new Set<string>();
+      // The snapshots rebuild every slice, a skipped event's too.
+      skippedLive = false;
     }
     attemptFirstEvent = false;
   };
@@ -238,6 +283,10 @@ export function startEventSync({ observer = false }: { observer?: boolean } = {}
   const deliver = observer ? dispatchObserved : dispatchEvent;
   const onEvent = (ev: EventView): void => {
     hadConnected = true;
+    const live = lastEnvelopeSeq > 0n;
+    const mayResync = () => handlerResyncAt === null || Date.now() - handlerResyncAt >= HANDLER_RESYNC_COOLDOWN_MS;
+    // A live event skipped during the cooldown: once it is over, resync before going on.
+    if (skippedLive && live && mayResync()) throw resyncAfterThrow(ev.source);
     if (snapshotTerminals !== null) {
       if (ev.source === "terminal" && ev.event.kind === "updated") {
         snapshotTerminals.add(ev.event.terminal.id);
@@ -257,9 +306,17 @@ export function startEventSync({ observer = false }: { observer?: boolean } = {}
         });
       }
     }
-    deliver(ev);
-    // Advance the resume cursor only after delivery succeeded so a throwing handler does
-    // not skip the event on reconnect.
+    try {
+      deliver(ev);
+    } catch (err) {
+      console.error(`code-foundry: the ${ev.source} handler failed on an event`, ev.event, err);
+      // A live event's throw restarts the stream from snapshots, so the slice is rebuilt instead
+      // of resumed past (or, resuming at it, replayed into the same throw forever). A snapshot
+      // event's throw would come back with the next snapshot, and one within the cooldown would
+      // loop: those are skipped, a live one marked for a resync after the cooldown.
+      if (live && mayResync()) throw resyncAfterThrow(ev.source);
+      if (live) skippedLive = true;
+    }
     if (lastEnvelopeSeq > lastSeq) lastSeq = lastEnvelopeSeq;
     // A full gh snapshot on reconnect (or after a mid-stream gh drop resync) invalidates
     // viewer, dashboard and repo activity via its events, but not watched PR details or
@@ -298,7 +355,10 @@ export function startEventSync({ observer = false }: { observer?: boolean } = {}
       quietTicks = 0;
       if (useEventsStore.getState().silent) useEventsStore.setState({ silent: false });
     },
-    onError: invalidateOnTransportError,
+    onError: (err) => {
+      // A handler's throw is ours, not the transport's: the endpoint is fine.
+      if (!(err instanceof HandlerFailedError)) invalidateOnTransportError(err);
+    },
   });
   const silence = setInterval(() => {
     // Silence is a daemon that answers and streams nothing; a down daemon is the red dot.

@@ -19,6 +19,9 @@ const env = vi.hoisted(() => ({
   loadSchema: 0,
   getBranchPrs: 0,
   getPrDetail: 0,
+  // A project id that makes the project handler throw (a handler bug), counted per call.
+  poison: "",
+  poisonThrows: 0,
 }));
 
 const fakeClient = vi.hoisted(() => ({
@@ -61,6 +64,19 @@ vi.mock("./settings", async (orig) => ({
     return Promise.resolve();
   },
 }));
+vi.mock("./projects", async (orig) => {
+  const real = await orig<typeof import("./projects")>();
+  return {
+    ...real,
+    applyProjectEvent: (prev: Parameters<typeof real.applyProjectEvent>[0], ev: Parameters<typeof real.applyProjectEvent>[1]) => {
+      if (env.poison && ev.kind === "snapshot" && ev.projects.some((p) => p.id === env.poison)) {
+        env.poisonThrows++;
+        throw new Error("handler bug");
+      }
+      return real.applyProjectEvent(prev, ev);
+    },
+  };
+});
 vi.mock("@/api/gh", async (orig) => ({
   ...(await orig<typeof import("@/api/gh")>()),
   getBranchPullRequests: () => {
@@ -73,7 +89,7 @@ vi.mock("@/api/gh", async (orig) => ({
   },
 }));
 
-const { startEventSync } = await import("./events");
+const { HANDLER_RESYNC_COOLDOWN_MS, onDaemonEvent, startEventSync } = await import("./events");
 const { branchKey, branchPullRequestsResource, pullRequestDetailResource, pullRequestKey } = await import("./gh");
 const { emptyProjects, useProjectsStore } = await import("./projects");
 const { emptyTerminals, useTerminalsStore } = await import("./terminals");
@@ -143,6 +159,8 @@ beforeEach(() => {
   env.loadSchema = 0;
   env.getBranchPrs = 0;
   env.getPrDetail = 0;
+  env.poison = "";
+  env.poisonThrows = 0;
   useProjectsStore.setState({ ...emptyProjects, loaded: false });
   useTerminalsStore.setState({ ...emptyTerminals, loaded: false });
   useThreadsStore.setState({ ...emptyThreads, loaded: false, error: null, epoch: 0 });
@@ -294,5 +312,144 @@ describe("EventService.Watch connect and reconnect", () => {
     expect(env.getPrDetail).toBe(1);
     // Third connect after snapshot-only ep-2 sends no stale seq 10n from ep-1.
     expect(env.requests[2]?.sinceSeq).toBeUndefined();
+  });
+});
+
+describe("a handler that throws on an event", () => {
+  beforeEach(() => {
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  // The daemon's side: a fresh connect sends snapshots; a resume after seq 5 replays the poison
+  // event (seq 6) first, as the hub's resume log does.
+  const daemonWithPoisonAt6 = (snapshotProjects: string[]) => {
+    let attempt = 0;
+    return (req: Partial<WatchEventsRequest>, signal: AbortSignal) =>
+      (async function* () {
+        attempt++;
+        if (attempt === 1) {
+          yield projectSnap("ep-1", ["a"]);
+          yield workspaceSnap("ep-1");
+          yield threadSnap("ep-1", []);
+          yield projectSnap("ep-1", ["a", "b"], 5n);
+          yield projectSnap("ep-1", ["poison"], 6n);
+          await park(signal);
+        }
+        if (req.sinceSeq === 5n) {
+          yield projectSnap("ep-1", ["poison"], 6n);
+          await park(signal);
+        }
+        if (req.sinceSeq === undefined) {
+          yield projectSnap("ep-1", snapshotProjects);
+          yield workspaceSnap("ep-1");
+          yield threadSnap("ep-1", []);
+          yield projectSnap("ep-1", ["a", "b", "c", "d"], 7n);
+        }
+        await park(signal);
+      })();
+  };
+
+  it("resyncs from snapshots once instead of replaying the same event forever", async () => {
+    env.poison = "poison";
+    env.stream = daemonWithPoisonAt6(["a", "b", "c"]);
+
+    stop = startEventSync();
+    await vi.advanceTimersByTimeAsync(10_000);
+
+    // One resume would replay seq 6 and throw again; the recovery reconnects without since_seq.
+    expect(env.requests.map((r) => r.sinceSeq)).toEqual([undefined, undefined]);
+    expect(env.poisonThrows).toBe(1);
+    // The snapshot re-baselined the store and live events after it apply.
+    expect(useProjectsStore.getState().order).toEqual(["a", "b", "c", "d"]);
+    expect(console.error).toHaveBeenCalled();
+  });
+
+  it("does not loop when the handler throws on the snapshot too", async () => {
+    env.poison = "poison";
+    env.stream = daemonWithPoisonAt6(["poison"]);
+
+    stop = startEventSync();
+    await vi.advanceTimersByTimeAsync(10_000);
+
+    // The live throw resyncs once; the snapshot's throw is contained and the stream carries on.
+    expect(env.requests.map((r) => r.sinceSeq)).toEqual([undefined, undefined]);
+    expect(env.poisonThrows).toBe(2);
+    expect(useProjectsStore.getState().order).toEqual(["a", "b", "c", "d"]);
+  });
+
+  it("resyncs at most once per cooldown when live events keep throwing", async () => {
+    env.poison = "poison";
+    let attempt = 0;
+    let liveSeq = 10n;
+    env.stream = (_req, signal) =>
+      (async function* () {
+        attempt++;
+        yield projectSnap("ep-1", ["a"]);
+        yield workspaceSnap("ep-1");
+        yield threadSnap("ep-1", []);
+        // Every attempt brings a stream of live events that all throw.
+        for (let i = 0; i < 5; i++) yield projectSnap("ep-1", ["poison"], liveSeq++);
+        await park(signal);
+      })();
+
+    stop = startEventSync();
+    await vi.advanceTimersByTimeAsync(10_000);
+
+    expect(attempt).toBe(2);
+    expect(env.requests).toHaveLength(2);
+  });
+
+  it("after the cooldown, a live event skipped during it brings one more resync", async () => {
+    env.poison = "poison";
+    let attempt = 0;
+    env.stream = (_req, signal) =>
+      (async function* () {
+        attempt++;
+        yield projectSnap("ep-1", ["a"]);
+        yield workspaceSnap("ep-1");
+        yield threadSnap("ep-1", []);
+        if (attempt === 1) yield projectSnap("ep-1", ["poison"], 10n);
+        if (attempt === 2) {
+          // Within the cooldown: skipped, not resynced.
+          yield projectSnap("ep-1", ["poison"], 11n);
+          await new Promise((r) => setTimeout(r, HANDLER_RESYNC_COOLDOWN_MS));
+          // A good live event after it: the skipped one is made good by a resync first.
+          yield projectSnap("ep-1", ["a", "b"], 12n);
+        }
+        await park(signal);
+      })();
+
+    stop = startEventSync();
+    await vi.advanceTimersByTimeAsync(HANDLER_RESYNC_COOLDOWN_MS + 5_000);
+
+    expect(attempt).toBe(3);
+    expect(env.requests.map((r) => r.sinceSeq)).toEqual([undefined, undefined, undefined]);
+    expect(useProjectsStore.getState().order).toEqual(["a"]);
+  });
+
+  it("a tap that throws neither reconnects nor keeps the other taps from hearing the event", async () => {
+    const heard: string[] = [];
+    const offBad = onDaemonEvent(() => {
+      throw new Error("tap bug");
+    });
+    const offGood = onDaemonEvent((ev) => heard.push(ev.source));
+    env.stream = (_req, signal) =>
+      (async function* () {
+        yield projectSnap("ep-1", ["a"]);
+        yield projectSnap("ep-1", ["a", "b"], 5n);
+        await park(signal);
+      })();
+
+    stop = startEventSync();
+    await vi.advanceTimersByTimeAsync(5_000);
+    offBad();
+    offGood();
+
+    expect(env.requests).toHaveLength(1);
+    expect(heard).toEqual(["project", "project"]);
+    expect(useProjectsStore.getState().order).toEqual(["a", "b"]);
   });
 });
