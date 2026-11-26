@@ -13,9 +13,10 @@ import (
 // after later merges, as long as those did not rewrite the same lines again. A branch
 // whose copy was changed while landing (a resolved conflict) is not recognised. Any git
 // failure is "not merged". An old git without `merge-tree --write-tree` (before 2.38)
-// falls back to comparing the two trees. During status refreshes (base.go), only
-// managed, non-main, clean worktrees run this automatically, memoized by (head, base);
-// branch deletion (branch_delete.go) calls it directly on demand.
+// falls back to comparing the two trees. Status refreshes (base.go) and, after a base
+// move, jobBaseCounts (basecounts.go) run this for every non-main worktree that is
+// both ahead of and behind the base, memoized by (head, base); branch deletion
+// (branch_delete.go) calls it directly on demand.
 func (g *Git) mergedByContent(ctx context.Context, dir, head, base string) bool {
 	baseTree, err := g.runner.Run(ctx, dir, "rev-parse", "--verify", "--quiet", base+"^{tree}")
 	if err != nil {

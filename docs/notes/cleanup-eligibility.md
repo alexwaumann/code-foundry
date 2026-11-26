@@ -57,7 +57,10 @@ removable verdict.
   (HEAD, base sha), and only when HEAD is both ahead and behind (no copy can have landed
   otherwise). So the dry run, the GUI's `merged_clean` "in main" tag and the cleanup
   count all agree with the real run, and the cost is one `rev-parse` + one `merge-tree`
-  per worktree per base or HEAD move.
+  per worktree per base or HEAD move. (Since `project-lazy-base-counts.md`, a base move
+  computes it for inactive worktrees in `jobBaseCounts` instead of their status job,
+  with the same memo, at low priority and before publishing; the real run's `Refresh`
+  still runs every status, which reuses the memo.)
 - **The 10-minute grace keys on HEAD, not on BaseAhead.** A worktree just made from an
   existing branch whose copy landed is kept too (someone just asked for it). A fresh
   worktree that already committed and merged goes at once.

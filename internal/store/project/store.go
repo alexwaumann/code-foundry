@@ -138,6 +138,9 @@ type projectState struct {
 	meta atomic.Pointer[projectMeta]
 	// base is origin/<default> resolved to a sha; written only by the project's jobBase.
 	base atomic.Pointer[projectBase]
+	// lazy is the last base move left to jobBaseCounts, with the worktrees that got a
+	// status for it instead; written only by jobBase (basecounts.go).
+	lazy atomic.Pointer[lazyBase]
 	// wts is guarded by Git.mu; reconcile and CreateWorktree add slots, reconcile removes them.
 	wts map[string]*wtSlot
 	// hydrated is true when Start loaded cached state from SQLite; cleared on the first
@@ -153,11 +156,15 @@ type statusDiskStamp struct {
 }
 
 // wtSlot is one worktree's snapshot slot, written only by its status job (and seeded
-// by the reconcile job that creates it).
+// by the reconcile job that creates it), except cur's base fields and base, which
+// jobBaseCounts also writes while it holds mu (basecounts.go).
 type wtSlot struct {
+	// mu is held by the status job for its whole run, and tried by jobBaseCounts to
+	// store a base comparison: so cur and base have one writer at a time.
+	mu  sync.Mutex
 	cur atomic.Pointer[Worktree]
-	// base memoizes the last base ahead/behind by (HEAD, base sha); written only by
-	// the status job.
+	// base memoizes the last base ahead/behind by (HEAD, base sha); written by the
+	// status job, and by jobBaseCounts under mu.
 	base atomic.Pointer[baseCount]
 	// entries is the changed paths from the last successful status (nil when none),
 	// from which the detail job derives the uncommitted files (uncommittedFiles);
@@ -240,6 +247,9 @@ type Git struct {
 	compareCache *compareCaches
 	// refsCache caches ListRefs per project until invalidated by mutations or FSEvents.
 	refsCache refsCache
+	// aheadBehindUnsupported is set once git rejects for-each-ref's %(ahead-behind:)
+	// (before 2.41): jobBaseCounts then uses rev-list per worktree (basecounts.go).
+	aheadBehindUnsupported atomic.Bool
 
 	cancel context.CancelFunc
 	wg     sync.WaitGroup
@@ -1314,6 +1324,8 @@ func (g *Git) runJob(ctx context.Context, k jobKey) {
 		g.resolveBase(ctx, k.projectID)
 	case jobFiles:
 		g.flushFiles(ctx, k)
+	case jobBaseCounts:
+		g.baseCountsBatch(ctx, k.projectID)
 	}
 }
 
@@ -1586,6 +1598,8 @@ func (g *Git) status(ctx context.Context, projectID, path string) {
 	if st == nil || slot == nil || !st.meta.Load().Git {
 		return // a project without git keeps its zero status
 	}
+	slot.mu.Lock() // jobBaseCounts stores nothing in the slot meanwhile
+	defer slot.mu.Unlock()
 	prev := *slot.cur.Load()
 	next := prev
 	now := g.now()

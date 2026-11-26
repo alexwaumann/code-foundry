@@ -29,6 +29,9 @@ const (
 	jobBase
 	// jobFiles owns one worktree's collected file changes (files.go).
 	jobFiles
+	// jobBaseCounts brings a project's inactive worktrees' base comparison up to a
+	// moved base without git status (basecounts.go).
+	jobBaseCounts
 )
 
 func (k jobKind) String() string {
@@ -43,6 +46,8 @@ func (k jobKind) String() string {
 		return "base"
 	case jobFiles:
 		return "files"
+	case jobBaseCounts:
+		return "base-counts"
 	}
 	return "jobKind(?)"
 }

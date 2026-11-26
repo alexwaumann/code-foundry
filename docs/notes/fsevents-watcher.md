@@ -81,7 +81,7 @@ Known directories per git project (`<common>` = `<main>/.git`):
 |---|---|
 | `<common>` | `HEAD`, `index` → status(main). `FETCH_HEAD` → base(project). `packed-refs`, `config`, `config.lock` created → reconcile and status(all) (a reconcile alone refreshes no status since #897; `project-rescan-idle-poll.md`). `worktrees` → reconcile. Operation markers (`rebase-merge`, `rebase-apply`, `MERGE_HEAD`, `CHERRY_PICK_HEAD`, `REVERT_HEAD`, `BISECT_LOG`) → status(main). Anything deeper (`objects/`, `refs/heads/`, `rebase-merge/*`, fsmonitor cookies) → nothing |
 | `<common>/logs` | `HEAD` → status(main). Deeper (`logs/refs/...`) → nothing |
-| `<common>/refs/remotes/origin` | **anything at any depth** → base(project), which refreshes status(all) when origin/<default> moved; another branch's ref → status of the worktrees on or tracking it |
+| `<common>/refs/remotes/origin` | **anything at any depth** → base(project), which, when origin/<default> moved, refreshes the active worktrees' status and every other worktree's base comparison without one (`project-lazy-base-counts.md`); another branch's ref → status of the worktrees on or tracking it |
 | `<common>/worktrees` | entry created, removed, or renamed → reconcile |
 | `<common>/worktrees/<name>` | `HEAD`, `index`, operation markers → status(that worktree). An admin dir not yet reconciled is ignored; its creation in `worktrees/` reconciles |
 | `<common>/worktrees/<name>/logs` | `HEAD` → status(that worktree) |

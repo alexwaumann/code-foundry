@@ -12,9 +12,12 @@ import (
 // sha is resolved once per project by jobBase, which owns projectState.base.
 //
 // jobBase runs after reconcile, on FETCH_HEAD and remote-ref changes, and after
-// store-initiated fetches. When the resolved (ref, sha) moves, it fans out a status
-// refresh to every worktree; when unchanged, it refreshes only uninitialized worktrees.
-// Its cost is one `git rev-parse` per project per round.
+// store-initiated fetches. When the resolved (ref, sha) moves, it refreshes the status
+// of the active worktrees (a live thread or a watched detail) and requests
+// jobBaseCounts, which brings every other worktree's base comparison up to date
+// without a status (basecounts.go); on the first resolution and when the base goes
+// away, it refreshes every status. When unchanged, it refreshes only uninitialized
+// worktrees. Its own cost is one `git rev-parse` per project per round.
 
 // projectBase is origin/<default> as last resolved for a project. A nil or empty sha means
 // there is no such ref (no remote, never fetched, or the project is in error).
@@ -25,7 +28,8 @@ type projectBase struct {
 
 // baseCount memoizes one worktree's base ahead/behind: the counts of `git rev-list
 // --left-right --count head...sha`, and whether head's changes are in sha by content
-// (mergedByContent). Written only by the worktree's status job.
+// (mergedByContent). Written by the worktree's status job, and by jobBaseCounts while
+// it holds the slot's mu.
 type baseCount struct {
 	head, ref, sha string
 	ahead, behind  int
@@ -37,9 +41,8 @@ type baseCount struct {
 	mergedChecked bool
 }
 
-// resolveBase is the jobBase body: the only writer of st.base. When the resolved base
-// changes, it fans out a status refresh to every worktree in the project; when the base
-// is unchanged, it only refreshes worktrees that have never had a status yet.
+// resolveBase is the jobBase body: the only writer of st.base. See the file comment
+// for what it refreshes.
 func (g *Git) resolveBase(ctx context.Context, projectID string) {
 	g.refsCache.invalidate(projectID)
 	st := g.project(projectID)
@@ -78,8 +81,27 @@ func (g *Git) resolveBase(ctx context.Context, projectID string) {
 	}
 	st.base.Store(next)
 	keys := g.uninitializedStatusKeys(projectID)
-	if changed {
+	switch {
+	case !changed:
+	case prev == nil || next.sha == "":
+		// The first resolution after start (hydrated slots, every status due anyway),
+		// or no base any more: every status, which also clears the base fields.
 		keys = g.statusKeys(projectID)
+	default:
+		// Only the base comparison moved: active worktrees get their status as
+		// before; jobBaseCounts covers the rest without one.
+		lz := &lazyBase{base: *next, statused: map[string]bool{}}
+		for _, k := range keys {
+			lz.statused[k.path] = true
+		}
+		for _, k := range g.statusKeys(projectID) {
+			if g.worktreeActive(projectID, k.path) {
+				keys = append(keys, k)
+				lz.statused[k.path] = true
+			}
+		}
+		st.lazy.Store(lz)
+		g.sched.requestPrio(jobKey{kind: jobBaseCounts, projectID: projectID}, prioLow)
 	}
 	for _, k := range keys {
 		g.sched.requestPrio(k, g.eventPrio(k))
@@ -90,8 +112,8 @@ func (g *Git) resolveBase(ctx context.Context, projectID string) {
 // worktree's memo when neither HEAD nor the base moved. ok is false when there is no
 // base comparison (no base ref, unborn HEAD, or rev-list failed). reused reports a memo
 // hit. checkMerged gates mergedByContent (skipped for the main worktree, which is never
-// a leftover or cleanup candidate). Called only by the worktree's status job, which owns
-// slot.base.
+// a leftover or cleanup candidate). Called only by the worktree's status job, while it
+// holds slot.mu.
 func (g *Git) baseCounts(ctx context.Context, st *projectState, slot *wtSlot, dir, head string, checkMerged bool) (c baseCount, ok, reused bool) {
 	b := st.base.Load()
 	if b == nil || b.sha == "" || head == "" {

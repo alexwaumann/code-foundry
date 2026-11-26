@@ -88,7 +88,8 @@ optional `extra` pass and an injectable timer for tests):
   tier's interval: 5 min for an active worktree, 15 min for any other, whatever its
   siblings are. "Older" is measured from the later of the worktree's last poll and its
   status's `RefreshedAt`, so a status refreshed by anything else (an fs event, Touch,
-  TouchNow, Refresh, a base move) postpones its poll. The pass returns how long until
+  TouchNow, Refresh; a base move only for active worktrees since
+  `project-lazy-base-counts.md`) postpones its poll. The pass returns how long until
   the next worktree is due, and the loop sleeps until the sooner of that and the next
   project (at most the live interval).
 
