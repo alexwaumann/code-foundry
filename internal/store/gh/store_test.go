@@ -37,9 +37,15 @@ var opRE = regexp.MustCompile(`^(?:query|mutation) (\w+)`)
 func (f *fakeRunner) GraphQL(ctx context.Context, q string, vars map[string]any) (json.RawMessage, error) {
 	op := opRE.FindStringSubmatch(q)[1]
 	f.mu.Lock()
+	h := f.graphql
+	if h == nil {
+		// A store whose Run is started polls at once; a fake with no handler is a test
+		// bug, reported as an error rather than a nil-pointer panic.
+		f.mu.Unlock()
+		return nil, fmt.Errorf("fakeRunner: %s called with no GraphQL handler (build the fake with serve, set or setDoc)", op)
+	}
 	f.inflight++
 	f.maxInflight = max(f.maxInflight, f.inflight)
-	h := f.graphql
 	f.mu.Unlock()
 	start := time.Now()
 	if f.delay > 0 {

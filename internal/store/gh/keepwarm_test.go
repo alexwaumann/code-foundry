@@ -786,7 +786,9 @@ func (r *blockingWarmerCloserRunner) Close() {
 
 func TestStoreRunClosesRunnerAndDrainsWarmConnection(t *testing.T) {
 	r := &blockingWarmerCloserRunner{
-		fakeRunner:  &fakeRunner{},
+		// Run polls at once on an empty cache, before the test cancels it, so the fake
+		// needs a handler.
+		fakeRunner:  (&fakeRunner{}).serve(newFakeGitHub()),
 		warmStarted: make(chan struct{}),
 	}
 	opts := testOptions(openTestDB(t), r, nil)
