@@ -32,6 +32,9 @@ const (
 	// jobBaseCounts brings a project's inactive worktrees' base comparison up to a
 	// moved base without git status (basecounts.go).
 	jobBaseCounts
+	// jobUpstreams checks a project's branch worktrees' upstreams after a packed-refs
+	// or config rewrite and refreshes only the ones that changed (upstreams.go).
+	jobUpstreams
 )
 
 func (k jobKind) String() string {
@@ -48,6 +51,8 @@ func (k jobKind) String() string {
 		return "files"
 	case jobBaseCounts:
 		return "base-counts"
+	case jobUpstreams:
+		return "upstreams"
 	}
 	return "jobKind(?)"
 }

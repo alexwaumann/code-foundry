@@ -36,6 +36,10 @@ in `onEvents` is gone (it is one of the three cases now):
 
 - `packed-refs`, `config`, `config.lock` created in the common dir: reconcile and the
   status of every worktree of the project (from the routing table's worktree roots).
+  (Since `project-packed-refs-upstream-check.md`: reconcile and one upstream check,
+  which refreshes only the worktrees whose upstream changed. Git 2.54+ rewrites
+  packed-refs from auto maintenance after fetches and commits, so the status of every
+  worktree undid the saving of part 3.)
 - A rescan (`rescanKeys`): reconcile every project with a known directory at, above or
   below the path, as before, and refresh the worktrees whose events may be lost:
   - a worktree root at or below the path: that worktree;

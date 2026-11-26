@@ -158,6 +158,7 @@ func TestEventKeys(t *testing.T) {
 	status := func(p string) jobKey { return jobKey{kind: jobStatus, projectID: "p", path: p} }
 	base := jobKey{kind: jobBase, projectID: "p"}
 	recP := jobKey{kind: jobReconcile, projectID: "p"}
+	upstreams := jobKey{kind: jobUpstreams, projectID: "p"}
 	recQ := jobKey{kind: jobReconcile, projectID: "q"}
 	tests := []struct {
 		path  string
@@ -185,11 +186,12 @@ func TestEventKeys(t *testing.T) {
 		{"/h/p/.git/HEAD", renamed, []jobKey{status("/h/p")}},
 		{"/h/p/.git/logs/HEAD", modified, []jobKey{status("/h/p")}},
 		{"/h/p/.git/FETCH_HEAD", modified, []jobKey{base}},
-		// shared by every worktree: a reconcile and every status (resolveBase fans out
-		// only when the base moved)
-		{"/h/p/.git/packed-refs", renamed, []jobKey{recP, status("/h/p"), status("/h/p/.claude/worktrees/agent"), status("/w/o/p/feat"), status("/x/hand")}},
-		{"/h/p/.git/config.lock", modified, []jobKey{recP, status("/h/p"), status("/h/p/.claude/worktrees/agent"), status("/w/o/p/feat"), status("/x/hand")}},
-		{"/h/p/.git/config", renamed, []jobKey{recP, status("/h/p"), status("/h/p/.claude/worktrees/agent"), status("/w/o/p/feat"), status("/x/hand")}},
+		// shared by every worktree: a reconcile and the upstream check, which refreshes
+		// the worktrees whose upstream changed (a pack-refs changes none)
+		{"/h/p/.git/packed-refs", renamed, []jobKey{recP, upstreams}},
+		{"/h/p/.git/packed-refs", created, []jobKey{recP, upstreams}},
+		{"/h/p/.git/config.lock", modified, []jobKey{recP, upstreams}},
+		{"/h/p/.git/config", renamed, []jobKey{recP, upstreams}},
 		{"/h/p/.git/MERGE_HEAD", removed, []jobKey{status("/h/p")}},
 		{"/h/p/.git/worktrees", dirNew, []jobKey{recP}},
 		{"/h/p/.git/worktrees/new", dirNew, []jobKey{recP}},

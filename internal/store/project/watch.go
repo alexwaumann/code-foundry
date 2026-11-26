@@ -277,9 +277,12 @@ func opsOf(f fsevents.EventFlags) op {
 //   - A rescan reconciles every project with a known directory at, above, or below its
 //     path (for a stream root, every project it covers), and refreshes the worktrees
 //     whose events may be lost (rescanKeys).
-//   - packed-refs (gc, or `fetch --prune` deleting a packed remote ref) and config (an
+//   - packed-refs (`pack-refs`, run by auto maintenance after a fetch or commit since
+//     git 2.54; gc; `fetch --prune` deleting a packed remote ref) and config (an
 //     upstream set or a remote changed, `git branch -u`) are shared by every worktree:
-//     each one is refreshed.
+//     jobUpstreams compares every branch worktree's upstream with its published
+//     status and refreshes the ones that differ (upstreams.go), rather than a status
+//     for each: a pack-refs changes no ref's value.
 func eventKeys(dirs map[string]watchTarget, path string, flags fsevents.EventFlags) (keys []jobKey, tree bool) {
 	path = filepath.Clean(path)
 	if flags&rescanFlags != 0 {
@@ -290,7 +293,7 @@ func eventKeys(dirs map[string]watchTarget, path string, flags fsevents.EventFla
 	if t.kind == wkCommon && act == actReconcile {
 		switch filepath.Base(path) {
 		case "packed-refs", "config", "config.lock":
-			keys = append(keys, worktreeStatusKeys(dirs, t.projectID)...)
+			keys = append(keys, jobKey{kind: jobUpstreams, projectID: t.projectID})
 		}
 	}
 	return keys, t.kind == wkRoot && act == actStatus

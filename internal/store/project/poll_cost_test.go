@@ -96,8 +96,10 @@ func formatCounts(m map[string]int, total int) string {
 // one live worktree and 40 idle ones (10 of them with a commit of their own, so they
 // diverge from origin/main once it moves): (a) one hour of backstop polls at the
 // default intervals, driven by a test clock with no fs event, and (b) one move of
-// origin/main fetched outside the store. The numbers are the measurement in
-// docs/notes/project-rescan-idle-poll.md and project-lazy-base-counts.md.
+// origin/main fetched outside the store, (c) the refs packed, as git's auto
+// maintenance does after a fetch or commit since git 2.54, and (d) a fetch that brings
+// nothing. The numbers are the measurement in docs/notes/project-rescan-idle-poll.md,
+// project-lazy-base-counts.md and project-packed-refs-upstream-check.md.
 func TestIdleWorktreeGitCost(t *testing.T) {
 	if testing.Short() {
 		t.Skip("creates 40 worktrees")
@@ -158,12 +160,15 @@ func TestIdleWorktreeGitCost(t *testing.T) {
 		t.Errorf("an hour of polls ran status %d times and %d reconciles, want %d and 12", hour["status"], hour["worktree"], 12+4*idle)
 	}
 
-	// (b) origin/main moves; the fetch's events reach the store.
+	// (b) origin/main moves; the fetch's events reach the store. Auto maintenance is
+	// off for this fetch so the part measures the base move alone on every git: since
+	// git 2.54 the fetch's auto maintenance also packs the refs here (41 loose
+	// branches), which part (c) measures on its own.
 	writeFile(t, filepath.Join(f.other, "moved.txt"), "moved\n")
 	git(t, f.other, "add", ".")
 	git(t, f.other, "commit", "-q", "-m", "moved")
 	git(t, f.other, "push", "-q")
-	git(t, f.project, "fetch", "-q")
+	git(t, f.project, "-c", "maintenance.auto=false", "fetch", "-q")
 	before = cr.snapshot()
 	h.fsChanged()
 	h.settle()
@@ -172,9 +177,9 @@ func TestIdleWorktreeGitCost(t *testing.T) {
 	// The live worktree's status and base counts (before: every worktree's, 41 and
 	// 41); one for-each-ref for the 40 others; still a merge check for each diverged
 	// worktree but main.
-	if move["status"] != 1 || move["rev-list"] != 1 || move["for-each-ref"] != 1 || move["merge-tree"] != diverged {
-		t.Errorf("a base move ran status %d, rev-list %d, for-each-ref %d, merge-tree %d times, want 1, 1, 1, %d",
-			move["status"], move["rev-list"], move["for-each-ref"], move["merge-tree"], diverged)
+	if move["status"] != 1 || move["rev-list"] != 1 || move["for-each-ref"] != 1 || move["merge-tree"] != diverged || moveTotal != 24 {
+		t.Errorf("a base move ran status %d, rev-list %d, for-each-ref %d, merge-tree %d times (total %d), want 1, 1, 1, %d (24)",
+			move["status"], move["rev-list"], move["for-each-ref"], move["merge-tree"], moveTotal, diverged)
 	}
 	for i, p := range paths {
 		w, _ := h.store.Snapshot().Worktree(r.ID, p)
@@ -189,5 +194,35 @@ func TestIdleWorktreeGitCost(t *testing.T) {
 	w, _ := h.store.Snapshot().Worktree(r.ID, paths[idle-1])
 	if w.Status.BaseBehind != 1 {
 		t.Fatalf("an idle worktree after the base move: %+v", w.Status)
+	}
+
+	// (c) The refs are packed: what auto maintenance runs after a fetch, commit, merge
+	// or rebase since git 2.54 once enough loose refs piled up (`pack-refs --all
+	// --prune --auto`), and gc. packed-refs is rewritten and every loose ref removed,
+	// no value changes: a reconcile, the base re-resolved for the removed loose
+	// origin/main, and one upstream check (before: the reconcile and a status of every
+	// worktree, 41, with 41 rev-list when it came with a base move).
+	before = cr.snapshot()
+	git(t, f.project, "pack-refs", "--all", "--prune")
+	h.fsChanged()
+	h.settle()
+	pack, packTotal := cr.countsSince(before)
+	t.Logf("pack-refs, 1 live + %d idle worktrees: %s", idle, formatCounts(pack, packTotal))
+	if pack["status"] != 0 || pack["for-each-ref"] != 1 || pack["worktree"] != 1 || packTotal != 7 {
+		t.Errorf("pack-refs ran status %d, for-each-ref %d, worktree %d times (total %d), want 0, 1, 1 (7)",
+			pack["status"], pack["for-each-ref"], pack["worktree"], packTotal)
+	}
+
+	// (d) A fetch that brings nothing, auto maintenance on: FETCH_HEAD alone, one base
+	// re-resolution. (The refs are packed, so maintenance packs nothing; with enough
+	// loose refs on git 2.54+ it would add part (c).)
+	before = cr.snapshot()
+	git(t, f.project, "fetch", "-q")
+	h.fsChanged()
+	h.settle()
+	noop, noopTotal := cr.countsSince(before)
+	t.Logf("a fetch with nothing new, 1 live + %d idle worktrees: %s", idle, formatCounts(noop, noopTotal))
+	if noop["rev-parse"] != 1 || noopTotal != 1 {
+		t.Errorf("a no-op fetch ran %s, want rev-parse=1 (total 1)", formatCounts(noop, noopTotal))
 	}
 }

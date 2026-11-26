@@ -91,6 +91,11 @@ events delivered. Counts from the counting runner.
 | Before (branch 1 tip) | 41 | 41 | 0 | 11 (1 base + 10 merge checks) | 10 | 103 |
 | After | 1 (the live worktree) | 1 (the live worktree) | 1 | 11 | 10 | 24 |
 
+These numbers are for the fetch alone. The test's fetch now runs with auto maintenance
+off: on git 2.54+ the fixture's 41 loose branch refs make the same fetch pack the refs,
+which (until `project-packed-refs-upstream-check.md`) refreshed every worktree's status
+on top of this and made the test fail on CI's git 2.56.1 (112 commands, 44 status).
+
 The merge checks stay (10: the 9 idle diverged worktrees in `jobBaseCounts`, the live
 one in its status): they are what keeps `Landed()` right. Part (a), an hour of polls,
 is unchanged (232 commands; a poll's status reuses the memo).
