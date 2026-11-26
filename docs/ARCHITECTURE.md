@@ -1314,11 +1314,14 @@ the new command goes without it, reported on its row.
   tree window (`WorktreeFilesChanged`, not in the snapshot;
   `docs/notes/gh-events-2-worktree-files.md`). Workers write disjoint
   per-path snapshot pointers. The backstop poll (a reconcile: worktrees, metadata and
-  the stream's paths re-read, then every status, so an event that is late, dropped or
-  never sent leaves nothing stale past one interval; `docs/notes/project-watcher-tests.md`)
-  and the background fetch run each project on a live tier (a worktree with a live thread, or a detail asked for in the
-  last 10 minutes: poll and fetch every 2 min) or a slower idle tier (poll 10 min,
-  fetch 15 min); threads' edit-tool results and turn ends refresh their worktree's
+  the stream's paths re-read; plus each worktree's status once it is older than its
+  tier's interval, so an event that is late, dropped or never sent leaves nothing stale
+  past one interval; `docs/notes/project-watcher-tests.md`,
+  `docs/notes/project-rescan-idle-poll.md`) and the background fetch run on a live tier
+  (a worktree with a live thread, or a detail asked for in the last 10 minutes: its
+  project reconciled every 5 min, fetched every 2 min, and that worktree's status
+  polled every 5 min) or a slower idle tier (15 min for each, and for every worktree
+  that is not active, even beside a live one); threads' edit-tool results and turn ends refresh their worktree's
   status directly, through daemon glue on the thread events
   (`docs/notes/git-activity-tiers.md`). After a live project's fetch, checkouts on
   its default branch that are only behind their upstream and not busy are

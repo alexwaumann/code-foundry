@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"sync"
 	"testing"
 	"time"
 )
@@ -332,4 +333,133 @@ func TestTouch(t *testing.T) {
 	if n := cr.count("status") - before; n != 3 {
 		t.Fatalf("Touch then TouchNow ran status %d times, want 1", n-2)
 	}
+}
+
+func TestWtPollSchedRemaining(t *testing.T) {
+	const live, idle = 5 * time.Minute, 15 * time.Minute
+	start := time.Date(2026, 11, 25, 9, 0, 0, 0, time.UTC) // wall only, like a cached time
+	k := jobKey{kind: jobStatus, projectID: "p", path: "/w"}
+	tests := []struct {
+		name      string
+		polled    time.Time // zero: never polled, the seed applies
+		active    bool
+		refreshed time.Time
+		now       time.Time
+		want      time.Duration
+	}{
+		{"seeded at start, idle", time.Time{}, false, time.Time{}, start.Add(5 * time.Minute), 10 * time.Minute},
+		{"seeded at start, active", time.Time{}, true, time.Time{}, start.Add(5 * time.Minute), 0},
+		{"idle, polled 15 min ago", start, false, start, start.Add(15 * time.Minute), 0},
+		{"idle, refreshed by an event since", start, false, start.Add(10 * time.Minute), start.Add(15 * time.Minute), 10 * time.Minute},
+		{"turned active, refreshed 6 min ago", start, true, start.Add(4 * time.Minute), start.Add(10 * time.Minute), 0},
+		{"turned active, refreshed 1 min ago", start, true, start.Add(9 * time.Minute), start.Add(10 * time.Minute), 4 * time.Minute},
+		{"after a 1 h sleep (wall clock moved)", start, false, start, start.Add(time.Hour), 0},
+		{"clock jumped back past the last poll", start, false, start, start.Add(-time.Hour), 0},
+		{"refresh time in the future is ignored", start, false, start.Add(time.Hour), start.Add(15 * time.Minute), 0},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := newWtPollSched(tier{live: live, idle: idle}, start)
+			if !tt.polled.IsZero() {
+				s.last[k] = tt.polled
+			}
+			if got := s.remaining(k, tt.active, tt.refreshed, tt.now); got != tt.want {
+				t.Fatalf("remaining = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+// dirRunner counts git subcommands by directory.
+type dirRunner struct {
+	next Runner
+	mu   sync.Mutex
+	n    map[[2]string]int
+}
+
+func (c *dirRunner) Run(ctx context.Context, dir string, args ...string) ([]byte, error) {
+	c.mu.Lock()
+	c.n[[2]string{args[0], dir}]++
+	c.mu.Unlock()
+	return c.next.Run(ctx, dir, args...)
+}
+
+func (c *dirRunner) count(sub, dir string) int {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.n[[2]string{sub, dir}]
+}
+
+// TestPollWorktrees: the backstop's status refreshes follow each worktree's own tier,
+// whatever its siblings are; a refresh by anything else postpones the worktree's poll;
+// a worktree that turns active with an old status is refreshed at the next round;
+// worktrees added and removed between rounds are picked up and forgotten.
+func TestPollWorktrees(t *testing.T) {
+	f := newFixture(t)
+	a, b, c := filepath.Join(f.base, "a"), filepath.Join(f.base, "b"), filepath.Join(f.base, "c")
+	git(t, f.project, "worktree", "add", "-q", "-b", "a", a, "main")
+	git(t, f.project, "worktree", "add", "-q", "-b", "b", b, "main")
+	t0 := time.Date(2026, 11, 25, 9, 0, 0, 0, time.UTC)
+	clk := &testClock{t: t0}
+	dr := &dirRunner{next: ExecRunner{}, n: map[[2]string]int{}}
+	h := startHarness(t, "", Options{Runner: dr, Now: clk.Now}) // the loop is off: rounds are called below
+	g := h.store
+	r, err := g.Register(context.Background(), f.project)
+	if err != nil {
+		t.Fatal(err)
+	}
+	h.settle()
+	s := newWtPollSched(tier{live: 5 * time.Minute, idle: 15 * time.Minute}, clk.Now())
+	statuses := func() [4]int {
+		return [4]int{dr.count("status", f.project), dr.count("status", a), dr.count("status", b), dr.count("status", c)}
+	}
+	// round runs the poll's worktree pass at t0+at and checks which worktrees (main, a,
+	// b, c) it refreshed and how long until the next one is due.
+	round := func(at time.Duration, want [4]int, wantWait time.Duration) {
+		t.Helper()
+		clk.advance(t0.Add(at).Sub(clk.Now()))
+		before := statuses()
+		wait := g.pollWorktrees(s, clk.Now())
+		h.settle()
+		after := statuses()
+		var got [4]int
+		for i := range got {
+			got[i] = after[i] - before[i]
+		}
+		if got != want || wait != wantWait {
+			t.Fatalf("round at +%v: statuses (main, a, b, c) %v, next in %v; want %v, %v", at, got, wait, want, wantWait)
+		}
+	}
+
+	g.SetLiveWorktrees([]string{a}) // a is live; main and b are idle siblings
+	round(5*time.Minute, [4]int{0, 1, 0, 0}, 5*time.Minute)
+	round(10*time.Minute, [4]int{0, 1, 0, 0}, 5*time.Minute)
+	// b refreshed by something else (a turn end): its poll moves to 15 min after that.
+	g.TouchNow(b)
+	h.settle()
+	round(15*time.Minute, [4]int{1, 1, 0, 0}, 5*time.Minute)
+	// b turns active with a status 5 min old: the next round (the nudge's) refreshes it.
+	g.SetLiveWorktrees([]string{a, b})
+	round(15*time.Minute+time.Second, [4]int{0, 0, 1, 0}, 5*time.Minute-time.Second)
+	g.SetLiveWorktrees(nil)
+	round(20*time.Minute, [4]int{0, 0, 0, 0}, 5*time.Minute)
+
+	// c is added and a removed between rounds: c has its first status from the
+	// reconcile and is polled 15 min after it; a is forgotten.
+	git(t, f.project, "worktree", "add", "-q", "-b", "c", c, "main")
+	git(t, f.project, "worktree", "remove", a)
+	if err := g.sched.wait(context.Background(), jobKey{kind: jobReconcile, projectID: r.ID}); err != nil {
+		t.Fatal(err)
+	}
+	h.settle()
+	if n := dr.count("status", c); n != 1 {
+		t.Fatalf("new worktree c: %d statuses, want its first one", n)
+	}
+	round(25*time.Minute, [4]int{0, 0, 0, 0}, 5*time.Minute)
+	if _, ok := s.last[jobKey{kind: jobStatus, projectID: r.ID, path: a}]; ok {
+		t.Fatal("removed worktree a is still scheduled")
+	}
+	round(30*time.Minute, [4]int{1, 0, 0, 0}, time.Second)
+	round(30*time.Minute+time.Second, [4]int{0, 0, 1, 0}, 5*time.Minute-time.Second)
+	round(35*time.Minute, [4]int{0, 0, 0, 1}, 5*time.Minute)
 }

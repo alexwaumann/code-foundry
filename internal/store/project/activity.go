@@ -7,18 +7,25 @@ import (
 	"time"
 )
 
-// Activity tiers (docs/notes/git-activity-tiers.md). The backstop poll and the fetch
-// loop run each project on one of two cadences:
+// Activity tiers (docs/notes/git-activity-tiers.md). The fetch loop and the backstop
+// poll's reconcile run each project on one of two cadences:
 //
-//   - live: some worktree of the project has a live thread (SetLiveWorktrees: not
-//     archived, not snoozed) or was asked for its detail (WorktreeDetail) within
-//     DetailWatch. Polled every PollInterval, fetched every FetchInterval.
-//   - idle: everything else. Polled every IdlePollInterval, fetched every
+//   - live: some worktree of the project is active: it has a live thread
+//     (SetLiveWorktrees: not archived, not snoozed) or was asked for its detail
+//     (WorktreeDetail) within DetailWatch. Reconciled every PollInterval, fetched every
+//     FetchInterval.
+//   - idle: everything else. Reconciled every IdlePollInterval, fetched every
 //     IdleFetchInterval.
 //
-// A project that turns live is checked at once: a fetch (or poll) older than the live
-// interval runs now rather than at the next tick. Threads also drive status refreshes
-// directly: Touch (a file-editing tool result, debounced) and TouchNow (a turn end).
+// The poll's status refreshes are tiered per worktree (wtPollSched): an active worktree
+// is refreshed when its status is older than PollInterval, any other one when it is
+// older than IdlePollInterval, even when a sibling is live
+// (docs/notes/project-rescan-idle-poll.md).
+//
+// A project or worktree that turns active is checked at once: a fetch, reconcile or
+// status older than the live interval runs now rather than at the next tick. Threads
+// also drive status refreshes directly: Touch (a file-editing tool result, debounced)
+// and TouchNow (a turn end).
 
 // Defaults for the idle tier and Touch. Idle poll aligns with IdleFetchInterval (15m)
 // so idle projects do not stagger redundant background sweeps.
@@ -137,9 +144,11 @@ func (s *tierSched) wait(ids []string, live func(string) bool, now time.Time) ti
 // tierLoop runs run(id) for every project when it is due, first after first (nudges
 // are ignored until then), then whenever the next project is due or nudge fires
 // (a project turned live). wake (optional, active immediately) forces a round for live
-// projects after system sleep/wake. name labels the debug log.
-func (g *Git) tierLoop(ctx context.Context, name string, s *tierSched, first time.Duration, nudge, wake <-chan struct{}, run func(context.Context, string)) {
-	t := time.NewTimer(first)
+// projects after system sleep/wake. extra (optional) runs after every round from the
+// first on and returns how long until it next has work; the loop sleeps until the
+// sooner of that and the next project. name labels the debug log.
+func (g *Git) tierLoop(ctx context.Context, name string, s *tierSched, first time.Duration, nudge, wake <-chan struct{}, run func(context.Context, string), extra func(now time.Time) time.Duration) {
+	t := g.newLoopTimer(name, first)
 	defer t.Stop()
 	var nudged <-chan struct{}
 	firstDone := false
@@ -148,7 +157,7 @@ func (g *Git) tierLoop(ctx context.Context, name string, s *tierSched, first tim
 		select {
 		case <-ctx.Done():
 			return
-		case <-t.C:
+		case <-t.C():
 			firstDone = true
 			nudged = nudge
 		case <-nudged:
@@ -177,8 +186,33 @@ func (g *Git) tierLoop(ctx context.Context, name string, s *tierSched, first tim
 			t.Reset(first)
 			continue
 		}
-		t.Reset(s.wait(ids, func(id string) bool { return g.projectLive(id, now) }, now))
+		w := s.wait(ids, func(id string) bool { return g.projectLive(id, now) }, now)
+		if extra != nil {
+			w = min(w, extra(now))
+		}
+		t.Reset(w)
 	}
+}
+
+// tierTimer is a tier loop's timer: a time.Timer, or a test's (Options.loopTimers).
+type tierTimer interface {
+	C() <-chan time.Time
+	Reset(time.Duration)
+	Stop()
+}
+
+type stdTimer struct{ t *time.Timer }
+
+func (t stdTimer) C() <-chan time.Time   { return t.t.C }
+func (t stdTimer) Reset(d time.Duration) { t.t.Reset(d) }
+func (t stdTimer) Stop()                 { t.t.Stop() }
+
+// newLoopTimer starts the timer of the tier loop called name.
+func (g *Git) newLoopTimer(name string, d time.Duration) tierTimer {
+	if g.loopTimers != nil {
+		return g.loopTimers(name, d)
+	}
+	return stdTimer{time.NewTimer(d)}
 }
 
 func tierName(live bool) string {
@@ -188,19 +222,97 @@ func tierName(live bool) string {
 	return "idle"
 }
 
-// poll is the backstop poll of one project: a reconcile (worktrees, metadata, stream
-// sync, base resolution) plus low-priority status refreshes of its worktrees. Because
-// resolveBase no longer fans out status when the base is unchanged, poll explicitly
-// requests low-priority status refreshes so nothing the stream missed stays stale past
-// a poll interval (a dropped event, a stream that failed to start, or reftable refs).
+// poll is the project half of the backstop poll: a reconcile (worktrees, metadata,
+// stream sync, base resolution), at the project's tier. The worktrees' statuses are
+// the other half, tiered per worktree (pollWorktrees).
 func (g *Git) poll(_ context.Context, id string) {
 	if g.project(id) == nil {
 		return
 	}
 	g.sched.requestPrio(jobKey{kind: jobReconcile, projectID: id}, prioLow)
-	for _, k := range g.statusKeys(id) {
-		g.sched.requestPrio(k, prioLow)
+}
+
+// wtPollSched decides when each worktree's backstop status refresh is due. It is owned
+// by the poll loop's goroutine.
+type wtPollSched struct {
+	tier tier
+	// seed is the last poll of a worktree the loop has not polled yet: the loop's
+	// start (Start's reconcile just refreshed everything).
+	seed time.Time
+	last map[jobKey]time.Time
+}
+
+func newWtPollSched(t tier, seed time.Time) *wtPollSched {
+	return &wtPollSched{tier: t, seed: seed, last: map[jobKey]time.Time{}}
+}
+
+// remaining is how long until a worktree is due: its interval (live when active)
+// less the time since it was last refreshed, by this poll or by anything else
+// (refreshed: its status's RefreshedAt, zero when it has none). Zero means due now.
+// A refresh time that lies in the future (a wall-clock jump back, on a time with no
+// monotonic reading) is ignored; a last poll in the future makes it due.
+func (s *wtPollSched) remaining(k jobKey, active bool, refreshed, now time.Time) time.Duration {
+	last, ok := s.last[k]
+	if !ok {
+		last = s.seed
 	}
+	elapsed, ok := elapsedSince(last, now)
+	if !ok {
+		return 0
+	}
+	if !refreshed.IsZero() {
+		if e, ok := elapsedSince(refreshed, now); ok {
+			elapsed = min(elapsed, e)
+		}
+	}
+	return max(s.tier.every(active)-elapsed, 0)
+}
+
+// pollWorktrees is the worktree half of the backstop poll, run by the poll loop after
+// every round: a low-priority status refresh of every worktree of a git project whose
+// status is older than its tier's interval (live for an active worktree, idle for the
+// rest, whatever its siblings are), so nothing the stream missed stays stale longer
+// than that. It returns how long until the next worktree is due (at most the live
+// interval, so a worktree that turned active is looked at again soon).
+func (g *Git) pollWorktrees(s *wtPollSched, now time.Time) time.Duration {
+	type wt struct {
+		key       jobKey
+		refreshed time.Time
+	}
+	var wts []wt
+	g.mu.RLock()
+	for id, st := range g.projects {
+		if !st.meta.Load().Git {
+			continue // no status to refresh (nogit.go)
+		}
+		for p, slot := range st.wts {
+			wts = append(wts, wt{
+				key:       jobKey{kind: jobStatus, projectID: id, path: p},
+				refreshed: slot.cur.Load().Status.RefreshedAt,
+			})
+		}
+	}
+	g.mu.RUnlock()
+	wait := s.tier.live
+	seen := make(map[jobKey]bool, len(wts))
+	for _, w := range wts {
+		seen[w.key] = true
+		active := g.worktreeActive(w.key.projectID, w.key.path)
+		r := s.remaining(w.key, active, w.refreshed, now)
+		if r == 0 {
+			g.log.Debug("poll", "project", w.key.projectID, "worktree", w.key.path, "tier", tierName(active))
+			s.last[w.key] = now
+			g.sched.requestPrio(w.key, prioLow)
+			r = s.tier.every(active)
+		}
+		wait = min(wait, r)
+	}
+	for k := range s.last {
+		if !seen[k] {
+			delete(s.last, k) // removed worktree or project
+		}
+	}
+	return wait
 }
 
 // worktreeActive reports whether the worktree at path is active (has a live thread or a
