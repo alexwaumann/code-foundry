@@ -7,6 +7,7 @@ import {
   GhService,
   Mergeable,
   MergeStateStatus,
+  PullRequestChangeKind,
   PullRequestCommentKind,
   PullRequestDetailSchema,
   PullRequestMergeMethod,
@@ -197,7 +198,37 @@ export type GhEventView =
   | { kind: "repoActivity"; repoSlug: string }
   | { kind: "branchPullRequests"; repoSlug: string; headRef: string }
   | { kind: "pullRequestDetail"; repoSlug: string; number: number }
-  | { kind: "pullRequestChanged"; repoSlug: string; number: number; headRef: string; pullRequest: PullRequestView };
+  | { kind: "pullRequestChanged"; repoSlug: string; number: number; headRef: string; pullRequest: PullRequestView; changes: PrChangeKindView[] };
+
+/** What a poll saw change about a pull request (gh.ChangeKind; docs/notes/gh-events-1-pull-request-changed.md). */
+export type PrChangeKindView =
+  | "appeared"
+  | "merged"
+  | "closed"
+  | "reopened"
+  | "headPushed"
+  | "checks"
+  | "reviewDecision"
+  | "reviews"
+  | "comments"
+  | "reviewRequested"
+  | "draft"
+  | "title";
+
+const CHANGE_KINDS: Partial<Record<PullRequestChangeKind, PrChangeKindView>> = {
+  [PullRequestChangeKind.APPEARED]: "appeared",
+  [PullRequestChangeKind.MERGED]: "merged",
+  [PullRequestChangeKind.CLOSED]: "closed",
+  [PullRequestChangeKind.REOPENED]: "reopened",
+  [PullRequestChangeKind.HEAD_PUSHED]: "headPushed",
+  [PullRequestChangeKind.CHECKS]: "checks",
+  [PullRequestChangeKind.REVIEW_DECISION]: "reviewDecision",
+  [PullRequestChangeKind.REVIEWS]: "reviews",
+  [PullRequestChangeKind.COMMENTS]: "comments",
+  [PullRequestChangeKind.REVIEW_REQUESTED]: "reviewRequested",
+  [PullRequestChangeKind.DRAFT]: "draft",
+  [PullRequestChangeKind.TITLE]: "title",
+};
 
 // ---- Pull request detail panel (GetPullRequestDetail, ListReviewerCandidates) ------
 // Reads only. Its actions are daemon commands (pr.revert, pr.review.request, pr.review, pr.refresh):
@@ -486,6 +517,7 @@ export function toGhEventView(e: GhEvent): GhEventView | null {
             number: g.value.number,
             headRef: g.value.headRef,
             pullRequest: toPullRequestView(g.value.pullRequest),
+            changes: g.value.changes.flatMap((c) => CHANGE_KINDS[c.kind] ?? []),
           }
         : null;
     default:

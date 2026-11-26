@@ -611,6 +611,7 @@ func (s *Store) applyPoll(ctx context.Context, cfg Config, plan *pollPlan, res *
 		publish(s, BranchPullRequestsUpdated{Slug: u.k.slug, HeadRef: u.k.head, FetchedAt: u.st.FetchedAt})
 	}
 	for _, e := range prChanges(slices.Concat(openLists, branchLists, mergedLists), known, s.appearing, login) {
+		e.Shown = s.localShown.applyPullRequest(e.PullRequest, now)
 		publish(s, e)
 	}
 	if err := s.cache.saveActivity(ctx, activityPoll, now, pollRow{FetchedAt: now}); err != nil {

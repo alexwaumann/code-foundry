@@ -102,6 +102,30 @@ func TestPullRequestChangedJSON(t *testing.T) {
 	}
 }
 
+// Clients get the row the store shows (Shown: the user's own close laid over the poll's
+// open row), not the one its diff used; an event without Shown sends PullRequest.
+func TestPullRequestChangedSendsShownRow(t *testing.T) {
+	shown := changedEvent()
+	shown.Shown = shown.PullRequest
+	shown.Shown.State = gh.PullRequestClosed
+	tests := []struct {
+		name string
+		e    gh.PullRequestChanged
+		want v1.PullRequestState
+	}{
+		{"shown", shown, v1.PullRequestState_PULL_REQUEST_STATE_CLOSED},
+		{"no shown", changedEvent(), v1.PullRequestState_PULL_REQUEST_STATE_OPEN},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p := ghPullRequestChangedEvent(tt.e).GetPullRequestChanged().GetPullRequest()
+			if p.GetState() != tt.want || p.GetTitle() != "Fix the login redirect" {
+				t.Errorf("pull request = %v, want state %v", p, tt.want)
+			}
+		})
+	}
+}
+
 func TestEventsPullRequestChanged(t *testing.T) {
 	f := newEventsFixture(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)

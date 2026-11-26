@@ -21,7 +21,9 @@ import (
 // The overlay is for what clients see only. The poll's diffs (PullRequestChanged, the
 // merged-this-month check) and the SQLite dashboard cache use the dashboard and branch
 // lists as the poll left them (basis), so a wake on "merged" or "closed" still fires when
-// the poll sees it, as it did before.
+// the poll sees it, as it did before. A PullRequestChanged carries both rows: PullRequest
+// as the poll saw it (the daemon's wakes read it) and Shown with the marks on it (what
+// clients get, so an event never takes back what the user just did).
 
 // mergeMarkTTL bounds how long a local mutation overrides GitHub's search results.
 const mergeMarkTTL = 10 * time.Minute

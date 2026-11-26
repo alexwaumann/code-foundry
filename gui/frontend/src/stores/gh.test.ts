@@ -1,6 +1,15 @@
 import { create } from "@bufbuild/protobuf";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { CheckRollupSchema, CheckRollupState, GhEvent_PullRequestChangedSchema, GhEventSchema, PullRequestSchema, PullRequestState } from "@/gen/codefoundry/v1/gh_pb";
+import {
+  CheckRollupSchema,
+  CheckRollupState,
+  GhEvent_PullRequestChangedSchema,
+  GhEventSchema,
+  PullRequestChangeKind,
+  PullRequestChangeSchema,
+  PullRequestSchema,
+  PullRequestState,
+} from "@/gen/codefoundry/v1/gh_pb";
 import { toGhEventView, type DashboardView, type PullRequestDetailView, type PullRequestView } from "@/api/gh";
 import {
   applyGhEvent,
@@ -107,7 +116,7 @@ describe("pull_request_changed in-place cache patching", () => {
     pullRequestDetailResource.store.setState({ entries: {} });
   });
 
-  it("maps proto pullRequestChanged and patches dashboard, branch, and detail caches in place", () => {
+  it("maps proto pullRequestChanged with its change kinds and patches the dashboard and branch rows in place", () => {
     const oldPr = makePr();
     const otherPr = makePr({ number: 99, title: "Untouched" });
     dashboardResource.set(DASHBOARD_KEY, {
@@ -122,10 +131,6 @@ describe("pull_request_changed in-place cache patching", () => {
     });
     const bKey = branchKey("acme/app", "feat/x");
     branchPullRequestsResource.set(bKey, { data: { pullRequests: [oldPr], fetchedAtMs: 1000, lastError: "" } });
-    const dKey = pullRequestKey("acme/app", 42);
-    pullRequestDetailResource.set(dKey, {
-      data: { pullRequest: oldPr, body: "keep body", comments: [{ id: "c1" }], commits: [{ sha: "111" }] } as unknown as PullRequestDetailView,
-    });
 
     const mapped = toGhEventView(
       create(GhEventSchema, {
@@ -144,16 +149,23 @@ describe("pull_request_changed in-place cache patching", () => {
               headSha: "222",
               checks: create(CheckRollupSchema, { state: CheckRollupState.SUCCESS, total: 2, passed: 2 }),
             }),
+            changes: [
+              create(PullRequestChangeSchema, { kind: PullRequestChangeKind.MERGED }),
+              create(PullRequestChangeSchema, { kind: PullRequestChangeKind.HEAD_PUSHED }),
+              create(PullRequestChangeSchema, { kind: PullRequestChangeKind.CHECKS }),
+              create(PullRequestChangeSchema, { kind: PullRequestChangeKind.TITLE }),
+            ],
           }),
         },
       }),
     );
-    expect(mapped?.kind).toBe("pullRequestChanged");
+    expect(mapped).toMatchObject({ kind: "pullRequestChanged", changes: ["merged", "headPushed", "checks", "title"] });
     if (mapped) applyGhEvent(mapped);
 
     const dash = dashboardResource.store.getState().entries[DASHBOARD_KEY]?.data;
-    expect(dash?.authored[0]?.title).toBe("New title");
-    expect(dash?.authored[0]?.state).toBe("merged");
+    expect(dash?.authored[0]).toMatchObject({ title: "New title", state: "merged", headSha: "222", checks: { state: "success" } });
+    // Fields no change names keep the cached row's values (the event's row has none of them).
+    expect(dash?.authored[0]).toMatchObject({ mergeable: "mergeable", mergeState: "clean", author: "alex", additions: 1 });
     expect(dash?.authored[1]).toBe(otherPr);
     expect(dash?.reviewRequested[0]?.title).toBe("New title");
     expect(dash?.reviewed[0]?.title).toBe("New title");
@@ -162,15 +174,7 @@ describe("pull_request_changed in-place cache patching", () => {
     expect(dash?.projectMerged.pullRequests[0]?.title).toBe("New title");
 
     const branch = branchPullRequestsResource.store.getState().entries[bKey]?.data;
-    expect(branch?.pullRequests[0]?.title).toBe("New title");
-    expect(branch?.pullRequests[0]?.checks.state).toBe("success");
-
-    const detail = pullRequestDetailResource.store.getState().entries[dKey]?.data;
-    expect(detail?.pullRequest.title).toBe("New title");
-    expect(detail?.pullRequest.headSha).toBe("222");
-    expect(detail?.body).toBe("keep body");
-    expect(detail?.comments).toHaveLength(1);
-    expect(detail?.commits).toHaveLength(1);
+    expect(branch?.pullRequests[0]).toMatchObject({ title: "New title", checks: { state: "success" }, mergeable: "mergeable" });
   });
 
   it("ignores partial pullRequest payloads and leaves unrelated entries untouched", () => {
@@ -178,30 +182,65 @@ describe("pull_request_changed in-place cache patching", () => {
     dashboardResource.set(DASHBOARD_KEY, { data: makeDashboard({ authored: [oldPr] }) });
     const beforeDash = dashboardResource.store.getState().entries;
 
-    applyGhEvent({ kind: "pullRequestChanged", repoSlug: "acme/app", number: 42, headRef: "feat/x", pullRequest: makePr({ title: "", partial: true }) });
+    applyGhEvent({ kind: "pullRequestChanged", repoSlug: "acme/app", number: 42, headRef: "feat/x", pullRequest: makePr({ title: "", partial: true }), changes: ["title"] });
     expect(dashboardResource.store.getState().entries).toBe(beforeDash);
 
-    applyGhEvent({ kind: "pullRequestChanged", repoSlug: "acme/app", number: 777, headRef: "other", pullRequest: makePr({ number: 777, title: "Other" }) });
+    applyGhEvent({ kind: "pullRequestChanged", repoSlug: "acme/app", number: 777, headRef: "other", pullRequest: makePr({ number: 777, title: "Other" }), changes: ["title"] });
     expect(dashboardResource.store.getState().entries).toBe(beforeDash);
 
     expect(toGhEventView(create(GhEventSchema, { event: { case: "pullRequestChanged", value: create(GhEvent_PullRequestChangedSchema, { repoSlug: "acme/app", number: 1 }) } }))).toBeNull();
   });
 
-  it("never downgrades a merged PR back to open from a lagging pull_request_changed event", () => {
-    const mergedPr = makePr({ state: "merged", title: "Merged title" });
-    dashboardResource.set(DASHBOARD_KEY, { data: makeDashboard({ recentlyMerged: [mergedPr] }) });
+  it("a poll event for another change does not take back the user's own close or ready for review", () => {
+    // What the lists show after the user closed #42 and marked #43 ready (the daemon's overlay).
+    const closed = makePr({ state: "closed" });
+    const ready = makePr({ number: 43, draft: false, mergeState: "clean" });
     const bKey = branchKey("acme/app", "feat/x");
-    branchPullRequestsResource.set(bKey, { data: { pullRequests: [mergedPr], fetchedAtMs: 1000, lastError: "" } });
-    const dKey = pullRequestKey("acme/app", 42);
-    pullRequestDetailResource.set(dKey, {
-      data: { pullRequest: mergedPr, body: "keep", comments: [], commits: [] } as unknown as PullRequestDetailView,
+    branchPullRequestsResource.set(bKey, { data: { pullRequests: [closed, ready], fetchedAtMs: 1000, lastError: "" } });
+
+    // A poll that read GitHub before the clicks reports checks moving on both.
+    const checks = { state: "success" as const, total: 1, passed: 1, failed: 0, pending: 0, skipped: 0 };
+    applyGhEvent({ kind: "pullRequestChanged", repoSlug: "acme/app", number: 42, headRef: "feat/x", pullRequest: makePr({ state: "open", checks }), changes: ["checks"] });
+    applyGhEvent({
+      kind: "pullRequestChanged",
+      repoSlug: "acme/app",
+      number: 43,
+      headRef: "feat/x",
+      pullRequest: makePr({ number: 43, draft: true, mergeState: "draft", checks }),
+      changes: ["checks"],
     });
 
-    applyGhEvent({ kind: "pullRequestChanged", repoSlug: "acme/app", number: 42, headRef: "feat/x", pullRequest: makePr({ state: "open", title: "Lagging open" }) });
+    const rows = branchPullRequestsResource.store.getState().entries[bKey]?.data?.pullRequests;
+    expect(rows?.[0]).toMatchObject({ state: "closed", checks });
+    expect(rows?.[1]).toMatchObject({ draft: false, mergeState: "clean", checks });
+  });
 
-    expect(dashboardResource.store.getState().entries[DASHBOARD_KEY]?.data?.recentlyMerged[0]?.state).toBe("merged");
-    expect(branchPullRequestsResource.store.getState().entries[bKey]?.data?.pullRequests[0]?.state).toBe("merged");
-    expect(pullRequestDetailResource.store.getState().entries[dKey]?.data?.pullRequest.state).toBe("merged");
+  it("never writes the pull request detail: the daemon's detail read is the only judge of what is fresher", () => {
+    const dKey = pullRequestKey("acme/app", 42);
+    // The detail re-read after the user's close: GitHub's state, with detail-only fields.
+    pullRequestDetailResource.set(dKey, {
+      data: { pullRequest: makePr({ state: "closed", mergeable: "conflicting", mergeState: "dirty" }), body: "keep", comments: [], commits: [] } as unknown as PullRequestDetailView,
+    });
+    const before = pullRequestDetailResource.store.getState().entries;
+
+    applyGhEvent({ kind: "pullRequestChanged", repoSlug: "acme/app", number: 42, headRef: "feat/x", pullRequest: makePr({ state: "open", title: "Lagging" }), changes: ["title", "checks"] });
+
+    expect(pullRequestDetailResource.store.getState().entries).toBe(before);
+  });
+
+  it("keeps object identity when the named fields already match", () => {
+    const pr = makePr();
+    dashboardResource.set(DASHBOARD_KEY, { data: makeDashboard({ authored: [pr] }) });
+    const bKey = branchKey("acme/app", "feat/x");
+    branchPullRequestsResource.set(bKey, { data: { pullRequests: [pr], fetchedAtMs: 1000, lastError: "" } });
+    const dashBefore = dashboardResource.store.getState().entries;
+    const branchBefore = branchPullRequestsResource.store.getState().entries;
+
+    // The event's row differs in fields its changes do not name: nothing to write.
+    applyGhEvent({ kind: "pullRequestChanged", repoSlug: "acme/app", number: 42, headRef: "feat/x", pullRequest: makePr({ checks: { ...pr.checks }, mergeable: "unknown" }), changes: ["checks"] });
+
+    expect(dashboardResource.store.getState().entries).toBe(dashBefore);
+    expect(branchPullRequestsResource.store.getState().entries).toBe(branchBefore);
   });
 
   it("invalidateWatchedGhOnReconnect invalidates watched branch and detail resources", () => {
