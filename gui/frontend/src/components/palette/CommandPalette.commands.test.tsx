@@ -2,6 +2,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testi
 import { dismissNotice } from "@/lib/notify";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ArgSpecView, CommandView, UiContextView } from "@/api/command";
+import { dropToasterTimers } from "@/test/toaster";
 
 /**
  * The daemon's List for a context: terminal commands are available with a terminal in it,
@@ -80,6 +81,8 @@ async function enter() {
   fireEvent.keyDown(input(), { key: "Enter" });
   await settle();
 }
+
+dropToasterTimers(); // before the file's hooks: the Toaster mounts on fake timers
 
 beforeEach(() => {
   resetDaemon();

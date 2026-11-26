@@ -78,8 +78,17 @@ works around it today; the file named is a place to copy from.
 - A debounce under fake timers: `vi.useFakeTimers({ shouldAdvanceTime: true })` and
   `advanceTimersByTimeAsync`, so zero timeouts still run (`pr/PullRequestSurface.test.tsx`).
 - Toasts: mock `@/lib/notify` and assert on `notify`'s calls; to see the card itself, mount
-  the `Toaster` from `components/ui/sonner`, find the text, and `dismissNotice()` in
-  `afterEach` (`actions/ActionRunDialog.test.tsx`). Nothing names sonner directly
+  the `Toaster` from `components/ui/sonner`, find the text, and call `dropToasterTimers()`
+  (`src/test/toaster.ts`) at the top of the file, before its own hooks
+  (`gitops/GitOpToast.test.tsx`). sonner updates the Toaster from its own timers (a dismiss
+  through requestAnimationFrame, a closed toast's 200 ms exit, a 0 ms timeout per new
+  toast); one still pending when the file ends fires after its jsdom is gone, as an
+  unhandled "ReferenceError: window is not defined" from react-dom that fails the run with
+  every test green. It shows only where the forked worker outlives the file by that long (a
+  slow CI runner; locally the worker exits within milliseconds), so a local pass proves
+  nothing: to check a file, append an `afterAll` that deletes `globalThis.window` and waits
+  300 ms. The helper runs every test on fake timers that advance with the clock, and after
+  each test dismisses, unmounts and drops what is pending. Nothing names sonner directly
   (`design/toastGuard.test.ts`).
 - A store fed by a fake stream gets a published snapshot a tick later: wait until the store
   holds it before asserting (`settings/DictationSettings.test.tsx`).

@@ -3,6 +3,7 @@ import { Code } from "@connectrpc/connect";
 import { dismissNotice } from "@/lib/notify";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ThreadItemView, ThreadPendingView, ThreadRequestView } from "@/api/thread";
+import { dropToasterTimers } from "@/test/toaster";
 
 vi.mock("@/api/command", async (orig) => ({ ...(await orig<typeof import("@/api/command")>()), ...(await import("@/test/daemonFakes")).commandFakes }));
 
@@ -216,6 +217,8 @@ function flushFrames(): void {
 }
 
 const responds = () => invocationsOf("thread.respond").map((i) => i.args);
+
+dropToasterTimers(); // before the file's hooks: the Toaster mounts on fake timers
 
 beforeEach(() => {
   resetDaemon();

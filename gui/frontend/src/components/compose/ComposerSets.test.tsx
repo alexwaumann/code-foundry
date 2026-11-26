@@ -14,6 +14,7 @@ import { SelectedComposer } from "@/test/SelectedComposer";
 import { daemon, invocationsOf, lastInvocation } from "@/test/daemonFakes";
 import { addThreads, CF, GP, SK, thread, WR } from "@/test/projectsWorld";
 import { hoverTooltipText, tooltipText } from "@/test/tooltip";
+import { dropToasterTimers } from "@/test/toaster";
 
 vi.mock("@/api/command", async (orig) => ({ ...(await orig<typeof import("@/api/command")>()), ...(await import("@/test/daemonFakes")).commandFakes }));
 vi.mock("@/api/project", async (orig) => ({ ...(await orig<typeof import("@/api/project")>()), ...(await import("@/test/composerFakes")).projectFakes }));
@@ -73,6 +74,8 @@ const type = (key: string, text: string) => {
     updateDraft(key, { text });
   });
 };
+
+dropToasterTimers(); // before the file's hooks: the Toaster mounts on fake timers
 
 beforeEach(() => {
   seedComposer();

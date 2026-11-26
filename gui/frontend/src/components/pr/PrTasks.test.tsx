@@ -2,6 +2,7 @@ import { act, cleanup, fireEvent, screen, within } from "@testing-library/react"
 import { dismissNotice } from "@/lib/notify";
 import { afterEach, beforeEach, describe, expect, vi } from "vitest";
 import { bodyDone, it, trackTests } from "@/test/isolate";
+import { dropToasterTimers } from "@/test/toaster";
 
 vi.mock("@/api/command", async (orig) => ({ ...(await orig<typeof import("@/api/command")>()), ...(await import("@/test/daemonFakes")).commandFakes }));
 vi.mock("@/api/gh", async (orig) => ({ ...(await orig<typeof import("@/api/gh")>()), ...(await import("@/test/prWorld")).prGhFakes }));
@@ -26,6 +27,8 @@ const { useUiStore } = await import("@/stores/ui");
 let world: ReturnType<typeof seedPrWorld>;
 
 trackTests();
+
+dropToasterTimers(); // before the file's hooks: the Toaster mounts on fake timers
 
 beforeEach(() => {
   resetDaemon();

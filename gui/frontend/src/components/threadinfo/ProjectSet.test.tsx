@@ -13,6 +13,7 @@ import { addThreads, addWorkspace, addWorktrees, HOME, thread, worktree } from "
 import { resetCard, selectThread, updateThread } from "@/test/threadInfoWorld";
 import { tooltipText } from "@/test/tooltip";
 import { PlaceGroup } from "./PlaceGroup";
+import { dropToasterTimers } from "@/test/toaster";
 
 vi.mock("@/api/command", async (orig) => ({ ...(await orig<typeof import("@/api/command")>()), ...(await import("@/test/daemonFakes")).commandFakes }));
 vi.mock("@/api/actions", async (orig) => ({ ...(await orig<typeof import("@/api/actions")>()), ...(await import("@/test/cardFakes")).cardActionFakes }));
@@ -113,6 +114,8 @@ async function openAddList(): Promise<HTMLElement> {
 const options = (list: HTMLElement) => within(list).queryAllByRole("option");
 const crumb = () => screen.getByTestId("thread-crumb");
 const runIn = (menu: HTMLElement, project: string) => menu.querySelector<HTMLElement>(`[data-testid="ti-runin-item"][data-project="${project}"]`) as HTMLElement;
+
+dropToasterTimers(); // before the file's hooks: the Toaster mounts on fake timers
 
 beforeEach(() => {
   resetDaemon();
