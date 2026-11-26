@@ -22,6 +22,14 @@ import (
 // PullRequestHot (nodes(ids:), cost 1) query every HotPollInterval (default 15 s) for up
 // to maxHotPRs pull requests.
 //
+// The lease says someone is looking; it does not keep a pull request hot on its own. A
+// leased pull request is polled only while something changed within DefaultHotQuiet: a
+// hot poll saw its state move, a read returned a different state than the read before,
+// it was mutated here, or its lease is new (opened afresh after the last one lapsed).
+// The GUI re-reads an open panel every 60 s, which renews the lease but, unchanged,
+// does not restart the quiet window, so a check that never reports stops costing hot
+// polls after DefaultHotQuiet and is left to the regular poll.
+//
 // Invariants:
 //   - Zero wasted polls: when no pull request is eligible, or presence != PresenceForeground,
 //     no hot poll is scheduled or sent.
@@ -45,6 +53,42 @@ type hotLease struct {
 	until     time.Time
 	touchedAt time.Time
 	mutatedAt time.Time
+	// quietSince is when the pull request last changed, was mutated, or was leased
+	// afresh; it is polled only while now - quietSince < DefaultHotQuiet.
+	quietSince time.Time
+	// read is the state the last read returned; polled the state the last hot poll saw
+	// (seen once polledOK). Each is compared only with its own previous value, so two
+	// sources that disagree (the hot poll seeing UNKNOWN mergeability the cache keeps
+	// resolved) cannot restart the window on every poll.
+	read     hotState
+	polled   hotState
+	polledOK bool
+}
+
+// hotState is what makes a hot pull request worth polling: its fingerprint plus the
+// fields PullRequestHot adds.
+type hotState struct {
+	updatedAt  int64
+	state      PullRequestState
+	headSHA    string
+	checks     CheckRollup
+	draft      bool
+	mergeable  Mergeable
+	mergeState MergeStateStatus
+}
+
+func hotStateOf(p PullRequest) hotState {
+	return hotState{
+		updatedAt: p.UpdatedAt.UnixNano(), state: p.State, headSHA: p.HeadSHA, checks: p.Checks,
+		draft: p.Draft, mergeable: p.Mergeable, mergeState: p.MergeStateStatus,
+	}
+}
+
+func hotStateOfNode(n hotNode) hotState {
+	return hotState{
+		updatedAt: n.fp.UpdatedAt.UnixNano(), state: n.fp.State, headSHA: n.fp.HeadSHA, checks: n.fp.Checks,
+		draft: n.Draft, mergeable: n.Mergeable, mergeState: n.MergeStateStatus,
+	}
 }
 
 type hotLeasedKey struct {
@@ -65,19 +109,32 @@ type hotPRs struct {
 	m  map[fullKey]hotLease
 }
 
-// touch refreshes k's hot lease at now. When mutated is true, mutatedAt is also stamped
-// to now; otherwise any existing mutatedAt is preserved.
-func (h *hotPRs) touch(k fullKey, now time.Time, mutated bool) {
+// touch renews k's hot lease at now. A new lease (none, or the last one lapsed), a
+// mutation (mutatedAt is then stamped too), or a read (non-nil) returning a different
+// state than the read before restarts the quiet window; a read returning the same state
+// only renews the lease.
+func (h *hotPRs) touch(k fullKey, now time.Time, mutated bool, read *hotState) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	if h.m == nil {
 		h.m = map[fullKey]hotLease{}
 	}
-	l := h.m[k]
+	l, ok := h.m[k]
+	switch {
+	case !ok || !now.Before(l.until):
+		l = hotLease{quietSince: now}
+		if read != nil {
+			l.read = *read
+		}
+	case read != nil && *read != l.read:
+		l.read = *read
+		l.quietSince = now
+	}
 	l.until = now.Add(DefaultHotLease)
 	l.touchedAt = now
 	if mutated {
 		l.mutatedAt = now
+		l.quietSince = now
 	}
 	h.m[k] = l
 	for key, cur := range h.m {
@@ -98,6 +155,22 @@ func (h *hotPRs) touch(k fullKey, now time.Time, mutated bool) {
 		}
 		delete(h.m, oldest)
 	}
+}
+
+// observe records the state a hot poll saw for k, restarting its quiet window when it
+// differs from what the previous hot poll saw.
+func (h *hotPRs) observe(k fullKey, st hotState, now time.Time) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	l, ok := h.m[k]
+	if !ok {
+		return
+	}
+	if l.polledOK && st != l.polled {
+		l.quietSince = now
+	}
+	l.polled, l.polledOK = st, true
+	h.m[k] = l
 }
 
 // drop immediately removes k from the hot lease map (e.g. once merged or closed).
@@ -141,7 +214,7 @@ func (c *fullCache) eligibleHot(leases []hotLeasedKey, now time.Time) (candidate
 			closed = append(closed, item.key)
 			continue
 		}
-		if p.ID == "" || e.stale || e.written {
+		if p.ID == "" || e.stale || e.written || now.Sub(item.lease.quietSince) >= DefaultHotQuiet {
 			continue
 		}
 		pendingChecks := p.Checks.State == RollupPending
@@ -244,7 +317,8 @@ func (s *Store) touchHot(k fullKey, p PullRequest, mutated bool) {
 		return
 	}
 	now := s.opts.Now()
-	s.hot.touch(k, now, mutated)
+	read := hotStateOf(p)
+	s.hot.touch(k, now, mutated, &read)
 	s.armHotPoll(now)
 }
 
@@ -256,7 +330,7 @@ func (s *Store) touchHotMutated(k fullKey) {
 		return
 	}
 	now := s.opts.Now()
-	s.hot.touch(k, now, true)
+	s.hot.touch(k, now, true, nil)
 	s.armHotPoll(now)
 }
 
@@ -524,9 +598,16 @@ func (s *Store) applyHotPoll(targets []hotCandidate, nodes []hotNode, complete b
 	now := s.opts.Now()
 	snap := s.Snapshot()
 	fps := make([]prFingerprint, 0, len(nodes))
-	returnedIDs := make(map[string]bool, len(nodes))
+	byID := make(map[string]hotNode, len(nodes))
 	for _, n := range nodes {
-		returnedIDs[n.fp.ID] = true
+		byID[n.fp.ID] = n
+	}
+	for _, t := range targets {
+		if n, ok := byID[t.id]; ok {
+			s.hot.observe(t.key, hotStateOfNode(n), now)
+		}
+	}
+	for _, n := range nodes {
 		fps = append(fps, n.fp)
 		if n.fp.State != PullRequestOpen && n.fp.Repo != "" && n.fp.Number > 0 {
 			s.hot.drop(fullKey{n.fp.Repo, n.fp.Number})
@@ -538,7 +619,7 @@ func (s *Store) applyHotPoll(targets []hotCandidate, nodes []hotNode, complete b
 	if complete {
 		// Drop deleted or transferred PRs (null nodes) so we do not re-poll them until lease expiry.
 		for _, t := range targets {
-			if !returnedIDs[t.id] {
+			if _, ok := byID[t.id]; !ok {
 				s.hot.drop(t.key)
 			}
 		}
