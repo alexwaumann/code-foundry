@@ -169,10 +169,22 @@ func TestIdleWorktreeGitCost(t *testing.T) {
 	h.settle()
 	move, moveTotal := cr.countsSince(before)
 	t.Logf("one base move, 1 live + %d idle worktrees: %s", idle, formatCounts(move, moveTotal))
-	// Every worktree's status and base counts; a merge check for each diverged one.
-	if move["status"] != idle+1 || move["rev-list"] != idle+1 || move["merge-tree"] != diverged {
-		t.Errorf("a base move ran status %d, rev-list %d, merge-tree %d times, want %d, %d, %d",
-			move["status"], move["rev-list"], move["merge-tree"], idle+1, idle+1, diverged)
+	// The live worktree's status and base counts (before: every worktree's, 41 and
+	// 41); one for-each-ref for the 40 others; still a merge check for each diverged
+	// worktree but main.
+	if move["status"] != 1 || move["rev-list"] != 1 || move["for-each-ref"] != 1 || move["merge-tree"] != diverged {
+		t.Errorf("a base move ran status %d, rev-list %d, for-each-ref %d, merge-tree %d times, want 1, 1, 1, %d",
+			move["status"], move["rev-list"], move["for-each-ref"], move["merge-tree"], diverged)
+	}
+	for i, p := range paths {
+		w, _ := h.store.Snapshot().Worktree(r.ID, p)
+		want := baseFields{"origin/main", 0, 1, false}
+		if i < diverged {
+			want.ahead = 1
+		}
+		if got := fieldsOf(w); got != want {
+			t.Errorf("%s after the base move: %+v, want %+v", filepath.Base(p), got, want)
+		}
 	}
 	w, _ := h.store.Snapshot().Worktree(r.ID, paths[idle-1])
 	if w.Status.BaseBehind != 1 {

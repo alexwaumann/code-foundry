@@ -64,7 +64,8 @@ func TestResolveBaseUnchangedSkipsStatusFanout(t *testing.T) {
 		t.Fatalf("unchanged resolveBase triggered %d status runs, want 0", got)
 	}
 
-	// Once origin/main moves, resolveBase fans out status to all 5 worktrees.
+	// Once origin/main moves, every worktree's base comparison follows; none is active,
+	// so jobBaseCounts does it without a status (project-lazy-base-counts.md).
 	writeFile(t, filepath.Join(f.other, "next.txt"), "n\n")
 	git(t, f.other, "add", ".")
 	git(t, f.other, "commit", "-q", "-m", "next")
@@ -74,9 +75,15 @@ func TestResolveBaseUnchangedSkipsStatusFanout(t *testing.T) {
 	if err := h.store.sched.wait(ctx, jobKey{kind: jobBase, projectID: r.ID}); err != nil {
 		t.Fatal(err)
 	}
-	eventually(t, "base change fans out status to all 5 worktrees", 5*time.Second, func() bool {
-		return cr.count("status")-before == 5
-	})
+	h.settle()
+	if got := cr.count("status") - before; got != 0 {
+		t.Fatalf("base change ran status %d times for idle worktrees, want 0", got)
+	}
+	for _, w := range h.store.Snapshot().Projects[0].Worktrees {
+		if w.Status.BaseBehind != 1 {
+			t.Fatalf("%s after the base moved: %+v", w.Path, w.Status)
+		}
+	}
 }
 
 // A store-initiated fetch coalesces with the FSEvents FETCH_HEAD and remote-ref events
@@ -111,7 +118,8 @@ func TestFetchCoalescesWatcherBurst(t *testing.T) {
 		t.Fatalf("no-op fetch triggered %d status runs, want 0", got)
 	}
 
-	// Remote moves: 0 reconciles, 1 status pass across all 5 worktrees.
+	// Remote moves: 0 reconciles; the 5 idle worktrees' base comparisons follow with
+	// no status (one for-each-ref).
 	writeFile(t, filepath.Join(f.other, "moved.txt"), "m\n")
 	git(t, f.other, "add", ".")
 	git(t, f.other, "commit", "-q", "-m", "moved")
@@ -119,16 +127,22 @@ func TestFetchCoalescesWatcherBurst(t *testing.T) {
 
 	beforeStatus, beforeWT = cr.count("status"), cr.count("worktree")
 	h.store.fetch(ctx, r.ID)
+	beforeFER := cr.count("for-each-ref")
 	h.fsChanged()
 	eventually(t, "moved fetch updates all 5 worktrees", 5*time.Second, func() bool {
-		return cr.count("status")-beforeStatus == 5
+		for _, w := range h.store.Snapshot().Projects[0].Worktrees {
+			if w.Status.BaseBehind != 1 {
+				return false
+			}
+		}
+		return true
 	})
-	time.Sleep(200 * time.Millisecond)
+	h.settle()
 	if got := cr.count("worktree") - beforeWT; got != 0 {
 		t.Fatalf("moved fetch triggered %d reconciles, want 0", got)
 	}
-	if got := cr.count("status") - beforeStatus; got != 5 {
-		t.Fatalf("moved fetch ran status %d times, want 5 (1 pass)", got)
+	if got, fer := cr.count("status")-beforeStatus, cr.count("for-each-ref")-beforeFER; got != 0 || fer != 1 {
+		t.Fatalf("moved fetch ran status %d and for-each-ref %d times, want 0 and 1", got, fer)
 	}
 }
 
