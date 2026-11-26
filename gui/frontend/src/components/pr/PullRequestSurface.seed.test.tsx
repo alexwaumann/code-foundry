@@ -1,6 +1,7 @@
 import { act, cleanup, fireEvent, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { PullRequestDetailView, PullRequestView } from "@/api/gh";
+import { dropToasterTimers } from "@/test/toaster";
 
 /**
  * The Pull request surface while a detail with nothing cached is on its way
@@ -50,6 +51,8 @@ const { applyGhEvent, DASHBOARD_KEY, dashboardResource, branchKey, branchPullReq
 const { DIFF_WARM_AFTER_MS, pullRequestDiffResource } = await import("@/stores/prDiff");
 
 let world: ReturnType<typeof seedPrWorld>;
+
+dropToasterTimers(); // before the file's hooks: the Toaster mounts on fake timers
 
 beforeEach(async () => {
   resetDaemon();

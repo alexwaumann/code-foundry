@@ -2,6 +2,7 @@ import { act, cleanup, fireEvent, screen, within } from "@testing-library/react"
 import { useRef } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { PullRequestDiffView } from "@/api/prDiff";
+import { dropToasterTimers } from "@/test/toaster";
 
 vi.mock("@/api/command", async (orig) => ({ ...(await orig<typeof import("@/api/command")>()), ...(await import("@/test/daemonFakes")).commandFakes }));
 vi.mock("@/api/gh", async (orig) => ({ ...(await orig<typeof import("@/api/gh")>()), ...(await import("@/test/prWorld")).prGhFakes }));
@@ -71,6 +72,8 @@ let world: ReturnType<typeof seedPrWorld>;
 let answer: (number: number, headSha: string, signal?: AbortSignal) => Promise<PullRequestDiffView>;
 
 const diffFor = (headSha: string, diff = DIFF, truncated = false): PullRequestDiffView => ({ diff, headSha, truncated, fetchedAtMs: Date.now() });
+
+dropToasterTimers(); // before the file's hooks: the Toaster mounts on fake timers
 
 beforeEach(async () => {
   resetDaemon();

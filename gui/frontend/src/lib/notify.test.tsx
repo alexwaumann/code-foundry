@@ -2,6 +2,7 @@ import { act, cleanup, fireEvent, render, waitFor } from "@testing-library/react
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Toaster } from "@/components/ui/sonner";
 import { dismissNotice, notify, notifyProgress } from "./notify";
+import { dropToasterTimers } from "@/test/toaster";
 
 /**
  * notify over a real Toaster (sonner cannot be spied on, docs/notes/testing-gotchas.md):
@@ -18,6 +19,8 @@ function toastOf(title: string): HTMLElement {
 }
 
 const shown = (title: string) => waitFor(() => toastOf(title));
+
+dropToasterTimers(); // before the file's hooks: the Toaster mounts on fake timers
 
 beforeEach(() => {
   render(<Toaster />);

@@ -22,6 +22,7 @@ import { useThreadsStore } from "@/stores/threads";
 import type { ThreadView } from "@/api/threads";
 import { updateThread } from "@/test/threadInfoWorld";
 import { Composer } from "./Composer";
+import { dropToasterTimers } from "@/test/toaster";
 
 vi.mock("@/api/command", async (orig) => ({ ...(await orig<typeof import("@/api/command")>()), ...(await import("@/test/daemonFakes")).commandFakes }));
 vi.mock("@/api/placement", async (orig) => ({ ...(await orig<typeof import("@/api/placement")>()), ...(await import("@/test/cardFakes")).cardPlacementFakes }));
@@ -132,6 +133,8 @@ async function sendPrompt(text: string): Promise<void> {
   fireEvent.click(screen.getByTestId("composer-send"));
   await tick();
 }
+
+dropToasterTimers(); // before the file's hooks: the Toaster mounts on fake timers
 
 beforeEach(() => {
   resetDaemon();

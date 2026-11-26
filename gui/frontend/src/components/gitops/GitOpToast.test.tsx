@@ -1,8 +1,8 @@
-import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { dismissNotice } from "@/lib/notify";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { GitOpView } from "@/api/gitops";
 import { Toaster } from "@/components/ui/sonner";
+import { dropToasterTimers } from "@/test/toaster";
 
 const runCommand = vi.hoisted(() => vi.fn(() => Promise.resolve(true)));
 vi.mock("@/stores/commands", () => ({ runCommand }));
@@ -32,16 +32,11 @@ function toasts(): HTMLElement[] {
   return [...document.querySelectorAll<HTMLElement>("[data-sonner-toast]")];
 }
 
+dropToasterTimers(); // before the hooks below: the Toaster mounts on fake timers
+
 beforeEach(() => {
   runCommand.mockClear();
   render(<Toaster theme="dark" />);
-});
-
-afterEach(() => {
-  act(() => {
-    dismissNotice();
-  });
-  cleanup();
 });
 
 describe("git-op toasts", () => {

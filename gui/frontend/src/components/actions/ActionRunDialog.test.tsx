@@ -2,6 +2,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testi
 import { dismissNotice } from "@/lib/notify";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ActionRunFinishedView, ActionRunOutputView } from "@/api/actions";
+import { dropToasterTimers } from "@/test/toaster";
 
 vi.mock("@/api/command", async (orig) => ({ ...(await orig<typeof import("@/api/command")>()), ...(await import("@/test/daemonFakes")).commandFakes }));
 const runs = vi.hoisted(() => new Map<string, ActionRunOutputView>());
@@ -48,6 +49,8 @@ async function settle(n = 3) {
     });
   }
 }
+
+dropToasterTimers(); // before the file's hooks: the Toaster mounts on fake timers
 
 beforeEach(() => {
   resetDaemon();

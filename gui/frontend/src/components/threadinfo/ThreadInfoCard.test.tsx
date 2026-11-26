@@ -16,6 +16,7 @@ import { useProjectsStore } from "@/stores/projects";
 import { useThreadsStore } from "@/stores/threads";
 import { useUiStore } from "@/stores/ui";
 import { ThreadInfoContent } from "./ThreadInfoCard";
+import { dropToasterTimers } from "@/test/toaster";
 
 vi.mock("@/api/command", async (orig) => ({ ...(await orig<typeof import("@/api/command")>()), ...(await import("@/test/daemonFakes")).commandFakes }));
 vi.mock("@/api/worktreeDetail", async (orig) => ({ ...(await orig<typeof import("@/api/worktreeDetail")>()), ...(await import("@/test/daemonFakes")).detailFakes }));
@@ -100,6 +101,8 @@ async function settle(): Promise<void> {
     await layoutSettled();
   });
 }
+
+dropToasterTimers(); // before the file's hooks: the Toaster mounts on fake timers
 
 beforeEach(() => {
   resetDaemon();
