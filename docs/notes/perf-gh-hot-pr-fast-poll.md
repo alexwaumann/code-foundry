@@ -42,11 +42,19 @@ query PullRequestHot($ids: [ID!]!) {
 
 * `Store.hot` (`hotPRs`) holds a bounded map (`hotLeaseMax = fullCacheMax = 64`) of
   `fullKey -> hotLease{until, touchedAt, mutatedAt}`:
-  * **`FullPullRequest`** refreshes a PR's lease (`DefaultHotLease = 5m`, preserving any
-    existing `mutatedAt`), or drops it immediately if the PR is not open. Note: a panel left
-    open on a single quiet CI job with zero state changes for longer than 5 minutes lets its
-    lease expire and falls back cleanly to the regular 60 s poll (until the next change
-    triggers a re-read), preventing forgotten tabs from fast-polling indefinitely.
+  * **`FullPullRequest`** renews a PR's lease (`DefaultHotLease = 5m`, preserving any
+    existing `mutatedAt`), or drops it immediately if the PR is not open. The GUI re-reads
+    an open panel every 60 s, so the lease never lapses while a panel is open: the lease
+    only says someone is looking. What bounds the cost is the **quiet window**
+    (`DefaultHotQuiet = 15m`, `lease.quietSince`): a PR is polled only while something
+    changed within it. The window restarts when a hot poll sees the PR's state move
+    (compared with the previous hot poll), a read returns a different state than the read
+    before (compared with the previous read; never across the two sources, which can
+    disagree), the PR is mutated here, or the lease is new (none, or the last one lapsed:
+    a panel opened afresh). A keep-alive read returning the same state does not restart
+    it. So a check that never reports or a mergeability stuck at `UNKNOWN` stops costing
+    hot polls 15 minutes after its last change and is left to the regular 60 s poll
+    (`docs/notes/fix-gh-hot-poll-lease-bound.md`).
   * **Local mutations** (`patchFull` / `invalidateFull`) refresh the lease AND stamp
     `mutatedAt = now` (for `DefaultHotMutateWindow = 2m`) so CI spinning up right after a
     ready-for-review toggle, reopen, checkbox edit, or comment is caught within 15 s even
@@ -55,7 +63,8 @@ query PullRequestHot($ids: [ID!]!) {
   * **Deleted / transferred PRs**: if a complete `PullRequestHot` response (no partial
     errors) omits an asked node ID (`null` node), its hot lease is dropped immediately.
 * A leased PR is eligible for `PullRequestHot` **only** when **all** of the following hold:
-  1. Its lease has not expired (`now < lease.until`).
+  1. Its lease has not expired (`now < lease.until`) and it changed, was mutated or was
+     leased afresh within `DefaultHotQuiet` (`now - lease.quietSince < 15m`).
   2. It has a cached entry in `Store.full` with non-empty node `ID`, `State == OPEN`, and
      neither `stale` nor `written` already set (if the entry is already marked stale, an
      open panel has not re-read yet and re-polling would waste requests).
@@ -143,8 +152,16 @@ query PullRequestHot($ids: [ID!]!) {
     detected hot-poll change per open panel), a realistic sustained worst case with
     continuously changing CI in the foreground for a full hour is roughly
     `60 (Poll) + 240 (PullRequestHot) + 240 (induced refreshes) ≈ 540 pts/hr` (~10.8% of
-    GitHub's 5,000 pts/hr primary budget), bounded by `DefaultHotLease` (5 m) and paused at
-    `MinRemaining = 200`.
+    GitHub's 5,000 pts/hr primary budget), paused at `MinRemaining = 200`.
+  * A PR whose state never resolves (a required status that never reports, mergeability
+    stuck at `UNKNOWN`) costs at most `DefaultHotQuiet / HotPollInterval = 60` hot polls
+    (59 when its open arms the timer, about 45 on a healthy 60 s regular poll; calculated,
+    not measured) after its last change, mutation or fresh
+    open, then none, however long its panel stays open. The same holds for all 8 slots
+    together, since one request carries them all: hot polling stops 15 minutes after the
+    last restart of any of their windows. Only a stream of real changes or user actions
+    (opening, hovering into a prefetch, or mutating PRs) keeps it at the 4 req/min
+    ceiling.
 * **Runaway ceiling**: because `jobHotPoll` runs on the primary worker at `MinGap` (1 s) and
   never spends `gapAllowance` tokens, the global runaway bound proven in
   `docs/notes/perf-gh-read-lane.md` (**<= 3,368 req/hr** at 0.2 s RTT, paused at
@@ -201,3 +218,10 @@ Verified under `-race` in `internal/store/gh/hot_poll_test.go`:
   * `TestHotPollReadLaneCausalityAndYielding` (concurrent read-lane overlap + `fetchSeq > fpSeq`
     causality, single-lane yielding, 0 `gapAllowance` tokens spent, `readLaneEligible() == false`).
   * `TestDecodeHotNodesIgnoresNullAndNonPullRequest` (cleanly skips deleted/non-PR union nodes).
+* `internal/store/gh/hot_poll_quiet_test.go`:
+  * `TestHotPollNeverResolvingPRIsBounded` (panel re-read every 60 s for 2 h on a PR stuck
+    `PENDING`: exactly `DefaultHotQuiet / HotPollInterval - 1 = 59` hot polls; 480 before the fix).
+  * `TestHotPollQuietRearm` (keep-alive reads do not re-arm; a mutation, a fresh open after
+    the lease lapsed, and a read returning a change do).
+  * `TestHotPollProgressingCIStaysHot` (a check finishing every 14 minutes keeps the PR hot
+    for the whole run, and the run's end is seen by the next hot poll).

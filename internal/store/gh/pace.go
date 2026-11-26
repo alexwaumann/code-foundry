@@ -50,6 +50,13 @@ const (
 	// DefaultHotLease is how long a pull request stays in the hot-poll candidate set
 	// after FullPullRequest or a local mutation touches it.
 	DefaultHotLease = 5 * time.Minute
+	// DefaultHotQuiet is how long a hot pull request is polled without anything changing
+	// before it falls back to the regular poll: a check that never reports or a
+	// mergeability that stays UNKNOWN costs at most DefaultHotQuiet/HotPollInterval hot
+	// polls, not one every HotPollInterval for as long as a panel stays open. A change
+	// (seen by a hot poll or returned by a read), a local mutation, or a read after the
+	// lease lapsed starts the window again.
+	DefaultHotQuiet = 15 * time.Minute
 	// DefaultHotMutateWindow is how long a recently mutated open pull request stays
 	// hot-poll eligible even before GitHub flips its check rollup to PENDING.
 	DefaultHotMutateWindow = 2 * time.Minute
