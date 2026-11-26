@@ -229,7 +229,15 @@ func (g *Git) onEvents(evs []fsevents.Event) {
 		if pid, ref, ok := remoteRefFor(g.routes, clean, ev.Flags); ok {
 			if st := g.projects[pid]; st != nil {
 				m := st.meta.Load()
-				if ref != "origin/"+m.DefaultBranch {
+				switch {
+				case ref == "origin/"+m.DefaultBranch:
+				case opsOf(ev.Flags).has(opRemove):
+					// A loose ref removed: `fetch --prune`, or `pack-refs --prune` moving
+					// it into packed-refs unchanged (auto maintenance since git 2.54).
+					// The upstream check refreshes only a worktree whose upstream it
+					// changed (upstreams.go).
+					addHit(jobKey{kind: jobUpstreams, projectID: pid}, false, ev.Path, ev.Flags)
+				default:
 					branch := ref[len("origin/"):]
 					for p, slot := range st.wts {
 						w := slot.cur.Load()

@@ -1326,6 +1326,8 @@ func (g *Git) runJob(ctx context.Context, k jobKey) {
 		g.flushFiles(ctx, k)
 	case jobBaseCounts:
 		g.baseCountsBatch(ctx, k.projectID)
+	case jobUpstreams:
+		g.upstreamsCheck(ctx, k.projectID)
 	}
 }
 
