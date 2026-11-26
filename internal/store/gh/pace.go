@@ -42,6 +42,17 @@ const (
 	// are on or any repository is tracked or branch watched
 	// (github.poll_interval_seconds). One request, cost 1.
 	DefaultPollInterval = 60 * time.Second
+	// DefaultHotPollInterval is how often the foreground fast-poll checks actively
+	// viewed open pull requests with pending checks, unknown mergeability, or recent
+	// local mutations (hot_poll.go). One cheap nodes(ids:) request, cost 1, for up to
+	// maxHotPRs pull requests.
+	DefaultHotPollInterval = 15 * time.Second
+	// DefaultHotLease is how long a pull request stays in the hot-poll candidate set
+	// after FullPullRequest or a local mutation touches it.
+	DefaultHotLease = 5 * time.Minute
+	// DefaultHotMutateWindow is how long a recently mutated open pull request stays
+	// hot-poll eligible even before GitHub flips its check rollup to PENDING.
+	DefaultHotMutateWindow = 2 * time.Minute
 	// DefaultIdleInterval is the poll cadence with dashboards off and nothing tracked
 	// or watched: only the viewer is fetched.
 	DefaultIdleInterval = 10 * time.Minute

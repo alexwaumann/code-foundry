@@ -124,7 +124,7 @@ func (s *Store) claimWaiting() *job {
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	i := slices.IndexFunc(s.queue, func(q *job) bool { return !q.background && q.kind != jobPoll })
+	i := slices.IndexFunc(s.queue, func(q *job) bool { return !q.background && q.kind != jobPoll && q.kind != jobHotPoll })
 	if i < 0 {
 		return nil
 	}

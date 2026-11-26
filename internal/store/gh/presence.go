@@ -93,6 +93,7 @@ func (s *Store) PresenceChanged(from, to Presence) {
 		}
 	}
 	next := s.pollNext.Sub(now)
+	hotArmed := !s.hotNext.IsZero()
 	shouldWarm := to == PresenceForeground && to > from &&
 		!idle && s.stopped == nil && !s.authBad && s.pausedLocked() == nil
 	s.mu.Unlock()
@@ -101,7 +102,7 @@ func (s *Store) PresenceChanged(from, to Presence) {
 	if shouldWarm {
 		s.warmConnection()
 	}
-	if to > from {
+	if to > from || (from == PresenceForeground && hotArmed) {
 		s.nudge()
 	}
 }

@@ -635,6 +635,9 @@ func (s *Store) applyPoll(ctx context.Context, cfg Config, plan *pollPlan, res *
 	s.mu.Lock()
 	s.pollFailures = 0
 	s.schedulePollLocked(now, now.Add(interval))
+	if hotInt := s.hotInterval(); hotInt > 0 {
+		s.hotNext = now.Add(hotInt)
+	}
 	s.mu.Unlock()
 }
 
