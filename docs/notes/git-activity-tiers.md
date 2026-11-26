@@ -29,11 +29,21 @@ Now each project is **live** or **idle**:
 | Backstop poll (a reconcile since `project-watcher-tests.md`: worktrees and metadata, then `jobBase` and status of every worktree) | 2 min | 10 min | `PollInterval` / `IdlePollInterval` |
 | `git fetch --prune` | 2 min (`projects.fetch_interval_seconds`) | 15 min | `FetchInterval` / `IdleFetchInterval` |
 
+**Since then** (current behaviour): the intervals are 5 min live and 15 min idle (#897,
+`perf-project-sched-fetch-fsx.md`), and the backstop poll is tiered in two halves
+(`project-rescan-idle-poll.md`): the reconcile stays per project (live project: 5 min,
+idle: 15 min), and each worktree's status refresh follows the worktree's own tier: an
+*active* worktree (live thread or detail watch) is refreshed once its status is 5 min
+old, every other worktree once it is 15 min old, even when a sibling is live. A status
+refreshed by anything else (an fs event, Touch, Refresh) postpones that worktree's poll.
+
 The idle interval is never shorter than the live one: a fetch interval set above 15 min
 applies to idle projects as well. The settings description says so.
 
 When a project turns live, both loops are woken. A fetch older than the live fetch
-interval (2 min) runs now, and so does a poll older than the live poll interval (2 min). A project that was idle for a while
+interval (2 min) runs now, and so does a poll older than the live poll interval (2 min)
+(since `project-rescan-idle-poll.md`: the worktree that turned active is refreshed if
+its status is older than the live interval, not its siblings). A project that was idle for a while
 is therefore fetched and polled the moment a thread starts or comes back (unarchive,
 snooze ends) in it.
 

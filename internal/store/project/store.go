@@ -79,13 +79,15 @@ type Options struct {
 	// IdleFetchInterval is how often each idle project is fetched. Zero means
 	// DefaultIdleFetchInterval; it is never shorter than FetchInterval.
 	IdleFetchInterval time.Duration
-	// PollInterval is a backstop status refresh of every worktree of a live project,
-	// for changes the FSEvents stream cannot see (a ref moved in a packed or reftable
-	// store, a stream that failed to start). Zero means DefaultPollInterval; negative
+	// PollInterval is the backstop poll of a live project (a reconcile) and of an
+	// active worktree (a status refresh once its status is this old), for changes the
+	// FSEvents stream cannot see (a ref moved in a packed or reftable store, a stream
+	// that failed to start, a network volume). Zero means DefaultPollInterval; negative
 	// disables polling.
 	PollInterval time.Duration
-	// IdlePollInterval is the backstop poll of an idle project. Zero means
-	// DefaultIdlePollInterval; it is never shorter than PollInterval.
+	// IdlePollInterval is the backstop poll of an idle project and of a worktree that
+	// is not active, even in a live project. Zero means DefaultIdlePollInterval; it is
+	// never shorter than PollInterval.
 	IdlePollInterval time.Duration
 	// TouchDebounce is Touch's per-worktree coalescing window. Zero means
 	// DefaultTouchDebounce.
@@ -98,6 +100,8 @@ type Options struct {
 	streams streamSource
 	// wake overrides the sleep/wake monitor in tests (sleepwake.go).
 	wake *wakeConfig
+	// loopTimers replaces the tier loops' timers in tests (activity.go).
+	loopTimers func(name string, d time.Duration) tierTimer
 }
 
 // projectMeta is a project's metadata slot, written only by Register, the project's
@@ -216,6 +220,7 @@ type Git struct {
 	fetchNudge chan struct{}
 	fetchWake  chan struct{}
 	wakeCfg    *wakeConfig
+	loopTimers func(name string, d time.Duration) tierTimer
 
 	details detailState   // worktree detail cache (detail.go)
 	files   fileCollector // live worktrees' file changes (files.go)
@@ -271,6 +276,7 @@ func Start(ctx context.Context, opts Options) (*Git, error) {
 		fetchNudge: make(chan struct{}, 1),
 		fetchWake:  make(chan struct{}, 1),
 		wakeCfg:    opts.wake,
+		loopTimers: opts.loopTimers,
 	}
 	if g.runner == nil {
 		g.runner = NewExecRunner()
@@ -322,14 +328,18 @@ func Start(ctx context.Context, opts Options) (*Git, error) {
 		// Every project is due in the first round (zero seed), shortly after start.
 		s := newTierSched(t, time.Time{})
 		g.wg.Go(func() {
-			g.tierLoop(ctx, "fetch", s, min(t.live, firstFetchDelay), g.fetchNudge, g.fetchWake, g.fetchAsync)
+			g.tierLoop(ctx, "fetch", s, min(t.live, firstFetchDelay), g.fetchNudge, g.fetchWake, g.fetchAsync, nil)
 		})
 	}
 	if t := tiers(opts.PollInterval, opts.IdlePollInterval, DefaultPollInterval, DefaultIdlePollInterval); t.live > 0 {
 		// The initial reconcile below refreshes everything, so each project's first
-		// poll is one interval after start.
-		s := newTierSched(t, g.now())
-		g.wg.Go(func() { g.tierLoop(ctx, "poll", s, t.live, g.pollNudge, nil, g.poll) })
+		// reconcile, and each worktree's first status, is one interval after start.
+		s, ws := newTierSched(t, g.now()), newWtPollSched(t, g.now())
+		g.wg.Go(func() {
+			g.tierLoop(ctx, "poll", s, t.live, g.pollNudge, nil, g.poll, func(now time.Time) time.Duration {
+				return g.pollWorktrees(ws, now)
+			})
+		})
 	}
 	g.wg.Go(func() { g.runWakeMonitor(ctx) })
 
@@ -1308,8 +1318,9 @@ func (g *Git) runJob(ctx context.Context, k jobKey) {
 }
 
 // reconcile re-lists a project's worktrees and metadata, syncs slots and fs routes,
-// publishes, then requests jobBase, which re-resolves the base and refreshes the
-// status of every worktree.
+// publishes, then requests jobBase, which re-resolves the base. jobBase refreshes the
+// status of every worktree only when the base moved (and of new worktrees always), so
+// a caller that needs statuses refreshed requests them itself (eventKeys, pollWorktrees).
 func (g *Git) reconcile(ctx context.Context, id string) {
 	g.refsCache.invalidate(id)
 	st := g.project(id)

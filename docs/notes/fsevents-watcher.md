@@ -79,16 +79,16 @@ Known directories per git project (`<common>` = `<main>/.git`):
 
 | Directory | Entry → action |
 |---|---|
-| `<common>` | `HEAD`, `index` → status(main). `FETCH_HEAD`, `packed-refs`, `config`, `worktrees` → reconcile. `config.lock` created → reconcile. Operation markers (`rebase-merge`, `rebase-apply`, `MERGE_HEAD`, `CHERRY_PICK_HEAD`, `REVERT_HEAD`, `BISECT_LOG`) → status(main). Anything deeper (`objects/`, `refs/heads/`, `rebase-merge/*`, fsmonitor cookies) → nothing |
+| `<common>` | `HEAD`, `index` → status(main). `FETCH_HEAD` → base(project). `packed-refs`, `config`, `config.lock` created → reconcile and status(all) (a reconcile alone refreshes no status since #897; `project-rescan-idle-poll.md`). `worktrees` → reconcile. Operation markers (`rebase-merge`, `rebase-apply`, `MERGE_HEAD`, `CHERRY_PICK_HEAD`, `REVERT_HEAD`, `BISECT_LOG`) → status(main). Anything deeper (`objects/`, `refs/heads/`, `rebase-merge/*`, fsmonitor cookies) → nothing |
 | `<common>/logs` | `HEAD` → status(main). Deeper (`logs/refs/...`) → nothing |
-| `<common>/refs/remotes/origin` | **anything at any depth** → base(project), then status(all) |
+| `<common>/refs/remotes/origin` | **anything at any depth** → base(project), which refreshes status(all) when origin/<default> moved; another branch's ref → status of the worktrees on or tracking it |
 | `<common>/worktrees` | entry created, removed, or renamed → reconcile |
 | `<common>/worktrees/<name>` | `HEAD`, `index`, operation markers → status(that worktree). An admin dir not yet reconciled is ignored; its creation in `worktrees/` reconciles |
 | `<common>/worktrees/<name>/logs` | `HEAD` → status(that worktree) |
 | each worktree root | **anything at any depth** except the root's `.git` → status(that worktree) |
 | a project without git (its directory) | `.git` created or renamed in → reconcile (`git init` outside the app). Nothing else |
 | a known directory itself removed or renamed | → reconcile (worktree deleted by hand, project moved) |
-| `MustScanSubDirs` / `KernelDropped` / `UserDropped` / `RootChanged` / `Mount` / `Unmount` | → reconcile every project with a known directory at, above, or below the event path |
+| `MustScanSubDirs` / `KernelDropped` / `UserDropped` / `RootChanged` / `Mount` / `Unmount` | → reconcile every project with a known directory at, above, or below the event path, and refresh the worktrees whose events may be lost: a worktree root at or below the path, or the one whose tree the path is in; every worktree of the project when a git admin dir is at or below the path or the path is inside one (`rescanKeys`, `project-rescan-idle-poll.md`) |
 
 Filters: `.lock` names are ignored in the git directories (except `<common>/config.lock`
 created), but **not in worktrees** any more: there a `.lock` file is the user's

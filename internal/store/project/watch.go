@@ -2,6 +2,7 @@ package project
 
 import (
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -102,8 +103,8 @@ type action uint8
 const (
 	actNone      action = iota
 	actStatus           // refresh the target's worktree
-	actStatusAll        // re-resolve the project's base (jobBase), then refresh every worktree
-	actReconcile        // re-list worktrees and project metadata, then refresh all
+	actStatusAll        // re-resolve the project's base (jobBase): every worktree is refreshed if it moved
+	actReconcile        // re-list worktrees and project metadata, then re-resolve the base (statuses: eventKeys)
 )
 
 func (a action) String() string {
@@ -218,8 +219,9 @@ func keysFor(t watchTarget, act action) []jobKey {
 	case actStatus:
 		return []jobKey{{kind: jobStatus, projectID: t.projectID, path: t.wtPath}}
 	case actStatusAll:
-		// A remote-tracking ref moved: re-resolve the base, which then refreshes
-		// every worktree (upstream and base ahead/behind).
+		// A remote-tracking ref moved: re-resolve the base, which refreshes every
+		// worktree when origin/<default> moved (base ahead/behind). Upstreams on
+		// other branches: onEvents (remoteRefFor).
 		return []jobKey{{kind: jobBase, projectID: t.projectID}}
 	case actReconcile:
 		return []jobKey{{kind: jobReconcile, projectID: t.projectID}}
@@ -263,28 +265,116 @@ func opsOf(f fsevents.EventFlags) op {
 	return o
 }
 
-// eventKeys maps one FSEvents event to the jobs it asks for. A rescan event
-// reconciles every project with a known directory at, above, or below its path (for a
-// stream root, every project it covers). tree reports an edit in a worktree's tree (the
-// nearest known directory is a worktree root and the action is a status refresh): its
-// job takes the longer tree debounce window (Options.TreeDebounce).
+// eventKeys maps one FSEvents event to the jobs it asks for. tree reports an edit in a
+// worktree's tree (the nearest known directory is a worktree root and the action is a
+// status refresh): its job takes the longer tree debounce window
+// (Options.TreeDebounce).
+//
+// A reconcile alone refreshes no status (resolveBase fans out only when the base
+// moved), so an event that may have changed statuses the reconcile does not see asks
+// for them too:
+//
+//   - A rescan reconciles every project with a known directory at, above, or below its
+//     path (for a stream root, every project it covers), and refreshes the worktrees
+//     whose events may be lost (rescanKeys).
+//   - packed-refs (gc, or `fetch --prune` deleting a packed remote ref) and config (an
+//     upstream set or a remote changed, `git branch -u`) are shared by every worktree:
+//     each one is refreshed.
 func eventKeys(dirs map[string]watchTarget, path string, flags fsevents.EventFlags) (keys []jobKey, tree bool) {
 	path = filepath.Clean(path)
 	if flags&rescanFlags != 0 {
-		ids := map[string]bool{}
-		for d, t := range dirs {
-			if fsx.Within(d, path) || fsx.Within(path, d) {
-				ids[t.projectID] = true
-			}
-		}
-		keys = make([]jobKey, 0, len(ids))
-		for id := range ids {
-			keys = append(keys, jobKey{kind: jobReconcile, projectID: id})
-		}
-		return keys, false
+		return rescanKeys(dirs, path), false
 	}
 	t, act := route(dirs, path, opsOf(flags))
-	return keysFor(t, act), t.kind == wkRoot && act == actStatus
+	keys = keysFor(t, act)
+	if t.kind == wkCommon && act == actReconcile {
+		switch filepath.Base(path) {
+		case "packed-refs", "config", "config.lock":
+			keys = append(keys, worktreeStatusKeys(dirs, t.projectID)...)
+		}
+	}
+	return keys, t.kind == wkRoot && act == actStatus
+}
+
+// rescanKeys is what a rescan at path asks for: a reconcile of every project with a
+// known directory at, above, or below path, and the status of every worktree whose
+// events may have been dropped. Those are decided by the known directories at or below
+// path, and, when path lies inside one, by the nearest known directory above it:
+//
+//   - a worktree root: that worktree (dropped edits in its files change nothing else);
+//   - a git admin directory (the common dir, its logs, remote refs, worktrees/, a linked
+//     worktree's admin dir): every worktree of the project, since a dropped
+//     packed-refs, config or remote-ref event can change any of them;
+//   - a project without git: nothing beyond the reconcile.
+//
+// So a rescan at the managed worktree root refreshes the worktrees under it, not the
+// main checkouts, and one inside a worktree's node_modules refreshes that worktree.
+func rescanKeys(dirs map[string]watchTarget, path string) []jobKey {
+	type cover struct {
+		all      bool
+		statuses map[string]bool
+		nearest  string // the nearest known directory above path
+	}
+	covers := map[string]*cover{}
+	for d, t := range dirs {
+		in, above := fsx.Within(path, d), fsx.Within(d, path)
+		if !in && !above {
+			continue
+		}
+		c := covers[t.projectID]
+		if c == nil {
+			c = &cover{statuses: map[string]bool{}}
+			covers[t.projectID] = c
+		}
+		switch {
+		case above:
+			if len(d) > len(c.nearest) {
+				c.nearest = d
+			}
+		case t.kind == wkRoot:
+			c.statuses[t.wtPath] = true
+		case t.kind != wkPlainRoot:
+			c.all = true
+		}
+	}
+	ids := slices.Sorted(maps.Keys(covers))
+	keys := make([]jobKey, 0, len(ids))
+	for _, id := range ids {
+		keys = append(keys, jobKey{kind: jobReconcile, projectID: id})
+	}
+	for _, id := range ids {
+		c := covers[id]
+		if c.nearest != "" {
+			switch t := dirs[c.nearest]; t.kind {
+			case wkRoot:
+				c.statuses[t.wtPath] = true
+			case wkPlainRoot:
+			default:
+				c.all = true
+			}
+		}
+		if c.all {
+			keys = append(keys, worktreeStatusKeys(dirs, id)...)
+			continue
+		}
+		for _, p := range slices.Sorted(maps.Keys(c.statuses)) {
+			keys = append(keys, jobKey{kind: jobStatus, projectID: id, path: p})
+		}
+	}
+	return keys
+}
+
+// worktreeStatusKeys returns the status job of every worktree of a git project in
+// dirs (its worktree roots), sorted by path.
+func worktreeStatusKeys(dirs map[string]watchTarget, projectID string) []jobKey {
+	var keys []jobKey
+	for d, t := range dirs {
+		if t.kind == wkRoot && t.projectID == projectID {
+			keys = append(keys, jobKey{kind: jobStatus, projectID: projectID, path: d})
+		}
+	}
+	slices.SortFunc(keys, func(a, b jobKey) int { return strings.Compare(a.path, b.path) })
+	return keys
 }
 
 // remoteRefFor reports whether an event at path (already cleaned) modified a loose
