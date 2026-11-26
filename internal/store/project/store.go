@@ -1294,8 +1294,9 @@ func (g *Git) runJob(ctx context.Context, k jobKey) {
 }
 
 // reconcile re-lists a project's worktrees and metadata, syncs slots and fs routes,
-// publishes, then requests jobBase, which re-resolves the base and refreshes the
-// status of every worktree.
+// publishes, then requests jobBase, which re-resolves the base. jobBase refreshes the
+// status of every worktree only when the base moved (and of new worktrees always), so
+// a caller that needs statuses refreshed requests them itself (eventKeys, poll).
 func (g *Git) reconcile(ctx context.Context, id string) {
 	g.refsCache.invalidate(id)
 	st := g.project(id)

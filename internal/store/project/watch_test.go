@@ -1,6 +1,7 @@
 package project
 
 import (
+	"cmp"
 	"reflect"
 	"slices"
 	"strings"
@@ -184,8 +185,11 @@ func TestEventKeys(t *testing.T) {
 		{"/h/p/.git/HEAD", renamed, []jobKey{status("/h/p")}},
 		{"/h/p/.git/logs/HEAD", modified, []jobKey{status("/h/p")}},
 		{"/h/p/.git/FETCH_HEAD", modified, []jobKey{base}},
-		{"/h/p/.git/packed-refs", renamed, []jobKey{recP}},
-		{"/h/p/.git/config.lock", modified, []jobKey{recP}},
+		// shared by every worktree: a reconcile and every status (resolveBase fans out
+		// only when the base moved)
+		{"/h/p/.git/packed-refs", renamed, []jobKey{recP, status("/h/p"), status("/h/p/.claude/worktrees/agent"), status("/w/o/p/feat"), status("/x/hand")}},
+		{"/h/p/.git/config.lock", modified, []jobKey{recP, status("/h/p"), status("/h/p/.claude/worktrees/agent"), status("/w/o/p/feat"), status("/x/hand")}},
+		{"/h/p/.git/config", renamed, []jobKey{recP, status("/h/p"), status("/h/p/.claude/worktrees/agent"), status("/w/o/p/feat"), status("/x/hand")}},
 		{"/h/p/.git/MERGE_HEAD", removed, []jobKey{status("/h/p")}},
 		{"/h/p/.git/worktrees", dirNew, []jobKey{recP}},
 		{"/h/p/.git/worktrees/new", dirNew, []jobKey{recP}},
@@ -223,17 +227,26 @@ func TestEventKeys(t *testing.T) {
 		{"/w/o/p/feat2/x.go", created, nil},
 		{"/elsewhere/x", created, nil},
 
-		// rescans reconcile what the path covers, or its owner
-		{"/h/p/src", fsevents.MustScanSubDirs | fsevents.UserDropped, []jobKey{recP}},
-		{"/w", fsevents.MustScanSubDirs | fsevents.KernelDropped, []jobKey{recP}},
-		{"/h", fsevents.MustScanSubDirs, []jobKey{recP, recQ}},
+		// rescans reconcile what the path covers, or its owner, and refresh the
+		// worktrees whose events may be lost: inside one worktree's tree, that one
+		{"/h/p/src", fsevents.MustScanSubDirs | fsevents.UserDropped, []jobKey{recP, status("/h/p")}},
+		{"/w/o/p/feat/node_modules", fsevents.MustScanSubDirs, []jobKey{recP, status("/w/o/p/feat")}},
+		// covering worktree roots only: those
+		{"/w", fsevents.MustScanSubDirs | fsevents.KernelDropped, []jobKey{recP, status("/w/o/p/feat")}},
+		{"/h/p/.claude", fsevents.MustScanSubDirs, []jobKey{recP, status("/h/p"), status("/h/p/.claude/worktrees/agent")}},
+		// covering or inside a git admin dir: every worktree of the project
+		{"/h", fsevents.MustScanSubDirs, []jobKey{recP, recQ, status("/h/p"), status("/h/p/.claude/worktrees/agent"), status("/w/o/p/feat"), status("/x/hand")}},
+		{"/h/p/.git/objects", fsevents.MustScanSubDirs, []jobKey{recP, status("/h/p"), status("/h/p/.claude/worktrees/agent"), status("/w/o/p/feat"), status("/x/hand")}},
+		{"/h/p/.git/worktrees/feat", fsevents.MustScanSubDirs, []jobKey{recP, status("/h/p"), status("/h/p/.claude/worktrees/agent"), status("/w/o/p/feat"), status("/x/hand")}},
+		// a project without git: the reconcile alone
 		{"/h/q", fsevents.RootChanged, []jobKey{recQ}},
 		{"/nowhere", fsevents.MustScanSubDirs, []jobKey{}},
 	}
 	dirs := fakeRoutes()
 	for _, tt := range tests {
 		got, _ := eventKeys(dirs, tt.path, tt.flags)
-		slices.SortFunc(got, func(a, b jobKey) int { return strings.Compare(a.projectID, b.projectID) })
+		slices.SortFunc(got, cmpJobKey)
+		slices.SortFunc(tt.want, cmpJobKey)
 		if !(len(got) == 0 && len(tt.want) == 0) && !reflect.DeepEqual(got, tt.want) {
 			t.Errorf("eventKeys(%q, %#x) = %v, want %v", tt.path, uint32(tt.flags), got, tt.want)
 		}
@@ -332,4 +345,8 @@ func TestParseGitFile(t *testing.T) {
 			t.Errorf("parseGitFile(%q, %q) = %q, %v", tt.wt, tt.content, got, err)
 		}
 	}
+}
+
+func cmpJobKey(a, b jobKey) int {
+	return cmp.Or(cmp.Compare(a.kind, b.kind), strings.Compare(a.projectID, b.projectID), strings.Compare(a.path, b.path))
 }
