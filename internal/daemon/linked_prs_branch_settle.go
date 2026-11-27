@@ -61,15 +61,25 @@ func headsByRef(prs []gh.PullRequest) map[gh.PullRequestRef]prHead {
 }
 
 // defaultBranchOf is the default branch of the project with GitHub slug (any case);
-// known is false while a project with that slug has none yet (not reconciled since the
-// start). No such project: "", true (nothing to compare with; the link keeps its head).
+// known is false while a project with that slug has none yet (registered this run and
+// not reconciled yet), and while any project is still the last run's (Cached, without
+// a failed reconcile): its slug and default branch may have changed while the daemon
+// was down, so which project has slug is not known either. A cached project whose
+// reconcile failed is left out, as it was before the cache (no slug until a reconcile
+// succeeds). No such project: "", true (nothing to compare with; the link keeps its
+// head).
 func defaultBranchOf(projects *project.Snapshot, slug string) (branch string, known bool) {
 	if projects == nil {
 		return "", false
 	}
+	for _, p := range projects.Projects {
+		if p.Cached && p.Error == "" {
+			return "", false
+		}
+	}
 	found := false
 	for _, p := range projects.Projects {
-		if !strings.EqualFold(p.GitHubSlug, slug) {
+		if p.Cached || !strings.EqualFold(p.GitHubSlug, slug) {
 			continue
 		}
 		if p.DefaultBranch != "" {

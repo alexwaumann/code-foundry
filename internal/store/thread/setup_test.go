@@ -12,6 +12,7 @@ import (
 
 	"github.com/alexwaumann/code-foundry/internal/bus"
 	"github.com/alexwaumann/code-foundry/internal/store/project"
+	"github.com/alexwaumann/code-foundry/internal/store/project/projecttest"
 	"github.com/alexwaumann/code-foundry/internal/store/workspace"
 	"github.com/alexwaumann/code-foundry/internal/store/workspace/workspacetest"
 )
@@ -1141,6 +1142,41 @@ func TestSetupWhy(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := setupWhy("s1", tt.err); got != tt.want {
 				t.Errorf("setupWhy = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+// A dead Create's cleanup waits for the projects of what it made to list their worktrees
+// this run: a project with only the last run's (Cached) may not have the worktree the
+// Create added yet.
+func TestSetupProjectsListed(t *testing.T) {
+	f := projecttest.New(nil)
+	wt := []project.Worktree{{ProjectID: "listed", Path: "/w", IsMain: true, Branch: "main"}}
+	f.Put(project.Project{ID: "listed", Git: true, Worktrees: wt})
+	f.Put(project.Project{ID: "cached", Git: true, Cached: true, Worktrees: wt})
+	f.Put(project.Project{ID: "none", Git: true})
+	f.Put(project.Project{ID: "plain", Worktrees: wt})
+	m := &Manager{opts: Options{Projects: f}}
+	for _, tt := range []struct {
+		name    string
+		project string
+		want    bool
+	}{
+		{"listed this run", "listed", true},
+		{"the last run's worktrees only", "cached", false},
+		{"no worktrees yet", "none", false},
+		{"a plain folder", "plain", true},
+		{"a project that is gone", "gone", true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			made := Thread{Setup: &Setup{Made: []SetupWorktree{{ProjectID: tt.project, Path: "/w/x"}}}}
+			adding := Thread{Setup: &Setup{Adding: []SetupAdd{{ProjectID: tt.project, Path: "/w/x"}}}}
+			if got := m.setupProjectsListed(made); got != tt.want {
+				t.Errorf("made: %v; want %v", got, tt.want)
+			}
+			if got := m.setupProjectsListed(adding); got != tt.want {
+				t.Errorf("adding: %v; want %v", got, tt.want)
 			}
 		})
 	}

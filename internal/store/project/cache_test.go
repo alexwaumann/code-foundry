@@ -2,6 +2,7 @@ package project
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"slices"
@@ -262,5 +263,114 @@ func TestSnapshotCacheDeletedProjectDirSkipped(t *testing.T) {
 	}
 	if len(p.Worktrees) != 0 || p.DefaultBranch != "" {
 		t.Fatalf("deleted project should not hydrate stale metadata/worktrees: %+v", p)
+	}
+}
+
+// noStatusRunner runs every git command for real but holds `git status` until its
+// context ends, so a test sees what the reconcile alone publishes.
+type noStatusRunner struct{ ExecRunner }
+
+func (r noStatusRunner) Run(ctx context.Context, dir string, args ...string) ([]byte, error) {
+	if len(args) > 0 && args[0] == "status" {
+		<-ctx.Done()
+		return nil, ctx.Err()
+	}
+	return r.ExecRunner.Run(ctx, dir, args...)
+}
+
+// failRunner fails every git command: a reconcile that cannot read the project.
+type failRunner struct{}
+
+func (failRunner) Run(context.Context, string, ...string) ([]byte, error) {
+	return nil, errors.New("boom")
+}
+
+// A hydrated project is Cached until its first successful reconcile, and the snapshot
+// that clears it already carries what the reconcile listed: a worktree that switched
+// branch or detached while the daemon was down is reseeded from the listing, not left
+// on the cached branch until its status job runs. A failed reconcile leaves it Cached; a
+// project registered this run never is.
+func TestSnapshotCacheCachedUntilLiveReconcile(t *testing.T) {
+	tests := []struct {
+		name       string
+		whileDown  func(t *testing.T, wt string)
+		runner     Runner
+		wantCached bool
+		wantError  bool
+		check      func(t *testing.T, w Worktree)
+	}{
+		{name: "nothing changed", runner: noStatusRunner{NewExecRunner()},
+			check: func(t *testing.T, w Worktree) {
+				if w.Branch != "feat/x" || w.Detached || !w.Status.Dirty {
+					t.Errorf("worktree %+v; want feat/x with its cached status kept", w)
+				}
+			}},
+		{name: "worktree switched branch", runner: noStatusRunner{NewExecRunner()},
+			whileDown: func(t *testing.T, wt string) { git(t, wt, "switch", "-q", "-c", "feat/y") },
+			check: func(t *testing.T, w Worktree) {
+				if w.Branch != "feat/y" || w.Detached || w.Status.Dirty {
+					t.Errorf("worktree %+v; want feat/y, its cached status (of feat/x) dropped", w)
+				}
+			}},
+		{name: "worktree detached", runner: noStatusRunner{NewExecRunner()},
+			whileDown: func(t *testing.T, wt string) { git(t, wt, "switch", "-q", "--detach") },
+			check: func(t *testing.T, w Worktree) {
+				if w.Branch != "" || !w.Detached {
+					t.Errorf("worktree %+v; want detached", w)
+				}
+			}},
+		{name: "reconcile failed", runner: failRunner{}, wantCached: true, wantError: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			f := newFixture(t)
+			dbPath := filepath.Join(t.TempDir(), "db.sqlite")
+			wtRoot := filepath.Join(f.base, "wt")
+			ctx := context.Background()
+			h := startHarness(t, dbPath, Options{WorktreeRoot: wtRoot})
+			r, err := h.store.Register(ctx, f.project)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if p, _ := h.store.Snapshot().Project(r.ID); p.Cached {
+				t.Fatal("a project registered this run is Cached")
+			}
+			wt, err := h.store.CreateWorktree(ctx, CreateWorktreeOptions{ProjectID: r.ID, Branch: "feat/x"})
+			if err != nil {
+				t.Fatal(err)
+			}
+			writeFile(t, filepath.Join(wt.Path, "dirty.txt"), "x\n")
+			if err := h.store.Refresh(ctx, r.ID); err != nil {
+				t.Fatal(err)
+			}
+			h.close()
+			if tt.whileDown != nil {
+				git(t, wt.Path, "stash", "-q", "-u") // a clean tree to switch from
+				tt.whileDown(t, wt.Path)
+			}
+
+			h2 := startHarness(t, dbPath, Options{WorktreeRoot: wtRoot, Runner: tt.runner})
+			if p, _ := h2.store.Snapshot().Project(r.ID); !p.Cached {
+				t.Fatal("hydrated project not Cached")
+			}
+			ev := h2.waitFor("the first reconcile's project event", func(ev Event) bool {
+				u, ok := ev.(ProjectUpdated)
+				return ok && u.Project.ID == r.ID
+			})
+			p := ev.(ProjectUpdated).Project
+			if p.Cached != tt.wantCached || (p.Error != "") != tt.wantError {
+				t.Fatalf("after the first reconcile: Cached %v, Error %q", p.Cached, p.Error)
+			}
+			if tt.check == nil {
+				return
+			}
+			for _, w := range p.Worktrees {
+				if w.Path == wt.Path {
+					tt.check(t, w)
+					return
+				}
+			}
+			t.Fatalf("worktree %s not in the event's project", wt.Path)
+		})
 	}
 }

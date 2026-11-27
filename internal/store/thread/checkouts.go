@@ -212,7 +212,7 @@ func resolveMember(t Thread, r project.Project, pathFor func(projectID, branch s
 // fillPaths is the checkouts recorded for a row from before migration 0049: each
 // member's as the derivation it replaces gave it (resolveMember; the primary's is the
 // cwd), "" when that is not on disk (its start makes it). decided is false while a git
-// member's project has not listed its worktrees yet, unless force (the wait is over:
+// member's project has not listed its worktrees this run (none yet, or Cached), unless force (the wait is over:
 // such a member gets "" too). A member whose project is not registered gets "".
 func fillPaths(t Thread, snap *project.Snapshot, pathFor func(projectID, branch string) string, exists func(string) bool, force bool) (map[string]string, bool) {
 	out := map[string]string{}
@@ -225,9 +225,9 @@ func fillPaths(t Thread, snap *project.Snapshot, pathFor func(projectID, branch 
 		switch {
 		case !ok:
 			out[id] = ""
-		case r.Git && len(r.Worktrees) == 0 && !force:
-			return nil, false
-		case r.Git && len(r.Worktrees) == 0:
+		case r.Git && (r.Cached || len(r.Worktrees) == 0) && !force:
+			return nil, false // not listed this run: the cached worktrees are the last run's
+		case r.Git && (r.Cached || len(r.Worktrees) == 0):
 			out[id] = ""
 		default:
 			p := resolveMember(t, r, pathFor)

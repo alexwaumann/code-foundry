@@ -391,7 +391,7 @@ func (g *Git) hydrateSnapshots(ctx context.Context) {
 			slot.cur.Store(&w)
 			st.wts[cw.Path] = slot
 		}
-		st.hydrated = true
+		st.hydrated, st.cached = true, true
 	}
 	if err := rows.Err(); err != nil {
 		g.log.Debug("iterate project snapshot cache failed", "err", err)

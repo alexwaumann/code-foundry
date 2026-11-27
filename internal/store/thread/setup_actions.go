@@ -559,7 +559,9 @@ func (m *Manager) discardListed(pending []string) []string {
 }
 
 // setupProjectsListed reports whether the projects of what s's setup made have listed
-// their worktrees. A project that is gone will not.
+// their worktrees this run (a project's cached worktrees are the last run's, which may
+// predate the worktree the dead Create added: project.Project.Cached). A project that is
+// gone will not.
 func (m *Manager) setupProjectsListed(s Thread) bool {
 	if m.opts.Projects == nil {
 		return true
@@ -567,7 +569,7 @@ func (m *Manager) setupProjectsListed(s Thread) bool {
 	snap := m.opts.Projects.Snapshot()
 	listed := func(id string) bool {
 		r, ok := snap.Project(id)
-		return !ok || !r.Git || len(r.Worktrees) > 0
+		return !ok || !r.Git || (!r.Cached && len(r.Worktrees) > 0)
 	}
 	return !slices.ContainsFunc(s.Setup.Made, func(w SetupWorktree) bool { return !listed(w.ProjectID) }) &&
 		!slices.ContainsFunc(s.Setup.Adding, func(a SetupAdd) bool { return !listed(a.ProjectID) })

@@ -22,6 +22,42 @@ func oldBranchLink(repo string, n int) thread.LinkedPullRequest {
 	return thread.LinkedPullRequest{Slug: repo, Number: n, URL: p.URL, Source: thread.LinkBranch}
 }
 
+func TestDefaultBranchOf(t *testing.T) {
+	def := project.Project{GitHubSlug: "o/def", DefaultBranch: "main", Git: true}
+	other := project.Project{GitHubSlug: "o/other", DefaultBranch: "trunk", Git: true}
+	with := func(p project.Project, edit func(*project.Project)) project.Project {
+		edit(&p)
+		return p
+	}
+	for _, tt := range []struct {
+		name   string
+		s      *project.Snapshot
+		branch string
+		known  bool
+	}{
+		{"no snapshot", nil, "", false},
+		{"its project's, any case", &project.Snapshot{Projects: []project.Project{other, def}}, "main", true},
+		{"no project with the slug: nothing to compare with", &project.Snapshot{Projects: []project.Project{other}}, "", true},
+		{"its project not reconciled yet (registered this run)", &project.Snapshot{Projects: []project.Project{
+			with(def, func(p *project.Project) { p.DefaultBranch = "" })}}, "", false},
+		{"its project is the last run's: its default branch may have changed", &project.Snapshot{Projects: []project.Project{
+			with(def, func(p *project.Project) { p.Cached = true })}}, "", false},
+		{"another project is the last run's: its slug may now be this one", &project.Snapshot{Projects: []project.Project{
+			def, with(other, func(p *project.Project) { p.Cached = true })}}, "", false},
+		{"a cached project whose reconcile failed does not hold the others", &project.Snapshot{Projects: []project.Project{
+			def, with(other, func(p *project.Project) { p.Cached, p.Error = true, "boom" })}}, "main", true},
+		{"nor counts as the slug's project", &project.Snapshot{Projects: []project.Project{
+			with(def, func(p *project.Project) { p.Cached, p.Error = true, "boom" })}}, "", true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			branch, known := defaultBranchOf(tt.s, "O/Def")
+			if branch != tt.branch || known != tt.known {
+				t.Errorf("defaultBranchOf = %q, %v; want %q, %v", branch, known, tt.branch, tt.known)
+			}
+		})
+	}
+}
+
 func TestSettleBranchLinksDecisions(t *testing.T) {
 	ref := func(repo string, n int) gh.PullRequestRef { return gh.PullRequestRef{Slug: repo, Number: n} }
 	headed := oldBranchLink("o/def", 9)

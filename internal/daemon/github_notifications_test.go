@@ -290,6 +290,9 @@ func TestProjectsSettled(t *testing.T) {
 		{"a reconcile failed", &project.Snapshot{Projects: []project.Project{{Git: true, Error: "boom"}}}, true},
 		{"a plain directory", &project.Snapshot{Projects: []project.Project{{}}}, true},
 		{"not reconciled yet", &project.Snapshot{Projects: []project.Project{{Git: true, DefaultBranch: "main"}, {Git: true}}}, false},
+		{"the last run's snapshot", &project.Snapshot{Projects: []project.Project{{Git: true, DefaultBranch: "main", GitHubSlug: "acme/web", Cached: true}}}, false},
+		{"the last run's snapshot of a plain directory (it may have become git)", &project.Snapshot{Projects: []project.Project{{Cached: true}}}, false},
+		{"the last run's snapshot whose reconcile failed", &project.Snapshot{Projects: []project.Project{{Git: true, DefaultBranch: "main", Cached: true, Error: "boom"}}}, true},
 	} {
 		if got := projectsSettled(tt.s); got != tt.want {
 			t.Errorf("%s: %v", tt.name, got)

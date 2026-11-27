@@ -43,6 +43,14 @@ type Project struct {
 	// the app, seen on the next refresh or poll).
 	Git   bool
 	Error string // last reconcile error, if any
+	// Cached: DefaultBranch, GitHubSlug, OriginPath, Remotes and the worktrees (their
+	// Branch, Head, Detached) are the last run's, hydrated from the snapshot cache at
+	// Start (cache.go), not yet read from disk this run. Cleared by the project's first
+	// successful reconcile, in the same snapshot that carries what it read; a failed one
+	// (Error) leaves it set. Never set for a project registered this run. Whatever
+	// decides and persists from these fields (a branch link, a settled link) waits
+	// while it is set (docs/notes/reconciled-since-start-gates.md).
+	Cached bool
 	// IncludeIgnored are the project's own patterns of git-ignored files its file search
 	// lists too, added to the files.include_ignored setting's (fsx.IncludedIgnored);
 	// fsx.CleanIncludePatterns' form. Never mutate.

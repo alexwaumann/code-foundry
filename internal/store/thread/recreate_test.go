@@ -282,6 +282,9 @@ func TestBackfillBranch(t *testing.T) {
 			{ProjectID: "r1", Path: "/w/d", Detached: true},
 		}},
 		{ID: "r2"}, // not reconciled yet
+		{ID: "r3", Cached: true, Worktrees: []project.Worktree{ // the last run's, not listed this run
+			{ProjectID: "r3", Path: "/w/c", Branch: "cf/old"},
+		}},
 	}}
 	tests := []struct {
 		name        string
@@ -294,6 +297,7 @@ func TestBackfillBranch(t *testing.T) {
 		{"detached", Thread{ProjectID: "r1", WorktreePath: "/w/d"}, "", true},
 		{"project gone", Thread{ProjectID: "r9", WorktreePath: "/w/a"}, "", true},
 		{"project without worktrees yet", Thread{ProjectID: "r2", WorktreePath: "/w/b"}, "", false},
+		{"project with the last run's worktrees only", Thread{ProjectID: "r3", WorktreePath: "/w/c"}, "", false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

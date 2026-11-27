@@ -187,6 +187,17 @@ func TestBranchLinksFor(t *testing.T) {
 			threads:  []thread.Thread{{ID: "t", ProjectID: "p-def", WorktreePath: "/wt/def-x"}},
 			prs:      []gh.PullRequest{branchPR("o/def", 2, "cf/x")},
 			projects: func(s *project.Snapshot) { s.Projects[2].DefaultBranch = "" }},
+		{name: "the last run's snapshot (not reconciled this run): nothing for the project, the others link",
+			threads:  []thread.Thread{{ID: "t", ProjectID: "p-api", ProjectIDs: []string{"p-api", "p-web"}, WorktreePath: "/wt/api-x", CreatedWorktree: true, Branch: "cf/x"}},
+			prs:      []gh.PullRequest{branchPR("o/api", 1, "cf/x"), branchPR("o/web", 2, "cf/x")},
+			projects: func(s *project.Snapshot) { s.Projects[0].Cached = true },
+			want:     []string{"t: o/web#2@2"}},
+		{name: "the last run's snapshot whose reconcile failed: still nothing (no live read this run)",
+			threads: []thread.Thread{{ID: "t", ProjectID: "p-api", WorktreePath: "/wt/removed", Branch: "cf/old"}},
+			prs:     []gh.PullRequest{branchPR("o/api", 1, "cf/old")},
+			projects: func(s *project.Snapshot) {
+				s.Projects[0].Cached, s.Projects[0].Error, s.Projects[0].Worktrees = true, "boom", nil
+			}},
 		{name: "fork pull requests, placeholders and links without a url are left out; no creation time: now",
 			threads: []thread.Thread{{ID: "t", ProjectID: "p-api", WorktreePath: "/api"}},
 			prs: func() []gh.PullRequest {
