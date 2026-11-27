@@ -131,6 +131,7 @@ func (s *Store) planPoll(cfg Config, now time.Time) (pollPlan, bool) {
 	}
 	statsDue := s.opts.StatsInterval > 0 && len(tracked) > 0 && !now.Before(s.statsNext)
 	s.pollAgain = false  // what was asked for so far is in this plan
+	s.pushAgain = false  // and so are the branches pushed so far
 	s.statsAsked = false // and so are the stats (askStatsLocked left them due)
 	s.mu.Unlock()
 	// Watched pull requests are watched branches without the expiry (pr_watch.go); one
@@ -312,7 +313,7 @@ func (s *Store) pollFailed(ctx context.Context, cfg Config, err error, retryNow 
 		// polling again at MinGap.
 	default:
 		s.pollFailures++
-		s.pollAgain = false // a failing poll is not retried early
+		s.pollAgain, s.pushAgain = false, false // a failing poll is not retried early
 		s.pollNext = now.Add(backoff(cfg.PollInterval, s.opts.MaxBackoff, s.pollFailures, s.opts.Rand()))
 	}
 	s.mu.Unlock()

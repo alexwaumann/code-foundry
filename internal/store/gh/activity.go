@@ -239,6 +239,13 @@ func (s *Store) BranchPullRequests(ctx context.Context, slug, head string) (Bran
 
 // BranchesPullRequests implements Service.
 func (s *Store) BranchesPullRequests(ctx context.Context, queries []BranchQuery) ([]BranchPullRequests, error) {
+	return s.branchesPullRequests(ctx, queries, false)
+}
+
+// branchesPullRequests is BranchesPullRequests. pushed: the branches just changed on
+// GitHub (BranchPushed), so the poll is asked for at the push spacing whether or not
+// they were watched, instead of within pollDebounce for a newly watched one.
+func (s *Store) branchesPullRequests(ctx context.Context, queries []BranchQuery, pushed bool) ([]BranchPullRequests, error) {
 	if len(queries) == 0 {
 		return nil, nil
 	}
@@ -293,11 +300,14 @@ func (s *Store) BranchesPullRequests(ctx context.Context, queries []BranchQuery)
 			needPoll = true
 		}
 	}
-	if needPoll {
+	switch {
+	case pushed:
+		s.pollAfterPushLocked(now)
+	case needPoll:
 		s.pollSoonLocked(now)
 	}
 	s.mu.Unlock()
-	if needPoll {
+	if needPoll || pushed {
 		s.nudge()
 	}
 

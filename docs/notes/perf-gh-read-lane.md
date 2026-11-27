@@ -120,54 +120,143 @@ read-only primary request instead of blocking behind it.
 
 ## Runaway hourly and per-minute budget proof
 
+Corrected 2026-11-27. The first version of this section gave 3,368 requests an hour at
+0.2 s RTT and 3,968 at zero RTT. It counted one request per read-lane token and put
+every tokenless follow-up page inside the primary lane's serial time. Neither holds in
+the code, so the bound below is higher. It is derived from `pace.go`, `yield.go` and
+`read_lane.go` as they stand. No pacing code changed with this correction.
+
 GitHub's limits (`docs/notes/gh-http-transport.md`, `docs/notes/pr-queue-priority.md`):
-* **Primary GraphQL budget**: 5,000 points/hour (shared across the user's token).
-* **Primary REST core budget**: 5,000 requests/hour.
+
+* **Primary GraphQL budget**: 5,000 points/hour, at least one point per request.
+* **Primary REST core budget**: 5,000 requests/hour, separate from GraphQL.
 * **Secondary limits**: 100 concurrent requests, 2,000 GraphQL points/min, 900 REST
   requests/min, serial writes spaced >= 1 s.
 
-Let:
-* $R_{\text{full}}$ = primary-lane requests paying `MinGap` = 1.0 s.
-* $R_{\text{short}}$ = primary-lane user-waited reads taking `UserGap` = 0.25 s (each spends
-  1 token from `s.allowance`).
-* $R_{\text{read}}$ = read-lane requests (every single request on the read lane spends 1
-  token from `s.allowance` in `admitReadLane`).
-* $d$ = request RTT (shortest warm GitHub HTTP/2 RTT measured in `gh-http-transport.md` is
-  ~0.20 s).
+### What sends requests
 
-Because both $R_{\text{short}}$ and $R_{\text{read}}$ draw from the **single shared**
-`gapAllowance` bucket (`userGapBurst = 8`, `userGapRefill = 10 s`):
+* **Primary worker.** Everything not on the read lane: the poll and its follow-ups
+  (detail batches, failing checks, stats, projects), the hot poll, the auth check (REST
+  `GET /user`), every write, and user reads the read lane did not take. One request in
+  flight. `admit` waits until `lastEnd + gap`, where the gap is `MinGap` (1 s), or
+  `UserGap` (0.25 s) for a user-waited read while a token is left. So consecutive primary
+  starts are at least `gap + d` apart, where `d` is the RTT.
+* **Read lane.** One job at a time. It claims a job only while the primary is inside a
+  read, a token is left and `lastEnd + UserGap` has passed. The claim spends nothing.
+  Each request then goes through `admitReadLane`. With a token left, it spends the token
+  and waits for `lastEnd + UserGap`. Without one, it waits for
+  `max(lastEnd, lastStart) + MinGap` and moves `lastEnd` to its own start. Either way
+  the job runs to the end, token or not.
+* **Outside both.** Keep-warm's `HEAD /rate_limit` runs at most once per 20 s, on a
+  presence rise, and `/rate_limit` does not count against the primary limit. Nothing else
+  sends requests.
 
-1. **Token bound over any 1-hour (3,600 s) window**:
-   $$R_{\text{read}} + R_{\text{short}} \le 8 + \frac{3600}{10} = 368$$
-2. **Primary-lane serial time bound**:
-   $$R_{\text{full}}(1.0 + d) + R_{\text{short}}(0.25 + d) \le 3600$$
-   Spending a token on $R_{\text{short}}$ saves 0.75 s of primary time (buying at most
-   $\frac{0.75}{1.0 + d} < 1$ extra request), whereas spending it on $R_{\text{read}}$ adds
-   $+1.0$ request directly. Therefore the worst case spends all 368 tokens on
-   $R_{\text{read}}$ ($R_{\text{short}} = 0, R_{\text{read}} = 368$):
-   * **At realistic minimum GitHub RTT ($d = 0.2\text{ s}$)**:
-     $$R_{\text{full}} \le \frac{3600}{1.2} = 3,000 \implies R_{\text{total}} \le 3,000 + 368 = \mathbf{3,368\text{ req/hr}}$$
-   * **Even at theoretical zero RTT ($d = 0\text{ s}$, impossible over HTTPS)**:
-     $$R_{\text{full}} \le \frac{3600}{1.0} = 3,600 \implies R_{\text{total}} \le 3,600 + 368 = \mathbf{3,968\text{ req/hr}}$$
-   * Tokenless follow-up pages on an already-claimed multi-request read-lane job reserve a
-     full `MinGap` (1.0 s) slot on the shared `lastEnd`/`lastStart` pacing clock rather than
-     spending tokens, so they count inside $R_{\text{full}}$ and preserve the exact same
-     request bound without stalling up to 10 s for a token refill.
-   * Note: the pacing bound above is in **requests/hour** (1-point queries match points 1:1;
-     heavier multi-point queries are guarded by `noteResult`, which reads `rateLimit.remaining`
-     from every GraphQL response on either lane and pauses **both** lanes until `resetAt + 5 s`
-     whenever `remaining < MinRemaining (200)`).
-3. **Worst-case 1-minute (60 s) window (secondary limit)**:
-   * Allowance tokens available in 60 s: $8 + \frac{60}{10} = 14$.
-   * Primary lane in 60 s: $\frac{60}{1.2} = 50$ req/min at $d = 0.2\text{ s}$ (60 req/min at
-     $d = 0\text{ s}$).
-   * Total across both lanes: **64 req/min** at $d = 0.2\text{ s}$ (**74 req/min** at
-     $d = 0\text{ s}$), which is **3.2%–3.7%** of GitHub's 2,000 GraphQL pts/min secondary
-     limit and **7.1%–8.2%** of the 900 REST pts/min limit.
-   * Concurrency: strictly **<= 2** in-flight requests vs GitHub's 100 concurrent limit (2%).
-   * Rate-limit pushback: any `*RateLimitError` on either lane immediately pauses both lanes
-     and calls `s.allowance.exhaust(now)` under `s.mu`, emptying all 8 tokens.
+### What the first proof missed
+
+1. **Tokenless pages run beside the primary, not inside its serial time.** The old
+   proof said they "reserve a full `MinGap` slot on the shared clock". Two things stop
+   that from happening:
+   * The primary's `admit` computes its wait once, from `lastEnd` as it stands
+     (normally the primary's own last end). When the timer fires, the wait ends without
+     re-reading `lastEnd`. The primary never looks at `lastStart`.
+   * The read lane also computes its wait once.
+
+   So each lane paces off its own last end, and the two interleave, each at one request
+   per `MinGap + d`. The read lane's reservation only delays a primary request whose wait
+   is computed after the reservation. The worker's job loop (`next()`) re-checks between
+   jobs, so a primary running one-request jobs is partly held back. A primary inside a
+   multi-request job is not held back: a poll's detail batches and check pages, or a
+   detail fetch.
+
+   This was measured on 2026-11-27 with a throwaway harness test, not committed, using
+   `fakeRunner`, which sleeps each request. The pacing was `MinGap` 100 ms, `UserGap`
+   25 ms and a 20 ms fake RTT, the production ratios scaled by 0.1, over a 3 s window:
+
+   | Load | Requests in 3 s | In flight at most | Shortest start-to-start |
+   |---|---|---|---|
+   | one 1,000-page `PullRequest` job, read lane off | 24 (3 s / 120 ms) | 1 | 121 ms |
+   | one such job on each lane | 48 (24 + 24) | 2 | 20 ms |
+   | the read-lane job beside a primary running one-request polls back to back | 34 (read lane 24, primary 10) | 2 | 18 ms |
+
+2. **A claim is one token, but its job can be several requests.**
+   * `PullRequest` and `LookupPullRequest`: at most `MaxPages` = 4.
+   * `FullPullRequest`: at most 5. A checks-only page can find CI settled or the commit
+     gone. The full detail follows, with up to `MaxPages - 1` = 3 more check pages.
+   * `PublishOwners`: 1 GraphQL request, plus one REST `GET /orgs/{org}` for each
+     organization the viewer may create repositories in (up to 100).
+   * Diff, file, reviewer candidates, search, lookup and body: 1.
+3. **REST is its own budget, and the `MinRemaining` pause does not cover it** (below).
+
+The later review's figure of about 4,450 is the 4-page case:
+3,000 + 368 × 4 = 4,472. The detail fetch's fallback makes 5 requests, which gives the
+figure below.
+
+### Hourly bound
+
+`d` is the RTT. The shortest warm GitHub RTT measured is about 0.20 s
+(`gh-http-transport.md`). `T = userGapBurst + 3600 / userGapRefill = 8 + 360 = 368`
+tokens an hour. `T` also bounds read-lane claims: each claim needs a token left, and
+its first request spends it.
+
+**GraphQL (5,000 points/hour):**
+
+* **Primary**: at most `3600 / (1 + d)` requests, which is 3,000 at d = 0.2 s. A token
+  spent on a primary short read saves 0.75 s, which is worth less than one request. So,
+  as before, the worst case spends every token on the read lane.
+* **Read lane**: at most `T × 5 = 1,840` GraphQL requests, from 5-request detail jobs. A
+  `PublishOwners` job brings only one GraphQL request. Timing check: a 5-request job
+  takes 0.25 + d + 4 × (1 + d) = 5.05 s at d = 0.2 s, inside the 10 s refill. So the
+  token, not the lane's own pacing, is what limits it.
+* **Total**: at most **3,000 + 1,840 = 4,840 requests/hour at d = 0.2 s**, a margin of
+  160 under 5,000. At d = 0 it is 3,600 + 1,840 = 5,440. Pacing alone keeps GraphQL under
+  5,000 only while `3600 / (1 + d) <= 3,160`, which is d >= 0.139 s.
+* Reaching this needs a primary that never idles (a runaway schedule or client) beside a
+  detail fetch every 10 s. Each of those fetches would have to take the
+  checks-only-then-full path on a commit with over 300 checks.
+
+**REST core (5,000 requests/hour):**
+
+* **Primary REST**: diff and file reads (`restRaw`), `GET /orgs/{org}`,
+  `search/commits` for the stats, and the auth check. That is at most 3,000 if a runaway
+  client kept the primary in REST reads.
+* **Read lane REST**: `PublishOwners` with many organizations keeps the lane busy at its
+  own pace. That is `(3600 - T × (0.25 + d)) / (1 + d) + T = 2,862 + 368 = 3,230`
+  requests at d = 0.2 s, almost all of them REST. This needs the owners result to come
+  back incomplete every time (a transient error on some organization), because a
+  complete result is cached for 10 minutes.
+* **Total**: up to about **6,200 REST requests/hour at d = 0.2 s, above 5,000**. Only a
+  runaway client reaches it.
+
+**Finding (not fixed here).** Without the pause, the true worst case can exceed 5,000:
+GraphQL at RTTs under about 139 ms, and REST at the measured RTT in the runaway case
+above. Before this correction, the text said the pacing alone kept every case under
+5,000.
+
+### What backstops it
+
+* **GraphQL**: every response, on either lane, carries `rateLimit`. When
+  `remaining < MinRemaining` (200), `noteResult` pauses both lanes until `resetAt + 5 s`.
+  This pause, not the pacing, keeps a runaway GraphQL hour inside 5,000 points. That
+  matters for multi-point queries too, since the bound above counts requests.
+* **REST**: REST responses give `noteResult` no `rateLimit`, so `MinRemaining` never
+  applies. An exhausted REST budget (`x-ratelimit-remaining: 0`, which `HTTPRunner`
+  turns into a `RateLimitError`) pauses the store only through `restRaw` (diff, file).
+  `orgPolicy` and `searchCommits` pass only auth and network errors to `noteResult`. An
+  exhausted budget seen there pauses nothing, and later REST requests fail until the
+  reset.
+
+### Per-minute window (secondary limits)
+
+* Both lanes at `MinGap + d`: 2 × 60 / 1.2 = 100 requests a minute. Add at most
+  8 + 60 / 10 = 14 token-paced ones, for about **114 a minute at d = 0.2 s** (134 at
+  d = 0).
+* That is 6–7% of the 2,000 GraphQL points/min limit and 13–15% of the 900 REST
+  requests/min limit.
+* Concurrency is at most **2** in flight, against GitHub's 100: the read lane is one
+  goroutine and the primary is one worker.
+* Rate-limit pushback: any `*RateLimitError` that reaches `noteResult` on either lane
+  pauses both lanes. It also calls `s.allowance.exhaust(now)` under `s.mu`, which empties
+  all 8 tokens.
 
 ## Real measurements (2026-11-25, Apple M3 Pro, darwin/arm64)
 
