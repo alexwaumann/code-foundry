@@ -16,7 +16,7 @@ import {
   type PrChangeKindView,
   type PullRequestView,
 } from "@/api/gh";
-import { errorMessage } from "@/api/stream";
+import { errorMessage, isPageVisible, onBecameVisible } from "@/api/stream";
 import { getUiContext } from "./context";
 import { createResource, useResource } from "./resource";
 
@@ -97,44 +97,80 @@ export const DASHBOARD_KEY = "all";
 /**
  * How often the Pull Requests page renews its daemon-side project-list watch lease
  * (the daemon keeps PollProjects active for 10 minutes after the last GetDashboard
- * with watch_projects: true).
+ * with watch_projects: true). Only while the window is visible: see watchProjects.
  */
 export const PROJECTS_WATCH_KEEPALIVE_MS = 5 * 60_000;
 
 let projectsWatchers = 0;
 let projectsTimer: ReturnType<typeof setInterval> | null = null;
+let stopProjectsVisible: (() => void) | null = null;
+/** A renewal fell while the window was hidden, so the lease may lapse: becoming visible renews it. */
+let projectsRenewalMissed = false;
 
 /** Whether any mounted view (Pull Requests page or page bridge) is keeping Snapshot.Projects live. */
 export const isProjectsWatched = (): boolean => projectsWatchers > 0;
 
+/**
+ * Whether a dashboard read renews the daemon's project-list lease: a view holds it and
+ * the window is visible. A read made while hidden (the daemon's poll changed the
+ * dashboard) is a plain one, or PollProjects publishing its own changes would keep its
+ * lease alive with nobody looking.
+ */
+const renewsProjectsLease = (): boolean => projectsWatchers > 0 && isPageVisible();
+
 /** Key: DASHBOARD_KEY. The viewer's pull request lists in every repository (GhService.GetDashboard). */
-export const dashboardResource = createResource((_key, signal) => getDashboard(undefined, signal, { watchProjects: projectsWatchers > 0 }));
+export const dashboardResource = createResource((_key, signal) => getDashboard(undefined, signal, { watchProjects: renewsProjectsLease() }));
+
+/** Renews the lease now (one dashboard read), or notes the renewal missed while the window is hidden. */
+function renewProjectsLease(): void {
+  if (!isPageVisible()) {
+    projectsRenewalMissed = true;
+    return;
+  }
+  if (dashboardResource.watched().includes(DASHBOARD_KEY)) {
+    dashboardResource.invalidate(DASHBOARD_KEY);
+  }
+}
+
+/** (Re)starts the keepalive: the next renewal is a full period from now. */
+function startProjectsKeepalive(): void {
+  if (projectsTimer !== null) clearInterval(projectsTimer);
+  projectsTimer = setInterval(renewProjectsLease, PROJECTS_WATCH_KEEPALIVE_MS);
+}
 
 /**
- * Declares active Pull Requests page interest in Snapshot.Projects. While held,
- * dashboardResource sends watch_projects: true and renews the daemon's 10-minute
- * lease every 5 minutes.
+ * Declares active Pull Requests page interest in Snapshot.Projects. While held and the
+ * window is visible, dashboardResource sends watch_projects: true and renews the
+ * daemon's 10-minute lease every 5 minutes. While hidden it renews nothing, so the lease
+ * lapses on its own and the daemon stops PollProjects; on becoming visible again after a
+ * missed renewal it renews at once (one read) and restarts the period. A hide with no
+ * renewal due in it sends nothing, and any number of flips sends at most one read per
+ * missed renewal.
  */
 export function watchProjects(): () => void {
   projectsWatchers++;
   if (projectsWatchers === 1) {
-    if (dashboardResource.watched().includes(DASHBOARD_KEY)) {
-      dashboardResource.invalidate(DASHBOARD_KEY);
-    }
-    projectsTimer = setInterval(() => {
-      if (dashboardResource.watched().includes(DASHBOARD_KEY)) {
-        dashboardResource.invalidate(DASHBOARD_KEY);
-      }
-    }, PROJECTS_WATCH_KEEPALIVE_MS);
+    projectsRenewalMissed = false;
+    renewProjectsLease();
+    startProjectsKeepalive();
+    stopProjectsVisible = onBecameVisible(() => {
+      if (!projectsRenewalMissed) return;
+      projectsRenewalMissed = false;
+      renewProjectsLease();
+      startProjectsKeepalive();
+    });
   }
   let released = false;
   return () => {
     if (released) return;
     released = true;
     projectsWatchers = Math.max(0, projectsWatchers - 1);
-    if (projectsWatchers === 0 && projectsTimer !== null) {
-      clearInterval(projectsTimer);
+    if (projectsWatchers === 0) {
+      if (projectsTimer !== null) clearInterval(projectsTimer);
       projectsTimer = null;
+      stopProjectsVisible?.();
+      stopProjectsVisible = null;
+      projectsRenewalMissed = false;
     }
   };
 }

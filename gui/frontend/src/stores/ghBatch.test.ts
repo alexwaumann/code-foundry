@@ -44,7 +44,13 @@ vi.mock("@/api/gh", async (orig) => ({
   },
 }));
 
-const { branchKey, DASHBOARD_KEY, dashboardResource, loadBranchPullRequests, PROJECTS_WATCH_KEEPALIVE_MS, watchProjects } = await import("./gh");
+const { applyGhEvent, branchKey, DASHBOARD_KEY, dashboardResource, loadBranchPullRequests, PROJECTS_WATCH_KEEPALIVE_MS, watchProjects } = await import("./gh");
+
+function setVisibility(state: DocumentVisibilityState): void {
+  Object.defineProperty(document, "visibilityState", { configurable: true, get: () => state });
+  Object.defineProperty(document, "hidden", { configurable: true, get: () => state === "hidden" });
+  document.dispatchEvent(new Event("visibilitychange"));
+}
 
 beforeEach(() => {
   calls.single.length = 0;
@@ -55,6 +61,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  setVisibility("visible");
   vi.useRealTimers();
 });
 
@@ -186,13 +193,30 @@ describe("branch pull requests microtask batcher", () => {
 });
 
 describe("watchProjects keepalive lease", () => {
+  // Every watch a test takes is let go after it, even when an assertion failed first, so
+  // one failing test cannot leave a watcher (and its timer) to the next.
+  const held: (() => void)[] = [];
+  const hold = (release: () => void): (() => void) => {
+    let done = false;
+    const once = () => {
+      if (done) return;
+      done = true;
+      release();
+    };
+    held.push(once);
+    return once;
+  };
+  afterEach(() => {
+    for (const release of held.splice(0)) release();
+  });
+
   it("renews watchProjects every 5 minutes while held and stops once released", async () => {
     vi.useFakeTimers();
-    const releaseDash = dashboardResource.watch(DASHBOARD_KEY);
+    const releaseDash = hold(dashboardResource.watch(DASHBOARD_KEY));
     await vi.advanceTimersByTimeAsync(0);
     expect(calls.dashboard).toEqual([false]);
 
-    const releaseProjects = watchProjects();
+    const releaseProjects = hold(watchProjects());
     await vi.advanceTimersByTimeAsync(0);
     expect(calls.dashboard).toEqual([false, true]);
 
@@ -206,6 +230,159 @@ describe("watchProjects keepalive lease", () => {
     dashboardResource.invalidate(DASHBOARD_KEY);
     await vi.advanceTimersByTimeAsync(0);
     expect(calls.dashboard).toEqual([false, true, true, false]);
+    releaseDash();
+  });
+
+  it("sends no renewal while the window is hidden, and renews once on return", async () => {
+    vi.useFakeTimers();
+    const releaseDash = hold(dashboardResource.watch(DASHBOARD_KEY));
+    const releaseProjects = hold(watchProjects());
+    await vi.advanceTimersByTimeAsync(0);
+    calls.dashboard.length = 0;
+
+    setVisibility("hidden");
+    await vi.advanceTimersByTimeAsync(PROJECTS_WATCH_KEEPALIVE_MS * 3);
+    expect(calls.dashboard).toEqual([]);
+
+    setVisibility("visible");
+    await vi.advanceTimersByTimeAsync(0);
+    expect(calls.dashboard).toEqual([true]);
+
+    // The keepalive resumes a full period after the return's renewal, not sooner.
+    await vi.advanceTimersByTimeAsync(PROJECTS_WATCH_KEEPALIVE_MS - 1);
+    expect(calls.dashboard).toEqual([true]);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(calls.dashboard).toEqual([true, true]);
+    releaseProjects();
+    releaseDash();
+  });
+
+  it("does not renew the lease from a dashboard read made while hidden", async () => {
+    vi.useFakeTimers();
+    const releaseDash = hold(dashboardResource.watch(DASHBOARD_KEY));
+    const releaseProjects = hold(watchProjects());
+    await vi.advanceTimersByTimeAsync(0);
+    calls.dashboard.length = 0;
+
+    // The daemon's own poll changes the dashboard while nobody looks: the re-read is a
+    // plain read, or PollProjects publishing changes would keep its own lease alive.
+    setVisibility("hidden");
+    applyGhEvent({ kind: "dashboard" });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(calls.dashboard).toEqual([false]);
+    releaseProjects();
+    releaseDash();
+  });
+
+  it("sends nothing extra for a hide shorter than the keepalive", async () => {
+    vi.useFakeTimers();
+    const releaseDash = hold(dashboardResource.watch(DASHBOARD_KEY));
+    const releaseProjects = hold(watchProjects());
+    await vi.advanceTimersByTimeAsync(0);
+    calls.dashboard.length = 0;
+
+    await vi.advanceTimersByTimeAsync(60_000);
+    setVisibility("hidden");
+    await vi.advanceTimersByTimeAsync(60_000);
+    setVisibility("visible");
+    await vi.advanceTimersByTimeAsync(0);
+    expect(calls.dashboard).toEqual([]);
+
+    // The keepalive kept its schedule: due 5 minutes after the watch began.
+    await vi.advanceTimersByTimeAsync(PROJECTS_WATCH_KEEPALIVE_MS - 120_000);
+    expect(calls.dashboard).toEqual([true]);
+    releaseProjects();
+    releaseDash();
+  });
+
+  it("renews once for many quick flips after a missed keepalive", async () => {
+    vi.useFakeTimers();
+    const releaseDash = hold(dashboardResource.watch(DASHBOARD_KEY));
+    const releaseProjects = hold(watchProjects());
+    await vi.advanceTimersByTimeAsync(0);
+    calls.dashboard.length = 0;
+
+    setVisibility("hidden");
+    await vi.advanceTimersByTimeAsync(PROJECTS_WATCH_KEEPALIVE_MS);
+    for (let i = 0; i < 10; i++) {
+      setVisibility("visible");
+      await vi.advanceTimersByTimeAsync(50);
+      setVisibility("hidden");
+      await vi.advanceTimersByTimeAsync(50);
+    }
+    setVisibility("visible");
+    await vi.advanceTimersByTimeAsync(0);
+    expect(calls.dashboard).toEqual([true]);
+    releaseProjects();
+    releaseDash();
+  });
+
+  it("renews on return when the watch began while hidden", async () => {
+    vi.useFakeTimers();
+    const releaseDash = hold(dashboardResource.watch(DASHBOARD_KEY));
+    await vi.advanceTimersByTimeAsync(0);
+    calls.dashboard.length = 0;
+
+    // Nothing to renew while hidden: the first read waits for the window to show.
+    setVisibility("hidden");
+    const releaseProjects = hold(watchProjects());
+    await vi.advanceTimersByTimeAsync(0);
+    expect(calls.dashboard).toEqual([]);
+
+    setVisibility("visible");
+    await vi.advanceTimersByTimeAsync(0);
+    expect(calls.dashboard).toEqual([true]);
+    releaseProjects();
+    releaseDash();
+  });
+
+  it("clears everything when released while hidden", async () => {
+    vi.useFakeTimers();
+    const releaseDash = hold(dashboardResource.watch(DASHBOARD_KEY));
+    const releaseProjects = hold(watchProjects());
+    await vi.advanceTimersByTimeAsync(0);
+    calls.dashboard.length = 0;
+
+    setVisibility("hidden");
+    await vi.advanceTimersByTimeAsync(PROJECTS_WATCH_KEEPALIVE_MS);
+    releaseProjects();
+    setVisibility("visible");
+    await vi.advanceTimersByTimeAsync(PROJECTS_WATCH_KEEPALIVE_MS * 2);
+    expect(calls.dashboard).toEqual([]);
+    expect(vi.getTimerCount()).toBe(0);
+
+    // A later watch starts clean: one read, then the keepalive.
+    const again = hold(watchProjects());
+    await vi.advanceTimersByTimeAsync(0);
+    expect(calls.dashboard).toEqual([true]);
+    again();
+    releaseDash();
+  });
+
+  it("holds one keepalive for two watchers until the last lets go", async () => {
+    vi.useFakeTimers();
+    const releaseDash = hold(dashboardResource.watch(DASHBOARD_KEY));
+    const page = hold(watchProjects());
+    const bridge = hold(watchProjects());
+    await vi.advanceTimersByTimeAsync(0);
+    calls.dashboard.length = 0;
+
+    setVisibility("hidden");
+    await vi.advanceTimersByTimeAsync(PROJECTS_WATCH_KEEPALIVE_MS);
+    page();
+    setVisibility("visible");
+    await vi.advanceTimersByTimeAsync(0);
+    expect(calls.dashboard).toEqual([true]);
+
+    await vi.advanceTimersByTimeAsync(PROJECTS_WATCH_KEEPALIVE_MS);
+    expect(calls.dashboard).toEqual([true, true]);
+
+    bridge();
+    setVisibility("hidden");
+    await vi.advanceTimersByTimeAsync(PROJECTS_WATCH_KEEPALIVE_MS);
+    setVisibility("visible");
+    await vi.advanceTimersByTimeAsync(PROJECTS_WATCH_KEEPALIVE_MS);
+    expect(calls.dashboard).toEqual([true, true]);
     releaseDash();
   });
 });
