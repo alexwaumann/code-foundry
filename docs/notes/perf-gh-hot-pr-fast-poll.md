@@ -163,9 +163,10 @@ query PullRequestHot($ids: [ID!]!) {
     (opening, hovering into a prefetch, or mutating PRs) keeps it at the 4 req/min
     ceiling.
 * **Runaway ceiling**: because `jobHotPoll` runs on the primary worker at `MinGap` (1 s) and
-  never spends `gapAllowance` tokens, the global runaway bound proven in
-  `docs/notes/perf-gh-read-lane.md` (**<= 3,368 req/hr** at 0.2 s RTT, paused at
-  `MinRemaining = 200`) is strictly unchanged.
+  never spends `gapAllowance` tokens, the global runaway bound in
+  `docs/notes/perf-gh-read-lane.md` is strictly unchanged by it. That bound was
+  corrected on 2026-11-27 from 3,368 to **<= 4,840 GraphQL req/hr** at 0.2 s RTT. The
+  `MinRemaining = 200` pause is what guarantees the budget.
 
 ## Real measurements (2026-11-25, Apple M3 Pro, darwin/arm64)
 

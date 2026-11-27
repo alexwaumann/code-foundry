@@ -20,10 +20,13 @@ import "time"
 //   - A read someone is waiting for may follow at a quarter of the gap, or run on the
 //     single extra read-only lane (read_lane.go) while the primary worker is blocked in a
 //     read-only request, both drawing from the same small allowance (gapAllowance,
-//     docs/notes/pr-queue-priority.md, docs/notes/perf-gh-read-lane.md). Over an hour
-//     that adds at most userGapBurst + 3600/userGapRefill = 368 requests to the 3,000
-//     above (3,368/hr at 0.2s RTT, 3,968/hr even at 0s RTT, well under 5,000), and the
-//     store still pauses both lanes at MinRemaining. Writes never use the allowance or
+//     docs/notes/pr-queue-priority.md, docs/notes/perf-gh-read-lane.md). A read-lane
+//     job takes one token to start but runs to the end, up to 5 GraphQL requests, at
+//     MinGap beside the primary rather than inside its time. Over an hour that is at
+//     most 368 jobs, 1,840 requests on top of the 3,000 above: 4,840/hr at 0.2s RTT,
+//     over 5,000 below ~0.14s. The store pauses both lanes at MinRemaining, which is
+//     what keeps GraphQL inside the budget. REST has no such pause (the note's
+//     "Runaway hourly" section). Writes never use the allowance or
 //     the read lane and never run concurrently with reads, as GitHub asks for serial
 //     writes spaced by at least a second.
 const (
