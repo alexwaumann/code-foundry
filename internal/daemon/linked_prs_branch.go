@@ -72,16 +72,19 @@ func prsByHead(prs []gh.PullRequest) map[headKey][]gh.PullRequest {
 // repository: what each of its checkouts has checked out (its HEAD, at the path the
 // thread records; docs/notes/thread-checkouts.md), and for a worktree-mode checkout or a
 // cwd that is gone the branch the thread was created for (it is made again on it). The
-// project's default branch is left out, and so is every branch of a project whose
-// default branch is not known yet (the first reconcile after a start has not run: a
-// project event follows it). A project without a GitHub slug and a detached checkout
-// contribute nothing; so does a thread without a project.
+// project's default branch is left out, and so is every branch of a project not read
+// from disk this run (project.Project.Cached: the snapshot is the last run's, and a
+// worktree may have switched branch, the slug or default branch changed, while the
+// daemon was down) or whose default branch is not known yet (registered this run and
+// not reconciled yet). The reconcile that settles either publishes a project event. A
+// project without a GitHub slug and a detached checkout contribute nothing; so does a
+// thread without a project.
 func threadBranches(th thread.Thread, projects *project.Snapshot) []headKey {
 	var out []headKey
 	// From the snapshot alone (every pass): an unlisted checkout is "not on a branch now".
 	for _, c := range thread.ListedCheckouts(th, projects) {
 		r, ok := projects.Project(c.ProjectID)
-		if !ok || r.GitHubSlug == "" || r.DefaultBranch == "" {
+		if !ok || r.Cached || r.GitHubSlug == "" || r.DefaultBranch == "" {
 			continue
 		}
 		head := c.Branch // "" when detached

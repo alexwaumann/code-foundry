@@ -185,6 +185,8 @@ func TestFillPaths(t *testing.T) {
 	apiMissing.Projects[1].Worktrees = listed.Projects[1].Worktrees[:1]
 	notListed := &project.Snapshot{Projects: slices.Clone(listed.Projects)}
 	notListed.Projects[1].Worktrees = nil
+	cached := &project.Snapshot{Projects: slices.Clone(listed.Projects)}
+	cached.Projects[1].Cached = true // the last run's worktrees, not listed this run
 	wt := Thread{ProjectID: "web", ProjectIDs: []string{"api", "docs", "web"}, WorktreePath: webWT, CreatedWorktree: true, Branch: "feat/x"}
 	tests := []struct {
 		name    string
@@ -201,6 +203,8 @@ func TestFillPaths(t *testing.T) {
 			map[string]string{"api": "", "docs": docs, "web": webWT}, true},
 		{"a project that has not listed its worktrees waits", wt, notListed, isDir, false, nil, false},
 		{"past the wait it is empty", wt, notListed, isDir, true, map[string]string{"api": "", "docs": docs, "web": webWT}, true},
+		{"a project with only the last run's worktrees waits", wt, cached, isDir, false, nil, false},
+		{"past the wait its cached worktrees are not used", wt, cached, isDir, true, map[string]string{"api": "", "docs": docs, "web": webWT}, true},
 		{"checkout mode: the main checkouts", Thread{ProjectID: "web", ProjectIDs: []string{"api", "web"}, WorktreePath: webWT}, listed, isDir, false,
 			map[string]string{"api": apiMain, "web": webWT}, true},
 		{"an unregistered member is empty; a missing primary keeps its path", Thread{ProjectID: "web", ProjectIDs: []string{"gone", "web"}, WorktreePath: "/nope"}, listed, isDir, false,

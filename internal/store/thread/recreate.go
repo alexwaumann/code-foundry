@@ -400,14 +400,15 @@ func (m *Manager) backfillStep(pending []string) []string {
 }
 
 // backfillBranch is s's branch read from snap: decided false while s's project has not
-// listed its worktrees, else the branch of the worktree at s's path ("" when there is
-// none, or it is detached).
+// listed its worktrees this run (none yet, or the last run's from the snapshot cache:
+// project.Project.Cached), else the branch of the worktree at s's path ("" when there
+// is none, or it is detached).
 func backfillBranch(snap *project.Snapshot, s Thread) (branch string, decided bool) {
 	r, ok := snap.Project(s.ProjectID)
 	if !ok {
 		return "", true
 	}
-	if len(r.Worktrees) == 0 {
+	if r.Cached || len(r.Worktrees) == 0 {
 		return "", false
 	}
 	wt, ok := snap.Worktree(s.ProjectID, s.WorktreePath)

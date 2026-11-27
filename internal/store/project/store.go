@@ -147,6 +147,9 @@ type projectState struct {
 	// live reconcile so subscribers always observe a post-reconcile ProjectUpdated.
 	// Guarded by Git.mu.
 	hydrated bool
+	// cached is Project.Cached: set with hydrated, cleared by the first successful
+	// reconcile (a failed one leaves it). Guarded by Git.mu.
+	cached bool
 }
 
 // statusDiskStamp snapshots .git/index right before `git status` runs so CompareWorktree
@@ -466,7 +469,7 @@ func (g *Git) buildLocked() *Snapshot {
 			ID: m.ID, Path: m.Path, Name: m.Name, RegisteredAt: m.RegisteredAt,
 			DefaultBranch: m.DefaultBranch, GitHubSlug: m.GitHubSlug, OriginPath: originPath(m.OriginURL),
 			Remotes: m.Remotes, Git: m.Git, Error: m.Error, IncludeIgnored: m.IncludeIgnored,
-			Worktrees: make([]Worktree, 0, len(st.wts)),
+			Cached: st.cached, Worktrees: make([]Worktree, 0, len(st.wts)),
 		}
 		for _, slot := range st.wts {
 			w := *slot.cur.Load()
@@ -1395,7 +1398,7 @@ func (g *Git) reconcile(ctx context.Context, id string) {
 		seen[l.Path] = true
 		isMain := i == 0
 		slot := st.wts[l.Path]
-		if slot == nil || gitChanged {
+		if slot == nil || gitChanged || staleHydrated(st, slot, l) {
 			slot = &wtSlot{}
 			slot.cur.Store(&Worktree{
 				ProjectID: id, Path: l.Path, Branch: l.Branch, Head: l.Head, IsMain: isMain, Detached: l.Detached,
@@ -1436,6 +1439,10 @@ func (g *Git) reconcile(ctx context.Context, id string) {
 	}
 	firstPublish := st.hydrated
 	st.hydrated = false
+	wasCached := st.cached
+	if next.Error == "" {
+		st.cached = false
+	}
 	var want map[string]watchTarget
 	switch {
 	case next.Error != "":
@@ -1465,7 +1472,7 @@ func (g *Git) reconcile(ctx context.Context, id string) {
 	// round trip to the watcher's goroutine.
 	g.fs.sync(ctx)
 
-	if metaChanged || setChanged || firstPublish {
+	if metaChanged || setChanged || firstPublish || wasCached != st.cached {
 		g.commit(func(s *Snapshot) []Event {
 			var evs []Event
 			for _, p := range removed {
@@ -1480,6 +1487,20 @@ func (g *Git) reconcile(ctx context.Context, id string) {
 	if next.Git {
 		g.sched.requestPrio(jobKey{kind: jobBase, projectID: id}, prioLow)
 	}
+}
+
+// staleHydrated reports whether slot still holds the last run's worktree (st is cached)
+// and the listing disagrees with it on what is checked out: a worktree that switched
+// branch, moved HEAD or detached while the daemon was down. Reconcile reseeds such a
+// slot from the listing, as it does a new one, so the snapshot that clears Cached
+// already carries the live branch; its cached status (of another HEAD) goes with it
+// until the status job runs. Holding g.mu.
+func staleHydrated(st *projectState, slot *wtSlot, l listedWorktree) bool {
+	if !st.cached {
+		return false
+	}
+	w := slot.cur.Load()
+	return w.Branch != l.Branch || w.Head != l.Head || w.Detached != l.Detached
 }
 
 // inspect fills m's git-derived fields and returns the listed worktrees, main first,

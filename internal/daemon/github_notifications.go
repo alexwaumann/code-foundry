@@ -63,15 +63,18 @@ type githubNotifier struct {
 	full  bool // the last evaluation had posts refused ErrFull (logged once until one has none)
 }
 
-// projectsSettled reports whether every git project has been reconciled since the start:
-// its GitHub slug is empty until then, and a start action's project (part of a card's
-// content) would flip from none to the project and bring a dismissed card back.
+// projectsSettled reports whether every project has been reconciled since the start: a
+// project registered this run has no GitHub slug until then, and one hydrated from the
+// last run's cache (Cached) may have a slug that changed while the daemon was down. A
+// start action's project (part of a card's content) would flip with it and bring a
+// dismissed card back. A project whose reconcile failed counts as settled (the
+// evaluation does not wait on a retry that may never succeed).
 func projectsSettled(s *project.Snapshot) bool {
 	if s == nil {
 		return false
 	}
 	for _, p := range s.Projects {
-		if p.Git && p.DefaultBranch == "" && p.Error == "" {
+		if (p.Cached || (p.Git && p.DefaultBranch == "")) && p.Error == "" {
 			return false
 		}
 	}
