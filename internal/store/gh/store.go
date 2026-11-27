@@ -155,6 +155,7 @@ type Store struct {
 	prWatches            map[PullRequestRef]prWatch // WatchPullRequests (pr_watch.go)
 	pollNext             time.Time
 	pollAgain            bool // a poll was asked for while one was running
+	pushAgain            bool // a push asked for a poll since the last plan (push_poll.go)
 	pollFailures         int
 	lastPoll             time.Time // when the last poll ended (or the cached poll's time after New)
 	hotNext              time.Time // next foreground hot-PR fast poll (hot_poll.go)
@@ -343,12 +344,16 @@ func (s *Store) pollSoonLocked(now time.Time) {
 }
 
 // schedulePollLocked sets the next poll after one finished: at next, or right away if
-// a poll was asked for meanwhile. Called with s.mu held.
+// a poll was asked for meanwhile, or pushPollGap from now if a push asked for one
+// meanwhile (push_poll.go). Called with s.mu held.
 func (s *Store) schedulePollLocked(now, next time.Time) {
+	if s.pushAgain {
+		next = earlierOf(next, now.Add(pushPollGap))
+	}
 	if s.pollAgain && next.After(now) {
 		next = now
 	}
-	s.pollAgain = false
+	s.pollAgain, s.pushAgain = false, false
 	s.pollNext = next
 }
 

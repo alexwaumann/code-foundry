@@ -15,10 +15,9 @@ import (
 )
 
 type fakeGitOpsGHStore struct {
-	mu      sync.Mutex
-	prs     []gh.PullRequest
-	watched []string
-	refresh []string
+	mu     sync.Mutex
+	prs    []gh.PullRequest
+	pushed []string
 }
 
 func (f *fakeGitOpsGHStore) CachedPullRequests() []gh.PullRequest {
@@ -27,17 +26,10 @@ func (f *fakeGitOpsGHStore) CachedPullRequests() []gh.PullRequest {
 	return slices.Clone(f.prs)
 }
 
-func (f *fakeGitOpsGHStore) BranchPullRequests(_ context.Context, slug, head string) (gh.BranchPullRequests, error) {
+func (f *fakeGitOpsGHStore) BranchPushed(_ context.Context, slug, head string) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	f.watched = append(f.watched, slug+"|"+head)
-	return gh.BranchPullRequests{Slug: slug, HeadRef: head}, nil
-}
-
-func (f *fakeGitOpsGHStore) Refresh(_ context.Context, slug string) error {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	f.refresh = append(f.refresh, slug)
+	f.pushed = append(f.pushed, slug+"|"+head)
 	return nil
 }
 
@@ -90,11 +82,10 @@ func TestGitOpsGitHubBridgeNotifyBranchChanged(t *testing.T) {
 	bridge := newGitOpsGitHubBridge(store, slog.New(slog.DiscardHandler))
 	bridge.NotifyBranchChanged(context.Background(), "acme/app", "feat/push")
 
-	if !slices.Equal(store.watched, []string{"acme/app|feat/push"}) {
-		t.Errorf("watched = %v, want [acme/app|feat/push]", store.watched)
-	}
-	if !slices.Equal(store.refresh, []string{""}) {
-		t.Errorf("refresh = %v, want [\"\"]", store.refresh)
+	// The spaced push path only: Refresh (unspaced, for a person waiting) is not
+	// part of the bridge's store interface.
+	if !slices.Equal(store.pushed, []string{"acme/app|feat/push"}) {
+		t.Errorf("pushed = %v, want [acme/app|feat/push]", store.pushed)
 	}
 }
 

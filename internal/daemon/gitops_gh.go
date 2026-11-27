@@ -15,15 +15,15 @@ import (
 // gitopsGitHubStore is the narrow slice of *gh.Store bridged into gitops.
 type gitopsGitHubStore interface {
 	CachedPullRequests() []gh.PullRequest
-	BranchPullRequests(ctx context.Context, slug, head string) (gh.BranchPullRequests, error)
-	Refresh(ctx context.Context, slug string) error
+	BranchPushed(ctx context.Context, slug, head string) error
 }
 
 var _ gitopsGitHubStore = (*gh.Store)(nil)
 
 // gitopsGitHubBridge connects gitops to gh.Store without coupling the two store packages:
 // OpenPR reads cached open pull requests directly in memory, and Push / CreatePR watch
-// the branch and trigger an immediate poll so PR panels and checks update right away.
+// the branch and ask for a poll (spaced, gh.Store.BranchPushed) so PR panels and checks
+// update right away.
 type gitopsGitHubBridge struct {
 	gh  gitopsGitHubStore
 	log *slog.Logger
@@ -69,17 +69,14 @@ func (b *gitopsGitHubBridge) OpenBranchPR(slug, branch string) (string, int, boo
 	return best.URL, best.Number, true
 }
 
-// NotifyBranchChanged implements gitops.GitHub. It registers the branch watch and marks
-// the GitHub poll due immediately (non-blocking) so newly pushed commits and newly
-// created pull requests appear without waiting for the regular poll interval.
+// NotifyBranchChanged implements gitops.GitHub. It registers the branch watch and asks
+// for a GitHub poll (non-blocking) so newly pushed commits and newly created pull
+// requests appear without waiting for the regular poll interval: at once after a quiet
+// stretch, spaced when many pushes come together (gh.Store.BranchPushed). It does not
+// use Refresh, which is unspaced and kept for what a person waits on.
 func (b *gitopsGitHubBridge) NotifyBranchChanged(ctx context.Context, slug, branch string) {
-	if slug != "" && branch != "" {
-		if _, err := b.gh.BranchPullRequests(ctx, slug, branch); err != nil && ctx.Err() == nil {
-			b.log.Debug("gitops: watch branch pull requests", "slug", slug, "branch", branch, "err", err)
-		}
-	}
-	if err := b.gh.Refresh(ctx, ""); err != nil && ctx.Err() == nil {
-		b.log.Debug("gitops: trigger github refresh", "slug", slug, "branch", branch, "err", err)
+	if err := b.gh.BranchPushed(ctx, slug, branch); err != nil && ctx.Err() == nil {
+		b.log.Debug("gitops: notify github of push", "slug", slug, "branch", branch, "err", err)
 	}
 }
 
